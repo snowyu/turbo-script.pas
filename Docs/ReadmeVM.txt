@@ -7,6 +7,7 @@
   Chinese 
     抽象虚拟机处理器抽象类
     拥有一个IR(instruction register)指令寄存器, 一个SP堆栈指针寄存器, 一个BP堆栈基址指针寄存器, 一个PC程序指针寄存器，一个状态寄存器.
+    指令存储器部分：在这里存放等待执行的指令序列，采用单向链表的形式。
     可以执行Execute和停止(Stop)。
   TODO
     是否需要加入调试功能？
@@ -31,13 +32,32 @@ TForthProcessor = Class(TStackProcessor)
 
 数据说明:
 虚拟机处理的数据区:
- 1. 程序数据区
+ 1. 程序数据区（指令存储器）
    首先，我要将指令按长度分为：
      1.简单指令: 没有任何参数的指令
      2.单参数指令: 带一个参数的指令
 
+   TVMCode = record
+     opCode      : TInstruction;
+     vInteger    : integer;         // the first integer parameter
+     vInteger1   : integer;         // the second integer parameter
+     Next        : pSimplifiedCode; // Next instruction pointer
+     ExecCode    : TGenericProc;    // instruction method
+     vString     : string;          // the string parameter: element name
+     vDebugInfo  : integer;         // the debug information: source code position
+     // Extra parameters
+     case byte of
+        0: ( vDouble:double );               // 1 double parameter
+        1: ( vProc:TGenericProc );           // 1 method parameter
+        2: ( vInteger2,vInteger3:integer );  // 2 additional integer parameters
+   end;
    TProgramDataArea = array of TVMCode
    
+分析一个简单的指令流程： “2 3 +”，编译后生成如下的指令流：
+  opPush 2, opPush 3, opAdd
+使用 fixed length VMCode:
+
+
  2. 返回堆栈区
  3. 变量数据区
  4. 内部程序区(Procs): 就是那些固定的机器指令代码/
