@@ -20,12 +20,12 @@ type
   TInstruction = (
     inPrepare,
     {## Arithmatic instuctions }
-    inAdd,
-    inSub,
-    inInc,
-    inDec,
-    inMUL,
-    inDIV,
+    inAdd, //Add
+    inSub, //subtract
+    inInc, //add 1
+    inDec, //subtract 1
+    inMUL, //multiply 
+    inDIV, //divide
 
     {## Logical instuctions }
     inEQU,
@@ -52,6 +52,8 @@ type
     inNoop,
 
     {## Stack Operation Instuction }
+    inPush,
+    inPop,
     inDrop,
     inDUP,
     inSWAP,
@@ -61,13 +63,18 @@ type
   
 type
   TCustomProcessor = class (TObject)
+  private
+    FMemorySize: Integer;
+    FStackSize: Integer;
+    procedure SetMemorySize(Value: Integer);
+    procedure SetStackSize(Value: Integer);
   protected
     FIR: TInstruction;
     FMemory: TMemoryArray;
     FPC: Integer;
     FSP: Integer;
     FStatus: TProcessorStates;
-    ProcStack: TStack;
+    Stack: TStack;
   public
     procedure Execute; virtual; abstract;
     procedure LoadFromFile(const aFileName: String);
@@ -76,8 +83,10 @@ type
     procedure SaveToStream(const aStream: TStream); virtual; abstract;
     procedure Stop; virtual; abstract;
     property IR: TInstruction read FIR;
+    property MemorySize: Integer read FMemorySize write SetMemorySize;
     property PC: Integer read FPC write FPC;
     property SP: Integer read FSP write FSP;
+    property StackSize: Integer read FStackSize write SetStackSize;
     property Status: TProcessorStates read FStatus;
   end;
   
@@ -114,6 +123,24 @@ begin
     SaveToStream(aFileStream);
   finally
     aFileStream.Free;
+  end;
+end;
+
+procedure TCustomProcessor.SetMemorySize(Value: Integer);
+begin
+  if FMemorySize <> Value then
+  begin
+    FMemorySize := Value;
+    SetLength(FMemory, FMemorySize);
+  end;
+end;
+
+procedure TCustomProcessor.SetStackSize(Value: Integer);
+begin
+  if FStackSize <> Value then
+  begin
+    FStackSize := Value;
+    SetLength(FStack, FStackSize);
   end;
 end;
 
