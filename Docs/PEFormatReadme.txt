@@ -11,3 +11,21 @@ Portable Executable File Format
 = SuperPEFormat V 1.0 =
 我定义的 SuperPEFormat V1.0 ，是采用一Section（各种Section在文件中最多存在一个）存在机制。
 类型分为：可执行文件，和库文件，库文件还可以细分为（DLL库，多国字符串资源库）。
+
+== 文件头格式 ==
+定义文件的Magic Flag，以及文件类型。无论哪一种类型的SuperPE文件都必须有的。
+SuperPEFormat文件的首字节总是: 'SuperPEF'，然后紧接着是一个DWORD的文件版本号。
+再接着为文件类型word: stExe, stLib, stRes
+接着为子类型也是一个word. eg, 对于Lib有: ForthLib, StdLib. 对于stRes 资源库则是语言的代号。
+
+== 可执行文件 ==
+
+=== 代码段(必须) ===
+
+=== Import段(可选) ===
+
+=== 地址重定向表(可选) ===
+
+=== Export段(可选) ===
+
+=== 数据段(可选) ===
