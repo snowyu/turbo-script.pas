@@ -5,7 +5,7 @@
 两大模块：编译器模块，执行器模块
 
 编译器模块
-抽象层: uSuperCompiler.pas
+抽象层: uSuperCompiler.pas(CustomSuperCompiler, CustomSuperScriptModule)
 使用层: SuperForthCompiler.pas, SuperPascalCompiler.pas
 扩展层: 
 
@@ -28,11 +28,18 @@
 
 注意：根据俺正在学习的PE格式，也许应该将其组织成Section，Section的用涂由其属性决定。
 
+这个Section应该称之为模块吧：TSuperScriptModule, 模块只应该在编译期存在。Section应该是比较简单的格式，这样运行效率才高。
 
 ForthDLL：与DLL类似，不过里面的代码不是机器码，而是Forth的VM码。
 
 
 类的说明:
+
+{ Summary the module for the SuperScript.}
+TCustomSuperScriptModule = Class
+protected
+pubic
+end;
 
 { Summary The Abstract Portable Executable File Format Helper Class }
 { Description 
