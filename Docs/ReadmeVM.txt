@@ -1,5 +1,7 @@
 我的虚拟机(Virtual Machine)说明：
 
+类的说明:
+
 { Summary : The Abstract Virtual Machine Processor }
 { Description :
   Chinese 
@@ -26,3 +28,18 @@ end;
     基于堆栈的Forth虚拟机处理器
 }
 TForthProcessor = Class(TStackProcessor)
+
+数据说明:
+虚拟机处理的数据区:
+ 1. 程序数据区
+   首先，我要将指令按长度分为：
+     1.简单指令: 没有任何参数的指令
+     2.单参数指令: 带一个参数的指令
+
+   TProgramDataArea = array of TVMCode
+   
+ 2. 返回堆栈区
+ 3. 变量数据区
+
+FORTH虚拟机处理的数据区除了上述的数据区外:
+ 4. 数据堆栈区

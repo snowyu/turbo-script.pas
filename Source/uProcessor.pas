@@ -60,6 +60,14 @@ type
     inOVER,
     inROT
   ); 
+  { Summary : The Virtual Machine Code }
+  { Description:
+    虚拟机机器码: 采用1参数码 
+  }
+  TVMCode = Record
+    OpCode: TInstruction;
+    OpParam: Integer;
+  end;
   
 type
   TCustomProcessor = class (TObject)
