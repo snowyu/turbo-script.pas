@@ -1,0 +1,36 @@
+TCustomScriptExecutor which can execute the script from stream or file. but we msut relocate the address before execute 
+
+动态生成机器码执行脚本的分析
+
+    PExecutedCodeIndex :integer;       //当前插入机器指令位置，编译时刻需要
+    //以下是需要保存在可执行文件中的内容，类似于PE格式。
+    ExecutedCodes  :array of byte; //编译以后的执行码（被放入堆heap中,也就是说在堆中的数据可以被执行.）
+    InternalProcTable: array of pointer; //所使用的内部过程表
+    DLLTable: array of string; //所使用的静态DLL表
+    DLLProcTable: array of pointer; //所使用的静态DLL过程表
+
+
+在从文件中重新装入执行码后,需要解决地址重定位问题: TCustomAddressFormatRelocator -> TForthFormatRelocator(我自己定义的格式), TPEFormatRelocator(PE格式的文件地址重定位)
+  TRelatedProcAddress = packed record
+    AddressIndex: integer; //需要修改的执行码地址索引号 ExecutedCodes[AddressIndex]
+    ProcIndex: Integer; //原始的过程index No.
+  end;
+函数过程的重定位包括：
+  1.Main主程序过程的函数或变量（在脚本外的）
+    FInternalProcAddress: array of TRelatedProcAddress;
+  2.DLL静态过程函数的地址重定向
+    FDLLProcAddress: array of TRelatedProcAddress;
+采用类似PE方式实现：1、按索引号访问；2、按函数名称访问。
+TNameString = array [0..31] of char;
+TImportModule = packed record
+  Name: TNameString; //主程序模块的名称: "__Main"
+  ModuleType: Integer; //1=程序模块；0=DLL模块
+  //Functions: TFunctions; //使用该模块的函数
+end;
+
+TFunction = packed record
+  Index: integer; //可以将index的最高位(最高位为1是索引号;也就是是负数的时候)当作判断是否为索引号访问!
+  if Index > 0 then
+    Name: array [0..index] of char;
+  VirtualAddress: array of TVirtualAddress; //all the function ref addresses in the script; 该函数在脚本中全部的引用地址列表。
+end;

@@ -1,0 +1,71 @@
+2005-1-12
+Flowchart:
+  Executor.LoadFromStream
+    aFormator := GetPEFormat()
+    if Assigned(aFormator) then
+    else raise ESuperExecutor.Create(RSInvalidPEFormat);
+2004-12-23
+1、定义PE文件头格式
+  定义类的方法属性
+  俺的PE文件映像定义
+  也许考虑定义模块: 代码，数据集合。
+2、定义执行器类方法属性
+3、定义编译器类方法属性
+
+19:33 2004-12-14
+任务计划：
+1、VM运行器: 装入VM码，将VM码变成机器码直接运行。这样翻译一下就解决了代码重定向问题。
+定义数据区域（区域划分）：
+  代码区 CodeArea : 存放运行代码。
+  数据区 DataArea : 存放全局变量。
+
+  返回栈 ReturnStack: 就是用系统栈
+  数据栈 DataStack: Intel CPU 上无数据栈,只有模拟？将寄存器串起来作为数据栈？
+    EAX  : 1 POP Stack
+    EDX  : 2
+    ECX  : 3
+    //EBX  : 4 注： EBX 是Delphi保留。
+    决定,栈顶由最常用的三寄存器: EAX, EDX, ECX构成，然后其他数据放入系统栈！如果其他数据放入数据栈，有可能会破坏返回栈数据，如何保护？！
+    算了，还是单独开辟一个数据区作为数据堆栈。备份EBX，然后将EBX作为数据堆栈指针。EBX=0 栈底
+    可以同返回栈共用，不过ESP的入栈是减少一直到0，而数据栈EBX指针是增加一直到EBP（其实如果碰到ESP就不能再增加了！同样ESP如果碰到EBX那么也就不能再减少）。
+
+定义实现的基本指令集:
+    inAdd, //Add(n1+n2=n) n1 n2 -- n
+    inSub, //subtract(n1-n2=n) n1 n2 -- n
+    inInc, //add 1(n1+1=n) n1 1 -- n
+    inDec, //subtract 1
+    inMUL, //multiply (n1*n2=n) n1 n2 -- n
+    inDIV, //divide(n1/n2=n) n1 n2 -- n
+
+    {## Logical instuctions }
+    inEQU, //equ(Result := n1=n2) n1 n2 -- T/F
+    inNEQ, // not equ
+    inLES, //less than
+    inLEQ, //less than and equ
+    inGET, //greater than
+    inGEQ, //greater than and equ
+    inNOT, //Negate(NOT)
+    inAND,
+    inOR,
+    inXOR,
+
+    {## Memory Operation Instruction }
+    inSetValue,
+    inGetValue,
+    
+    {## Proc Operation Instruction }
+    inJMP,
+    inJZ,
+    inJNZ,
+    inCall,
+    inReturn,
+    inNoop,
+
+    {## Stack Operation Instuction }
+    inPush,
+    inPop,
+    inDrop,
+    inDUP,
+    inSWAP,
+    inOVER,
+    inROT

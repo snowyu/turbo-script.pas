@@ -1,6 +1,47 @@
 我的虚拟机(Virtual Machine)说明：
 
+我将它命名为： SuperScriptEngine. 首先由编译模块将程序全部翻译成Forth虚拟机器码,再由执行器将虚拟机器码翻译成不同平台的执行码..
+
+两大模块：编译器模块，执行器模块
+
+编译器模块
+抽象层: uSuperCompiler.pas
+使用层: SuperForthCompiler.pas, SuperPascalCompiler.pas
+扩展层: 
+
+执行器模块
+抽象层: uSuperExecutor.pas(include abstract PEFormat, executor and debugger classes)
+使用层: SuperX86Executor.pas; SuperZ80Executor.pas, SuperJavaVMExecutor.pas
+扩展层: 如, SuperInterpreter.pas; SuperDebugger.pas;  
+
+执行器中只包括Codes, ImportModules(自己提供给脚本使用的以及通过LoadLibrary装入的), Resource, 其它信息(ImportTable)只在PEFormat中存在。
+
+文件支持层: uSuperPEFormat.pas(俺的格式); uSuperWin32PEFormat(windows32的PE格式);
+编译后的可执行文件格式, PE: Portable Executable File Format 
+功能：根据格式，装入Import表中的模块(DLL或ForthDLL模块)，重定位地址，以及管理RES资源。以及需要重新计算的绝对地址，relocation表。
+1、Import表(if any)
+2、Export表(if any)
+3、Relocation表(if any)：分为代码重定位表和数据重定位表。
+4、Resource表(if any)
+5、Code段表(if any)
+7、symbol符号表(if any)用于调试
+
+注意：根据俺正在学习的PE格式，也许应该将其组织成Section，Section的用涂由其属性决定。
+
+
+ForthDLL：与DLL类似，不过里面的代码不是机器码，而是Forth的VM码。
+
+
 类的说明:
+
+{ Summary The Abstract Portable Executable File Format Helper Class }
+{ Description 
+  Load the Executable File from the stream/file.
+  See Also GSuperPEFormatFactory
+}
+TCustomSuperPEFormat = Class
+
+end;
 
 { Summary : The Abstract Virtual Machine Processor }
 { Description :
@@ -12,7 +53,7 @@
   TODO
     是否需要加入调试功能？
 }
-TCustomProcessor = Class
+TCustomVMProcessor = Class
 end;
 
 { Summary : the Abstract stack-oriented Virtual Machine processor }
@@ -20,7 +61,7 @@ end;
   Chinese 
     基于堆栈虚拟机处理器抽象类
 }
-TStackProcessor = Class(TCustomProcessor)
+TStackVMProcessor = Class(TCustomVMProcessor)
 end;
 
 { Summary : the Forth Virtual Machine processor }
@@ -28,7 +69,56 @@ end;
   Chinese 
     基于堆栈的Forth虚拟机处理器
 }
-TForthProcessor = Class(TStackProcessor)
+TForthVMProcessor = Class(TStackVMProcessor)
+
+{ Summary 抽象的编译器for Forth Language}
+TCustomCompiler = Class
+
+{ Summary 抽象的脚本执行器 for Forth Language}
+{ Description
+  1、加载，根据文件头映像格式，加载模块和重定位地址。
+  2、翻译，翻译成本地机器码
+  3、执行脚本。
+}
+  TCustomScriptExecutor = Class
+  private
+  // 代码区 CodeArea : 存放运行代码。
+    FCodeArea: array of byte;
+  // 数据区 DataArea : 存放全局变量。
+    FDataArea: array of byte;
+  // 返回栈： 运行前，保存栈指针信息，然后将系统栈指针指向该FReturnStack。 ESP := @FReturnStack[0] + Length(FReturnStack) - 1; EBP := ESP;
+  // 
+    FReturnStack: array of byte;
+  // 数据栈
+    FDataStack: array of byte;
+  // 主程序的函数地址
+    FFunctions: array of TFunctionRec;
+    FVariables: array of TVariableRec;
+
+  protected
+    function InternalExecute: Integer;virtual;
+
+  public
+  //注册主程序的函数变量到执行器中
+    procedure AddFunction(AName:string; aProc:Pointer);
+    procedure AddVariable(AName:string; aVar:Pointer);
+
+    function Execute: Integer;
+
+    function LoadFromStream(const ResolveAddressReq: Boolean=True): Integer;virutal;
+    function LoadFromFile(const ResolveAddressReq: Boolean=True): Integer;
+  end;
+
+TFunctionProc = Function():Integer;
+
+{ Summary Intel x86 CPU 的执行器}
+  TIntelx86Executor = Class(TCustomScriptExecutor)
+  private
+    // 编译后才能调用
+    FDoExecute: TFunctionProc;
+
+
+  end;
 
 数据说明:
 虚拟机处理的数据区:
