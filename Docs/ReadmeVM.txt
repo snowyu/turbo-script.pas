@@ -40,6 +40,7 @@ TForthProcessor = Class(TStackProcessor)
    
  2. 返回堆栈区
  3. 变量数据区
+ 4. 内部程序区(Procs): 就是那些固定的机器指令代码/
 
 FORTH虚拟机处理的数据区除了上述的数据区外:
  4. 数据堆栈区
