@@ -26,7 +26,7 @@
 5、Code段表(if any)
 7、symbol符号表(if any)用于调试
 
-注意：根据俺正在学习的PE格式，也许应该将其组织成Section，Section的用涂由其属性决定。
+注意：根据俺正在学习的PE格式，也许应该将其组织成Section，Section的用涂由其属性决定。具体格式参见ExeCompile.txt。
 
 这个Section应该称之为模块吧：TSuperScriptModule, 模块只应该在编译期存在。Section应该是比较简单的格式，这样运行效率才高。
 

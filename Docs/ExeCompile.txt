@@ -23,7 +23,7 @@ TCustomScriptExecutor which can execute the script from stream or file. but we m
 采用类似PE方式实现：1、按索引号访问；2、按函数名称访问。
 TNameString = array [0..31] of char;
 TImportModule = packed record
-  Name: TNameString; //主程序模块的名称: "__Main"
+  Name: TNameString; //外部主程序模块（Delphi编译生成的）的名称: "__Main"
   ModuleType: Integer; //1=程序模块；0=DLL模块
   //Functions: TFunctions; //使用该模块的函数
 end;
