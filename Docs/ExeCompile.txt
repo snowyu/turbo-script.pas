@@ -34,3 +34,365 @@ TFunction = packed record
     Name: array [0..index] of char;
   VirtualAddress: array of TVirtualAddress; //all the function ref addresses in the script; 该函数在脚本中全部的引用地址列表。
 end;
+
+
+
+__________________________________________________________
+函数调用约定解析
+HouSisong@263.net  2004.11.07整理
+
+文章来源于abp论坛中的一篇帖子:http://bbs.allaboutprogram.com/viewtopic.php?t=1245
+（原文章写于2003.12.01，这里补充了函数返回值传递方式的说明）
+
+ 
+前言：
+文章讲述了几种主要程序语言中的函数调用约定；详细说明时主要以VC6中的函数调用约定为主,阐释方式主要是以C++程序编译后得到的汇编代码来进行说明;
+
+ 我所使用的编译器和平台：WindowsXP + 赛扬1G + VC6(主要工具)\Delphi6\C++Builder6;
+
+
+一：函数调用约定;
+    函数调用约定是函数调用者和被调用的函数体之间关于参数传递、返回值传递、堆栈清除、寄存器使用的一种约定;
+    它是需要二进制级别兼容的强约定,函数调用者和函数体如果使用不同的调用约定,将可能造成程序执行错误,必须把它看作是函数声明的一部分;
+
+二：常见的函数调用约定;
+
+VC6中的函数调用约定;
+
+
+        调用约定        堆栈清除    参数传递
+        __cdecl         调用者      从右到左,通过堆栈传递
+        __stdcall       函数体      从右到左,通过堆栈传递
+        __fastcall      函数体      从右到左,优先使用寄存器(ECX,EDX),然后使用堆栈
+        thiscall        函数体      this指针默认通过ECX传递,其它参数从右到左入栈
+
+
+__cdecl是C\C++的默认调用约定; VC的调用约定中并没有thiscall这个关键字,它是类成员函数默认调用约定;
+C\C++中的main(或wmain)函数的调用约定必须是__cdecl,不允许更改;
+默认调用约定一般能够通过编译器设置进行更改,如果你的代码依赖于调用约定,请明确指出需要使用的调用约定;
+
+
+Delphi6中的函数调用约定;
+
+
+        调用约定        堆栈清除    参数传递
+        register        函数体      从左到右,优先使用寄存器(EAX,EDX,ECX),然后使用堆栈
+        pascal          函数体      从左到右,通过堆栈传递
+        cdecl           调用者      从右到左,通过堆栈传递(与C\C++默认调用约定兼容)
+        stdcall         函数体      从右到左,通过堆栈传递(与VC中的__stdcall兼容)
+        safecall        函数体      从右到左,通过堆栈传递(同stdcall)
+
+Delphi中的默认调用约定是register,它也是我认为最有效率的一种调用方式,而cdecl是我认为综合效率最差的一种调用方式;
+VC中的__fastcall调用约定一般比register效率稍差一些;
+
+C++Builder6中的函数调用约定;
+
+
+        调用约定        堆栈清除    参数传递
+        __fastcall      函数体      从左到右,优先使用寄存器(EAX,EDX,ECX),然后使用堆栈 (兼容Delphi的register)
+        (register与__fastcall等同)
+        __pascal        函数体      从左到右,通过堆栈传递
+        __cdecl         调用者      从右到左,通过堆栈传递(与C\C++默认调用约定兼容)
+        __stdcall       函数体      从右到左,通过堆栈传递(与VC中的__stdcall兼容)
+        __msfastcall    函数体      从右到左,优先使用寄存器(ECX,EDX),然后使用堆栈(兼容VC的__fastcall)
+
+ 
+
+常见的函数调用约定中,只有cdecl约定需要调用者来清除堆栈;
+C\C++中的函数支持参数数目不定的参数列表,比如printf函数;由于函数体不知道调用者在堆栈中压入了多少参数,
+所以函数体不能方便的知道应该怎样清除堆栈,那么最好的办法就是把清除堆栈的责任交给调用者;
+这应该就是cdecl调用约定存在的原因吧;
+
+VB一般使用的是stdcall调用约定;(ps：有更强的保证吗)
+Windows的API中,一般使用的是stdcall约定;(ps: 有更强的保证吗)
+建议在不同语言间的调用中(如DLL)最好采用stdcall调用约定,因为它在语言间兼容性支持最好;
+
+三:函数返回值传递方式
+   其实，返回值的传递从处理上也可以想象为函数调用的一个out形参数； 函数返回值传递方式也是函数调用约定的一部分；
+   有返回值的函数返回时：一般int、指针等32bit数据值(包括32bit结构)通过eax传递，(bool,char通过al传递，short通过 ax传递),特别的__int64等64bit结构(struct) 通过edx,eax两个寄存器来传递(同理：32bit整形在16bit环境中通过dx,ax传递); 其他大小的结构(struct)返回时把其地址通过eax返回；(所以返回值类型不是1,2,4,8byte时，效率可能比较差)
+   参数和返回值传递中，引用方式的类型可以看作与传递指针方式相同；
+   float\double(包括Delphi中的extended)都是通过浮点寄存器st(0)返回；
+
+
+四：通过VC中的C++例子和产生出的汇编清单来对函数调用约定进行说明;
+
+(ps:后面虽然列出了很多汇编,但是我做了很详细的注释,我希望那些对汇编感到“恐惧”的人
+也能顺利的阅读; 并为那些想在VC中使用汇编的人提供一些帮助
+
+A:
+测试代码：
+
+
+int x;
+int __cdecl add(int a,int b) { return a+b; }//使用__cdecl调用约定
+int main(int argc, char* argv[])
+{
+    x=add(1,2);
+    return 0;
+}
+
+ 
+
+; Debug模式编译后得到的汇编代码
+
+
+PUBLIC      ?x@@3HA                    ; x
+_BSS        SEGMENT
+?x@@3HA     DD        01H DUP (?)      ; x变量
+_BSS        ENDS
+PUBLIC      ?add@@YAHHH@Z              ; add
+PUBLIC      _main
+EXTRN       __chkesp:NEAR
+;           COMDAT       _main
+_TEXT       SEGMENT
+
+_main       PROC NEAR                  ; COMDAT        //main函数体
+
+  push    ebp         ; //保存ebp的值到堆栈,退出函数前用pop ebp恢复
+  mov     ebp, esp    ; //ebp指向当前堆栈; 函数中可以通过ebp来进行堆栈访问
+  sub     esp, 64     ; //在堆栈中开辟64byte局部空间
+
+                      ; //说明：这三条汇编指令是很多函数体开始的惯用法;
+                      ; //用ebp指向堆栈(不会改变);并通过ebp来访问参数和局部变量;
+
+  push    ebx         ; //一般按照函数间调用的约定,函数中可以自由使用eax,ecx,edx;
+  push    esi         ; //其它寄存器如果需要使用则需要保存,用完时恢复；也就是寄存器的使用约定； 这也使函数调用约定的一部分；
+  push    edi         ; //即:在函数中调用了别的函数后,eax,ecx,edx很可能已经改变,
+                      ; //而其它寄存器(ebx,esi,edi,ebp)的值可以放心继续使用(esp除外)
+
+  lea    edi, DWORD PTR [ebp-64]
+  mov    ecx, 16                 ; 00000010H
+  mov    eax, -858993460         ; ccccccccH
+  rep stosd                      ; //前面开辟的(16*4)byte局部空间全部填充0xCC
+                                 ; //注意: 0xCC是调试中断(__asm int 3)的指令码,所以可以想象,当
+                                 ; //程序错误的跳转到这个区域进行执行时将产生调试中断
+
+  push   2                       ; //代码: x=add(1,2); 
+  push   1                       ; //从右到左入栈  (__cdecl调用约定!!!)
+  call   ?add@@YAHHH@Z           ; 调用add函数;call指令将把下一条指令的地址(返回地址)压入堆栈
+  add    esp, 8                  ; add函数调用完以后,调用者负责清理堆栈 (__cdecl调用约定!!!)
+                                 ; 两个int型参数共使用了8byte空间的堆栈
+  mov    DWORD PTR ?x@@3HA, eax  ; 将add函数的返回值存入x变量中,可以看出add函数的返回值放在eax中
+
+  xor    eax, eax      ; //原代码:return 0;   执行eax清零,main函数的返回值0放在eax中
+
+  pop    edi
+  pop    esi
+  pop    ebx           ; //恢复edi,esi,ebx寄存器
+  add    esp, 64       ; //恢复64byte局部空间
+  cmp    ebp, esp               
+  call    __chkesp     ; //到这里时应该ebp==esp, Debug版进行确认,如果不等,抛出异常等
+  mov    esp, ebp
+  pop    ebp           ; //恢复ebp寄存器
+  ret    0
+_main     ENDP
+_TEXT     ENDS
+
+;//下面是add函数的代码,就不用解释的像上面那么详细了
+
+
+;        COMDAT  ?add@@YAHHH@Z
+_TEXT            SEGMENT
+_a$ = 8                                ;//参数a相对于堆栈偏移8
+_b$ = 12                               ;//参数b相对于堆栈偏移12
+
+?add@@YAHHH@Z PROC NEAR                ; add, COMDAT        //add函数体
+
+  push        ebp
+  mov         ebp, esp
+  sub         esp, 64                  ; 00000040H
+  push        ebx
+  push        esi
+  push        edi
+  lea         edi, DWORD PTR [ebp-64]
+  mov         ecx, 16                  ; 00000010H
+  mov         eax, -858993460          ; ccccccccH
+  rep stosd
+
+  mov         eax, DWORD PTR _a$[ebp]  ;将参数a的值移动到eax
+  add         eax, DWORD PTR _b$[ebp]  ;将参数b的值累加到eax; 可以看出返回值通过eax返回
+
+  pop         edi
+  pop         esi
+  pop         ebx
+  mov         esp, ebp
+  pop         ebp
+  ret         0                     ; 函数体不管堆栈的参数清理 (__cdecl调用约定!!!)
+                                    ; ret指令将取出call指令压入的返回地址,并跳转过去继续执行
+
+?add@@YAHHH@Z ENDP                  ; add
+_TEXT        ENDS
+END
+
+; 再来看一下Release模式编译后得到的汇编代码
+; 可以看出,这比Debug模式少了很多的汇编指令,速度当然可能更快了;不再做详细说明了,请对照上面的解释
+
+
+PUBLIC        ?x@@3HA                   ; x
+_BSS          SEGMENT
+?x@@3HA       DD        01H DUP (?)     ; x
+_BSS          ENDS
+PUBLIC        ?add@@YAHHH@Z             ; add
+PUBLIC        _main
+;             COMDAT            _main
+_TEXT         SEGMENT
+
+_main         PROC NEAR                 ; COMDAT        //main函数体
+
+  push    2
+  push    1                       ; //从右到左入栈  (__cdecl调用约定!!!)
+  call    ?add@@YAHHH@Z           ; //调用add函数;
+  mov     DWORD PTR ?x@@3HA, eax  ; x
+  add     esp, 8                  ; //调用者负责清理堆栈 (__cdecl调用约定!!!)
+
+  xor     eax, eax
+  ret     0
+_main        ENDP
+_TEXT        ENDS
+
+;            COMDAT   ?add@@YAHHH@Z
+_TEXT        SEGMENT
+_a$ = 8
+_b$ = 12
+
+?add@@YAHHH@Z PROC NEAR            ; add, COMDAT        //add函数体
+
+  mov   eax, DWORD PTR _b$[esp-4]  ;将参数b的值移动到eax
+  mov   ecx, DWORD PTR _a$[esp-4]  ;将参数a的值移动到ecx
+  add   eax, ecx                   ;将ecx的值累加到eax; 返回值通过eax传递
+  ret   0                          ;函数体不管堆栈的参数清理 (__cdecl调用约定!!!)
+?add@@YAHHH@Z ENDP                 ; add
+_TEXT         ENDS
+END
+
+ 
+
+下面的分析中将只给出Release模式编译后的汇编代码
+
+B:
+声明add函数为__stdcall调用约定
+
+int x;
+int __stdcall add(int a,int b) { return a+b; }
+int main(int argc, char* argv[])
+{
+    x=add(1,2);
+    return 0;
+}
+
+
+;来看产生的汇编代码：
+
+ 
+
+; //main函数体
+  push    2
+  push    1                        ; //从右到左入栈
+  call    ?add@@YGHHH@Z            ; add
+  mov     DWORD PTR ?x@@3HA, eax   ; x
+  xor     eax, eax
+  ret     0
+
+; //add函数体
+  mov     eax, DWORD PTR _b$[esp-4]
+  mov     ecx, DWORD PTR _a$[esp-4]
+  add     eax, ecx
+  ret     8                        ; //函数体负责清栈 ;两个int型参数共使用了8byte空间的堆栈
+
+
+C:
+声明add函数为__fastcall调用约定
+
+int x;
+int __fastcall add(int a,int b) { return a+b; }
+int main(int argc, char* argv[])
+{
+    x=add(1,2);
+    return 0;
+}
+
+;来看产生的汇编代码：
+
+
+; //main函数体
+  mov    edx, 2                    ; b通过寄存器edx传递
+  mov    ecx, 1                    ; a通过寄存器ecx传递
+  call   ?add@@YIHHH@Z             ; add
+  mov    DWORD PTR ?x@@3HA, eax    ; x
+  xor    eax, eax
+  ret    0
+
+; //add函数体
+  lea    eax, DWORD PTR [ecx+edx]  ; //a,b参数值已经在ecx,edx中,该句将这两个值的和放到eax作为返回值;
+  ret    0                         ; //这里应该函数体负责清栈 ;但因为两个参数已经通过寄存器传递
+                                   ; //了,没有使用堆栈,所以ret 0;
+
+
+D:
+来看一下类的成员函数的调用：
+
+
+struct T
+{
+        int start0;
+        T():start0(1){}
+        int  add(int a,int b); //类成员函数;只要不明确声明调用约定则默认使用thiscall调用约定;
+};
+int  T::add(int a,int b) { return (*this).start0+a+b; }
+
+int x;
+int main(int argc, char* argv[])
+{
+        T t;
+        x=t.add(1,2);
+        return 0;
+}
+
+
+来看产生的汇编代码：
+
+
+; //main函数体
+  push    ecx                         ; //保存ecx
+  push    2
+  push    1                           ; //参数从右到左入栈
+  lea     ecx, DWORD PTR _t$[esp+12]  ; //t的地址保存到ecx
+  mov     DWORD PTR _t$[esp+12], 1    ; //执行t::start0=1;
+  call    ?add@T@@QAEHHH@Z            ; //调用T::add函数,这时ecx中存放了t的的地址(this指针);
+  mov     DWORD PTR ?x@@3HA, eax      ; x
+  xor     eax, eax
+  pop     ecx
+  ret     0
+
+; //T::add函数体
+  mov     eax, DWORD PTR [ecx]        ; //通过this指针(保存在ecx)将start0的值移动到eax
+  mov     ecx, DWORD PTR _a$[esp-4]   ; //把a的值移动到ecx; this的值将丢失,但函数体中已经不需要了
+  add     eax, ecx                    ; //将a的值累加到eax
+  mov     ecx, DWORD PTR _b$[esp-4]   ; //把b的值移动到ecx;
+  add     eax, ecx                    ; //将b的值累加到eax
+  ret     8                           ; //函数体负责清栈 ;
+
+
+五: 其他
+
+1.在VC中实现一个函数体时可以使用__declspec(naked)声明,它告诉编译器,不要为函数体自动产生开始和结束码;
+2.在VC6中,想得到汇编代码清单,设置方法为：
+
+引用:[Project]->[Setting...]->[C++]->[Category:]->[Listing Files]->[Listing file type:]->[Assembily ,...]
+
+3.VC6中嵌入汇编代码的方式为：
+
+            __asm { <汇编语句s> }
+         或 __asm <一条汇编语句>
+
+4.VC6中重新设定函数使用的默认调用约定的方法是：
+引用:
+在[Project]->[Setting...]->[C++]->[Project Options:]中增加编译设置
+比如：/Gd 代表__cdecl; /Gr 代表__fastcall; /Gz 代表__stdcall
+
+ 
+
+参考资料：
+MSDN:Calling Conventions;
+Delphi6\C++Builder6帮助;
+请用www.google.com和www.baidu.com搜索“调用约定”或“Calling Conventions”;
