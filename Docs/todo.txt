@@ -1,3 +1,39 @@
+2005-6-30
+我对FORTH的设想：
+几种执行机制都可采用，甚至可以包括Delphi Regiser, stdcall, fastcall等等这被称作调用方式。
+在连接后（正式发布五调试信息状态）消除名字信息（Published的除外），只包括使用到的过程。
+单词按照库名的方式分类组织。对单词的代码场的内容进行扩充。在调试状态下与原始的FORTH构架基本类似（统一用ITC机制执行）！
+不过单词的代码场的内容多了调用方式、指向一下个同名的CFA域、以及参数的说明。
+先实现类似解释性,然后在转向实现机器码.
+
+  完整的Forth缓存器有下列六个。
+  PSP:Parameter Stack(or data stack) Pointer
+  TOS:Top Of Stack
+  RSP:Return Stack Pointer
+  IP :Interpreter Pointer
+  UP :User Pointer
+  W  :Working register
+  另有其它缓存器，moving forth原文内称为X缓存器，亦有人用A(Addressing)缓存器。
+  以下描述各缓存器功能。
+  PSP,TOS：为数据堆栈相关缓存器，PSP为管理数据堆栈之指针器。
+    而TOS为数据堆栈顶端缓存器，主因为数据堆栈动作量大，但只有一个进出口。
+    若将顶端数据留在CPU之中，有加速数据处理的作用。
+  RSP：为程序呼叫之返回堆栈指针器。
+  IP ：执行Forth word用之地址缓存器，用以指向下次执行字为何，其运作和字典相关。
+  UP ：使用者管理用缓存器，为多任务管理用缓存器，指向task作用区。记录其Task相关信息。
+  W  ：辅助工作用缓存器，辅助字典动作或运算用。
+
+FORTH编译：就是插入代码流的过程。
+FORTH的执行：
+  初始化
+  根据不同的执行机制执行。我选ITC方式。
+
+注意：在我的虚拟机器中TOS实质上就是 ParameterStackSize.
+
+代码的在内存中的组织：
+
+|Address of CFA|Address of CFA|....|NEXT
+
 2005-6-16
 ！实现最简单的编译型的脚本执行器：
    只有全局变量，执行体（四则运算，赋值，显示）。
