@@ -1,3 +1,47 @@
+2005-7-2
+在ITC机制下，所有的单词内容都是地址(指向其他单词的CFA的地址)。所以必须有一个简单的解释器（其实称不上解释，因为它把适当的跳转指令早已嵌入到代码流中了“Enter, Exit, Next”）执行。
+通过CFA指向真实的机器执行码。
+只不过对于用户定义的单词（For all colon(冒号) definitions）中，它的入口单词总是"Enter",出口单词总是"Exit"。
+
+注意：
+  * Enter 又的FORTH上称作 DOCOL or DOCOLON。作用是保存当前IP，然后跳转到PFA中的下一个单词执行。
+  * Exit 在fig-Forth 中被称作 ;S。作用是恢复保存的IP，然后跳转回去。
+  * Next 无论用户单词或系统单词都有的,用在单词的最后.
+  * PFA:  Parameter Field address, 用户单词的定义体（单词内容）。
+
+Enter 的伪流程
+PUSH IP to Reutrun Stack
+IP + 2 -> IP
+ADD W, 3     //Parameter Field address -> W
+MOV IP, (W)  //the PFA's CFA -> IP
+NEXT
+
+Exit 的伪流程
+POP IP From RS
+NEXT
+
+NEXT 的伪流程
+JMP (IP)
+
+
+== 最重要 AND wonderful DOES> 语句 ==
+FORTH 单词定义的Body是由两部分构成的：CF(Code Field) and PF(Parameter Field).
+ * The Code Field is the "action" taken by this Forth word, and the Parameter Field is the data on which it acts.
+ * The Code Field is a subroutine call, and the Parameter Field is parameters that are included "in-line" after the call. (The assembly language programmer's view.)
+ * The Code Field is the single "method" for this "class" of words, and the Parameter Field contains the "instance variables" for this particular word. (The object-oriented programmer's view.) 
+
+Code Field过程总有一个参数——PF参数域的起始地址. CF过程用来解释PFA的内容，是单词，常量，变量，词汇表，等等。
+FORTH预定了以下几种Code Field过程。
+
+||    Code Field  || Parameter Field || 
+||    routine     || contents        ||                
+||    ENTER       || a high-level "thread" (series of addresses)  ||
+||    DOCON       || a constant value ||
+||    DOVAR       || a storage location for data  ||
+||    DOVOC       || vocabulary info (varies by implementation) ||
+
+通过DOES>语句，你也可以实现自己的Code Field过程。
+
 2005-7-1
 uForthCore_80386.pas
 包含纯汇编过程.如果公用堆栈,那么就不能调整堆栈的大小了.不过无所谓.就当是自举好了.而且这样可以直接使用Delphi的过程。
