@@ -1,3 +1,16 @@
+2005-7-4
+为了避免重新计算地址，全部采用相对偏移量！
+
+词汇的数据结构：
+Core 词汇: 虚拟机器码 （或者用汇编）实现的。必须的！
+System 词库： 以Core词汇为基础编写的，当然也可以用汇编实现，不过为了可移植性，最好两种实现方式都有。
+
+怎么组织Unit？
+增加一个Unit指针，类似于词汇指针CP, Context, Last, Current:
+
+称之为字典区(或词汇区),这是单独的一个空间区域，有别于代码区，由ALLOT分配空间。
+
+
 2005-7-2
 在ITC机制下，所有的单词内容都是地址(指向其他单词的CFA的地址)。所以必须有一个简单的解释器（其实称不上解释，因为它把适当的跳转指令早已嵌入到代码流中了“Enter, Exit, Next”）执行。
 通过CFA指向真实的机器执行码。
@@ -40,7 +53,8 @@ FORTH预定了以下几种Code Field过程。
 ||    DOVAR       || a storage location for data  ||
 ||    DOVOC       || vocabulary info (varies by implementation) ||
 
-通过DOES>语句，你也可以实现自己的Code Field过程。
+通过DOES>语句，可以实现自己的Code Field过程。这样我可以很容易的通过扩充Code Field过程实现对Delphi过程以及stdcall,fastcall等等过程的调用。
+
 
 2005-7-1
 uForthCore_80386.pas
