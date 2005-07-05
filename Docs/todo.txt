@@ -1,3 +1,33 @@
+2005-7-5
+字典区结构：
+1、字典索引区：包含的字典库
+  在文件中的组织:
+  LibNameLen: Byte;
+  LibName: array [0..LibNameLen-1] of char
+  LastWordOffset: Integer; //该库的最后一个单词的偏移量.
+
+  在内存中组织:
+  TForthLibs = array of TForthLib;
+  TForthLib = packed record
+    Name: ShortString;
+    Words: TForthWords;
+  end;
+  TForthWords = array of TForthWord;
+  PForthWord = ^ TForthWord;
+  TForthWord = packed record //ITC (Indirect Threaded Code)
+    PriorWord: PForthWord; //前一个单词 -1 means 为最前面。
+    Name: ShortString;
+    State: Word; //include Precedence bit(equals 1 for an IMMEDIATE word), Smudge bit(the 2nd bit used to prevent FIND from finding this word.)
+    CallStyle: Word;
+    ParameterFields: array of PForthWord; //the first PFA is CFA.
+  end;
+  放弃这样的内存组织，清晰倒是清晰，但是速度太慢！
+  还是采用分配一个固定大小的内存区域作为字典区。
+
+注：
+  1. 对于非汇编过程,该过程无论是否有参数或局部变量,都会有push EBP; MOV EBP, ESP的动作!
+     也就是说如果我想使用一般的过程,就不能将系统堆栈作为参数栈使用！
+
 2005-7-4
 为了避免重新计算地址，全部采用相对偏移量！
 
@@ -79,7 +109,10 @@ end {POP EBP; RET};//delphi 建立的代码
 堆栈中的第二个参数(就是参数表中倒数第二个参数ok): [EBP+$0C] 
 ：
 
-注: 如果是汇编方法,那么最后一个参数始终是该对象实例的地址(对于类方法而言则是该类的VMT表的地址)。
+注: 
+  1. 如果是汇编方法,那么最后一个参数始终是该对象实例的地址(对于类方法而言则是该类的VMT表的地址)。
+  2. 对于非汇编过程,该过程无论是否有参数或局部变量,都会有push EBP; MOV EBP, ESP的动作!也就是说如果我使用一般的过程,
+     就不能将系统堆栈作为参数栈使用！
 
 词汇的数据结构：
 Core 词汇: 虚拟机器码 （或者用汇编）实现的。必须的！
