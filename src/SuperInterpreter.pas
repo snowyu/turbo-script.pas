@@ -11,25 +11,34 @@ uses
 type
   TMemoryArray = array of byte;
   TStack = TMemoryArray;
+  TVMMethodList = array [TVMInstruction] of TMethod;
 
-  TForthLibs = array of TForthLib; 
+  //TForthLibs = array of TForthLib;
+  PForthLib = ^ TForthLib; 
   TForthLib = packed record
-    Name: string; //1 DWord(Pointer)
-    Words: TForthWords;
+    PriorLib: Integer; //PForthLib;
+    LastWord: Integer; //PForthWord; //前一个单词 0 means 为最前面。
+    NameLen: Byte;
+    //Name: array[0..NameLen] of char; //it's a PChar, the last char is #0
   end;
-  TForthWords = array of TForthWord;
+  //TForthWords = array of TForthWord;
   PForthWord = ^ TForthWord;
   TForthWord = packed record //ITC (Indirect Threaded Code)
-    //PriorWord: PForthWord; //前一个单词 -1 means 为最前面。
-    Name: String;
+    PriorWord: Integer; //PForthWord; //前一个单词 0 means 为最前面。
     Precedence: Byte; //优先级, 0=low, 1=high equals 1 for an IMMEDIATE word
     //1=True; 0=False; Smudge bit. used to prevent FIND from finding this word
     //this can be extent to private, protected, public, etc
     Visibility: Byte; 
     CallStyle: Byte;
     CodeFieldStyle: Byte;
-    CFA: Integer;
-    ParameterFields: array of Integer; //大多数情况下是PForthWord，但是少数情况下是数据或VM Codes
+    //其实就是直接指向的某个单词的PFA，不过那个单词的PFA就是直接执行的机器码而已。
+    CFA: LongWord;
+    //the Param Field Length 
+    ParamFieldLength: LongWord;
+    NameLen: Byte;
+    //Name: String; it's a PChar, the last char is #0
+    //the following is ParameterFields   
+    //ParameterFields: array of Integer; //大多数情况下是PForthWord，但是少数情况下是数据或VM Codes
   end;
   TProcessorState = (psRunning, psCompiling, psFinished, psNoData, psBadData, 
     psBadOp, psDivZero, psOverFlow);
@@ -38,14 +47,20 @@ type
   TSuperInterpreter = class(TCustomSuperExecutor)
   private
     FForthLibs: TForthLibs;
+    FMemorySize: Integer;
     FParameterStack: TStack;
     FParameterStackSize: Integer;
+    FPLibEntry: PForthLib;
     FPSP: Integer;
     FStackSize: Integer;
+    FUsedMemory: Integer;
+    procedure SetMemorySize(Value: Integer);
     procedure SetParameterStackSize(const Value: Integer);
     procedure SetStackSize(const Value: Integer);
   protected
+    FInternalProcList: TVMMethodList;
     FIR: TInstruction;
+    FMemory: TMemoryArray;
     FPC: Integer;
     FSP: Integer;
     FStatus: TProcessorStates;
@@ -56,17 +71,21 @@ type
     constructor Create;
     procedure ExecuteInstruction(const aInstruction: TInstruction); virtual;
     function GetWordCFA(const aWord: string): Integer; override;
+    procedure InitProcList;
     procedure LoadFromStream(const aStream: TStream); override;
     procedure SaveToStream(const aStream: TStream); override;
     property ForthLibs: TForthLibs read FForthLibs write FForthLibs;
     property IR: TInstruction read FIR;
+    property MemorySize: Integer read FMemorySize write SetMemorySize;
     property ParameterStackSize: Integer read FParameterStackSize write
             SetParameterStackSize;
     property PC: Integer read FPC write FPC;
+    property PLibEntry: PForthLib read FPLibEntry write FPLibEntry;
     property PSP: Integer read FPSP write FPSP;
     property SP: Integer read FSP write FSP;
     property StackSize: Integer read FStackSize write SetStackSize;
     property Status: TProcessorStates read FStatus;
+    property UsedMemory: Integer read FUsedMemory write FUsedMemory;
   end;
   
 
@@ -102,6 +121,12 @@ begin
   PC := 0;
   SP := StackSize;
   FPSP := FParameterStackSize;
+  SetLength(FMemory, 0);
+end;
+
+procedure TSuperInterpreter.InitProcList;
+begin
+  FInternalProcList[inAddInt] := iVMAddInt;
 end;
 
 procedure TSuperInterpreter.LoadFromStream(const aStream: TStream);
@@ -114,6 +139,7 @@ var
   LPriorWordEntry: LongWord;
 begin
   inherited LoadFromStream(aStream);
+  Init;
   with aStream do
   begin
     Read(LDumy, SizeOf(LDumy));
@@ -128,7 +154,16 @@ begin
       StackSize := LDumy;
     end;
   
-    SetLength(FForthLibs, Length(FForthLibs)+1);
+    UsedMemory := Size - Poision + Length(FMemory);
+    SetLength(FMemory, UsedMemory);
+    Read(@FMemory[0], Length(FMemory));
+    LDumy := PLongWord(@FMemory[0])^;
+    PLibEntry := PForthLib(@FMemory[LDumy]);
+    {
+      So the Memory Mirror is
+      Lib Entry: FMemory[0]
+    }
+    {//SetLength(FForthLibs, Length(FForthLibs)+1);
     //the Lib Entry
     Read(LDumy, SizeOf(LDumy));
     Seek(LDumy, soFromBeginning);
@@ -181,7 +216,7 @@ begin
         Seek(LPriorLibEntry, soFromBeginning);
       end;
     until LPriorLibEntry = 0;
-  
+  //}
   
   end;
 end;
@@ -189,6 +224,15 @@ end;
 procedure TSuperInterpreter.SaveToStream(const aStream: TStream);
 begin
   inherited SaveToStream(aStream);
+end;
+
+procedure TSuperInterpreter.SetMemorySize(Value: Integer);
+begin
+  if FMemorySize <> Value then
+  begin
+    FMemorySize := Value;
+    SetLength(FMemory, FMemorySize);
+  end;
 end;
 
 procedure TSuperInterpreter.SetParameterStackSize(const Value: Integer);

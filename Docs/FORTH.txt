@@ -86,7 +86,23 @@ Moving Forth为实现Forth的重要入门文章，实现上则为Camel Forth。
 可以参照各家Forth之实现方法，以了解Forth的核心运作。
 
 
+ Many systems support a variant of the word SAVE
+(or TURNKEY ) that saves the Forth dictionary
+in a file for subsequent running.
 
+On some systems, address relocation is not done
+during this process. In consequence of this,
+all ANS Forth programs that store absolute
+addresses of data structures into variables
+(and other data structures) must be rewritten.
+
+Note that we have an ANS Forth Program and
+an ANS Forth System, but the reason why the
+ANS Forth Program cannot run on the ANS Forth System
+is beyond the scope of the current standard:
+the word SAVE (whose use is inevitable for
+some kinds of applications) imposes significant
+Restrictions on Functionality.
 
 系统变量及指令
 
