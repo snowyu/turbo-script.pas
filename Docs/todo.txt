@@ -1,3 +1,68 @@
+2005-7-6
+我相通了，FORTH在内存中的组织，可以根据不同地点具体实现方式不同而不同。
+但是文件映像对于任何实现都必须是一样的！
+在文件中的组织：
+MagicWord: 'SUPER4TH'
+
+类型 TYPE(TSuperForthFileType): 是程序，还是库
+NAME：StrLen(Byte): string
+版本号：DWORD
+日期：DWORD(The Data field indicates the number of calendar days since the start of the calendar (the number of days since 1/1/0001 plus one).)
+如果是程序：
+  参数栈大小： DWORD，0表示默认。
+  返回栈大小： DWORD，0表示默认。未用，使用系统的返回栈。
+如果是库：
+  参数栈大小： DWORD，0表示默认。未用
+  返回栈大小： DWORD，0表示默认。未用，使用系统的返回栈。
+
+LibEntry: DWORD; 指向该程序或单元拥有的单词库入口
+  PriorLibEntry: DWORD(Pointer) 文件中的相对偏移量
+  LibNameLen: Byte
+  LibName: array [0..LibNameLen-1] of char
+  LastWord: DWORD(Pointer) //the last word. 因为它是一个只能向prior前移动的单向链表。
+
+单词链:
+    PriorWord: DWORD(Pointer); //前一个单词 -1 means 为最前面。文件中的相对偏移量
+    NameLen: Byte
+    Name: array [0..NameLen-1] of char
+    Precedence: Byte; //优先级, 0=low, 1=high equals 1 for an IMMEDIATE word
+    //1=True; 0=False; Smudge bit. used to prevent FIND from finding this word
+    //this can be extent to private, protected, public, etc
+    Visibility: Byte; 
+    CallStyle: Byte;
+    CodeFieldStyle: Byte;
+    CFA: DWORD //其实就是直接指向的某个单词的PFA，不过那个单词的PFA就是直接执行的机器码而已。
+    PFLen: DWORD
+    ParameterFields: array [0..PFLen-1] of integer(DWORD);
+
+以上为文件中的组织。
+_______________________________
+  在内存中组织:
+  TForthLib = packed record
+    Name: string; //1 DWord(Pointer)
+    PLastWord: PForthWord; //the last word. 因为它是一个只能向prior前移动的单向链表。
+  end;
+  //TForthWords = array of TForthWord;
+  PForthWord = ^ TForthWord;
+  TForthWord = packed record //ITC (Indirect Threaded Code)
+    PriorWord: PForthWord; //前一个单词 -1 means 为最前面。
+    Name: String;
+    Precedence: Byte; //优先级, 0=low, 1=high equals 1 for an IMMEDIATE word
+    //1=True; 0=False; Smudge bit. used to prevent FIND from finding this word
+    //this can be extent to private, protected, public, etc
+    Visibility: Byte; 
+    CallStyle: Byte;
+    CodeFieldStyle: Byte;
+    //ParameterFields: array of PForthWord; //the first PFA is CFA.
+  end;
+
+对于编译型FORTH，CFA需要特别关注。因为在原始的ITC运行模式中，CFA直接指向的是执行的机器码地址。
+而对于我的编译型FORTH，当加载已经编译的FORTH虚拟机后，如果CFA的执行码在Host中，那么就必须对该地址进行重定位。
+那么如何区分CFA（在Host or VM）？
+在FORTH Word 头结构中增加 CodeFieldStyle 属性：
+cfsHost: the CF is in Host, so the CFA is the index No for the Host. Must fix.
+cfsFORTH: the CF is in FORHT, so the CFA is the offset address of the FORTH, no need to fix.
+
 2005-7-5
 字典区结构：
 1、字典索引区：包含的字典库
@@ -9,20 +74,20 @@
   在内存中组织:
   TForthLibs = array of TForthLib;
   TForthLib = packed record
-    Name: ShortString;
+    Name: String[31]; //32 bytes
     Words: TForthWords;
   end;
   TForthWords = array of TForthWord;
   PForthWord = ^ TForthWord;
   TForthWord = packed record //ITC (Indirect Threaded Code)
     PriorWord: PForthWord; //前一个单词 -1 means 为最前面。
-    Name: ShortString;
+    Name: String[31]; //32 bytes
     State: Word; //include Precedence bit(equals 1 for an IMMEDIATE word), Smudge bit(the 2nd bit used to prevent FIND from finding this word.)
     CallStyle: Word;
     ParameterFields: array of PForthWord; //the first PFA is CFA.
   end;
   放弃这样的内存组织，清晰倒是清晰，但是速度太慢！
-  还是采用分配一个固定大小的内存区域作为字典区。
+  还是采用分配一个固定大小的内存区域作为字典区(统一放在Memory区)。
 
 注：
   1. 对于非汇编过程,该过程无论是否有参数或局部变量,都会有push EBP; MOV EBP, ESP的动作!

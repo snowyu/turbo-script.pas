@@ -6,7 +6,17 @@ uses
   SysUtils, Classes
   ;
 
+const
+  cFORTHHeaderMagicWord = 'SUPER4TH';
+  cDefaultStackSize = 127;
+  cDefaultParamStackSize = 127; 
+
+resourcestring
+  rsMissFileHeaderError = 'Error: The file header is missed';
+
 type
+  ESuperScriptError = class(Exception);
+  TSuperForthFileType = (ftProgram, ftLib);
   PByte = ^Byte;
   {: The Code(Word) Field }
   TCodeField = packed record

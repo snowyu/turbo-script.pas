@@ -36,12 +36,23 @@ type
   end;
   
   TCustomSuperExecutor = class(TObject)
+  private
+    FFileDate: LongWord;
+    FFileType: TSuperForthFileType;
+    FFileVersion: LongWord;
   protected
     function ExecuteCFA(const aCFA: Integer): Integer; virtual;
     procedure Init; virtual;
   public
     function ExecuteWord(const aWord: string): Integer;
     function GetWordCFA(const aWord: string): Integer; virtual;
+    procedure LoadFromFile(const aFileName: String);
+    procedure LoadFromStream(const aStream: TStream); virtual;
+    procedure SaveToFile(const aFile: String);
+    procedure SaveToStream(const aStream: TStream); virtual;
+    property FileDate: LongWord read FFileDate write FFileDate;
+    property FileType: TSuperForthFileType read FFileType write FFileType;
+    property FileVersion: LongWord read FFileVersion write FFileVersion;
   end;
   
 
@@ -75,6 +86,54 @@ procedure TCustomSuperExecutor.Init;
 begin
   //PC := 0;
   //SP := StackSize;
+end;
+
+procedure TCustomSuperExecutor.LoadFromFile(const aFileName: String);
+var
+  aFileStream: TFileStream;
+begin
+  aFileStream := TFileStream.Create(aFileName, fmOpenRead);
+  try
+    LoadFromStream(aFileStream);
+  finally
+    aFileStream.Free;
+  end;
+end;
+
+procedure TCustomSuperExecutor.LoadFromStream(const aStream: TStream);
+var
+  s: string;
+begin
+  SetLength(s, Length(cFORTHHeaderMagicWord));
+  with aStream do
+  begin
+    Read(@s[1], Length(cFORTHHeaderMagicWord));
+    if s <> cFORTHHeaderMagicWord then
+      Raise ESuperScriptError.Create(rsMissFileHeaderError);
+    Read(FFileType, SizeOf(FFileType)); //TODO: not used yet
+    Read(FFileVersion, SizeOf(FFileVersion));
+    Read(FFileDate, SizeOf(FFileDate));
+  end;
+end;
+
+procedure TCustomSuperExecutor.SaveToFile(const aFile: String);
+var
+  aFileStream: TFileStream;
+begin
+  aFileStream := TFileStream.Create(aFileName, mCreate);
+  try
+    SaveToStream(aFileStream);
+  finally
+    aFileStream.Free;
+  end;
+end;
+
+procedure TCustomSuperExecutor.SaveToStream(const aStream: TStream);
+begin
+  aStream.Write(@cFORTHHeaderMagicWord[1], Length(cFORTHHeaderMagicWord));
+  aStream.Write(FFileType, SizeOf(FFileType));
+  aStream.Write(FFileVersion, SizeOf(FFileVersion));
+  aStream.Write(FFileDate, SizeOf(FFileDate));
 end;
 
 
