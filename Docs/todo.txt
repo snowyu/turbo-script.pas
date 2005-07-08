@@ -1,3 +1,37 @@
+2005-7-7
+按照 delphi帮助所说，当重新分配的内存块很大，它将会移动该块的地址到能放下的地方！
+当移动后，除非是相对偏移量，否则字典中的CFA地址将全部出错！除非对绝对地址进行地址重定位。
+另外如果在运行状态，那么对于已经压入堆栈的绝对地址，也会出错。
+
+所以，必须将程序和数据分开才好，或者就只有采用固定大小的内存块。
+暂时采用固定内存块，因为它的单词都是PFA。当然需要在运行中动态添加单词的应用毕竟是少数。
+
+当然，如果所有的地址全部都是相对偏移量地址，那么就不会存在地址重定位。但是这样一来，速度
+必然会受一定的影响。
+
+在我的解释其实现中，堆栈的方向是向上递增的（压栈），它的栈顶指针总是指向未用的元素。
+并且使用的地址全部都是相对偏移量地址.
+
+解释器需要两个运行指针:
+1. IP 机器指令的运行指针
+2. PC FORTH的PFA解释运行指针
+
+type
+  TmMethod = procedure of object;
+procedure TForm1.Button1Click(Sender: TObject);
+var
+  aProc: procedure;
+  aT, aMethod: TmMethod;
+begin
+  //aProc := ;
+  aMethod := test;
+  aProc := TMethod(aMethod).Code;
+  //aMethod;
+  TMethod(aT).Code := @aProc;
+  TMethod(aT).Data := Self;
+  aT;
+end;
+
 2005-7-6
 如何Cast 数组中的元素：
 aLongWord := PLongWord(@Array[3])^
@@ -122,11 +156,21 @@ System 词库： 以Core词汇为基础编写的，当然也可以用汇编实现，不过为了可移植性，最
   * Next 无论用户单词或系统单词都有的,用在单词的最后.
   * PFA:  Parameter Field address, 用户单词的定义体（单词内容）。
 
+(IP) -> W  fetch memory pointed by IP into "W" register
+              ...W now holds address of the Code Field(CFA)
+
+IP+2 -> IP advance IP, just like a program counter
+              (assuming 2-byte addresses in the thread)
+(W) ->  X  fetch memory pointed by W into "X" register
+              ...X now holds address of the machine code 
+JMP (X)     jump to the address in the X register
+
 Enter 的伪流程
+(the address of the Forth word just entered is kept in W. SEE NEXT)
+
 PUSH IP to Reutrun Stack
-IP + 2 -> IP
 ADD W, 3     //Parameter Field address -> W
-MOV IP, (W)  //the PFA's CFA -> IP
+MOV IP, W
 NEXT
 
 Exit 的伪流程
@@ -134,8 +178,40 @@ POP IP From RS
 NEXT
 
 NEXT 的伪流程
-JMP (IP)
+(IP) -> W  fetch memory pointed by IP into "W" register
+              ...W now holds address of the Code Field(CFA)
+IP + 2 -> IP //(assuming 2-byte addresses in the thread)
+(W) -> X  // the machine code address of CFA in W
+JMP (X)
 
+关于8086的优化：
+   AX = W         DI = scratch
+   BX = TOS       SI = IP
+   CX = scratch   BP = RSP
+   DX = scratch   SP = PSP
+
+Enter:
+  XCHG SP,BP  //将系统堆栈指向FORTH返回栈, 注意，如果我系统堆栈作为返回栈该指令就不必!
+  PUSH SI     //将IP指针压入FORTH返回栈
+  XCHG SP, BP //还原, 注意，如果我系统堆栈作为返回栈该指令就不必!
+  ADD AX, 3   //Parameter Field address -> W 我觉得应该是加2才对!!! ADD AX, SizeOf(Pointer)
+  NEXT
+
+Exit:
+  XCHG SP,BP  //将系统堆栈指向FORTH返回栈, 注意，如果我系统堆栈作为返回栈该指令就不必!
+  POP SI     //将IP指针压入FORTH返回栈
+  XCHG SP, BP //还原, 注意，如果我系统堆栈作为返回栈该指令就不必!
+  NEXT
+
+Next:
+  ITC:
+    LODSW         // (SI) -> AX  means (IP) -> W, IP++
+    MOV CX, [AX]  // (W) -> X
+    JMP CX        // JMP (X)
+
+  DTC:
+    LODSW   // (SI) -> AX  means (IP) -> W, IP++
+    JMP AX  // JMP (W)
 
 == 最重要 AND wonderful DOES> 语句 ==
 FORTH 单词定义的Body是由两部分构成的：CF(Code Field) and PF(Parameter Field).

@@ -11,7 +11,8 @@ uses
 type
   TMemoryArray = array of byte;
   TStack = TMemoryArray;
-  TVMMethodList = array [TVMInstruction] of TMethod;
+  TForthMethod = procedure of object;
+  PPointer = ^ Pointer;
 
   //TForthLibs = array of TForthLib;
   PForthLib = ^ TForthLib; 
@@ -46,46 +47,59 @@ type
 
   TSuperInterpreter = class(TCustomSuperExecutor)
   private
-    FForthLibs: TForthLibs;
-    FMemorySize: Integer;
-    FParameterStack: TStack;
-    FParameterStackSize: Integer;
-    FPLibEntry: PForthLib;
-    FPSP: Integer;
-    FStackSize: Integer;
-    FUsedMemory: Integer;
+    FIP: Integer;
     procedure SetMemorySize(Value: Integer);
     procedure SetParameterStackSize(const Value: Integer);
     procedure SetStackSize(const Value: Integer);
   protected
+    FInstrunction: TForthMethod;
     FInternalProcList: TVMMethodList;
     FIR: TInstruction;
     FMemory: TMemoryArray;
-    FPC: Integer;
-    FSP: Integer;
+    FMemorySize: Integer;
+    FParameterStack: TStack;
+    FParameterStackSize: Integer;
+    FPC: Pointer;
+    FPC0: Pointer;
+    FPLibEntry: PForthLib;
+    FRP: Pointer;
+    FRP0: Pointer;
+    FSP: Pointer;
+    FSP0: Pointer;
+    FStackSize: Integer;
     FStatus: TProcessorStates;
+    FUsedMemory: Integer;
+    FWRegister: Integer;
     Stack: TStack;
     function ExecuteCFA(const aCFA: Integer): Integer; override;
     procedure Init; override;
+    procedure iVMEnter;
+    procedure iVMNext;
   public
     constructor Create;
-    procedure ExecuteInstruction(const aInstruction: TInstruction); virtual;
+    procedure ExecuteInstruction; overload;
+    procedure ExecuteInstruction(const aInstruction: TInstruction); overload;
     function GetWordCFA(const aWord: string): Integer; override;
     procedure InitProcList;
     procedure LoadFromStream(const aStream: TStream); override;
     procedure SaveToStream(const aStream: TStream); override;
-    property ForthLibs: TForthLibs read FForthLibs write FForthLibs;
+    property Instrunction: TForthMethod read FInstrunction;
+    property IP: Integer read FIP write FIP;
     property IR: TInstruction read FIR;
     property MemorySize: Integer read FMemorySize write SetMemorySize;
     property ParameterStackSize: Integer read FParameterStackSize write
             SetParameterStackSize;
-    property PC: Integer read FPC write FPC;
+    property PC: Pointer read FPC write FPC;
+    property PC0: Pointer read FPC0;
     property PLibEntry: PForthLib read FPLibEntry write FPLibEntry;
-    property PSP: Integer read FPSP write FPSP;
-    property SP: Integer read FSP write FSP;
+    property RP: Pointer read FRP write FRP;
+    property RP0: Pointer read FRP0;
+    property SP: Pointer read FSP write FSP;
+    property SP0: Pointer read FSP0;
     property StackSize: Integer read FStackSize write SetStackSize;
     property Status: TProcessorStates read FStatus;
     property UsedMemory: Integer read FUsedMemory write FUsedMemory;
+    property WRegister: Integer read FWRegister;
   end;
   
 
@@ -99,6 +113,7 @@ begin
   inherited Create;
   StackSize := cDefaultStackSize;
   ParameterStackSize := cDefaultParamStackSize;
+  TMethod(FInstrunction).Data := Self;
 end;
 
 function TSuperInterpreter.ExecuteCFA(const aCFA: Integer): Integer;
@@ -106,9 +121,19 @@ begin
   Result := inherited ExecuteCFA(aCFA);
 end;
 
+procedure TSuperInterpreter.ExecuteInstruction;
+begin
+  FIR := TVMInstruction(FMemory[IP]);
+  ExecuteInstruction(FIR);
+  Inc(FIP, SizeOf(TVMInstruction));
+end;
+
 procedure TSuperInterpreter.ExecuteInstruction(const aInstruction:
         TInstruction);
 begin
+  TMethod(FInstrunction).Code := FInternalProcList[aInstruction];
+  //Run the Instrunction
+  FInstrunction;
 end;
 
 function TSuperInterpreter.GetWordCFA(const aWord: string): Integer;
@@ -118,15 +143,47 @@ end;
 
 procedure TSuperInterpreter.Init;
 begin
-  PC := 0;
-  SP := StackSize;
-  FPSP := FParameterStackSize;
-  SetLength(FMemory, 0);
+  FPC := FPC0;
+  FRP := FRP0;
+  FSP := FSP0;
+  FIP := 0;
 end;
 
 procedure TSuperInterpreter.InitProcList;
 begin
-  FInternalProcList[inAddInt] := iVMAddInt;
+  FInternalProcList[inEnter] := @iVMEnter;
+  FInternalProcList[inNext] := @iVMNext;
+end;
+
+procedure TSuperInterpreter.iVMEnter;
+begin
+  //PUSH IP to Reutrun Stack
+  PPointer(SP)^ := PC;
+  Inc(SP, SizeOf(Pointer));
+  
+  Inc(FWRegister, SizeOf(Pointer));
+  
+  //FWRegister is related adrress
+  PC := @FWRegister + PC0;
+  
+  iVMNext;
+end;
+
+procedure TSuperInterpreter.iVMNext;
+begin
+  {(IP) -> W  fetch memory pointed by IP into "W" register
+                ...W now holds address of the Code Field(CFA)
+  IP + 2 -> IP //(assuming 2-byte addresses in the thread)
+  (W) -> X  // the machine code address of CFA in W
+  JMP (X)
+  }
+  
+  FWRegister := PInteger(PC)^;
+  Inc(PC, SizeOf(Pointer));
+  
+  //JMP (X)
+  FIP := FMemory[FWRegister];
+  ExecuteInstruction;
 end;
 
 procedure TSuperInterpreter.LoadFromStream(const aStream: TStream);
@@ -139,7 +196,7 @@ var
   LPriorWordEntry: LongWord;
 begin
   inherited LoadFromStream(aStream);
-  Init;
+  //Init;
   with aStream do
   begin
     Read(LDumy, SizeOf(LDumy));
@@ -155,7 +212,8 @@ begin
     end;
   
     UsedMemory := Size - Poision + Length(FMemory);
-    SetLength(FMemory, UsedMemory);
+    //SetLength(FMemory, UsedMemory + cDefaultFreeMemSize);
+    MemorySize := UsedMemory + cDefaultFreeMemSize;
     Read(@FMemory[0], Length(FMemory));
     LDumy := PLongWord(@FMemory[0])^;
     PLibEntry := PForthLib(@FMemory[LDumy]);
@@ -232,6 +290,13 @@ begin
   begin
     FMemorySize := Value;
     SetLength(FMemory, FMemorySize);
+    if (FPC >= FPC0) and (FPC0 <> @FMemory[0]) then
+    begin
+      //the Block has been moved a new address
+      // so, i've to update to the PC too.
+      FPC := (FPC - FPC0) + @FMemory[0];
+    end;
+    FPC0 := @FMemory[0];
   end;
 end;
 
@@ -241,6 +306,13 @@ begin
   begin
     FParameterStackSize := Value;
     SetLength(FParameterStack, FParameterStackSize);
+    if (FSP >= FSP0) and (FSP0 <> @FParameterStack[0]) then
+    begin
+      //the Block has been moved a new address
+      // so, i've to update to the PC too.
+      FSP := (FSP - FSP0) + @FParameterStack[0];
+    end;
+    FSP0 := @FParameterStack[0];
   end;
 end;
 
@@ -250,6 +322,13 @@ begin
   begin
     FStackSize := Value;
     SetLength(FStack, FStackSize);
+    if (FRP >= FRP0) and (FRP0 <> @FStack[0]) then
+    begin
+      //the Block has been moved a new address
+      // so, i've to update to the PC too.
+      FRP := (FRP - FRP0) + @FStack[0];
+    end;
+    FRP0 := @FStack[0];
   end;
 end;
 

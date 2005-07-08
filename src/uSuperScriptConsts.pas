@@ -10,6 +10,7 @@ const
   cFORTHHeaderMagicWord = 'SUPER4TH';
   cDefaultStackSize = 127;
   cDefaultParamStackSize = 127; 
+  cDefaultFreeMemSize = 1024 * 8; //the Free Memory 8kb
 
 resourcestring
   rsMissFileHeaderError = 'Error: The file header is missed';
@@ -24,9 +25,18 @@ type
     CallStyle: Byte;
     NextCFA: Pointer;
   end;
+
+  //the Core procedure List, maybe procedure or method.
+  TVMMethodList = array [TVMInstruction] of Pointer;
+
   { Summary the FORTH Virtual Mache Codes}
   TVMInstruction = (
-    {## Arithmatic instuctions }
+    {## The FORTH CORE instructions }
+    inEnter,
+    inExit,
+    inNext,
+    
+    {## Arithmatic instructions }
     {## for Integer}
     inAddInt, //Add
     inSubInt, //subtract
@@ -37,7 +47,7 @@ type
     inIncNInt, //add N
     inDecNInt, //subtract N
 
-    {## Logical instuctions }
+    {## Logical instructions }
     {## for Integer}
     inEQUInt,
     inNEQInt, // not equ
