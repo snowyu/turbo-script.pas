@@ -1,3 +1,26 @@
+2005-7-12
+~ 关于连接和调用其它的脚本中的单词的问题。
+
+调用的单元中必须对其进行说明：
+ImportWord WordName LibName
+
+放弃在一个程序（单元）中使用多个库多单词的结构。
+在我的FORTH中对程序和单元不加区分，以后就统称为
+单元，如果在单元中存在Main的单词，那么调用没指定
+Word的Execute,就会执行Main这个单词。
+
+只有保存到文件中才存在:MagicWord, UnitName
+在流中不存在(为了方便我将VMCode直接写入数据库)
+
+对于非本单元的词的分类：
+Forth 词汇
+Delphi
+DLL
+
+2005-7-11
++ FORTH解释器核心词汇:
+  VMFillMem
+
 2005-7-8
 + FORTH解释器核心词汇:
   Enter
