@@ -2,6 +2,8 @@ unit SuperInterpreter;
 
 interface
 
+{$I Setting.inc}
+
 uses
   SysUtils, Classes
   , uSuperScriptConsts
@@ -14,49 +16,74 @@ type
   TForthMethod = procedure of object;
   PPointer = ^ Pointer;
 
-  //TForthLibs = array of TForthLib;
+  TForthVisibility = (fvDefault, fvPrivate, fvProtected, fvPublic, fvPublished);
+  {//TForthLibs = array of TForthLib;
   PForthLib = ^ TForthLib; 
   TForthLib = packed record
     PriorLib: Integer; //PForthLib;
     LastWord: Integer; //PForthWord; //前一个单词 0 means 为最前面。
     NameLen: Byte;
     //Name: array[0..NameLen] of char; //it's a PChar, the last char is #0
+  end;//}
+
+  //For internal used(not the real memory mirror)
+  //the Forth word attributes.
+  TForthWordRec = packed record
+    case Boolean of
+     True: (Params: LongWord);
+     False: (
+      Precedence: Byte; 
+      Visibility: Byte; 
+      CallStyle: Byte;
+      CodeFieldStyle: Byte);
+    end;
+    Name: string;
   end;
+  
   //TForthWords = array of TForthWord;
   PForthWord = ^ TForthWord;
+  //For cast the Mem
   TForthWord = packed record //ITC (Indirect Threaded Code)
     PriorWord: Integer; //PForthWord; //前一个单词 0 means 为最前面。
-    Precedence: Byte; //优先级, 0=low, 1=high equals 1 for an IMMEDIATE word
-    //1=True; 0=False; Smudge bit. used to prevent FIND from finding this word
-    //this can be extent to private, protected, public, etc
-    Visibility: Byte; 
-    CallStyle: Byte;
-    CodeFieldStyle: Byte;
-    //其实就是直接指向的某个单词的PFA，不过那个单词的PFA就是直接执行的机器码而已。
-    CFA: LongWord;
+    case Boolean of
+     True: (Params: LongWord);
+     False: (
+      //优先级, 0=low, 1=high equals 1 for an IMMEDIATE word
+      //1=True; 0=False; Smudge bit. used to prevent FIND from finding this word
+      //this can be extent to private, protected, public, etc
+      Precedence: Byte; 
+      Visibility: Byte; 
+      CallStyle: Byte;
+      CodeFieldStyle: Byte);
+    end;
     //the Param Field Length 
     ParamFieldLength: LongWord;
     NameLen: Byte;
     //Name: String; it's a PChar, the last char is #0
     //the following is ParameterFields   
+    //其实就是直接指向的某个单词的PFA，不过那个单词的PFA就是直接执行的机器码而已。
+    //CFA = ParameterFields[0]
+    //CFA: LongWord;
     //ParameterFields: array of Integer; //大多数情况下是PForthWord，但是少数情况下是数据或VM Codes
   end;
-  TProcessorState = (psRunning, psCompiling, psFinished, psNoData, psBadData, 
+  TForthProcessorState = (psRunning, psCompiling, psFinished, psNoData, psBadData, 
     psBadOp, psDivZero, psOverFlow);
-  TProcessorStates = set of TProcessorState;
+  TForthProcessorStates = set of TProcessorState;
 
   TSuperInterpreter = class(TCustomSuperExecutor)
   private
-    FIP: Integer;
-    FLibEntryAddress: Integer;
-    function GetPLibEntry: PForthLib;
+    function GetPLibEntry: PForthWord;
     procedure SetMemorySize(Value: Integer);
     procedure SetParameterStackSize(const Value: Integer);
     procedure SetStackSize(const Value: Integer);
+    procedure SetText(const Value: string);
   protected
     FInstrunction: TForthMethod;
     FInternalProcList: TVMMethodList;
+    FIP: Integer;
     FIR: TInstruction;
+    FLastWordEntryAddress: Integer;
+    FLibEntryAddress: Integer;
     FMemory: TMemoryArray;
     FMemorySize: Integer;
     FParameterStack: TStack;
@@ -64,23 +91,44 @@ type
     FPC: Integer;
     FRP: Integer;
     FSP: Integer;
+    FStack: TStack;
     FStackSize: Integer;
     FStatus: TProcessorStates;
+    FText: string;
+    FTextIndex: Integer;
     FUsedMemory: Integer;
     FWRegister: Integer;
-    Stack: TStack;
     function ExecuteCFA(const aCFA: Integer): Integer; override;
     procedure Init; override;
+    procedure iVMAlignMem;
     procedure iVMEnter;
     procedure iVMExit;
-    procedure iVMFillMem(const aValue;  const Size: Integer);
+    procedure iVMFill(const aValue;  const Size: Integer);
+    procedure iVMFillByte(const aValue: Byte);
+    procedure iVMFillCountPChar(const aValue: PChar; const aSize: Integer);
+    procedure iVMFillForthWordHeader(const aWordAttr: TForthWordRec);
+    procedure iVMFillInt(const aValue: Integer);
+    procedure iVMFillShortCountPChar(const aValue: PChar; const aSize: Byte);
+    procedure iVMFillShortString(const aValue: string);
+    procedure iVMFillString(const aValue: string);
+    procedure iVMFillWord(const aValue: Word);
     procedure iVMNext;
-    procedure iVMWordHeader(const aLibName, aWordName: string);
+    procedure iVMRevel;
+    procedure vAddInt;
+    procedure vCount;
+    procedure vCountShort;
+    procedure vHERE;
+    procedure vPARSE;
+    procedure vPlaceShortString;
+    procedure vPlaceString;
+    procedure vSetRunning;
+    procedure vSkipBlank;
   public
-    constructor Create;
+    constructor Create(const aParamStack: TStack = nil); virtual;
     procedure ExecuteInstruction; overload;
     procedure ExecuteInstruction(const aInstruction: TInstruction); overload;
     function GetWordCFA(const aWord: string): Integer; override;
+    procedure iForthHeader(const aWordAttr: TForthWordRec);
     procedure InitProcList;
     procedure LoadFromStream(const aStream: TStream); override;
     procedure SaveToStream(const aStream: TStream); override;
@@ -92,11 +140,12 @@ type
     property ParameterStackSize: Integer read FParameterStackSize write
             SetParameterStackSize;
     property PC: Integer read FPC write FPC;
-    property PLibEntry: PForthLib read GetPLibEntry;
+    property PLibEntry: PForthWord read GetPLibEntry;
     property RP: Integer read FRP write FRP;
     property SP: Integer read FSP write FSP;
     property StackSize: Integer read FStackSize write SetStackSize;
     property Status: TProcessorStates read FStatus;
+    property Text: string read FText write SetText;
     property UsedMemory: Integer read FUsedMemory write FUsedMemory;
     property WRegister: Integer read FWRegister;
   end;
@@ -107,10 +156,11 @@ implementation
 {
 ****************************** TSuperInterpreter *******************************
 }
-constructor TSuperInterpreter.Create;
+constructor TSuperInterpreter.Create(const aParamStack: TStack = nil);
 begin
   inherited Create;
   StackSize := cDefaultStackSize;
+  if aParamStack <> nil then FParameterStack := aParamStack;
   ParameterStackSize := cDefaultParamStackSize;
   TMethod(FInstrunction).Data := Self;
 end;
@@ -135,14 +185,20 @@ begin
   FInstrunction;
 end;
 
-function TSuperInterpreter.GetPLibEntry: PForthLib;
+function TSuperInterpreter.GetPLibEntry: PForthWord;
 begin
-  Result := PForthLib(@FMemory[LibEntryAddress]);
+  Result := PForthWord(@FMemory[LibEntryAddress]);
 end;
 
 function TSuperInterpreter.GetWordCFA(const aWord: string): Integer;
 begin
-  Result := inherited GetWordCFA(aWord);
+  Result := -1;
+end;
+
+procedure TSuperInterpreter.iForthHeader(const aWordAttr: TForthWordRec);
+begin
+  iVMFillForthWordHeader(aWordAttr);
+  iVMRevel;
 end;
 
 procedure TSuperInterpreter.Init;
@@ -153,6 +209,8 @@ begin
   
   FIP := 0;
   UsedMemory := 0;
+  
+  FTIBIndex := 1;
 end;
 
 procedure TSuperInterpreter.InitProcList;
@@ -161,11 +219,20 @@ begin
   FInternalProcList[inNext] := @iVMNext;
 end;
 
+procedure TSuperInterpreter.iVMAlignMem;
+begin
+  Inc(FUsedMemory, (SizeOf(Pointer)-1));
+  FUsedMemory := FUsedMemory and -SizeOf(Pointer);
+end;
+
 procedure TSuperInterpreter.iVMEnter;
 begin
   //PUSH IP to Reutrun Stack
-  PPointer(SP)^ := PC;
-  Inc(SP, SizeOf(Pointer));
+  Assert(FSP + SizeOf(Integer) <= Length(FStack), rsReturnStackOverflowError);
+  PInteger(@FStack[FSP])^ := PC;
+  Inc(FSP, SizeOf(Integer));
+  //PPointer(SP)^ := PC;
+  //Inc(SP, SizeOf(Pointer));
   
   Inc(FWRegister, SizeOf(Pointer));
   
@@ -177,19 +244,122 @@ end;
 procedure TSuperInterpreter.iVMExit;
 begin
   //POP IP From RS
-  Dec(SP, SizeOf(Pointer));
-  PC := PInteger(SP)^;
+  Dec(FSP, SizeOf(Integer));
+  Assert(FSP >= 0, rsReturnStackUnderflowError);
+  PC := PInteger(@FStack[SP])^;
   iVMNext;
 end;
 
-procedure TSuperInterpreter.iVMFillMem(const aValue;  const Size: Integer);
+procedure TSuperInterpreter.iVMFill(const aValue;  const Size: Integer);
 begin
   if UsedMemory + Size > Length(FMemory) then
   begin
-    SetLength(FMemory, UsedMemory + Size);
-    Move(aValue, @FMemory[UsedMemory], Size);
-    Inc(UsedMemory, Size);
+    SetLength(FMemory, UsedMemory + Size + (SizeOf(Pointer)-1));
   end;
+  Move(aValue, @FMemory[UsedMemory], Size);
+  Inc(UsedMemory, Size);
+end;
+
+procedure TSuperInterpreter.iVMFillByte(const aValue: Byte);
+begin
+  if UsedMemory + SizeOf(aValue) > Length(FMemory) then
+  begin
+    SetLength(FMemory, UsedMemory + SizeOf(aValue)+ (SizeOf(Pointer)-1));
+  end;
+  PByte(@FMemory[UsedMemory])^ := aValue;
+  Inc(UsedMemory, SizeOf(aValue));
+end;
+
+procedure TSuperInterpreter.iVMFillCountPChar(const aValue: PChar; const aSize:
+        Integer);
+begin
+  iVMFillInt(aSize);
+  if Length(aValue) > 0 then
+  begin
+    iVMFill(PChar(aValue), aSize);
+    iVMFillByte(0);
+    iVMAlignMem;
+  end;
+end;
+
+procedure TSuperInterpreter.iVMFillForthWordHeader(const aWordAttr:
+        TForthWordRec);
+begin
+  //write the integer 0 to header first
+  iVMFillInt(0);
+  
+  //reserved the current defining word address.
+  FLastWordEntryAddress := UsedMemory;
+  
+  if FLibEntryAddress = 0 then
+  begin
+    //the first words
+    FLibEntryAddress := UsedMemory;
+    iVMFillInt(0); //No PriorWord
+  end
+  else begin
+    iVMFillInt(FLibEntryAddress); //PriorWord
+  end;
+  
+  iVMFillInt(aWordAttr.Params);
+  iVMFillInt(0); //the Parameter Filed Length(unknown);
+  
+  //Fill ShortString
+  iVMFillShortString(aWordAttr.Name);
+end;
+
+procedure TSuperInterpreter.iVMFillInt(const aValue: Integer);
+begin
+  if UsedMemory + SizeOf(aValue) > Length(FMemory) then
+  begin
+    SetLength(FMemory, UsedMemory + SizeOf(aValue));
+  end;
+  Pinteger(@FMemory[UsedMemory])^ := aValue;
+  Inc(UsedMemory, SizeOf(aValue));
+end;
+
+procedure TSuperInterpreter.iVMFillShortCountPChar(const aValue: PChar; const
+        aSize: Byte);
+begin
+  iVMFillByte(aSize);
+  if Length(aValue) > 0 then
+  begin
+    iVMFill(PChar(aValue), aSize);
+    iVMFillByte(0);
+    iVMAlignMem;
+  end;
+end;
+
+procedure TSuperInterpreter.iVMFillShortString(const aValue: string);
+begin
+  iVMFillByte(Length(aValue));
+  if Length(aValue) > 0 then
+  begin
+    iVMFill(PChar(aValue), Byte(Length(aValue)));
+    iVMFillByte(0);
+    iVMAlignMem;
+  end;
+end;
+
+procedure TSuperInterpreter.iVMFillString(const aValue: string);
+begin
+  iVMFillInt(Length(aValue));
+  if Length(aValue) > 0 then
+  begin
+    iVMFill(PChar(aValue), Length(aValue));
+    iVMFillByte(0);
+    iVMAlignMem;
+  end;
+end;
+
+procedure TSuperInterpreter.iVMFillWord(const aValue: Word);
+begin
+  if UsedMemory + SizeOf(aValue) > Length(FMemory) then
+  begin
+    SetLength(FMemory, UsedMemory + SizeOf(aValue)+ (SizeOf(Pointer)-1));
+  end;
+  PWord(@FMemory[UsedMemory])^ := aValue;
+  Inc(UsedMemory, SizeOf(aValue));
 end;
 
 procedure TSuperInterpreter.iVMNext;
@@ -201,16 +371,17 @@ begin
   JMP (X)
   }
   
-  FWRegister := PInteger(PC)^;
-  Inc(PC, SizeOf(Pointer));
+  FWRegister := PC;
+  Inc(PC, SizeOf(Integer));
   
   //JMP (X)
   FIP := FMemory[FWRegister];
   ExecuteInstruction;
 end;
 
-procedure TSuperInterpreter.iVMWordHeader(const aLibName, aWordName: string);
+procedure TSuperInterpreter.iVMRevel;
 begin
+  FLibEntryAddress := FLastWordEntryAddress;
 end;
 
 procedure TSuperInterpreter.LoadFromStream(const aStream: TStream);
@@ -227,13 +398,13 @@ begin
   with aStream do
   begin
     Read(LDumy, SizeOf(LDumy));
-    if (LDumy > 0) and (FileType = ftProgram) then
+    if (LDumy > 0) {and (FileType = ftProgram)} then
     begin
       ParameterStackSize := LDumy;
     end;
   
     Read(LDumy, SizeOf(LDumy));
-    if (LDumy > 0) and (FileType = ftProgram) then
+    if (LDumy > 0) {and (FileType = ftProgram)} then
     begin
       StackSize := LDumy;
     end;
@@ -242,8 +413,8 @@ begin
     //SetLength(FMemory, UsedMemory + cDefaultFreeMemSize);
     MemorySize := UsedMemory + cDefaultFreeMemSize;
     Read(@FMemory[0], Length(FMemory));
-    LibEntryAddress := PLongWord(@FMemory[0])^;
-    PLibEntry := PForthLib(@FMemory[LDumy]);
+    FLibEntryAddress := PLongWord(@FMemory[0])^;
+    //PLibEntry := PForthLib(@FMemory[LDumy]);
     {
       So the Memory Mirror is
       Lib Entry: FMemory[0]
@@ -333,6 +504,7 @@ begin
   begin
     FParameterStackSize := Value;
     SetLength(FParameterStack, FParameterStackSize);
+    if FSP > FParameterStackSize then FSP := FParameterStackSize;
     {if (FSP >= FSP0) and (FSP0 <> @FParameterStack[0]) then
     begin
       //the Block has been moved a new address
@@ -349,6 +521,7 @@ begin
   begin
     FStackSize := Value;
     SetLength(FStack, FStackSize);
+    if FRP > FStackSize then FRP = FStackSize;
     {if (FRP >= FRP0) and (FRP0 <> @FStack[0]) then
     begin
       //the Block has been moved a new address
@@ -356,6 +529,183 @@ begin
       FRP := (FRP - FRP0) + @FStack[0];
     end;
     FRP0 := @FStack[0]; //}
+  end;
+end;
+
+procedure TSuperInterpreter.SetText(const Value: string);
+begin
+  if Value <> FText then
+  begin
+    FText := Value;
+    FTIBIndex := 1;
+  end;
+end;
+
+procedure TSuperInterpreter.vAddInt;
+begin
+  //至少栈上应该有两个数据
+  Assert(FSP>=2*SizeOf(Integer), rsParamStackUnderflowError);
+  Dec(FSP, SizeOf(Integer));
+  PInteger(@FParameterStack[FSP-SizeOf(Integer)])^ :=
+    PInteger(@FParameterStack[FSP-SizeOf(Integer)])^ +
+    PInteger(@FParameterStack[FSP])^;
+end;
+
+procedure TSuperInterpreter.vCount;
+var
+  LStrAddr: Integer;
+  LStrCount: Integer;
+begin
+  //Popup an Address from Parameter stack
+  Assert(FSP>=SizeOf(Integer), rsParamStackUnderflowError);
+  Dec(FSP, SizeOf(Integer))
+  LStrAddr := PInteger(@FParameterStack[FSP])^;
+  
+  LStrCount := PInteger(@FParameterStack[LStrAddr])^;
+  
+  //Push the PChar index address
+  Assert(FSP + SizeOf(Integer)<= Length(FParameterStack), rsParamStackUnderflowError);
+  //Point to the Pchar
+  PInteger(@FParameterStack[FSP])^ := LStrAddr + SizeOf(Integer);
+  Inc(FSP, SizeOf(Integer));
+  
+  //Push the current Str Length to param stack
+  Assert(FSP + SizeOf(Integer)<= Length(FParameterStack), rsParamStackUnderflowError);
+  PInteger(@FParameterStack[FSP])^ := LStrCount;
+  Inc(FSP, SizeOf(Integer));
+end;
+
+procedure TSuperInterpreter.vCountShort;
+var
+  LDstStrAddr: Integer;
+  LSrcCount: Byte;
+  LSrcPChar: PChar;
+begin
+  //Popup an Address from Parameter stack
+  Assert(FSP>=SizeOf(Integer), rsParamStackUnderflowError);
+  Dec(FSP, SizeOf(Integer))
+  LStrAddr := PInteger(@FParameterStack[FSP])^;
+  
+  LStrCount := PByte(@FParameterStack[LStrAddr])^;
+  
+  //Push the PChar index address
+  Assert(FSP + SizeOf(Integer)<= Length(FParameterStack), rsParamStackUnderflowError);
+  //Point to the Pchar
+  PInteger(@FParameterStack[FSP])^ := LStrAddr + SizeOf(Byte);
+  Inc(FSP, SizeOf(Integer));
+  
+  //Push the current Str Length to param stack
+  Assert(FSP + SizeOf(Integer)<= Length(FParameterStack), rsParamStackUnderflowError);
+  PByte(@FParameterStack[FSP])^ := LStrCount;
+  Inc(FSP, SizeOf(Byte));
+end;
+
+procedure TSuperInterpreter.vHERE;
+begin
+  //Push the current UsedMemory to param stack
+  Assert(FSP + SizeOf(Integer)<= Length(FParameterStack), rsParamStackUnderflowError);
+  PInteger(@FParameterStack[FSP])^ := FUsedMemory;
+  Inc(FSP, SizeOf(Integer));
+end;
+
+procedure TSuperInterpreter.vPARSE;
+var
+  LSepChar: Char;
+  LOldTIBIndex: Integer;
+begin
+  //Popup a Char(Byte) from Parameter stack
+  Assert(FSP>=1, rsParamStackUnderflowError);
+  Dec(FSP, 1)
+  //分割符
+  LSepChar := PChar(@FParameterStack[FSP])^;
+  LOldTIBIndex := FTextIndex;
+  
+  //Push the current FTIBIndex to param stack
+  Assert(FSP + SizeOf(Integer)<= Length(FParameterStack), rsParamStackUnderflowError);
+  PInteger(@FParameterStack[FSP])^ := FTextIndex;
+  Inc(FSP, SizeOf(Integer));
+  
+  while (FTextIndex <= Length(FText)) and (FText[FTextIndex] <> LSepChar) do
+  begin
+    Inc(FTextIndex);
+    {$IFDEF MBCS_SUPPORT}
+    while (FTextIndex <= Length(FText)) and (ByteType(FText, FTextIndex) <> mbSingleByte) do
+      Inc(FTextIndex);
+    {$ENDIF}
+  end;
+  
+  //Push the current Str Length to param stack
+  Assert(FSP + SizeOf(Integer)<= Length(FParameterStack), rsParamStackUnderflowError);
+  PInteger(@FParameterStack[FSP])^ := FTextIndex - LOldTIBIndex;
+  Inc(FSP, SizeOf(Integer));
+end;
+
+procedure TSuperInterpreter.vPlaceShortString;
+var
+  LDstStrAddr: Integer;
+  LSrcCount: Byte;
+  LSrcPChar: PChar;
+begin
+  //Popup an Address from Parameter stack
+  Assert(FSP>=SizeOf(Integer), rsParamStackUnderflowError);
+  Dec(FSP, SizeOf(Integer))
+  LDstStrAddr := PInteger(@FParameterStack[FSP])^;
+  
+  
+  //Popup a Count(Byte) from Parameter stack
+  Assert(FSP>=SizeOf(Byte), rsParamStackUnderflowError);
+  Dec(FSP, SizeOf(Byte))
+  LSrcCount := PByte(@FParameterStack[FSP])^;
+  
+  
+  //Popup a PChar address from Parameter stack
+  Assert(FSP>=SizeOf(PChar), rsParamStackUnderflowError);
+  Dec(FSP, SizeOf(PChar))
+  LSrcPChar := PChar(@FParameterStack[FSP])^;
+  
+  iVMFillShortCountPChar(LSrcPChar, LSrcCount);
+end;
+
+procedure TSuperInterpreter.vPlaceString;
+var
+  LDstStrAddr: Integer;
+  LSrcCount: Integer;
+  LSrcPChar: PChar;
+begin
+  //Popup an Address from Parameter stack
+  Assert(FSP>=SizeOf(Integer), rsParamStackUnderflowError);
+  Dec(FSP, SizeOf(Integer))
+  LDstStrAddr := PInteger(@FParameterStack[FSP])^;
+  
+  
+  //Popup a Count(Integer) from Parameter stack
+  Assert(FSP>=SizeOf(Integer), rsParamStackUnderflowError);
+  Dec(FSP, SizeOf(Integer))
+  LSrcCount := PByte(@FParameterStack[FSP])^;
+  
+  
+  //Popup a PChar address from Parameter stack
+  Assert(FSP>=SizeOf(PChar), rsParamStackUnderflowError);
+  Dec(FSP, SizeOf(PChar))
+  LSrcPChar := PChar(@FParameterStack[FSP])^;
+  
+  iVMFillCountPChar(LSrcPChar, LSrcCount);
+end;
+
+procedure TSuperInterpreter.vSetRunning;
+begin
+  Include(FStatus, psRunning);
+end;
+
+procedure TSuperInterpreter.vSkipBlank;
+begin
+  while (FTextIndex <= Length(FText))
+    {$IFDEF MBCS_SUPPORT}
+    and (ByteType(FText, FTextIndex) = mbSingleByte)
+    {$ENDIF}
+    and (FText[FTexrIndex] = ' ')
+  do begin
+    Inc(FTextIndex);
   end;
 end;
 

@@ -1,3 +1,46 @@
+2005-7-15
+现在我有两种字符串在FORTH中,并且它们都是会对齐地址边界（基于Pointer的大小计算）：
+ShortString: (ByteCount)PChar
+String: (IntCount)PChar
+
+function StrToPChar(const aV: string): PChar;
+begin
+  SHowMessage(IntToStr(Length(aV)));
+  Result := Pchar(aV);
+end;
+
+procedure TForm1.Button1Click(Sender: TObject);
+var
+  d: PChar;
+  a: pChar;
+begin
+  d := 'Hello world';
+
+  a := StrToPChar(d);
+  {in fact delphi will call the LStrFromPChar to convert the PChar(d) to String!}
+end;
+
+
+重新设定单词结构：
+删除掉关于库名的设定。只有单词链表。
+至于库不在此处处理。
+也就是说LibEntry 变成了Forth Word Entry.
+
+文件头:
+MagicWord: 'SUPER4TH'
+//类型 TYPE(TSuperForthFileType): 是程序，还是库
+NAME：StrLen(Byte): string
+版本号：DWORD
+日期：DWORD(The Data field indicates the number of calendar days since the start of the calendar (the number of days since 1/1/0001 plus one).)
+参数栈大小： DWORD，0表示默认。
+返回栈大小： DWORD，0表示默认。未用，使用系统的返回栈。
+
+装入内存的映象:
+LibEntry: DWORD(PForthWord); 指向该程序或单元拥有的单词入口
+
+因为要传递数据栈中的数据,所以,SP该是指针，可以指向别人！
+不过对动态数组无所谓！暂时就先用动态数组。
+
 2005-7-12
 ~ 关于连接和调用其它的脚本中的单词的问题。
 
@@ -97,10 +140,11 @@ LibEntry: DWORD; 指向该程序或单元拥有的单词库入口
     Visibility: Byte; 
     CallStyle: Byte;
     CodeFieldStyle: Byte;
-    CFA: DWORD //其实就是直接指向的某个单词的PFA，不过那个单词的PFA就是直接执行的机器码而已。
     ParamFieldLength: DWORD
     NameLen: Byte
     Name: array [0..NameLen] of char, the last char is #0
+    //CFA: DWORD //其实就是直接指向的某个单词的PFA，不过那个单词的PFA就是直接执行的机器码而已。
+               //CFA = ParameterFields[0]
     ParameterFields: array [0..PFLen-1] of integer(DWORD);
 
 以上为文件中的组织。

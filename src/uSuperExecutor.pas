@@ -40,6 +40,7 @@ type
     FFileDate: LongWord;
     FFileType: TSuperForthFileType;
     FFileVersion: LongWord;
+    FName: string;
   protected
     function ExecuteCFA(const aCFA: Integer): Integer; virtual;
     procedure Init; virtual;
@@ -53,6 +54,7 @@ type
     property FileDate: LongWord read FFileDate write FFileDate;
     property FileType: TSuperForthFileType read FFileType write FFileType;
     property FileVersion: LongWord read FFileVersion write FFileVersion;
+    property Name: string read FName write FName;
   end;
   
 
@@ -103,6 +105,7 @@ end;
 procedure TCustomSuperExecutor.LoadFromStream(const aStream: TStream);
 var
   s: string;
+  L: Byte;
 begin
   SetLength(s, Length(cFORTHHeaderMagicWord));
   with aStream do
@@ -110,7 +113,14 @@ begin
     Read(@s[1], Length(cFORTHHeaderMagicWord));
     if s <> cFORTHHeaderMagicWord then
       Raise ESuperScriptError.Create(rsMissFileHeaderError);
-    Read(FFileType, SizeOf(FFileType)); //TODO: not used yet
+  
+    //Get the Unit(Program) Name.
+    Read(L, SizeOf(L));
+    SetLength(FName, L);
+    if L<>0 then
+      Read(PChar(FName), L);
+  
+    //Read(FFileType, SizeOf(FFileType)); //abondon
     Read(FFileVersion, SizeOf(FFileVersion));
     Read(FFileDate, SizeOf(FFileDate));
   end;
@@ -129,9 +139,17 @@ begin
 end;
 
 procedure TCustomSuperExecutor.SaveToStream(const aStream: TStream);
+var
+  L: Byte;
 begin
   aStream.Write(@cFORTHHeaderMagicWord[1], Length(cFORTHHeaderMagicWord));
-  aStream.Write(FFileType, SizeOf(FFileType));
+  //Get the Unit(Program) Name.
+  L := Length(FName);
+  aStream.Write(L, SizeOf(L));
+  if L<>0 then
+    aStream.Write(PChar(FName), L);
+  
+  //aStream.Write(FFileType, SizeOf(FFileType));
   aStream.Write(FFileVersion, SizeOf(FFileVersion));
   aStream.Write(FFileDate, SizeOf(FFileDate));
 end;

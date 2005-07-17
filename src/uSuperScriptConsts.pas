@@ -14,6 +14,10 @@ const
 
 resourcestring
   rsMissFileHeaderError = 'Error: The file header is missed';
+  rsReturnStackUnderflowError = 'Return Stack underflow.';
+  rsReturnStackOverflowError = 'Return Stack overflow';
+  rsParamStackUnderflowError = 'Parameter Stack underflow.';
+  rsParamStackOverflowError = 'Parameter Stack overflow';
 
 type
   ESuperScriptError = class(Exception);
