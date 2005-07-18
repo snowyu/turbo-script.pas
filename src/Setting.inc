@@ -29,6 +29,7 @@
   {$P+ Open string parameters}
   {$J+ Writeable typed constants}
   {$R- No Range checking}
+  {$Z1 MIN ENUM SIZE}
 
 {$IFDEF BCB}
   {$OBJEXPORTALL ON}

@@ -30,6 +30,12 @@ type
     NextCFA: Pointer;
   end;
 
+  TForthVisibility = (fvDefault, fvHide, fvPrivate, fvProtected, fvPublic, fvPublished);
+  TForthPriority = (fpLowest, fpLower, fpLow, fpNormal, fpHigh, pfHigher, fpHighest);
+  TForthCallStyle = (csForth, csRegister, csPascal, csStdCall, csFastCall);
+  TForthCodeFieldStyle = (cfsImmediately);
+  TForthCodeFieldStyles = set of TForthCodeFieldStyle;
+
   //the Core procedure List, maybe procedure or method.
   TVMMethodList = array [TVMInstruction] of Pointer;
 
@@ -85,6 +91,36 @@ type
     inOVERInt,
     inROTInt
   ); 
+
+  PForthWord = ^ TForthWord;
+  //For cast the Mem
+  TForthWord = packed record //ITC (Indirect Threaded Code)
+    PriorWord: Integer; //PForthWord; //前一个单词 0 means 为最前面。
+    case Boolean of
+     True: (Params: LongWord);
+     False: (
+      //优先级, 0=low, 1=high equals 1 for an IMMEDIATE word
+      //1=True; 0=False; Smudge bit. used to prevent FIND from finding this word
+      //this can be extent to private, protected, public, etc
+      Precedence: TForthPriority; 
+      Visibility: TForthVisibility; 
+      CallStyle: TForthCallStyle;
+      CodeFieldStyle: TForthCodeFieldStyles);
+    end;
+    //the Param Field Length 
+    ParamFieldLength: LongWord;
+    NameLen: Byte;
+    //Name: String; it's a PChar, the last char is #0
+    //the following is ParameterFields   
+    //其实就是直接指向的某个单词的PFA，不过那个单词的PFA就是直接执行的机器码而已。
+    //CFA = ParameterFields[0]
+    //CFA: LongWord;
+    //ParameterFields: array of Integer; //大多数情况下是PForthWord，但是少数情况下是数据或VM Codes
+  end;
+  TForthProcessorState = (psRunning, psCompiling, psFinished, psNoData, psBadData, 
+    psBadOp, psDivZero, psOverFlow);
+  TForthProcessorStates = set of TForthProcessorState;
+
 
 implementation
 

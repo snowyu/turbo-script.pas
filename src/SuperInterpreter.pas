@@ -16,7 +16,6 @@ type
   TForthMethod = procedure of object;
   PPointer = ^ Pointer;
 
-  TForthVisibility = (fvDefault, fvPrivate, fvProtected, fvPublic, fvPublished);
   {//TForthLibs = array of TForthLib;
   PForthLib = ^ TForthLib; 
   TForthLib = packed record
@@ -32,43 +31,17 @@ type
     case Boolean of
      True: (Params: LongWord);
      False: (
-      Precedence: Byte; 
-      Visibility: Byte; 
-      CallStyle: Byte;
-      CodeFieldStyle: Byte);
+      //TForthPriority: Byte
+      Precedence: TForthPriority; 
+      //TForthVisibility: Byte
+      Visibility: TForthVisibility; 
+      CallStyle: TForthCallStyle;
+      CodeFieldStyle: TForthCodeFieldStyles);
     end;
     Name: string;
   end;
   
   //TForthWords = array of TForthWord;
-  PForthWord = ^ TForthWord;
-  //For cast the Mem
-  TForthWord = packed record //ITC (Indirect Threaded Code)
-    PriorWord: Integer; //PForthWord; //前一个单词 0 means 为最前面。
-    case Boolean of
-     True: (Params: LongWord);
-     False: (
-      //优先级, 0=low, 1=high equals 1 for an IMMEDIATE word
-      //1=True; 0=False; Smudge bit. used to prevent FIND from finding this word
-      //this can be extent to private, protected, public, etc
-      Precedence: Byte; 
-      Visibility: Byte; 
-      CallStyle: Byte;
-      CodeFieldStyle: Byte);
-    end;
-    //the Param Field Length 
-    ParamFieldLength: LongWord;
-    NameLen: Byte;
-    //Name: String; it's a PChar, the last char is #0
-    //the following is ParameterFields   
-    //其实就是直接指向的某个单词的PFA，不过那个单词的PFA就是直接执行的机器码而已。
-    //CFA = ParameterFields[0]
-    //CFA: LongWord;
-    //ParameterFields: array of Integer; //大多数情况下是PForthWord，但是少数情况下是数据或VM Codes
-  end;
-  TForthProcessorState = (psRunning, psCompiling, psFinished, psNoData, psBadData, 
-    psBadOp, psDivZero, psOverFlow);
-  TForthProcessorStates = set of TProcessorState;
 
   TSuperInterpreter = class(TCustomSuperExecutor)
   private
@@ -115,6 +88,7 @@ type
     procedure iVMNext;
     procedure iVMRevel;
     procedure vAddInt;
+    procedure vAligned;
     procedure vCount;
     procedure vCountShort;
     procedure vHERE;
@@ -549,6 +523,18 @@ begin
   PInteger(@FParameterStack[FSP-SizeOf(Integer)])^ :=
     PInteger(@FParameterStack[FSP-SizeOf(Integer)])^ +
     PInteger(@FParameterStack[FSP])^;
+end;
+
+procedure TSuperInterpreter.vAligned;
+var
+  I: Integer;
+begin
+  //至少栈上应该有个数据
+  I := FSP-SizeOf(Integer);
+  Assert(I>=0, rsParamStackUnderflowError);
+  
+  Inc(PInteger(@FParameterStack[I])^, (SizeOf(Pointer)-1));
+  PInteger(@FParameterStack[I])^ := PInteger(@FParameterStack[I])^ and -SizeOf(Pointer);
 end;
 
 procedure TSuperInterpreter.vCount;

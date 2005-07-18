@@ -1,3 +1,6 @@
+2005-7-17
+开始搞核心词汇。
+
 2005-7-15
 现在我有两种字符串在FORTH中,并且它们都是会对齐地址边界（基于Pointer的大小计算）：
 ShortString: (ByteCount)PChar
