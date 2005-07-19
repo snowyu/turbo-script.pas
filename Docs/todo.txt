@@ -1,3 +1,82 @@
+2005-7-18
+该测试下是否我写的解释器正确！！
+* [Bug] 修正编译错误！！
+
+Win32Forth 的数据栈采用的是我所设想的技巧:
+数据栈使用的是Hardware栈，不过使用EBX作为实际栈顶。
+
+EBX    <-- TOS Data
+数据栈 <-- 第二个数据
+
+(a b -- )
+EBX = a
+b is in  数据栈.
+
+修改FORTH解释器的内存映象的结构:
+FORTH解释器初始化的时候，先分配的内存：
+[cTIBLengthOffset]TIBLength: DWORD (#TIB=1)
+[cToINOffset]>IN:DWORD(the current TIB index)
+[cTIBOffset]TIB(1024 Byte):原有内存！
+
+从磁盘装入:
+[cLastWordEntryOffset]LastWordEntry: DWORD(PForthWord); 指向该程序或单元拥有的单词入口
+
+cTIBLengthOffset = 0;
+cToINOffset = cTIBLengthOffset + SizeOf(Integer);
+cTIBOffset = cToINOffset + SizeOf(Integer);
+cMAXTIBCount = 1024; //Bytes
+cLastWordEntryOffset = cTIBOffset + cMAXTIBCount;
+
+我又有点昏了，既然我这里的地址是相对偏移量，那么所有的地址都应该是才对！
+因此@等FORTH词汇，也是取的相对偏移量！
+如果需要存取绝对地址（外部地址）的数据，应该建立专门的非标准词汇来处理！
+所以，我所写的一些词汇要改！！
+
+另外：将TIB作为固定的缓冲区放入FORTH内存中，不错（SP-FORTH 分配的是1024个字节）。
+spf_parser.f
+
+必须在系统中实现的核心词汇:
+spf_defkern.f
+CODE _CREATE-CODE
+CODE _CONSTANT-CODE
+CODE _USER-CODE (this is SP-FORTH impl, not ANSI-FORTH)
+CODE _SLITERAL
+CODE _CLITERAL-CODE
+CODE _USER-VALUE
+
+其次为: spf_forthproc.f
+@, !, DUP, LAST-CFA, ALLOT, DP, HERE, LAST, ",", 
+
+6.1.2450 WORD 
+CORE 
+
+        ( char "<chars>ccc<char>" -- c-addr )
+
+Skip leading delimiters. Parse characters ccc delimited by char. 
+An ambiguous condition exists if the length of the parsed string 
+is greater than the implementation-defined length of a counted string. 
+
+c-addr is the address of a transient region containing the parsed word 
+as a counted string. If the parse area was empty or contained no 
+characters other than the delimiter, the resulting string has a zero 
+length. A space, not included in the length, follows the string. A 
+program may replace characters within the string. 
+
+Note: The requirement to follow the string with a space is obsolescent 
+and is included as a concession to existing programs that use CONVERT. 
+A program shall not depend on the existence of the space. 
+
+See: 3.3.3.6 Other transient regions, 3.4.1 Parsing, 6.2.2008 PARSE , A.6.1.2450 WORD 
+
+It' for the input buffer process(TIB).
+
+: WORD ( char "<chars>ccc<char>" -- c-addr ) \ 94
+  DUP SKIP PARSE 255 MIN
+  DUP SYSTEM-PAD C! SYSTEM-PAD 1+ SWAP QCMOVE
+  0 SYSTEM-PAD COUNT + C!
+  SYSTEM-PAD
+;
+
 2005-7-17
 开始搞核心词汇。
 

@@ -8,29 +8,13 @@ uses
   ;
 
 type
-  TImportModuleRec = record
-    Functions: TImportFunctions;
-    ModuleType: TModuleType;
-    Name: string;
-  end;
-  
-  TImportFunctionRec = record
-    Name: string;
-    Ordinal: Integer;
-    VirtualAddresses: TVirtualAddressTable;
-  end;
-  
-  TRelocationAddress = packed record
-    VirtualAddress: Integer;
-  end;
-  
   TCustomSuperPEFormat = class(TObject)
   private
     FImageBase: Integer;
   protected
     ExportTable: Integer;
     ImportTable: Integer;
-    RelocationTable: TVirtualAddressTable;
+    RelocationTable: Pointer;
   public
     property ImageBase: Integer read FImageBase write FImageBase;
   end;
@@ -49,7 +33,7 @@ type
     function GetWordCFA(const aWord: string): Integer; virtual;
     procedure LoadFromFile(const aFileName: String);
     procedure LoadFromStream(const aStream: TStream); virtual;
-    procedure SaveToFile(const aFile: String);
+    procedure SaveToFile(const aFileName: String);
     procedure SaveToStream(const aStream: TStream); virtual;
     property FileDate: LongWord read FFileDate write FFileDate;
     property FileType: TSuperForthFileType read FFileType write FFileType;
@@ -65,6 +49,7 @@ implementation
 }
 function TCustomSuperExecutor.ExecuteCFA(const aCFA: Integer): Integer;
 begin
+  Result := -1;
 end;
 
 function TCustomSuperExecutor.ExecuteWord(const aWord: string): Integer;
@@ -104,21 +89,22 @@ end;
 
 procedure TCustomSuperExecutor.LoadFromStream(const aStream: TStream);
 var
-  s: string;
+  Lstr: string;
   L: Byte;
 begin
-  SetLength(s, Length(cFORTHHeaderMagicWord));
+  L := Length(cFORTHHeaderMagicWord);
+  SetLength(Lstr, L);
   with aStream do
   begin
-    Read(@s[1], Length(cFORTHHeaderMagicWord));
-    if s <> cFORTHHeaderMagicWord then
+    Read(Lstr[1], L);
+    if Lstr <> cFORTHHeaderMagicWord then
       Raise ESuperScriptError.Create(rsMissFileHeaderError);
   
     //Get the Unit(Program) Name.
     Read(L, SizeOf(L));
     SetLength(FName, L);
     if L<>0 then
-      Read(PChar(FName), L);
+      Read(FName[1], L);
   
     //Read(FFileType, SizeOf(FFileType)); //abondon
     Read(FFileVersion, SizeOf(FFileVersion));
@@ -126,11 +112,11 @@ begin
   end;
 end;
 
-procedure TCustomSuperExecutor.SaveToFile(const aFile: String);
+procedure TCustomSuperExecutor.SaveToFile(const aFileName: String);
 var
   aFileStream: TFileStream;
 begin
-  aFileStream := TFileStream.Create(aFileName, mCreate);
+  aFileStream := TFileStream.Create(aFileName, fmCreate);
   try
     SaveToStream(aFileStream);
   finally
@@ -142,12 +128,12 @@ procedure TCustomSuperExecutor.SaveToStream(const aStream: TStream);
 var
   L: Byte;
 begin
-  aStream.Write(@cFORTHHeaderMagicWord[1], Length(cFORTHHeaderMagicWord));
+  aStream.Write(cFORTHHeaderMagicWord[1], Length(cFORTHHeaderMagicWord));
   //Get the Unit(Program) Name.
   L := Length(FName);
   aStream.Write(L, SizeOf(L));
   if L<>0 then
-    aStream.Write(PChar(FName), L);
+    aStream.Write(PChar(FName)^, L);
   
   //aStream.Write(FFileType, SizeOf(FFileType));
   aStream.Write(FFileVersion, SizeOf(FFileVersion));

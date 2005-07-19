@@ -8,6 +8,7 @@ uses
 
 const
   cFORTHHeaderMagicWord = 'SUPER4TH';
+  //cFORTHMagicWordSize = SizeOf(cFORTHHeaderMagicWord);
   cDefaultStackSize = 127;
   cDefaultParamStackSize = 127; 
   cDefaultFreeMemSize = 1024 * 8; //the Free Memory 8kb
@@ -35,9 +36,6 @@ type
   TForthCallStyle = (csForth, csRegister, csPascal, csStdCall, csFastCall);
   TForthCodeFieldStyle = (cfsImmediately);
   TForthCodeFieldStyles = set of TForthCodeFieldStyle;
-
-  //the Core procedure List, maybe procedure or method.
-  TVMMethodList = array [TVMInstruction] of Pointer;
 
   { Summary the FORTH Virtual Mache Codes}
   TVMInstruction = (
@@ -92,21 +90,24 @@ type
     inROTInt
   ); 
 
+  //the Core procedure List, maybe procedure or method.
+  TVMMethodList = array [TVMInstruction] of Pointer;
+
   PForthWord = ^ TForthWord;
-  //For cast the Mem
-  TForthWord = packed record //ITC (Indirect Threaded Code)
-    PriorWord: Integer; //PForthWord; //前一个单词 0 means 为最前面。
-    case Boolean of
-     True: (Params: LongWord);
-     False: (
+  TForthWordOptions = packed record //a DWORD
       //优先级, 0=low, 1=high equals 1 for an IMMEDIATE word
       //1=True; 0=False; Smudge bit. used to prevent FIND from finding this word
       //this can be extent to private, protected, public, etc
       Precedence: TForthPriority; 
       Visibility: TForthVisibility; 
       CallStyle: TForthCallStyle;
-      CodeFieldStyle: TForthCodeFieldStyles);
-    end;
+      CodeFieldStyle: TForthCodeFieldStyles;
+  end;
+  //For cast the Mem
+  TForthWord = packed record //ITC (Indirect Threaded Code)
+    PriorWord: Integer; //PForthWord; //前一个单词 0 means 为最前面。
+
+    Options: TForthWordOptions;
     //the Param Field Length 
     ParamFieldLength: LongWord;
     NameLen: Byte;
