@@ -32,18 +32,26 @@ type
   end;
 
   TForthVisibility = (fvDefault, fvHide, fvPrivate, fvProtected, fvPublic, fvPublished);
+  //the Forth Execution priority fpHighest means cfsImmediately
   TForthPriority = (fpLowest, fpLower, fpLow, fpNormal, fpHigh, pfHigher, fpHighest);
   TForthCallStyle = (csForth, csRegister, csPascal, csStdCall, csFastCall);
-  TForthCodeFieldStyle = (cfsImmediately);
+  TForthCodeFieldStyle = (cfsSysWord);
   TForthCodeFieldStyles = set of TForthCodeFieldStyle;
 
   { Summary the FORTH Virtual Mache Codes}
   TVMInstruction = (
     {## The FORTH CORE instructions }
+    inHalt,
     inEnter,
     inExit,
     inNext,
     
+    {## Memory Operation Instruction }
+    inStoreInt, 
+    inStoreByte, //CStore
+    inFetchInt,
+    inFetchByte, //CFetch
+
     {## Arithmatic instructions }
     {## for Integer}
     inAddInt, //Add
@@ -68,10 +76,6 @@ type
     inORInt,
     inXORInt,
 
-    {## Memory Operation Instruction }
-    inSetIntValue,
-    inGetIntValue,
-    
     {## Proc Operation Instruction }
     inJMP,
     inJZ,

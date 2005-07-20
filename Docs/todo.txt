@@ -1,3 +1,20 @@
+2005-7-19
+* 决定不在字符串后面加对齐指令!!是怎么样就是怎么样!!
+
+手工跟踪测试：
+PC: CPU的运行指针
+IP: FORTH的运行指针
+
+调用核心词汇：iVMNext, 执行当前IP.
+(IP) -> W  fetch memory pointed by IP into "W" register
+              ...W now holds address of the Code Field(CFA)
+
+IP+2 -> IP advance IP, just like a program counter
+              (assuming 2-byte addresses in the thread)
+(W) ->  X  fetch memory pointed by W into "X" register
+              ...X now holds address of the machine code 
+JMP (X)     jump to the address in the X register
+
 2005-7-18
 该测试下是否我写的解释器正确！！
 * [Bug] 修正编译错误！！

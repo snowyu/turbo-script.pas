@@ -74,6 +74,7 @@ type
     FWRegister: Integer;
     function ExecuteCFA(const aCFA: Integer): Integer; override;
     procedure Init; override;
+    procedure InitProcList;
     procedure iVMAlignMem;
     procedure iVMEnter;
     procedure iVMExit;
@@ -86,6 +87,7 @@ type
     procedure iVMFillShortString(const aValue: string);
     procedure iVMFillString(const aValue: string);
     procedure iVMFillWord(const aValue: Word);
+    procedure iVMHalt;
     procedure iVMNext;
     procedure iVMRevel;
     procedure vAddInt;
@@ -104,6 +106,7 @@ type
     procedure vSetRunning;
     procedure vSkipBlank;
     procedure vStore;
+    procedure vSubInt;
     procedure vTIB;
     procedure vTIBNum;
     procedure vToIN;
@@ -113,7 +116,6 @@ type
     procedure ExecuteInstruction(const aInstruction: TVMInstruction); overload;
     function GetWordCFA(const aWord: string): Integer; override;
     procedure iForthHeader(const aWordAttr: TForthWordRec);
-    procedure InitProcList;
     procedure LoadFromStream(const aStream: TStream); override;
     procedure SaveToStream(const aStream: TStream); override;
     property Instrunction: TForthMethod read FInstrunction;
@@ -151,14 +153,20 @@ end;
 
 function TSuperInterpreter.ExecuteCFA(const aCFA: Integer): Integer;
 begin
-  Result := inherited ExecuteCFA(aCFA);
+  Assert(aCFA < FMemorySize, rsVisitMemoryExceed);
+  FIP := aCFA;
+  Include(FStatus, psRunning);
+  iVMNext;
 end;
 
 procedure TSuperInterpreter.ExecuteInstruction;
 begin
-  FIR := TVMInstruction(FMemory[IP]);
-  ExecuteInstruction(FIR);
-  Inc(FIP, SizeOf(TVMInstruction));
+  while (FPC < FMemorySize) and (psRunning in Status) do
+  begin
+    FIR := TVMInstruction(FMemory[PC]);
+    ExecuteInstruction(FIR);
+    Inc(FPC, SizeOf(TVMInstruction));
+  end;
 end;
 
 procedure TSuperInterpreter.ExecuteInstruction(const aInstruction:
@@ -228,6 +236,20 @@ begin
   FInternalProcList[inEnter] := TMethod(LVM).Code;
   LVM := iVMNext;
   FInternalProcList[inNext] := TMethod(LVM).Code;
+  LVM := iVMHalt;
+  FInternalProcList[inHalt] := TMethod(LVM).Code;
+  LVM := iVMExit;
+  FInternalProcList[inExit] := TMethod(LVM).Code;
+  
+  //Memory Operation Instruction with Param Stack
+  LVM := vFetch;
+  FInternalProcList[inFetchInt] := TMethod(LVM).Code;
+  LVM := vStore;
+  FInternalProcList[inStoreInt] := TMethod(LVM).Code;
+  LVM := vCFetch;
+  FInternalProcList[inFetchByte] := TMethod(LVM).Code;
+  LVM := vCStore;
+  FInternalProcList[inStoreByte] := TMethod(LVM).Code;
 end;
 
 procedure TSuperInterpreter.iVMAlignMem;
@@ -240,14 +262,12 @@ procedure TSuperInterpreter.iVMEnter;
 begin
   //PUSH IP to Reutrun Stack
   Assert(FSP + SizeOf(Integer) <= Length(FStack), rsReturnStackOverflowError);
-  PInteger(@FStack[FSP])^ := PC;
+  PInteger(@FStack[FSP])^ := IP;
   Inc(FSP, SizeOf(Integer));
-  //PPointer(SP)^ := PC;
-  //Inc(SP, SizeOf(Pointer));
   
   Inc(FWRegister, SizeOf(Pointer));
   
-  PC := FWRegister;
+  IP := FWRegister;
   
   iVMNext;
 end;
@@ -257,7 +277,7 @@ begin
   //POP IP From RS
   Dec(FSP, SizeOf(Integer));
   Assert(FSP >= 0, rsReturnStackUnderflowError);
-  PC := PInteger(@FStack[SP])^;
+  FIP := PInteger(@FStack[SP])^;
   iVMNext;
 end;
 
@@ -284,13 +304,15 @@ end;
 procedure TSuperInterpreter.iVMFillCountPChar(const aValue: PChar; const aSize:
         Integer);
 begin
-  iVMFillInt(aSize);
-  if Length(aValue) > 0 then
+  if aSize > 0 then
   begin
+    iVMFillInt(aSize+1);
     iVMFill(PChar(aValue)^, aSize);
     iVMFillByte(0);
-    iVMAlignMem;
-  end;
+    //iVMAlignMem;
+  end
+  else
+    iVMFillInt(0);
 end;
 
 procedure TSuperInterpreter.iVMFillForthWordHeader(const aWordAttr:
@@ -332,35 +354,46 @@ end;
 procedure TSuperInterpreter.iVMFillShortCountPChar(const aValue: PChar; const
         aSize: Byte);
 begin
-  iVMFillByte(aSize);
-  if Length(aValue) > 0 then
+  if aSize > 0 then
   begin
+    iVMFillByte(aSize+1);
     iVMFill(PChar(aValue)^, aSize);
+    //if PChar(aValue)[aSize-1]^ <> #0 then
+    //if PChar(@FMemory[UsedMemory-1])^ <> #0 then
+    //begin
+      //Inc(PByte(@FMemory[UsedMemory-1])^, 1);
     iVMFillByte(0);
-    iVMAlignMem;
-  end;
+   // end;
+    //iVMAlignMem;
+  end
+  else
+    iVMFillByte(0);
 end;
 
 procedure TSuperInterpreter.iVMFillShortString(const aValue: string);
 begin
-  iVMFillByte(Length(aValue));
   if Length(aValue) > 0 then
   begin
+    iVMFillByte(Length(aValue)+1);
     iVMFill(PChar(aValue)^, Byte(Length(aValue)));
     iVMFillByte(0);
-    iVMAlignMem;
-  end;
+    //iVMAlignMem;
+  end
+  else
+    iVMFillByte(0);
 end;
 
 procedure TSuperInterpreter.iVMFillString(const aValue: string);
 begin
-  iVMFillInt(Length(aValue));
   if Length(aValue) > 0 then
   begin
+    iVMFillInt(Length(aValue)+1);
     iVMFill(PChar(aValue)^, Length(aValue));
     iVMFillByte(0);
-    iVMAlignMem;
-  end;
+    //iVMAlignMem;
+  end
+  else
+    iVMFillInt(0);
 end;
 
 procedure TSuperInterpreter.iVMFillWord(const aValue: Word);
@@ -373,6 +406,11 @@ begin
   Inc(FUsedMemory, SizeOf(aValue));
 end;
 
+procedure TSuperInterpreter.iVMHalt;
+begin
+  Exclude(FStatus, psRunning);
+end;
+
 procedure TSuperInterpreter.iVMNext;
 begin
   {(IP) -> W  fetch memory pointed by IP into "W" register
@@ -382,12 +420,13 @@ begin
   JMP (X)
   }
   
-  FWRegister := PC;
-  Inc(FPC, SizeOf(Integer));
+  FWRegister := IP;
+  Inc(FIP, SizeOf(Integer));
   
   //JMP (X)
   Assert(FWRegister < FMemorySize, rsVisitMemoryExceed);
-  FIP := FMemory[FWRegister];
+  FPC := FWRegister;
+  //FIR := FMemory[FWRegister];
   ExecuteInstruction;
 end;
 
@@ -841,6 +880,16 @@ begin
   //Store the Value
   Assert(LVarAddr < FMemorySize, rsVisitMemoryExceed);
   PInteger(@FMemory[LVarAddr])^ := I;
+end;
+
+procedure TSuperInterpreter.vSubInt;
+begin
+  //至少栈上应该有两个数据
+  Assert(FSP>=2*SizeOf(Integer), rsParamStackUnderflowError);
+  Dec(FSP, SizeOf(Integer));
+  PInteger(@FParameterStack[FSP-SizeOf(Integer)])^ :=
+    PInteger(@FParameterStack[FSP-SizeOf(Integer)])^ -
+    PInteger(@FParameterStack[FSP])^;
 end;
 
 procedure TSuperInterpreter.vTIB;
