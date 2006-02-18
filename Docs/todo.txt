@@ -29,6 +29,8 @@ EBX    <-- TOS Data
 EBX = a
 b is in  数据栈.
 
+TIB: Text Input Buffer
+
 修改FORTH解释器的内存映象的结构:
 FORTH解释器初始化的时候，先分配的内存：
 [cTIBLengthOffset]TIBLength: DWORD (#TIB=1)
