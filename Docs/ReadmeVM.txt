@@ -1,24 +1,28 @@
 我的虚拟机(Virtual Machine)说明：
 
-我将它命名为： SuperScriptEngine. 
+我将它命名为： TurboScriptEngine. 
+
+设计目标：
+  高速（既能够解释执行，也能够编译成机器码直接执行），小巧，高效；
+  数据库执行功能：the run-time script types, constants, global variables and procedures can be stored in the memory or database.
 
 首先由编译模块将程序全部翻译成Forth虚拟机器码,再由执行器将虚拟机器码翻译成不同平台的执行码并执行或者由执行器解释执行.
 
 两大模块：编译器模块，执行器模块
 
 编译器模块
-抽象层: uSuperCompiler.pas(CustomSuperCompiler, CustomSuperScriptModule)
-使用层: SuperForthCompiler.pas, SuperPascalCompiler.pas
+抽象层: uTurboCompiler.pas(CustomTurboCompiler, CustomTurboScriptModule)
+使用层: TurboForthCompiler.pas, TurboPascalCompiler.pas, TurboBasicCompiler.pas, TurboCCompiler.pas, etc
 扩展层: 
 
 执行器模块
-抽象层: uSuperExecutor.pas(include abstract PEFormat, executor and debugger classes)
-使用层: SuperX86Executor.pas; SuperZ80Executor.pas, SuperJavaVMExecutor.pas
-扩展层: 如, SuperInterpreter.pas; SuperDebugger.pas;  
+抽象层: uTurboExecutor.pas(include abstract PEFormat, executor and debugger classes)
+使用层: TurboX86Executor.pas; TurboZ80Executor.pas, TurboJavaVMExecutor.pas
+扩展层: 如, TurboInterpreter.pas; TurboDebugger.pas;  
 
 执行器中只包括Codes, ImportModules(自己提供给脚本使用的以及通过LoadLibrary装入的), Resource, 其它信息(ImportTable)只在PEFormat中存在。
 
-文件支持层: uSuperPEFormat.pas(俺的格式); uSuperWin32PEFormat(windows32的PE格式);
+文件支持层: uTurboPEFormat.pas(俺的格式); uTurboWin32PEFormat(windows32的PE格式);
 编译后的可执行文件格式, PE: Portable Executable File Format 
 功能：根据格式，装入Import表中的模块(DLL或ForthDLL模块)，重定位地址，以及管理RES资源。以及需要重新计算的绝对地址，relocation表。
 1、Import表(if any)
@@ -30,15 +34,15 @@
 
 注意：根据俺正在学习的PE格式，也许应该将其组织成Section，Section的用涂由其属性决定。具体格式参见ExeCompile.txt。
 
-这个Section应该称之为模块吧：TSuperScriptModule, 模块只应该在编译期存在。Section应该是比较简单的格式，这样运行效率才高。
+这个Section应该称之为模块吧：TTurboScriptModule, 模块只应该在编译期存在。Section应该是比较简单的格式，这样运行效率才高。
 
 ForthDLL：与DLL类似，不过里面的代码不是机器码，而是Forth的VM码。
 
 
 类的说明:
 
-{ Summary the module for the SuperScript.}
-TCustomSuperScriptModule = Class
+{ Summary the module for the TurboScript.}
+TCustomTurboScriptModule = Class
 protected
 pubic
 end;
@@ -46,9 +50,9 @@ end;
 { Summary The Abstract Portable Executable File Format Helper Class }
 { Description 
   Load the Executable File from the stream/file.
-  See Also GSuperPEFormatFactory
+  See Also GTurboPEFormatFactory
 }
-TCustomSuperPEFormat = Class
+TCustomTurboPEFormat = Class
 
 end;
 
