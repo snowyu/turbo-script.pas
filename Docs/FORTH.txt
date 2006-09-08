@@ -53,15 +53,40 @@ Moving Forth简介
   W  ：辅助工作用缓存器，辅助字典动作或运算用。
 
 3.Forth字典运作
+以该单词定义说明： ": SQUARE  DUP * ;"
+
   Forth字典运作有四种方式：
   Indirect Thread Code(ITC)
   Direct Thread Code(DTC)
   Subroution Thread Code(STC)
   Token Thread Code(TTC)
   ITC:为原始Forth所使用的字典方法。现已不用，多为DTC所取代。
+    代码流为：各个过程的入口地址
     其结构及动作原理参照Moving Forth-Figure 1。
+    machine code Address of ENTER, address of DUP , address of *, address of EXIT
+   In pseudo-code, this is:
+   (IP) -> W  fetch memory pointed by IP into "W" register
+              ...W now holds address of the Code Field
+   IP+2 -> IP advance IP, just like a program counter
+              (assuming 2-byte addresses in the thread)
+   (W) ->  X  fetch memory pointed by W into "X" register
+              ...X now holds address of the machine code 
+   JP (X)     jump to the address in the X register
+
+   DOCOLON or ENTER in various Forths:
+   PUSH IP     onto the "return address stack"
+   W+2 -> IP   W still points to the Code Field, so W+2 is 
+               the address of the Body!  (Assuming a 2-byte
+               address -- other Forths may be different.)
+   JUMP to interpreter ("NEXT")
   DTC:现在Forth常用的字典方法，结构及动作原理参照Moving Forth-Figure 2。
 　　和ITC不同点在于底层执行机械码之字典结构不同，高阶字则一样。
+    不同处：过程代码入口处为实际的机器码
+    CALL/JUMP ENTER, address of DUP , address of *, address of EXIT
+   The NEXT pseudo-code for direct threading is simply:
+   (IP) -> W   fetch memory pointed by IP into "W" register
+   IP+2 -> IP  advance IP (assuming 2-byte addresses)
+   JP (W)      jump to the address in the W register
   STC:动作最简单，最容易理解的字典动作，直接使用一般CPU的呼叫。
 　　可能有较快的执行速度，但加大程序代码的容量。
 　　而且高阶字及低阶字有相同的结构，最容易实现的字典动作。
