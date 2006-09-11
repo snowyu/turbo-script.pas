@@ -7,7 +7,7 @@ uses
   ;
 
 const
-  cFORTHHeaderMagicWord = 'SUPER4TH';
+  cFORTHHeaderMagicWord = 'TURBO4TH';
   //cFORTHMagicWordSize = SizeOf(cFORTHHeaderMagicWord);
   cDefaultStackSize = 127;
   cDefaultParamStackSize = 127; 
@@ -21,8 +21,12 @@ resourcestring
   rsParamStackOverflowError = 'Parameter Stack overflow';
 
 type
-  ESuperScriptError = class(Exception);
-  TSuperForthFileType = (ftProgram, ftLib);
+  ETurboScriptError = class(Exception);
+  {: the Module Type }
+  {
+    @param mtFunction         the script function(word).
+  }
+  TTurboScriptModuleType = (mtUnknown, mtProgram, mtLib, mtFunction);
   PByte = ^Byte;
   {: The Code(Word) Field }
   TCodeField = packed record
@@ -40,6 +44,7 @@ type
 
   { Summary the FORTH Virtual Mache Codes}
   TVMInstruction = (
+    inNone,
     {## The FORTH CORE instructions }
     inHalt,
     inEnter,

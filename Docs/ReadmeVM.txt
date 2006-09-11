@@ -22,7 +22,10 @@
 
 执行器中只包括Codes, ImportModules(自己提供给脚本使用的以及通过LoadLibrary装入的), Resource, 其它信息(ImportTable)只在PEFormat中存在。
 
-文件支持层: uTurboPEFormat.pas(俺的格式); uTurboWin32PEFormat(windows32的PE格式);
+文件支持层: 
+  uTurboScriptAccessor(模块装入保存机制); 
+  实际的装载、卸载发生在这里，管理从文件或数据库加载模块，模块的唯一性。
+  uTurboPEFormat.pas(俺的格式); uTurboWin32PEFormat(windows32的PE格式);
 编译后的可执行文件格式, PE: Portable Executable File Format 
 功能：根据格式，装入Import表中的模块(DLL或ForthDLL模块)，重定位地址，以及管理RES资源。以及需要重新计算的绝对地址，relocation表。
 1、Import表(if any)
@@ -161,9 +164,96 @@ TFunctionProc = Function():Integer;
 使用 fixed length VMCode:
 
 
+内部(Internal)函数总览
+也就是内部关键字（过程）。ID为LongWord（$1-$FFFFFFFF）,可以分为系统关键字过程,ID从1-$FFFF和用户自定义关键字过程，ID($10000-$FFFFFFFF).
+如果是在内部解释执行，反正都需要解释，那么就采用查表法(TTC)；只有当需要脱离的时候才换成执行地址(DTC or STC)。
+
+TTC(查表)的表： 对于系统关键字，可以在细分下($1-$1FF)为核心系统关键字，采用数组的形式直接存放执行入口地址；
+而对于其他的关键字则采用散列等其他形式来节约内存。嘿嘿，我有了更好的主意，直接采用地址。
+对于内部关键过程全部采用数组形式，新加的添加在最后（当然这样的后果就是用户自定义的函数可能不会唯一，和别的用户定义相冲突）。
+
+
+系统关键字过程:
+  四则运算过程：
+  逻辑运算过程：
+  字符串处理：
+  流程控制： if...else, while, for...next, repeat...until.
+
+
  2. 返回堆栈区
  3. 变量数据区
  4. 内部程序区(Procs): 就是那些固定的机器指令代码/
 
 FORTH虚拟机处理的数据区除了上述的数据区外:
  4. 数据堆栈区
+
+TTC(查表方式下)寄存器的使用：
+
+TurboScript 机器指令(Forth)汇编：
+指令以字节作为长度。换句话说，机器指令最多255个。在解释器中，VM机器指令是以查表的方式解释执行。在翻译器中将这些VM指令翻译成真正的机器语言然后在执行器（如：X86Executor）中执行。
+
+  { Summary the FORTH Virtual Mache Codes}
+  TVMInstruction = (
+    inNone,
+    {## The FORTH CORE instructions }
+    inHalt,
+    inEnter,
+    inExit,
+    inNext,
+    
+    {## Memory Operation Instruction }
+    inStoreInt, 
+    inStoreByte, //CStore
+    inFetchInt,
+    inFetchByte, //CFetch
+
+    {## Arithmatic instructions }
+    {## for Integer}
+    inAddInt, //Add
+    inSubInt, //subtract
+    inIncInt, //add 1
+    inDecInt, //subtract 1
+    inMULInt, //multiply 
+    inDIVInt, //divide
+    inIncNInt, //add N
+    inDecNInt, //subtract N
+
+    {## Logical instructions }
+    {## for Integer}
+    inEQUInt,
+    inNEQInt, // not equ
+    inLESInt, //less than
+    inLEQInt, //less than and equ
+    inGERInt, //greater than
+    inGEQInt, //greater than and equ
+    inNOTInt, //Negate(NOT)
+    inANDInt,
+    inORInt,
+    inXORInt,
+
+    {## Proc Operation Instruction }
+    inJMP,
+    inJZ,
+    inJNZ,
+    inCall,
+    inReturn,
+    inNoop,
+
+    {## Stack Operation Instuction }
+    inPushInt,
+    inPopInt,
+    inDropInt,
+    inDUPInt,
+    inSWAPInt,
+    inOVERInt,
+    inROTInt
+  ); 
+
+
+
+TurboScript 标准库文件 Lib 格式： 
+我想将内部关键字（函数）全部弄成库的形式，这样便于自举。
+System.tcu (TurboScript Compiled Unit)
+对于内部核心关键字应该是如何办啊？必须有一套汇编指令。既然是Forth机器，那么汇编指令就是Forth核心指令。
+
+tcu<VersionNo>

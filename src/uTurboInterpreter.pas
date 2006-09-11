@@ -19,7 +19,7 @@ uMeInterpreter。
 还是建立一个TTurboX86Interpreter来作为专门针对x86的优化.
 还是专门建立一个单元来做。
 }
-unit TurboInterpreter;
+unit uTurboInterpreter;
 
 interface
 

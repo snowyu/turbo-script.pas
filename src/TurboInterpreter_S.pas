@@ -1,25 +1,5 @@
-{1 The Virtual FORTH Interpreter }
-{{
-
-参数栈，全局内存。
-返回栈，全局内存。
-
-Note: 参数栈, 返回栈是所有的 TurboInterpreter
-实例共享的。这样函数库才有戏。只有代码＆变量内存空间
-为每一个解释器(module)私有。
-
-考虑到 Interpreter 可以使用其他库(Interpreter)的函数，增加Modules属性.总之参考
-uMeInterpreter。
-
-
-需要对解释器进行的针对x86的优化：
-参数栈，使用全局内存。
-返回栈，使用机器的返回栈。
-
-还是建立一个TTurboX86Interpreter来作为专门针对x86的优化.
-还是专门建立一个单元来做。
-}
-unit TurboInterpreter;
+{1 the pure pascal impl. }
+unit TurboInterpreter_S;
 
 interface
 
@@ -28,7 +8,8 @@ interface
 uses
   SysUtils, Classes
   , uTurboScriptConsts
-  , uTurboExecutor 
+  , uTurboExecutor
+  //, uTurboInterpretor 
   ;
 
 resourcestring
@@ -64,8 +45,9 @@ type
     Options: TForthWordOptions;
     Name: string;
   end;
-  
-  {1 The abstract Virtual FORTH Interpreter Class }
+
+type
+  {1 The Virtual FORTH Interpreter Class(pure pascal impl) }
   {{
   Return Stack:
     * SP        Return Stack Pointer
@@ -84,7 +66,7 @@ type
     PInteger(SP)^ := aInt;
     Inc(SP, SizeOf(Integer));
   }
-  TCustomTurboInterpreter = class(TCustomTurboExecutor)
+  TTurboInterpreter = class(TCustomTurboExecutor)
   private
     function GetPLibEntry: PForthWord;
     function GetTIB: string;
@@ -113,6 +95,7 @@ type
     FParameterStack: TStack;
     FParameterStackSize: Integer;
     FPC: Integer;
+    FProcessorStates: TForthProcessorStates;
     FRP: Integer;
     {1 the Parameter Stack(or data stack) Pointer }
     FSP: Integer;
@@ -122,7 +105,6 @@ type
     }
     FStack: TStack;
     FStackSize: Integer;
-    FStatus: TForthProcessorStates;
     {1 The Current TIB Index }
     {{
     FTIBIndex : Text[FTIBIndex]
@@ -487,6 +469,12 @@ type
     }
     property PC: Integer read FPC write FPC;
     property PLibEntry: PForthWord read GetPLibEntry;
+    {1 : the Status of the Processor Register. }
+    {{
+    Chinese
+      状态寄存器
+    }
+    property ProcessorStates: TForthProcessorStates read FProcessorStates;
     {1 : return stack pointer(TOS). }
     {{
     stack pointer, a register that points to the area 
@@ -499,12 +487,6 @@ type
     property SP: Integer read FSP write FSP;
     {1 : the Stack Size. }
     property StackSize: Integer read FStackSize write SetStackSize;
-    {1 : the Status of the Processor Register. }
-    {{
-    Chinese
-      状态寄存器
-    }
-    property Status: TForthProcessorStates read FStatus;
     {1 the script source(TIB) }
     {{
     TIB: text input Buffer
@@ -523,9 +505,9 @@ type
 implementation
 
 {
-*************************** TCustomTurboInterpreter ****************************
+****************************** TTurboInterpreter *******************************
 }
-constructor TCustomTurboInterpreter.Create(const aParamStack: TStack = nil);
+constructor TTurboInterpreter.Create(const aParamStack: TStack = nil);
 begin
   inherited Create;
   StackSize := cDefaultStackSize;
@@ -534,15 +516,15 @@ begin
   TMethod(FInstrunction).Data := Self;
 end;
 
-function TCustomTurboInterpreter.ExecuteCFA(const aCFA: Integer): Integer;
+function TTurboInterpreter.ExecuteCFA(const aCFA: Integer): Integer;
 begin
   Assert(aCFA < FMemorySize, rsVisitMemoryExceed);
   FIP := aCFA;
-  Include(FStatus, psRunning);
+  Include(FProcessorStates, psRunning);
   iVMNext;
 end;
 
-procedure TCustomTurboInterpreter.ExecuteInstruction;
+procedure TTurboInterpreter.ExecuteInstruction;
 begin
   while (FPC < FMemorySize) and (psRunning in Status) do
   begin
@@ -552,7 +534,7 @@ begin
   end;
 end;
 
-procedure TCustomTurboInterpreter.ExecuteInstruction(const aInstruction:
+procedure TTurboInterpreter.ExecuteInstruction(const aInstruction:
         TVMInstruction);
 begin
   TMethod(FInstrunction).Code := FInternalProcList[aInstruction];
@@ -560,12 +542,12 @@ begin
   FInstrunction;
 end;
 
-function TCustomTurboInterpreter.GetPLibEntry: PForthWord;
+function TTurboInterpreter.GetPLibEntry: PForthWord;
 begin
   Result := PForthWord(@FMemory[LibEntryAddress]);
 end;
 
-function TCustomTurboInterpreter.GetTIB: string;
+function TTurboInterpreter.GetTIB: string;
 var
   I: Integer;
 begin
@@ -579,18 +561,18 @@ begin
     Result := '';
 end;
 
-function TCustomTurboInterpreter.GetWordCFA(const aWord: string): Integer;
+function TTurboInterpreter.GetWordCFA(const aWord: string): Integer;
 begin
   Result := -1;
 end;
 
-procedure TCustomTurboInterpreter.iForthHeader(const aWordAttr: TForthWordRec);
+procedure TTurboInterpreter.iForthHeader(const aWordAttr: TForthWordRec);
 begin
   iVMFillForthWordHeader(aWordAttr);
   iVMRevel;
 end;
 
-procedure TCustomTurboInterpreter.Init;
+procedure TTurboInterpreter.Init;
 begin
   FPC := 0;
   FRP := 0;
@@ -611,7 +593,7 @@ begin
   PChar(@FMemory[cLastWordEntryOffset-1])^ := #0;
 end;
 
-procedure TCustomTurboInterpreter.InitProcList;
+procedure TTurboInterpreter.InitProcList;
 var
   LVM: TVMMethod;
 begin
@@ -635,13 +617,13 @@ begin
   FInternalProcList[inStoreByte] := TMethod(LVM).Code;
 end;
 
-procedure TCustomTurboInterpreter.iVMAlignMem;
+procedure TTurboInterpreter.iVMAlignMem;
 begin
   Inc(FUsedMemory, (SizeOf(Pointer)-1));
   FUsedMemory := FUsedMemory and -SizeOf(Pointer);
 end;
 
-procedure TCustomTurboInterpreter.iVMEnter;
+procedure TTurboInterpreter.iVMEnter;
 begin
   //PUSH IP to Reutrun Stack
   Assert(FSP + SizeOf(Integer) <= Length(FStack), rsReturnStackOverflowError);
@@ -655,7 +637,7 @@ begin
   iVMNext;
 end;
 
-procedure TCustomTurboInterpreter.iVMExit;
+procedure TTurboInterpreter.iVMExit;
 begin
   if FSP > 0 then
   begin
@@ -669,7 +651,7 @@ begin
   end;
 end;
 
-procedure TCustomTurboInterpreter.iVMFill(const aValue;  const Size: Integer);
+procedure TTurboInterpreter.iVMFill(const aValue;  const Size: Integer);
 begin
   if UsedMemory + Size > Length(FMemory) then
   begin
@@ -679,7 +661,7 @@ begin
   Inc(FUsedMemory, Size);
 end;
 
-procedure TCustomTurboInterpreter.iVMFillByte(const aValue: Byte);
+procedure TTurboInterpreter.iVMFillByte(const aValue: Byte);
 begin
   if UsedMemory + SizeOf(aValue) > Length(FMemory) then
   begin
@@ -689,8 +671,8 @@ begin
   Inc(FUsedMemory, SizeOf(aValue));
 end;
 
-procedure TCustomTurboInterpreter.iVMFillCountPChar(const aValue: PChar; const
-        aSize: Integer);
+procedure TTurboInterpreter.iVMFillCountPChar(const aValue: PChar; const aSize:
+        Integer);
 begin
   if aSize > 0 then
   begin
@@ -703,7 +685,7 @@ begin
     iVMFillInt(0);
 end;
 
-procedure TCustomTurboInterpreter.iVMFillForthWordHeader(const aWordAttr:
+procedure TTurboInterpreter.iVMFillForthWordHeader(const aWordAttr:
         TForthWordRec);
 begin
   //write the integer 0 to header first
@@ -729,7 +711,7 @@ begin
   iVMFillShortString(aWordAttr.Name);
 end;
 
-procedure TCustomTurboInterpreter.iVMFillInt(const aValue: Integer);
+procedure TTurboInterpreter.iVMFillInt(const aValue: Integer);
 begin
   if UsedMemory + SizeOf(aValue) > Length(FMemory) then
   begin
@@ -739,8 +721,8 @@ begin
   Inc(FUsedMemory, SizeOf(aValue));
 end;
 
-procedure TCustomTurboInterpreter.iVMFillShortCountPChar(const aValue: PChar;
-        const aSize: Byte);
+procedure TTurboInterpreter.iVMFillShortCountPChar(const aValue: PChar; const
+        aSize: Byte);
 begin
   if aSize > 0 then
   begin
@@ -758,7 +740,7 @@ begin
     iVMFillByte(0);
 end;
 
-procedure TCustomTurboInterpreter.iVMFillShortString(const aValue: string);
+procedure TTurboInterpreter.iVMFillShortString(const aValue: string);
 begin
   if Length(aValue) > 0 then
   begin
@@ -771,7 +753,7 @@ begin
     iVMFillByte(0);
 end;
 
-procedure TCustomTurboInterpreter.iVMFillString(const aValue: string);
+procedure TTurboInterpreter.iVMFillString(const aValue: string);
 begin
   if Length(aValue) > 0 then
   begin
@@ -784,7 +766,7 @@ begin
     iVMFillInt(0);
 end;
 
-procedure TCustomTurboInterpreter.iVMFillWord(const aValue: Word);
+procedure TTurboInterpreter.iVMFillWord(const aValue: Word);
 begin
   if UsedMemory + SizeOf(aValue) > Length(FMemory) then
   begin
@@ -794,12 +776,12 @@ begin
   Inc(FUsedMemory, SizeOf(aValue));
 end;
 
-procedure TCustomTurboInterpreter.iVMHalt;
+procedure TTurboInterpreter.iVMHalt;
 begin
-  Exclude(FStatus, psRunning);
+  Exclude(FProcessorStates, psRunning);
 end;
 
-procedure TCustomTurboInterpreter.iVMNext;
+procedure TTurboInterpreter.iVMNext;
 begin
   {(IP) -> W  fetch memory pointed by IP into "W" register
                 ...W now holds address of the Code Field(CFA)
@@ -818,12 +800,12 @@ begin
   ExecuteInstruction;
 end;
 
-procedure TCustomTurboInterpreter.iVMRevel;
+procedure TTurboInterpreter.iVMRevel;
 begin
   FLibEntryAddress := FLastWordEntryAddress;
 end;
 
-procedure TCustomTurboInterpreter.LoadFromStream(const aStream: TStream);
+procedure TTurboInterpreter.LoadFromStream(const aStream: TStream);
 var
   I: Integer;
   J: Integer;
@@ -919,12 +901,12 @@ begin
   end;
 end;
 
-procedure TCustomTurboInterpreter.SaveToStream(const aStream: TStream);
+procedure TTurboInterpreter.SaveToStream(const aStream: TStream);
 begin
   inherited SaveToStream(aStream);
 end;
 
-procedure TCustomTurboInterpreter.SetMemorySize(Value: Integer);
+procedure TTurboInterpreter.SetMemorySize(Value: Integer);
 begin
   if FMemorySize <> Value then
   begin
@@ -940,7 +922,7 @@ begin
   end;
 end;
 
-procedure TCustomTurboInterpreter.SetParameterStackSize(const Value: Integer);
+procedure TTurboInterpreter.SetParameterStackSize(const Value: Integer);
 begin
   if FParameterStackSize <> Value then
   begin
@@ -957,7 +939,7 @@ begin
   end;
 end;
 
-procedure TCustomTurboInterpreter.SetStackSize(const Value: Integer);
+procedure TTurboInterpreter.SetStackSize(const Value: Integer);
 begin
   if FStackSize <> Value then
   begin
@@ -974,7 +956,7 @@ begin
   end;
 end;
 
-procedure TCustomTurboInterpreter.SetTIB(const Value: string);
+procedure TTurboInterpreter.SetTIB(const Value: string);
 var
   I: Integer;
 begin
@@ -993,7 +975,7 @@ begin
   end;
 end;
 
-procedure TCustomTurboInterpreter.vAddInt;
+procedure TTurboInterpreter.vAddInt;
 begin
   //至少栈上应该有两个数据
   Assert(FSP>=2*SizeOf(Integer), rsParamStackUnderflowError);
@@ -1003,7 +985,7 @@ begin
     PInteger(@FParameterStack[FSP])^;
 end;
 
-procedure TCustomTurboInterpreter.vAligned;
+procedure TTurboInterpreter.vAligned;
 var
   I: Integer;
 begin
@@ -1015,7 +997,7 @@ begin
   PInteger(@FParameterStack[I])^ := PInteger(@FParameterStack[I])^ and -SizeOf(Pointer);
 end;
 
-procedure TCustomTurboInterpreter.vCFetch;
+procedure TTurboInterpreter.vCFetch;
 var
   I: Integer;
   LVarAddress: Integer;
@@ -1029,7 +1011,7 @@ begin
   PInteger(@FParameterStack[i])^ := PByte(@FMemory[LVarAddress])^;
 end;
 
-procedure TCustomTurboInterpreter.vCONTEXT;
+procedure TTurboInterpreter.vCONTEXT;
 begin
   //Push the CONTEXT Address
   Assert(FSP + SizeOf(Integer)<= Length(FParameterStack), rsParamStackUnderflowError);
@@ -1038,7 +1020,7 @@ begin
   Inc(FSP, SizeOf(Integer));
 end;
 
-procedure TCustomTurboInterpreter.vCount;
+procedure TTurboInterpreter.vCount;
 var
   LStrAddr: Integer;
   LStrCount: Integer;
@@ -1062,7 +1044,7 @@ begin
   Inc(FSP, SizeOf(Integer));
 end;
 
-procedure TCustomTurboInterpreter.vCountShort;
+procedure TTurboInterpreter.vCountShort;
 var
   LStrAddr: Integer;
   LStrCount: Byte;
@@ -1086,7 +1068,7 @@ begin
   Inc(FSP, SizeOf(Integer));
 end;
 
-procedure TCustomTurboInterpreter.vCStore;
+procedure TTurboInterpreter.vCStore;
 var
   I: Integer;
   LVarAddr: Integer;
@@ -1106,7 +1088,7 @@ begin
   PInteger(@FMemory[LVarAddr])^ := I;
 end;
 
-procedure TCustomTurboInterpreter.vFetch;
+procedure TTurboInterpreter.vFetch;
 var
   I: Integer;
   LVarAddress: Integer;
@@ -1120,7 +1102,7 @@ begin
   PInteger(@FParameterStack[i])^ := PInteger(@FMemory[LVarAddress])^;
 end;
 
-procedure TCustomTurboInterpreter.vHERE;
+procedure TTurboInterpreter.vHERE;
 begin
   //Push the current UsedMemory to param stack
   Assert(FSP + SizeOf(Integer)<= Length(FParameterStack), rsParamStackUnderflowError);
@@ -1128,7 +1110,7 @@ begin
   Inc(FSP, SizeOf(Integer));
 end;
 
-procedure TCustomTurboInterpreter.vLAST;
+procedure TTurboInterpreter.vLAST;
 begin
   //Push the LAST-WORD Address
   Assert(FSP + SizeOf(Integer)<= Length(FParameterStack), rsParamStackUnderflowError);
@@ -1137,7 +1119,7 @@ begin
   Inc(FSP, SizeOf(Integer));
 end;
 
-procedure TCustomTurboInterpreter.vPARSE;
+procedure TTurboInterpreter.vPARSE;
 var
   LTIBIndex: Integer;
   LSepChar: Char;
@@ -1175,7 +1157,7 @@ begin
   Inc(FSP, SizeOf(Integer));
 end;
 
-procedure TCustomTurboInterpreter.vPlaceShortString;
+procedure TTurboInterpreter.vPlaceShortString;
 var
   LDstStrAddr: Integer;
   LSrcCount: Byte;
@@ -1201,7 +1183,7 @@ begin
   iVMFillShortCountPChar(LSrcPChar, LSrcCount);
 end;
 
-procedure TCustomTurboInterpreter.vPlaceString;
+procedure TTurboInterpreter.vPlaceString;
 var
   LDstStrAddr: Integer;
   LSrcCount: Integer;
@@ -1227,12 +1209,12 @@ begin
   iVMFillCountPChar(LSrcPChar, LSrcCount);
 end;
 
-procedure TCustomTurboInterpreter.vSetRunning;
+procedure TTurboInterpreter.vSetRunning;
 begin
-  Include(FStatus, psRunning);
+  Include(FProcessorStates, psRunning);
 end;
 
-procedure TCustomTurboInterpreter.vSkipBlank;
+procedure TTurboInterpreter.vSkipBlank;
 var
   LTIBLen: Integer;
   LTIBIndex: Integer;
@@ -1250,7 +1232,7 @@ begin
   PInteger(@FMemory[cToINOffset])^ := LTIBIndex;
 end;
 
-procedure TCustomTurboInterpreter.vStore;
+procedure TTurboInterpreter.vStore;
 var
   I: Integer;
   LVarAddr: Integer;
@@ -1270,7 +1252,7 @@ begin
   PInteger(@FMemory[LVarAddr])^ := I;
 end;
 
-procedure TCustomTurboInterpreter.vSubInt;
+procedure TTurboInterpreter.vSubInt;
 begin
   //至少栈上应该有两个数据
   Assert(FSP>=2*SizeOf(Integer), rsParamStackUnderflowError);
@@ -1280,7 +1262,7 @@ begin
     PInteger(@FParameterStack[FSP])^;
 end;
 
-procedure TCustomTurboInterpreter.vTIB;
+procedure TTurboInterpreter.vTIB;
 begin
   //Push the TIB Address
   Assert(FSP + SizeOf(Integer)<= Length(FParameterStack), rsParamStackUnderflowError);
@@ -1289,7 +1271,7 @@ begin
   Inc(FSP, SizeOf(Integer));
 end;
 
-procedure TCustomTurboInterpreter.vTIBNum;
+procedure TTurboInterpreter.vTIBNum;
 begin
   //Push the TIB Length address
   Assert(FSP + SizeOf(Integer)<= Length(FParameterStack), rsParamStackUnderflowError);
@@ -1298,7 +1280,7 @@ begin
   Inc(FSP, SizeOf(Integer));
 end;
 
-procedure TCustomTurboInterpreter.vToIN;
+procedure TTurboInterpreter.vToIN;
 begin
   //Push the TIB index
   Assert(FSP + SizeOf(Integer)<= Length(FParameterStack), rsParamStackUnderflowError);
