@@ -1,4 +1,4 @@
-unit uSuperScriptConsts;
+unit uTurboScriptConsts;
 
 interface
 

@@ -1,14 +1,14 @@
-unit uSuperExecutor;
+unit uTurboExecutor;
 
 interface
 
 uses
   SysUtils, Classes
-  , uSuperScriptConsts
+  , uTurboScriptConsts
   ;
 
 type
-  TCustomSuperPEFormat = class(TObject)
+  TCustomTurboPEFormat = class(TObject)
   private
     FImageBase: Integer;
   protected
@@ -19,7 +19,7 @@ type
     property ImageBase: Integer read FImageBase write FImageBase;
   end;
   
-  TCustomSuperExecutor = class(TObject)
+  TCustomTurboExecutor = class(TObject)
   private
     FFileDate: LongWord;
     FFileType: TSuperForthFileType;
@@ -45,14 +45,14 @@ type
 implementation
 
 {
-***************************** TCustomSuperExecutor *****************************
+***************************** TCustomTurboExecutor *****************************
 }
-function TCustomSuperExecutor.ExecuteCFA(const aCFA: Integer): Integer;
+function TCustomTurboExecutor.ExecuteCFA(const aCFA: Integer): Integer;
 begin
   Result := -1;
 end;
 
-function TCustomSuperExecutor.ExecuteWord(const aWord: string): Integer;
+function TCustomTurboExecutor.ExecuteWord(const aWord: string): Integer;
 var
   aCFA: Integer;
 begin
@@ -64,18 +64,18 @@ begin
     Result := -1;
 end;
 
-function TCustomSuperExecutor.GetWordCFA(const aWord: string): Integer;
+function TCustomTurboExecutor.GetWordCFA(const aWord: string): Integer;
 begin
   Result := -1;
 end;
 
-procedure TCustomSuperExecutor.Init;
+procedure TCustomTurboExecutor.Init;
 begin
   //PC := 0;
   //SP := StackSize;
 end;
 
-procedure TCustomSuperExecutor.LoadFromFile(const aFileName: String);
+procedure TCustomTurboExecutor.LoadFromFile(const aFileName: String);
 var
   aFileStream: TFileStream;
 begin
@@ -87,7 +87,7 @@ begin
   end;
 end;
 
-procedure TCustomSuperExecutor.LoadFromStream(const aStream: TStream);
+procedure TCustomTurboExecutor.LoadFromStream(const aStream: TStream);
 var
   Lstr: string;
   L: Byte;
@@ -112,7 +112,7 @@ begin
   end;
 end;
 
-procedure TCustomSuperExecutor.SaveToFile(const aFileName: String);
+procedure TCustomTurboExecutor.SaveToFile(const aFileName: String);
 var
   aFileStream: TFileStream;
 begin
@@ -124,7 +124,7 @@ begin
   end;
 end;
 
-procedure TCustomSuperExecutor.SaveToStream(const aStream: TStream);
+procedure TCustomTurboExecutor.SaveToStream(const aStream: TStream);
 var
   L: Byte;
 begin

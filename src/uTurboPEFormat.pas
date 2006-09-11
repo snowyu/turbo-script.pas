@@ -1,4 +1,4 @@
-unit uSuperPEFormat;
+unit uTurboPEFormat;
 
 interface
 
@@ -16,7 +16,7 @@ type
   //in fact it is the index No. in the CodeArea array.
   TVirtualAddress = integer;
   TVirtualAddressTable = array of TVirtualAddress;
-  TSuperPEFormat = class(TCustomSuperPEFormat)
+  TTurboPEFormat = class(TCustomTurboPEFormat)
   end;
   
 
