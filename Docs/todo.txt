@@ -1,3 +1,14 @@
+2006-9-14
+~如果参数栈＆返回栈使用全局内存，好处就是多个执行器可以共享数据，坏处就是多个执行器不能并行执行。
+ 也许在执行器上面还应有一个类，这个类就可以管理参数栈＆返回栈内存以及参数，这样在这个类上就可以并行执行。
+ 这个类叫什么好呢？ TTurboProgram:
+   TTurboProgram: Execute
+
+记住这里的X86堆栈： 压入则是地址减少，弹出则是地址增加
+When an item is pushed onto the stack, the processor decrements the ESP
+register, then writes the item at the new top of stack. When an item is popped off the stack, the
+processor reads the item from the top of stack, then increments the ESP register
+
 2005-7-19
 * 决定不在字符串后面加对齐指令!!是怎么样就是怎么样!!
 

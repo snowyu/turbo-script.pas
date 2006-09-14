@@ -4,9 +4,10 @@
 参数栈，全局内存。
 返回栈，全局内存。
 
-Note: 参数栈, 返回栈是所有的 TurboInterpreter
-实例共享的。这样函数库才有戏。只有代码＆变量内存空间
-为每一个解释器(module)私有。
+Note: 
+参数栈, 返回栈是所有的 TurboInterpreter 实例共享的。这样函数库才有戏。
+参数栈, 返回栈的创建放在TTurboProgram中，所有的Executor都将依附于TurboProgram.
+只有代码＆变量内存空间为每一个解释器(module)私有。
 
 考虑到 Interpreter 可以使用其他库(Interpreter)的函数，增加Modules属性.总之参考
 uMeInterpreter。
@@ -88,7 +89,6 @@ type
   private
     function GetPLibEntry: PForthWord;
     function GetTIB: string;
-    procedure SetMemorySize(Value: Integer);
     procedure SetParameterStackSize(const Value: Integer);
     procedure SetStackSize(const Value: Integer);
     procedure SetTIB(const Value: string);
@@ -106,9 +106,6 @@ type
     }
     FLastWordEntryAddress: Integer;
     FLibEntryAddress: Integer;
-    {1 The Code Memory }
-    FMemory: TMemoryArray;
-    FMemorySize: Integer;
     {1 : the Parameter Stack }
     FParameterStack: TStack;
     FParameterStackSize: Integer;
@@ -128,7 +125,6 @@ type
     FTIBIndex : Text[FTIBIndex]
     }
     FTextIndex: Integer;
-    FUsedMemory: Integer;
     FWRegister: Integer;
     function ExecuteCFA(const aCFA: Integer): Integer; override;
     procedure Init; override;
@@ -472,11 +468,6 @@ type
     it's a index of FMemory.
     }
     property LibEntryAddress: Integer read FLibEntryAddress;
-    {1 : the Memory Size. }
-    {{
-    warining: if in the running status, you may be get trouble!!
-    }
-    property MemorySize: Integer read FMemorySize write SetMemorySize;
     property ParameterStackSize: Integer read FParameterStackSize write
             SetParameterStackSize;
     {1 : program counter. }
@@ -510,12 +501,6 @@ type
     TIB: text input Buffer
     }
     property TIB: string read GetTIB write SetTIB;
-    {1 已经使用的内存 }
-    {{
-    也就是指向最大的可用内存：
-    从该地址起的内存未用：FMemory[UsedMemory] 
-    }
-    property UsedMemory: Integer read FUsedMemory write FUsedMemory;
     property WRegister: Integer read FWRegister;
   end;
   
@@ -922,22 +907,6 @@ end;
 procedure TCustomTurboInterpreter.SaveToStream(const aStream: TStream);
 begin
   inherited SaveToStream(aStream);
-end;
-
-procedure TCustomTurboInterpreter.SetMemorySize(Value: Integer);
-begin
-  if FMemorySize <> Value then
-  begin
-    FMemorySize := Value;
-    SetLength(FMemory, FMemorySize);
-    {if (FPC >= FPC0) and (FPC0 <> @FMemory[0]) then
-    begin
-      //the Block has been moved a new address
-      // so, i've to update to the PC too.
-      FPC := (FPC - FPC0) + @FMemory[0];
-    end;
-    FPC0 := @FMemory[0]; //}
-  end;
 end;
 
 procedure TCustomTurboInterpreter.SetParameterStackSize(const Value: Integer);

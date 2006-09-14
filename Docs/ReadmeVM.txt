@@ -16,11 +16,30 @@
 扩展层: 
 
 执行器模块
-抽象层: uTurboExecutor.pas(include abstract PEFormat, executor and debugger classes)
+抽象层: uTurboExecutor.pas(include abstract PEFormat, executor , debugger and TurboProgram classes)
 使用层: TurboX86Executor.pas; TurboZ80Executor.pas, TurboJavaVMExecutor.pas
 扩展层: 如, TurboInterpreter.pas; TurboDebugger.pas;  
 
 执行器中只包括Codes, ImportModules(自己提供给脚本使用的以及通过LoadLibrary装入的), Resource, 其它信息(ImportTable)只在PEFormat中存在。
+
+TurboInterpreter_S: Pure Pascal 实现，暂缓
+TurboInterpreter: 基于x86指令优化。核心指令汇编实现，寄存器采用x86的寄存器，对应关系如下：
+ESP,EBP: 返回堆栈： EAX, EDX 为返回堆栈栈顶，次栈顶。.
+ESI（栈指针）: 数据栈，基址指针放在内存某个单元中。
+EDI: 指向当前指令地址
+EBX: 状态寄存器 (0Bit: 是否运行；1Bit:是否调试)
+ECX: W Register 临时寄存器
+
+可以用PUSHAD 将这些通用寄存器保存于堆栈，供调用其他系统的过程时采用。然后POPAD.
+现在我的问题，这些核心过程是用方法实现还是函数过程实现？函数实现。
+规定：
+EBP-4(SizeOf(Pointer)): 所指的是代码内存地址;
+EBP-8(SizeOf(Pointer)*2): 则是数据栈基址.
+
+PUSH EBP
+MOV  EBP, ESP
+PUSH FMemory
+PUSH FParameterStack
 
 文件支持层: 
   uTurboScriptAccessor(模块装入保存机制); 
@@ -190,7 +209,8 @@ FORTH虚拟机处理的数据区除了上述的数据区外:
 TTC(查表方式下)寄存器的使用：
 
 TurboScript 机器指令(Forth)汇编：
-指令以字节作为长度。换句话说，机器指令最多255个。在解释器中，VM机器指令是以查表的方式解释执行。在翻译器中将这些VM指令翻译成真正的机器语言然后在执行器（如：X86Executor）中执行。
+基本指令以字节作为长度。换句话说，机器指令最多255个。在解释器中，VM机器指令是以查表的方式解释执行。在翻译器中将这些VM指令翻译成真正的机器语言然后在执行器（如：X86Executor）中执行。
+指令可分单字节指令和多字节指令（指令＋操作数）
 
   { Summary the FORTH Virtual Mache Codes}
   TVMInstruction = (
