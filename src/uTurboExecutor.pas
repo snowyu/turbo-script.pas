@@ -54,15 +54,15 @@ type
     {1 预设的代码基地址 }
     property ImageBase: Integer read FImageBase write FImageBase;
   end;
-  
+
   {1 the abstract turbo script executor. }
   {{
   Load the script into memory, and execute the script(maybe translate it into
   native language first).
-  
+
   如果该模块引用了其他模块（函数，变量）怎么办？
   答；无所谓，这就是后期绑定做的事情。
-  
+
   是否支持嵌套子模块？
   答：如果支持，那么就必须在这里加上Modules属性，这样即可实现。
   如果要调用嵌套子模块内的函数那么就要: Module.SubModule.Func.
@@ -70,7 +70,7 @@ type
   我的想法则是：在文件中以相对子目录的形式实现子模块。当然还有数据库也是如法炮制。
   另外对于子模块装入的时候只装入名字，其他的主体则在执行时候按需要装入。
   我准备将模块装入保存机制，从Executor上分离： TTurboScriptAccessor。
-  
+
   Note:为了避免重新计算地址，全部采用相对偏移量！
   }
   TCustomTurboExecutor = class(TObject)
@@ -109,7 +109,7 @@ type
     {1 : Run the CFA word. }
     {{
     internal proc, not init.
-    
+
     @param aCFA the Code Field Address(related to FMemory).
     相对于FMemory的偏移量。
     }
@@ -122,7 +122,7 @@ type
     {1 : Run the Virtual Machine. }
     {{
     Run the Virtual Machine from the PC adress.
-    
+
     @param aCFA the Code Field Address(related to FMemory).
     相对于FMemory的偏移量。
     }
@@ -166,7 +166,7 @@ type
     {{
     stack pointer, a register that points to the area 
     in memory utilized as the main return stack.
-    
+
     the RP0-StackSize <= the stack memory < RP0.
     }
     property RP: Integer read FRP write FRP;
@@ -175,7 +175,7 @@ type
     {1 : Return(Proc) Stack }
     {{
     返回堆栈
-    
+
     指向栈底： @Stack[0]
     压入减小
     }
@@ -194,7 +194,7 @@ type
     }
     property UsedMemory: Integer read FUsedMemory write FUsedMemory;
   end;
-  
+
   TTurboProgram = class(TObject)
   private
     FOptions: TTurboScriptOptions;
@@ -234,7 +234,7 @@ type
     {1 the current status of the script. }
     property Status: TTurboScriptStatus read FStatus write FStatus;
   end;
-  
+
 
 implementation
 
@@ -299,19 +299,34 @@ procedure TCustomTurboExecutor.InitExecution;
 begin
   if FStatus >= ssRunning then
     raise ETurboScriptError.CreateRes(@rsTurboScriptAlreayRunningError);
-  MemorySize := cLastWordEntryOffset + cDefaultFreeMemSize;
-  FUsedMemory := cLastWordEntryOffset-1;
-  
-  PInteger(@FMemory[cTIBLengthOffset])^ := 0;
+  //MemorySize := cLastWordEntryOffset + cDefaultFreeMemSize;
+  //FUsedMemory := cLastWordEntryOffset;
+  MemorySize := SizeOf(TPreservedCodeMemory) + cDefaultFreeMemSize;
+  FUsedMemory := SizeOf(TPreservedCodeMemory);
+
+
+  {PInteger(@FMemory[cTIBLengthOffset])^ := 0;
   PInteger(@FMemory[cToINOffset])^ := 0;
   PChar(@FMemory[cTIBOffset])^ := #0;
   PChar(@FMemory[cLastWordEntryOffset-1])^ := #0;
-  
+  }
+  with PPreservedCodeMemory(FMemory)^ do
+  begin
+    TIBLength := 0;
+    ToIn := 0;
+    TIB[0] := #0;
+    LastWordEntry := nil;
+  end;
+
   FParameterStack := Prog.ParameterStack;
-  SP := @FParameterStack + Prog.ParameterStackSize;
-  
+  PPreservedCodeMemory(FMemory).ParamStackBase := FParameterStack;
+  PPreservedCodeMemory(FMemory).ParamStackSize := Prog.ParameterStackSize*SizeOf(Pointer);
+  SP := Integer(FParameterStack) + PPreservedCodeMemory(FMemory).ParamStackSize;
+
   FReturnStack := Prog.Stack;
-  RP := @Stack + Prog.StackSize;
+  PPreservedCodeMemory(FMemory).ReturnStackBase := FReturnStack;
+  PPreservedCodeMemory(FMemory).ReturnStackSize := Prog.StackSize*SizeOf(Pointer);
+  RP := Integer(Stack) + PPreservedCodeMemory(FMemory).ReturnStackSize;
 end;
 
 procedure TCustomTurboExecutor.SetMemorySize(Value: Integer);

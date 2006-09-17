@@ -24,33 +24,95 @@
 
 TurboInterpreter_S: Pure Pascal 实现，暂缓
 TurboInterpreter: 基于x86指令优化。核心指令汇编实现，寄存器采用x86的寄存器，对应关系如下：
-ESP,EBP: 返回堆栈.
-EDI（栈指针）: 数据栈，基址指针放在内存某个单元中。EAX 为堆栈栈顶，次栈顶。
+ESP,EBP: 返回堆栈.记住压入减少，弹出增加地址。
+EDI（栈指针）: 数据栈，基址指针放在内存某个单元中。EAX 为数据栈栈顶。不采用 STOS EAX, 所以EDI总是指向栈顶。
 ESI: 指向当前指令地址
 EBX: 状态寄存器 (0Bit: 是否运行；1Bit:是否调试)
 ECX: W Register 临时寄存器
+EDX: 临时寄存器
 
 可以用PUSHAD 将这些通用寄存器保存于堆栈，供调用其他系统的过程时采用。然后POPAD.
 现在我的问题，这些核心过程是用方法实现还是函数过程实现？用无参数的过程实现。
 规定：
 EBP+4: 所指的是TTurboX86Interpreter实例所在地址。
 EBP: 所指的是代码内存地址;
-EBP-4(SizeOf(Pointer)): 则是数据栈基址.
+//EBP-4(SizeOf(Pointer)): 则是数据栈基址.
 
 PUSH EAX      
 PUSH FMemory 
 MOV  EBP, ESP
-PUSH FParameterStack
+//PUSH FParameterStack
 
-采用什么形式 THREADING TECHNIQUE 来实现呢？基于查表字典的方式么！
+采用什么形式 THREADING TECHNIQUE 来实现呢？基于核心虚拟指令采用查表字典的方式！用户自定义Word采用相对地址（由于我占用了代码区前面的至少1024个字节，所以地址不可能小于255）表示。
 那么我的函数表放在哪里好呢？全局变量的形式。
+
+用户自定义Word 实际上 THREADING TECHNIQUE 类似于DTC(Direct Threaded Code) 模式，不过我有办法区分是否是VM机器指令，还是相对地址。
+最核心的，最重要的Forth指令，我作为VM机器指令实现了：Next, Enter, Exit
+
+用户自定义word:序列： 没有Enter了！只有Exit.
+
+vmNext
+  TEST EBX, cIsRunningBit
+  JZ @@Exit
+
+  MOV ECX, [ESI]  //the current instruction in W register
+  ADD ESI, Type(Pointer) //4 = INC PC INC PC INC PC INC PC
+  
+@@ExecInstruction:
+  CMP  ECX, cMaxTurboVMDirectiveCount
+  MOV  EDX, PTR GTurboCoreWords
+  JAE   @@IsUserWord
+@@IsVMCode:
+  MOV  ECX, [EDX+ECX]
+  JMP  [ECX]
+@@IsUserWord:
+  ADD  ECX, [EBP] //指向用户定义的word入口
+  JMP  vmEnter
+@@Exit:
+
+干脆不用CALL 全部 jmp 比较好！然后每一个最后都有一个JMP vmNext
+
+vmEnter: push the current IP(ESI),set the new IP, and run the vmNext
+  PUSH ESI        //push the current IP.
+  MOV  ESI, ECX   //set the new IP
+  JMP .vmNext
+
+
+Exit: pop to the IP(ESI),and run the vmNext.
+  POP  ESI
+  JMP  vmNext
+
+vmHalt
+  BTR EBX, cIsRunningBit  //clear the cIsRunningBit to 0.
+  JMP vmNext
 
 TCoreForthWords = array [Byte] of TProcedure;
 
 代码区内存镜像：
-TIBLength(Integer) ToIn(Integer) TIB(PChar: 1024) LastWordEntry
+FParameterStackBase(Pointer:是数据栈基址) FParameterStackSize(Integer:是数据栈大小)  
+ReturnStackBase(Pointer: 返回栈基址) ReturnStackSize(Integer: 返回栈大小)
+TIBLength(Integer) ToIn(Integer) TIB(PChar: 1024) LastWordEntry(Pointer: 用户自定义单词链入口)
+type //in TurboScriptConsts
+  PPreservedCodeMemory = ^ TPreservedCodeMemory;
+  //the typecast for code memory area to get the parameters
+  TPreservedCodeMemory = packed record
+    ParamStackBase: Pointer;
+    ParamStackSize: Integer; //bytes
+    ReturnStackBase: Pointer;
+    ReturnStackSize: Integer; //bytes
+    TIBLength: Integer; //the text buffer length
+    ToIn: Integer; //the text buffer current index
+    TIB: array [0..1023] of char;
+    LastWordEntry: Pointer;
+  end;
 
 如何区分指令和入口地址（为 CALL 入口地址）？
+方式1：指令长度与地址指针的长度一样，由于我占用了代码区前面的至少1024个字节，所以地址不可能小于255，因此<256的为虚拟指令，否则为入口地址。
+方式2：指令长度为1字节，专门增加一个指令CALL,后面紧跟用户定义单词的入口地址。
+
+采用方式1，理由：
+  1、节约内存，系统的扩建主要是在用户自定义单词上
+  2、便于扩充系统指令，方式2最多只能有256个指令，而且无法扩充。
 
 文件支持层: 
   uTurboScriptAccessor(模块装入保存机制); 
