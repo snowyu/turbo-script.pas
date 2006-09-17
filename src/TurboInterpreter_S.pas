@@ -15,13 +15,6 @@ uses
 resourcestring
   rsVisitMemoryExceed = 'Visit Memory Index Exceed!';
   
-const
-  cTIBLengthOffset = 0;
-  cToINOffset = cTIBLengthOffset + SizeOf(Integer);
-  cTIBOffset = cToINOffset + SizeOf(Integer);
-  cMAXTIBCount = 1024; //Bytes
-  cLastWordEntryOffset = cTIBOffset + cMAXTIBCount;
-
 type
   TVMMethod = procedure of object;
   TMemoryArray = array of byte;
@@ -113,7 +106,7 @@ type
     FUsedMemory: Integer;
     FWRegister: Integer;
     function ExecuteCFA(const aCFA: Integer): Integer; override;
-    procedure Init; override;
+    procedure InitExecution; override;
     procedure InitProcList;
     {{
     6.1.0705 ALIGN 
@@ -572,25 +565,18 @@ begin
   iVMRevel;
 end;
 
-procedure TTurboInterpreter.Init;
+procedure TTurboInterpreter.InitExecution;
 begin
+  inherited InitExecution;
   FPC := 0;
   FRP := 0;
   FSP := 0;
   
   FIP := 0;
-  UsedMemory := 0;
   
   //FTIBIndex := 1;
   
   //SetLength(FMemory, cLastWordEntryOffset+1);
-  MemorySize := cLastWordEntryOffset+1;
-  FUsedMemory := MemorySize;
-  
-  PInteger(@FMemory[cTIBLengthOffset])^ := 0;
-  PInteger(@FMemory[cToINOffset])^ := 0;
-  PChar(@FMemory[cTIBOffset])^ := #0;
-  PChar(@FMemory[cLastWordEntryOffset-1])^ := #0;
 end;
 
 procedure TTurboInterpreter.InitProcList;

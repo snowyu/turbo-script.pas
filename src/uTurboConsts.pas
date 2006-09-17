@@ -13,8 +13,16 @@ const
   cDefaultParamStackSize = 127; 
   cDefaultFreeMemSize = 1024 * 8; //the Free Memory 8kb
 
+const
+  cTIBLengthOffset = 0;
+  cToINOffset = cTIBLengthOffset + SizeOf(Integer);
+  cTIBOffset = cToINOffset + SizeOf(Integer);
+  cMAXTIBCount = 1024; //Bytes
+  cLastWordEntryOffset = cTIBOffset + cMAXTIBCount;
+
 resourcestring
   rsMissFileHeaderError = 'Error: The file header is missed';
+  rsTurboScriptAlreayRunningError = 'Error: The Turbo Script is already running.';
   rsReturnStackUnderflowError = 'Return Stack underflow.';
   rsReturnStackOverflowError = 'Return Stack overflow';
   rsParamStackUnderflowError = 'Parameter Stack underflow.';

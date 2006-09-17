@@ -1,4 +1,12 @@
 {1 The abstract super script executor module. }
+{{
+
+记住这里的堆栈(采用X86的堆栈规则)： 压入则是地址减少，弹出则是地址增加
+When an item is pushed onto the stack, the processor decrements the ESP
+register, then writes the item at the new top of stack. When an item is popped
+off the stack, the
+processor reads the item from the top of stack, then increments the ESP register
+}
 unit uTurboExecutor;
 
 interface
@@ -67,19 +75,36 @@ type
   }
   TCustomTurboExecutor = class(TObject)
   private
+    function GetTIB: string;
+    procedure SetMemorySize(Value: Integer);
+    procedure SetTIB(const Value: string);
+  protected
+    {1 The Code Memory }
     FMemory: Pointer;
+    FMemorySize: Integer;
     FModuleDate: TTimeStamp;
     FModuleType: TTurboScriptModuleType;
     FModuleVersion: LongWord;
     FName: string;
     FOptions: TTurboScriptOptions;
+    {1 : the Parameter Stack }
     FParameterStack: Pointer;
-    FProgram: TTurboProgram;
+    FPC: Integer;
+    FProg: TTurboProgram;
+    FRP: Integer;
+    {1 the Parameter Stack(or data stack) Pointer }
+    FSP: Integer;
+    {1 : Return(Proc) Stack }
+    {{
+    返回堆栈
+    }
     FStack: Pointer;
     FStatus: TTurboScriptStatus;
-    procedure SetMemorySize(Value: Integer);
-  protected
-    FMemorySize: Integer;
+    {1 The Current TIB Index }
+    {{
+    FTIBIndex : Text[FTIBIndex]
+    }
+    FTextIndex: Integer;
     FUsedMemory: Integer;
     {1 : Run the CFA word. }
     {{
@@ -90,8 +115,9 @@ type
     }
     function ExecuteCFA(const aCFA: Integer): Integer; virtual;
     {1 Init the Virtual Machine. }
-    procedure Init; virtual;
+    procedure InitExecution; virtual;
   public
+    constructor Create; virtual;
     destructor Destroy; override;
     {1 : Run the Virtual Machine. }
     {{
@@ -101,7 +127,9 @@ type
     相对于FMemory的偏移量。
     }
     function ExecuteWord(const aWord: string): Integer;
+    procedure FinalizeExecution; virtual;
     function GetWordCFA(const aWord: string): Integer; virtual;
+    procedure Stop;
     {1 The Code Memory }
     property Memory: Pointer read FMemory write FMemory;
     {1 : the Memory Size. }
@@ -121,15 +149,44 @@ type
     property Name: string read FName write FName;
     property Options: TTurboScriptOptions read FOptions write FOptions;
     {1 : the Parameter Stack }
+    {{
+    指向栈底： @Stack[0]
+    压入减小
+    }
     property ParameterStack: Pointer read FParameterStack write FParameterStack;
-    property Program: TTurboProgram read FProgram write FProgram;
+    {1 : program counter. }
+    {{
+    program counter, which contains the address 
+    in memory of the instruction that is the next 
+    to be executed. 
+    }
+    property PC: Integer read FPC write FPC;
+    property Prog: TTurboProgram read FProg write FProg;
+    {1 : return stack pointer(TOS). }
+    {{
+    stack pointer, a register that points to the area 
+    in memory utilized as the main return stack.
+    
+    the RP0-StackSize <= the stack memory < RP0.
+    }
+    property RP: Integer read FRP write FRP;
+    {1 the Parameter Stack(or data stack) Pointer }
+    property SP: Integer read FSP write FSP;
     {1 : Return(Proc) Stack }
     {{
     返回堆栈
+    
+    指向栈底： @Stack[0]
+    压入减小
     }
     property Stack: Pointer read FStack write FStack;
     {1 the current status of the script. }
     property Status: TTurboScriptStatus read FStatus write FStatus;
+    {1 the script source(TIB) }
+    {{
+    TIB: text input Buffer
+    }
+    property TIB: string read GetTIB write SetTIB;
     {1 已经使用的内存 }
     {{
     也就是指向最大的可用内存：
@@ -170,8 +227,9 @@ type
     property ParameterStack: Pointer read FParameterStack write FParameterStack;
     property ParameterStackSize: Integer read FParameterStackSize write
             SetParameterStackSize;
-    {1 return stack. }
+    {1 :Return Stack }
     property Stack: Pointer read FStack write FStack;
+    {1 : Return Stack Size }
     property StackSize: Integer read FStackSize write SetStackSize;
     {1 the current status of the script. }
     property Status: TTurboScriptStatus read FStatus write FStatus;
@@ -183,23 +241,30 @@ implementation
 {
 ***************************** TCustomTurboExecutor *****************************
 }
+constructor TCustomTurboExecutor.Create;
+begin
+  inherited Create;
+end;
+
 destructor TCustomTurboExecutor.Destroy;
 begin
   FreeMem(FMemory);
   FMemory := nil;
+  FMemorySize := 0;
   inherited Destroy;
 end;
 
 function TCustomTurboExecutor.ExecuteCFA(const aCFA: Integer): Integer;
 begin
   Result := -1;
+  if FStatus >= ssRunning then
+    raise ETurboScriptError.CreateRes(@rsTurboScriptAlreayRunningError);
 end;
 
 function TCustomTurboExecutor.ExecuteWord(const aWord: string): Integer;
 var
   aCFA: Integer;
 begin
-  Init;
   aCFA := GetWordCFA(aWord);
   if aCFA >=0 then
     Result := ExecuteCFA(aCFA)
@@ -207,15 +272,46 @@ begin
     Result := -1;
 end;
 
+procedure TCustomTurboExecutor.FinalizeExecution;
+begin
+end;
+
+function TCustomTurboExecutor.GetTIB: string;
+var
+  I: Integer;
+begin
+  i := PInteger(@FMemory[cTIBLengthOffset])^;
+  if i > 0 then
+  begin
+    SetLength(Result, i);
+    Move(PChar(@FMemory[cTIBOffset])^, PChar(Result)^, i);
+  end
+  else
+    Result := '';
+end;
+
 function TCustomTurboExecutor.GetWordCFA(const aWord: string): Integer;
 begin
   Result := -1;
 end;
 
-procedure TCustomTurboExecutor.Init;
+procedure TCustomTurboExecutor.InitExecution;
 begin
-  //PC := 0;
-  //SP := StackSize;
+  if FStatus >= ssRunning then
+    raise ETurboScriptError.CreateRes(@rsTurboScriptAlreayRunningError);
+  MemorySize := cLastWordEntryOffset + cDefaultFreeMemSize;
+  FUsedMemory := cLastWordEntryOffset-1;
+  
+  PInteger(@FMemory[cTIBLengthOffset])^ := 0;
+  PInteger(@FMemory[cToINOffset])^ := 0;
+  PChar(@FMemory[cTIBOffset])^ := #0;
+  PChar(@FMemory[cLastWordEntryOffset-1])^ := #0;
+  
+  FParameterStack := Prog.ParameterStack;
+  SP := @FParameterStack + Prog.ParameterStackSize;
+  
+  FReturnStack := Prog.Stack;
+  RP := @Stack + Prog.StackSize;
 end;
 
 procedure TCustomTurboExecutor.SetMemorySize(Value: Integer);
@@ -225,6 +321,29 @@ begin
     FMemorySize := Value;
     ReallocMem(FMemory, FMemorySize);
   end;
+end;
+
+procedure TCustomTurboExecutor.SetTIB(const Value: string);
+var
+  I: Integer;
+begin
+  if Value <> '' then
+  begin
+    i := Length(Value);
+    if i >= cMAXTIBCount then i := cMAXTIBCount-1;
+    Move(PChar(Value)^, FMemory[cTIBOffset], i);
+    FMemory[cTIBOffset+i] := 0;
+    PInteger(@FMemory[cToINOffset])^ := 0;
+    PInteger(@FMemory[cTIBLengthOffset])^ := i;
+  end
+  else begin
+    FMemory[cTIBOffset] := 0;
+    PInteger(@FMemory[cTIBLengthOffset])^ := 0;
+  end;
+end;
+
+procedure TCustomTurboExecutor.Stop;
+begin
 end;
 
 {
@@ -262,7 +381,7 @@ begin
   if (Status < ssRunning) and (FParameterStackSize <> Value) then
   begin
     FParameterStackSize := Value;
-    ReallocMem(FParameterStack, FParameterStackSize);
+    ReallocMem(FParameterStack, (FParameterStackSize+1)*SizeOf(Pointer));
     //if FSP > FParameterStackSize then FSP := FParameterStackSize;
   end;
 end;
@@ -272,7 +391,7 @@ begin
   if (Status < ssRunning) and (FStackSize <> Value) then
   begin
     FStackSize := Value;
-    ReallocMem(FStack, FStackSize);
+    ReallocMem(FStack, (FStackSize+1)*SizeOf(Pointer));
     //if FSP > FParameterStackSize then FSP := FParameterStackSize;
   end;
 end;

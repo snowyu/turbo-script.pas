@@ -88,10 +88,8 @@ type
   TCustomTurboInterpreter = class(TCustomTurboExecutor)
   private
     function GetPLibEntry: PForthWord;
-    function GetTIB: string;
     procedure SetParameterStackSize(const Value: Integer);
     procedure SetStackSize(const Value: Integer);
-    procedure SetTIB(const Value: string);
   protected
     FInstrunction: TForthMethod;
     {1 the internal core procedure list }
@@ -109,10 +107,6 @@ type
     {1 : the Parameter Stack }
     FParameterStack: TStack;
     FParameterStackSize: Integer;
-    FPC: Integer;
-    FRP: Integer;
-    {1 the Parameter Stack(or data stack) Pointer }
-    FSP: Integer;
     {1 : Return(Proc) Stack }
     {{
     ·µ»Ø¶ÑÕ»
@@ -120,14 +114,9 @@ type
     FStack: TStack;
     FStackSize: Integer;
     FStatus: TForthProcessorStates;
-    {1 The Current TIB Index }
-    {{
-    FTIBIndex : Text[FTIBIndex]
-    }
-    FTextIndex: Integer;
     FWRegister: Integer;
     function ExecuteCFA(const aCFA: Integer): Integer; override;
-    procedure Init; override;
+    procedure InitExecution; override;
     procedure InitProcList;
     {{
     6.1.0705 ALIGN 
@@ -470,24 +459,7 @@ type
     property LibEntryAddress: Integer read FLibEntryAddress;
     property ParameterStackSize: Integer read FParameterStackSize write
             SetParameterStackSize;
-    {1 : program counter. }
-    {{
-    program counter, which contains the address 
-    in memory of the instruction that is the next 
-    to be executed. 
-    }
-    property PC: Integer read FPC write FPC;
     property PLibEntry: PForthWord read GetPLibEntry;
-    {1 : return stack pointer(TOS). }
-    {{
-    stack pointer, a register that points to the area 
-    in memory utilized as the main return stack.
-    
-    the RP0-StackSize <= the stack memory < RP0.
-    }
-    property RP: Integer read FRP write FRP;
-    {1 the Parameter Stack(or data stack) Pointer }
-    property SP: Integer read FSP write FSP;
     {1 : the Stack Size. }
     property StackSize: Integer read FStackSize write SetStackSize;
     {1 : the Status of the Processor Register. }
@@ -496,11 +468,6 @@ type
       ×´Ì¬¼Ä´æÆ÷
     }
     property Status: TForthProcessorStates read FStatus;
-    {1 the script source(TIB) }
-    {{
-    TIB: text input Buffer
-    }
-    property TIB: string read GetTIB write SetTIB;
     property WRegister: Integer read FWRegister;
   end;
   
@@ -550,20 +517,6 @@ begin
   Result := PForthWord(@FMemory[LibEntryAddress]);
 end;
 
-function TCustomTurboInterpreter.GetTIB: string;
-var
-  I: Integer;
-begin
-  i := PInteger(@FMemory[cTIBLengthOffset])^;
-  if i > 0 then
-  begin
-    SetLength(Result, i);
-    Move(PChar(@FMemory[cTIBOffset])^, PChar(Result)^, i);
-  end
-  else
-    Result := '';
-end;
-
 function TCustomTurboInterpreter.GetWordCFA(const aWord: string): Integer;
 begin
   Result := -1;
@@ -575,7 +528,7 @@ begin
   iVMRevel;
 end;
 
-procedure TCustomTurboInterpreter.Init;
+procedure TCustomTurboInterpreter.InitExecution;
 begin
   FPC := 0;
   FRP := 0;
@@ -940,25 +893,6 @@ begin
       FRP := (FRP - FRP0) + @FStack[0];
     end;
     FRP0 := @FStack[0]; //}
-  end;
-end;
-
-procedure TCustomTurboInterpreter.SetTIB(const Value: string);
-var
-  I: Integer;
-begin
-  if Value <> '' then
-  begin
-    i := Length(Value);
-    if i >= cMAXTIBCount then i := cMAXTIBCount-1;
-    Move(PChar(Value)^, FMemory[cTIBOffset], i);
-    FMemory[cTIBOffset+i] := 0;
-    PInteger(@FMemory[cToINOffset])^ := 0;
-    PInteger(@FMemory[cTIBLengthOffset])^ := i;
-  end
-  else begin
-    FMemory[cTIBOffset] := 0;
-    PInteger(@FMemory[cTIBLengthOffset])^ := 0;
   end;
 end;
 

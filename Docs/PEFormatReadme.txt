@@ -8,13 +8,13 @@ Portable Executable File Format
 可能有细微区别，但根据上下文关系可以很清楚的理解，这不是关键问题。最后，可执行文件
 通常都有一个文件头部以描述本文件的总体结构。
 
-= SuperPEFormat V 1.0 =
-我定义的 SuperPEFormat V1.0 ，是采用一Section（各种Section在文件中最多存在一个）存在机制。
+= TurboPEFormat V 1.0 =
+我定义的 TurboPEFormat V1.0 ，是采用一Section（各种Section在文件中最多存在一个）存在机制。
 类型分为：可执行文件，和库文件，库文件还可以细分为（DLL库，多国字符串资源库）。
 
 == 文件头格式 ==
-定义文件的Magic Flag，以及文件类型。无论哪一种类型的SuperPE文件都必须有的。
-SuperPEFormat文件的首字节总是: 'SuperPEF'，然后紧接着是一个DWORD的文件版本号。
+定义文件的Magic Flag，以及文件类型。无论哪一种类型的TurboPE文件都必须有的。
+TurboPEFormat文件的首字节总是: 'TurboScrptPEF'，然后紧接着是一个DWORD的文件版本号。
 再接着为文件类型word: stExe, stLib, stRes
 接着为子类型也是一个word. eg, 对于Lib有: ForthLib, StdLib. 对于stRes 资源库则是语言的代号。
 

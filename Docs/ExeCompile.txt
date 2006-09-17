@@ -1,4 +1,4 @@
-TCustomScriptExecutor which can execute the script from stream or file. but we msut relocate the address before execute 
+TCustomScriptExecutor which can execute the script from stream or file. but we must relocate the address before execute 
 
 动态生成机器码执行脚本的分析
 
