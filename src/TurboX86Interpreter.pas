@@ -1,7 +1,7 @@
-{1 the fastest script
+{: the fastest script
         基于x86指令优化。核心指令汇编实现，寄存器采用x86的寄存器.对应关系如下：
         }
-{{
+{ Description
 对应关系如下：
 ESP,EBP: 返回堆栈
 EDI（栈指针）: 数据栈，基址指针放在内存某个单元中。EAX 为数据栈栈顶。不采用
@@ -50,7 +50,7 @@ unit TurboInterpreter;
 
 interface
 
-{$I Setting.inc}
+{.$I Setting.inc}
 
 uses
   SysUtils, Classes
@@ -64,9 +64,6 @@ const
   cIsSteppedBit = 2; 
   
 type
-  {: 核心虚拟指令表 }
-  TTurboCoreWords = array [0..cMaxTurboVMDirectiveCount-1] of TProcedure;
-
   TTurboX86Interpreter = class(TCustomTurboExecutor)
   private
     FOldEBP: Integer;
@@ -75,11 +72,10 @@ type
     FOldEDX: Integer;
     FOldESI: Integer;
     FOldESP: Integer;
-  protected
-    function ExecuteCFA(const aCFA: Integer): Integer; override;
-    procedure InitExecution; override;
   public
     destructor Destroy; override;
+    function ExecuteCFA(const aCFA: Integer): Integer; override;
+    procedure InitExecution; override;
   end;
 
 
@@ -88,6 +84,7 @@ var
 
 implementation
 
+procedure iVMNext;forward;
 
 {
 ***************************** TTurboX86Interpreter *****************************
@@ -99,38 +96,44 @@ end;
 
 function TTurboX86Interpreter.ExecuteCFA(const aCFA: Integer): Integer;
 
-  {$ifdef NoSuch_Def}
+  {$ifdef NoSuchDef}
 
 begin
-  Result := inherited ExecuteCFA(aCFA);
   {$else}
   asm
   {$endif}
-    MOV  FOldESP, ESP
-    MOV  FOldEBP, EBP
-    MOV  FOldESI, ESI
-    MOV  FOldEDI, EDI
-    MOV  FOldEBX, EBX
-    MOV  ESP, FRP //return stack pointer: RP
+    PUSH EAX
+    PUSH EDX
+    CALL TCustomTurboExecutor.ExecuteCFA
+    POP  EDX
+    POP  EAX
+    MOV  [EAX].FOldESP, ESP
+    MOV  [EAX].FOldEBP, EBP
+    MOV  Self.FOldESI, ESI
+    MOV  Self.FOldEDI, EDI
+    MOV  Self.FOldEBX, EBX
+    MOV  ESP, Self.FRP //return stack pointer: RP
     //PUSHAD
     PUSH EAX
-    PUSH FMemory
+    PUSH [EAX].FMemory
     MOV  EBP, ESP
-    PUSH FParameterStack
+    PUSH [EAX].FParameterStack
 
-    MOV  ESI, FMemory
+    MOV  ESI, [EAX].FMemory
     ADD  ESI, aCFA
     MOV  EBX, cIsRunningBit
-    MOV  EDI, FSP //SP the data stack pointer.
+    MOV  EDI, [EAX].FSP //SP the data stack pointer.
     XOR  EAX, EAX
     //MOV  EDX, EAX
-    STD  //the EDI will be decremented.
+    //STD  //the EDI will be decremented.
 
     //PUSH @@ReturnAdr
     CALL  iVMNext
   @@ReturnAdr:
-    //数据总是指向栈顶空
-    STOS EAX //STOSD  the EDI will be decremented automatically.
+    //数据总是指向栈顶
+    SUB EDI, Type(Integer)
+    MOV [EDI], EAX
+    //STOS EAX //STOSD  the EDI will be decremented automatically.
     //自己判断是否数据栈为空。
 
 
@@ -158,7 +161,6 @@ end;
 
 
 {----Helper functions ----}
-procedure iVMNext;forward;
 
 procedure iVMEnter;
 asm
@@ -167,6 +169,7 @@ asm
   JMP iVMNext
 end;
 
+//the interpreter core here:
 procedure iVMNext;
 asm
   TEST EBX, cIsRunningBit
@@ -177,11 +180,11 @@ asm
   
 @@ExecInstruction:
   CMP  ECX, cMaxTurboVMDirectiveCount
-  MOV  EDX, PTR GTurboCoreWords
+  LEA  EDX, GTurboCoreWords
   JAE   @@IsUserWord
 @@IsVMCode:
-  MOV  ECX, [EDX+ECX]
-  JMP  [ECX]
+  MOV  ECX, [EDX+ECX*4]
+  JMP  ECX
 @@IsUserWord:
   ADD  ECX, [EBP] //指向用户定义的word入口
   JMP  iVMEnter
@@ -200,7 +203,7 @@ asm
   JMP  iVMNext
 end;
 
-//this is a Push Integer directive
+//this is a Push Integer(立即操作数) directive
 procedure iVMPushInt;
 asm
   //Decrement the data stack pointer.
@@ -210,6 +213,16 @@ asm
   
   MOV  EAX, [ESI]
   ADD  ESI, Type(Integer)
+  JMP  iVMNext
+end;
+
+procedure iVMPopInt;
+asm
+  //move the top in stack to EAX 
+  MOV  EAX, [EDI] 
+  //Increment the data stack pointer.
+  ADD  EDI, Type(Integer)
+  
   JMP  iVMNext
 end;
 
@@ -268,8 +281,12 @@ begin
   GTurboCoreWords[inStoreInt] := vStore;
   GTurboCoreWords[inFetchByte] := vCFetch;
   GTurboCoreWords[inStoreByte] := vCStore;
+
+  GTurboCoreWords[inPushInt] := iVMPushInt;
+  GTurboCoreWords[inPopInt] := iVMPopInt;
+
 end;
 
 initialization
-
+  InitTurboCoreWordList;
 end.

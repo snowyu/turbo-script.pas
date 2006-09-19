@@ -51,7 +51,7 @@ MOV  EBP, ESP
 
 用户自定义word:序列： 没有Enter了！只有Exit.
 
-vmNext
+iVMNext
   TEST EBX, cIsRunningBit
   JZ @@Exit
 
@@ -67,24 +67,24 @@ vmNext
   JMP  [ECX]
 @@IsUserWord:
   ADD  ECX, [EBP] //指向用户定义的word入口
-  JMP  vmEnter
+  JMP  iVMEnter
 @@Exit:
 
 干脆不用CALL 全部 jmp 比较好！然后每一个最后都有一个JMP vmNext
 
-vmEnter: push the current IP(ESI),set the new IP, and run the vmNext
+iVMEnter: push the current IP(ESI),set the new IP, and run the vmNext
   PUSH ESI        //push the current IP.
   MOV  ESI, ECX   //set the new IP
-  JMP .vmNext
+  JMP iVMNext
 
 
-Exit: pop to the IP(ESI),and run the vmNext.
+iVMExit: pop to the IP(ESI),and run the vmNext.
   POP  ESI
-  JMP  vmNext
+  JMP  iVMNext
 
-vmHalt
-  BTR EBX, cIsRunningBit  //clear the cIsRunningBit to 0.
-  JMP vmNext
+iVMHalt
+  BTR EBX, cIsRunningBit  //clear the cIsRunningBit to 0.  = MOV EDX, cIsRunningBit; NOT EDX; AND EBX, EDX 
+  JMP iVMNext
 
 TCoreForthWords = array [Byte] of TProcedure;
 
@@ -103,8 +103,21 @@ type //in TurboScriptConsts
     TIBLength: Integer; //the text buffer length
     ToIn: Integer; //the text buffer current index
     TIB: array [0..1023] of char;
-    LastWordEntry: Pointer;
+    LastWordEntry: Pointer; //有名字的函数链表
+    LastVarEntry: Pointer; //有名字的变量链表
   end;
+
+测试VM代码：
+2 3 +
+
+pushInt 2 pushInt 3 AddInt Halt 
+
+性能 QueryPerformanceCounter 大概 7-8 QueryPerformanceCounter.
+而其他性能则要 400-800.QueryPerformanceCounter.
+
+变量区，代码区，都在FMemory中。
+可以看作是该executor的局部变量（或参数）。
+里面的变量、函数可以有名字，也可以没有。有名字的以链表的形式聚集在一起。
 
 如何区分指令和入口地址（为 CALL 入口地址）？
 方式1：指令长度与地址指针的长度一样，由于我占用了代码区前面的至少1024个字节，所以地址不可能小于255，因此<256的为虚拟指令，否则为入口地址。

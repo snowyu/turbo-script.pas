@@ -1,4 +1,4 @@
-{1 the pure pascal impl. }
+{: the pure pascal impl. }
 unit TurboInterpreter_S;
 
 interface
@@ -40,8 +40,8 @@ type
   end;
 
 type
-  {1 The Virtual FORTH Interpreter Class(pure pascal impl) }
-  {{
+  {: The Virtual FORTH Interpreter Class(pure pascal impl) }
+  { Description
   Return Stack:
     * SP        Return Stack Pointer
     * StackSize Return Stack Size
@@ -69,46 +69,44 @@ type
     procedure SetTIB(const Value: string);
   protected
     FInstrunction: TForthMethod;
-    {1 the internal core procedure list }
+    {: the internal core procedure list }
     FInternalProcList: TVMMethodList;
     FIP: Integer;
     FIR: TVMInstruction;
-    {1 The LAST in the FORTH }
-    {{
+    {: The LAST in the FORTH }
+    { Description
     the defining word.
 
     正在定义的单词.
     }
     FLastWordEntryAddress: Integer;
     FLibEntryAddress: Integer;
-    {1 The Code Memory }
+    {: The Code Memory }
     FMemory: TMemoryArray;
     FMemorySize: Integer;
-    {1 : the Parameter Stack }
+    {: : the Parameter Stack }
     FParameterStack: TStack;
     FParameterStackSize: Integer;
     FPC: Integer;
     FProcessorStates: TForthProcessorStates;
     FRP: Integer;
-    {1 the Parameter Stack(or data stack) Pointer }
+    {: the Parameter Stack(or data stack) Pointer }
     FSP: Integer;
-    {1 : Return(Proc) Stack }
-    {{
+    {: : Return(Proc) Stack }
+    { Description
     返回堆栈
     }
     FStack: TStack;
     FStackSize: Integer;
-    {1 The Current TIB Index }
-    {{
+    {: The Current TIB Index }
+    { Description
     FTIBIndex : Text[FTIBIndex]
     }
     FTextIndex: Integer;
     FUsedMemory: Integer;
     FWRegister: Integer;
-    function ExecuteCFA(const aCFA: Integer): Integer; override;
-    procedure InitExecution; override;
     procedure InitProcList;
-    {{
+    { Description
     6.1.0705 ALIGN 
     CORE 
 
@@ -117,70 +115,70 @@ type
     If the data-space pointer is not aligned, reserve enough space to align it. 
     }
     procedure iVMAlignMem;
-    {{
+    { Description
     Forth subroutine enter procedure.
     }
     procedure iVMEnter;
-    {{
+    { Description
     Forth subroutine exit procedure.
     }
     procedure iVMExit;
-    {1 Alloc and Fill sValue to the Memory for Compile }
-    {{
+    {: Alloc and Fill sValue to the Memory for Compile }
+    { Description
     the UsedMemory pointer incresed automaticlly
     (FC)
     }
     procedure iVMFill(const aValue;  const Size: Integer);
-    {1 Alloc and Fill sValue to the Memory for Compile }
-    {{
+    {: Alloc and Fill sValue to the Memory for Compile }
+    { Description
     the UsedMemory pointer incresed automaticlly
     (FC)
     }
     procedure iVMFillByte(const aValue: Byte);
-    {1 Alloc and Fill aValue to the Memory for Compile }
-    {{
+    {: Alloc and Fill aValue to the Memory for Compile }
+    { Description
     Pls Dont include #0 in PChar length!!!
     }
     procedure iVMFillCountPChar(const aValue: PChar; const aSize: Integer);
-    {1 add the word name header to free memory. }
+    {: add the word name header to free memory. }
     procedure iVMFillForthWordHeader(const aWordAttr: TForthWordRec);
-    {1 Alloc and Fill sValue to the Memory for Compile }
-    {{
+    {: Alloc and Fill sValue to the Memory for Compile }
+    { Description
     the UsedMemory pointer incresed automaticlly
     (FC)
     }
     procedure iVMFillInt(const aValue: Integer);
-    {1 Alloc and Fill aValue to the Memory for Compile }
-    {{
+    {: Alloc and Fill aValue to the Memory for Compile }
+    { Description
     Pls Dont include #0 in PChar length!!!
     }
     procedure iVMFillShortCountPChar(const aValue: PChar; const aSize: Byte);
-    {1 Alloc and Fill aValue to the Memory for Compile }
+    {: Alloc and Fill aValue to the Memory for Compile }
     procedure iVMFillShortString(const aValue: string);
-    {1 Alloc and Fill aValue to the Memory for Compile }
+    {: Alloc and Fill aValue to the Memory for Compile }
     procedure iVMFillString(const aValue: string);
-    {1 Alloc and Fill sValue to the Memory for Compile }
-    {{
+    {: Alloc and Fill sValue to the Memory for Compile }
+    { Description
     the UsedMemory pointer incresed automaticlly
     (FC)
     }
     procedure iVMFillWord(const aValue: Word);
     procedure iVMHalt;
     procedure iVMNext;
-    {1 the defining forth word done! }
-    {{
+    {: the defining forth word done! }
+    { Description
     update the LibEntryAddress
     }
     procedure iVMRevel;
-    {1 Add the Integer in the param stack }
-    {{
+    {: Add the Integer in the param stack }
+    { Description
     (n1 n2 -- n3)
 
     n3 := n1 + n2
     }
     procedure vAddInt;
-    {1 The CORE FORTH Words: ALIGNED }
-    {{
+    {: The CORE FORTH Words: ALIGNED }
+    { Description
     6.1.0706 ALIGNED 
     CORE 
 
@@ -191,8 +189,8 @@ type
     See: 3.3.3.1 Address alignment, 6.1.0705 ALIGN 
     }
     procedure vAligned;
-    {1 C@ }
-    {{
+    {: C@ }
+    { Description
     c-fetch CORE 
 
             ( c-addr -- char )
@@ -205,8 +203,8 @@ type
     See: 3.3.3.1 Address alignment 
     }
     procedure vCFetch;
-    {1 CONTEXT }
-    {{
+    {: CONTEXT }
+    { Description
     CONTEXT CORE EXT 
 
             ( -- c-addr )
@@ -218,8 +216,8 @@ type
     the CONTEXT 可以作为一个用户变量实现！
     }
     procedure vCONTEXT;
-    {1 Get the string Count  }
-    {{
+    {: Get the string Count  }
+    { Description
     ( c-addr -- PChar-addr u )
 
     Return the character string specification for 
@@ -230,8 +228,8 @@ type
     the string at PChar-addr. 
     }
     procedure vCount;
-    {1 Get the shortstring Count  }
-    {{
+    {: Get the shortstring Count  }
+    { Description
     ( c-addr1 -- c-addr2 b )
 
     Return the character string specification for 
@@ -242,8 +240,8 @@ type
     the string at c-addr2. 
     }
     procedure vCountShort;
-    {1 C! }
-    {{
+    {: C! }
+    { Description
     c-store CORE 
 
             ( char c-addr -- )
@@ -256,8 +254,8 @@ type
     See: 3.3.3.1 Address alignment 
     }
     procedure vCStore;
-    {1 @ }
-    {{
+    {: @ }
+    { Description
     fetch CORE 
 
             ( a-addr -- x )
@@ -267,12 +265,12 @@ type
     See: 3.3.3.1 Address alignment 
     }
     procedure vFetch;
-    {1 Push the HERE(FreeMemoryIndex: UsedMemory) to param stack }
-    {{
+    {: Push the HERE(FreeMemoryIndex: UsedMemory) to param stack }
+    { Description
     }
     procedure vHERE;
-    {1 LAST }
-    {{
+    {: LAST }
+    { Description
     LAST CORE EXT 
 
             ( -- c-addr )
@@ -284,8 +282,8 @@ type
     the LAST 可以作为一个用户变量实现！
     }
     procedure vLAST;
-    {1 PARSE }
-    {{
+    {: PARSE }
+    { Description
     CORE EXT 
 
             ( char "ccc<char>" -- c-addr u )
@@ -303,8 +301,8 @@ type
     长度u留在堆栈上。 
     }
     procedure vPARSE;
-    {1 Place the short string to Mem. }
-    {{
+    {: Place the short string to Mem. }
+    { Description
     (src-addr bLen dst-addr -- )
 
     src-addr: 字符串地址(PChar)
@@ -312,8 +310,8 @@ type
     dst-addr: 保存的目标地址
     }
     procedure vPlaceShortString;
-    {1 Place the string to Mem. }
-    {{
+    {: Place the string to Mem. }
+    { Description
     (src-addr uLen dst-addr -- )
 
     src-addr: 字符串地址(PChar)
@@ -321,15 +319,15 @@ type
     dst-addr: 保存的目标地址
     }
     procedure vPlaceString;
-    {1 change the VM state to running state. }
+    {: change the VM state to running state. }
     procedure vSetRunning;
-    {1 Skip the blanks in the TIB }
-    {{
+    {: Skip the blanks in the TIB }
+    { Description
     Update the FTextIndex(current TIB Index)
     }
     procedure vSkipBlank;
-    {1 ! }
-    {{
+    {: ! }
+    { Description
     store CORE 
 
             ( x a-addr -- )
@@ -339,15 +337,15 @@ type
     See: 3.3.3.1 Address alignment 
     }
     procedure vStore;
-    {1 Substract the Integer in the param stack }
-    {{
+    {: Substract the Integer in the param stack }
+    { Description
     (n1 n2 -- n3)
 
     n3 := n1 - n2
     }
     procedure vSubInt;
-    {1 TIB }
-    {{
+    {: TIB }
+    { Description
     t-i-b CORE EXT 
 
             ( -- c-addr )
@@ -363,8 +361,8 @@ type
     the TIB 可以作为一个用户变量实现！
     }
     procedure vTIB;
-    {1 #TIB }
-    {{
+    {: #TIB }
+    { Description
     number-t-i-b CORE EXT 
 
             ( -- a-addr )
@@ -381,8 +379,8 @@ type
     这个也可以作为一个用户变量实现！
     }
     procedure vTIBNum;
-    {1 >IN }
-    {{
+    {: >IN }
+    { Description
     to-in CORE 
 
             ( -- a-addr )
@@ -397,8 +395,9 @@ type
     procedure vToIN;
   public
     constructor Create(const aParamStack: TStack = nil); virtual;
-    {1 : Only execute the instruction on the current IP  }
-    {{
+    function ExecuteCFA(const aCFA: Integer): Integer; override;
+    {: : Only execute the instruction on the current IP  }
+    { Description
     Run the Virtual Machine from the PC adress.
 
     @Param aInstruction execute the aInstruction.
@@ -409,8 +408,8 @@ type
         TInstruction)
     }
     procedure ExecuteInstruction; overload;
-    {1 : Only execute one virtual machine instruction. }
-    {{
+    {: : Only execute one virtual machine instruction. }
+    { Description
     Run the Virtual Machine from the PC adress.
 
     @Param aInstruction execute the aInstruction.
@@ -422,71 +421,72 @@ type
     }
     procedure ExecuteInstruction(const aInstruction: TVMInstruction); overload;
     function GetWordCFA(const aWord: string): Integer; override;
-    {1 create a Forth word header by internal }
-    {{
+    {: create a Forth word header by internal }
+    { Description
     only used in internal:
 
     iForthHeader(':');          FillInt(xdcoma);     FillInt(xPEXIT);
     }
     procedure iForthHeader(const aWordAttr: TForthWordRec);
+    procedure InitExecution; override;
     procedure LoadFromStream(const aStream: TStream); override;
     procedure SaveToStream(const aStream: TStream); override;
     property Instrunction: TForthMethod read FInstrunction;
-    {1 the VM IP(offset of the FMemory) }
+    {: the VM IP(offset of the FMemory) }
     property IP: Integer read FIP write FIP;
-    {1 : instruction register(Current instruction). }
-    {{
+    {: : instruction register(Current instruction). }
+    { Description
     instruction register, in which is held 
     the instruction currently being executed. 
 
     Abondon.
     }
     property IR: TVMInstruction read FIR;
-    {1 the lib entry address (index) }
-    {{
+    {: the lib entry address (index) }
+    { Description
     it's a index of FMemory.
     }
     property LibEntryAddress: Integer read FLibEntryAddress;
-    {1 : the Memory Size. }
-    {{
+    {: : the Memory Size. }
+    { Description
     warining: if in the running status, you may be get trouble!!
     }
     property MemorySize: Integer read FMemorySize write SetMemorySize;
     property ParameterStackSize: Integer read FParameterStackSize write
             SetParameterStackSize;
-    {1 : program counter. }
-    {{
+    {: : program counter. }
+    { Description
     program counter, which contains the address 
     in memory of the instruction that is the next 
     to be executed. 
     }
     property PC: Integer read FPC write FPC;
     property PLibEntry: PForthWord read GetPLibEntry;
-    {1 : the Status of the Processor Register. }
-    {{
+    {: : the Status of the Processor Register. }
+    { Description
     Chinese
       状态寄存器
     }
     property ProcessorStates: TForthProcessorStates read FProcessorStates;
-    {1 : return stack pointer(TOS). }
-    {{
+    {: : return stack pointer(TOS). }
+    { Description
     stack pointer, a register that points to the area 
     in memory utilized as the main return stack.
 
     the RP0-StackSize <= the stack memory < RP0.
     }
     property RP: Integer read FRP write FRP;
-    {1 the Parameter Stack(or data stack) Pointer }
+    {: the Parameter Stack(or data stack) Pointer }
     property SP: Integer read FSP write FSP;
-    {1 : the Stack Size. }
+    {: : the Stack Size. }
     property StackSize: Integer read FStackSize write SetStackSize;
-    {1 the script source(TIB) }
-    {{
+    {: the script source(TIB) }
+    { Description
     TIB: text input Buffer
     }
     property TIB: string read GetTIB write SetTIB;
-    {1 已经使用的内存 }
-    {{
+    {: 已经使用的内存 }
+    { Description
     也就是指向最大的可用内存：
     从该地址起的内存未用：FMemory[UsedMemory] 
     }
