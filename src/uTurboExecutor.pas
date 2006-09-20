@@ -274,6 +274,20 @@ type
   end;
 
 
+  PPreservedCodeMemory = ^ TPreservedCodeMemory;
+  //the typecast for code memory area to get the parameters
+  TPreservedCodeMemory = packed record
+    Executor: TCustomTurboExecutor;
+    ParamStackBase: Pointer;
+    ParamStackSize: Integer; //bytes
+    ReturnStackBase: Pointer;
+    ReturnStackSize: Integer; //bytes
+    TIBLength: Integer; //#TIB the text buffer length
+    ToIn: Integer; //>IN the text buffer current index
+    TIB: array [0..cMAXTIBCount-1] of char; //'TIB
+    LastWordEntry: Pointer;
+  end;
+
 implementation
 
 {
@@ -364,7 +378,7 @@ begin
     TIB[0] := #0;
     LastWordEntry := nil;
   end;
-
+  PPreservedCodeMemory(FMemory).Executor := Self;
   //FParameterStack := Prog.ParameterStack;
   //FParamStackSize := Prog.ParameterStackSize*SizeOf(Pointer);
   PPreservedCodeMemory(FMemory).ParamStackBase := FParameterStack;

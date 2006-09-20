@@ -1,3 +1,10 @@
+2006-9-20
++ 基本实现 TTurboX86Interpreter 解释器核心
+  !+ 没有单步执行 ({$Define TurboScript_Stepping_Supports})
+  !+ 返回栈＆数据栈没有溢出判断。 {$Define TurboScript_DataStack_Overflow_Inspect} {$Define TurboScript_ReturnStack_Overflow_Inspect}
+  !+ 内存没有溢出判断 {$Define TurboScript_Memory_Overflow_Inspect}
+~ 关于控制流程指令：到底转移地址是放在数据栈中还是操作数中？
+
 2006-9-14
 ~如果参数栈＆返回栈使用全局内存，好处就是多个执行器可以共享数据，坏处就是多个执行器不能并行执行。
  也许在执行器上面还应有一个类，这个类就可以管理参数栈＆返回栈内存以及参数，这样在这个类上就可以并行执行。

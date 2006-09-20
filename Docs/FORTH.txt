@@ -1,3 +1,99 @@
+TurboForth: 我的TurboScript 的底层就是它！
+
+writen by riceball LEE
+
+Feature:
+  * 平台无关：采用 Forth Virtual Machine Codes 指令集；
+  * 高速执行：各种 TurboExecutor 可以根据 VM codes 翻译成不同CPU的真实指令集，直接运行，也有解释执行的Executor类。
+  * TurboInterpreter： 以解释方式执行VMCode是基于x86 机器代码优化，执行速度直逼C++，Delphi等高级编译语言。
+
+
+== Forth代码区内存镜像(TCustomTurboExecutor.Memory) ==
+
+每一个Executor 实例都有一个独立的内存区，内存区的头几k字节是保留的，内容见 TPreservedCodeMemory 记录.
+
+type //in TurboScriptConsts
+  PPreservedCodeMemory = ^ TPreservedCodeMemory;
+  //the typecast for code memory area to get the parameters
+  TPreservedCodeMemory = packed record
+    Executor: TCustomTurboExecutor;
+    //数据栈基址
+    ParamStackBase: Pointer;
+    //数据栈大小,单位字节。
+    ParamStackSize: Integer; //bytes
+    //返回栈基址
+    ReturnStackBase: Pointer;
+    //返回栈大小,单位字节。
+    ReturnStackSize: Integer; //bytes
+    //the text buffer length
+    TIBLength: Integer; 
+    ToIn: Integer; //the text buffer current index
+    //the text buffer
+    TIB: array [0..cMAXTIBCount-1] of char;
+    //用户最后一个自定义单词链入口
+    LastWordEntry: Pointer; //有名字的函数链表
+    LastVarEntry: Pointer; //有名字的变量链表
+  end;
+
+== TurboForth Virtual Machine Codes ==
+用户自定义函数采用相对地址(相对于FMemory)表示。
+由于我占用了代码区前面的至少1024个字节，所以用户函数地址不可能小于255，这样就可以判断该操作到底是VM指令还是用户函数地址。
+
+VM指令采用32位数据实现。一个VM指令至少占用4个字节。
+
+用户自定义word(函数):序列： 没有Enter了！只有Exit.
+
+注：
+本来还有另外的一种方式定义VM指令: 指令长度为1字节，专门增加一个指令CALL,后面紧跟用户定义单词的入口地址。
+
+采用该方式理由：
+  1、节约内存，系统的扩建主要是在用户自定义单词上，如果调用用户自定义单词的次数远远多于调用VM指令次数的时候，显然这种方式比较节约内存。
+  2、便于扩充系统指令，方式2最多只能有256个指令，而且无法扩充。
+
+=== VM指令详述 ===
+
+==== 核心指令 ====
+
+最核心的，最重要的Forth指令：Next, Enter, Exit, Halt
+
+iVMNext: 
+Forth执行器的核心, 装入指令，调度指令
+
+iVMEnter:
+用户自定义函数入口，由 iVMNext 在进入用户自定义函数前调用
+push the current IP(ESI),set the new IP, and run the vmNext
+
+iVMExit:
+用户自定义函数出口，每一个用户自定义函数退出的时候必须调用！
+pop to the IP(ESI),and run the vmNext.
+
+iVMHalt: 
+终止Forth机器执行.
+
+==== 流程控制指令 ====
+Flow Control Directives
+
+iVMExecute: call(EXECUTE) the (User defined Forth word) (CFA -- )
+
+
+== TurboInterpreter(Forth解释器实现) ==
+ 基于x86指令优化。核心指令汇编实现，寄存器采用x86的寄存器，对应关系如下：
+ESP: 返回堆栈指针.记住压入减少，弹出增加地址。
+EBP: 数据栈指针，基址指针放在内存某个单元中。所以EBP总是指向次栈顶。
+EDX: 为数据栈栈顶。 
+ESI: 指向当前指令地址
+EBX: 状态寄存器 (0Bit: 是否运行；1Bit:是否调试) TTurboForthStates = set of TTurboForthState; TTurboForthState = (tfsRunning, tfsDebugging, tfsCompiling)
+EAX: W Register 临时寄存器
+ECX: 临时寄存器
+EDI: FMemory基址
+
+
+
+基于核心虚拟指令在解释器中采用查表字典的方式实现！
+
+__________________________________________
+附件：
+__________________________________________
 FORTH 的核心分析:
 
 cwords.htm 中叙述得很全面
@@ -17,6 +113,7 @@ NEXT:  LODSW  ' Load the [DS:SI] to the AX
 This is short enough to include in-line in every CODE word. 
 
 
+__________________________________________
 Moving Forth简介
 原文出处http://www.zetetics.com/bj/papers/index.html
 相关网站http://www.zetetics.com/camel/index.html
@@ -36,12 +133,12 @@ Moving Forth简介
 2.认识Forth虚拟机器
   Forth有其自己的CPU架构，除缓存器外，拥有二组堆栈，一组为程序返回堆，一组为数据堆栈。
   完整的Forth缓存器有下列六个。
-  PSP:Parameter Stack(or data stack) Pointer
-  TOS:Top Of Stack
-  RSP:Return Stack Pointer
-  IP :Interpreter Pointer
+  PSP:Parameter Stack(or data stack) Pointer : EDI
+  TOS:Top Of Stack:  EAX
+  RSP:Return Stack Pointer:  ESP
+  IP :Interpreter Pointer(Program Counter): ESI
   UP :User Pointer
-  W  :Working register
+  W  :Working register: ECX
   另有其它缓存器，moving forth原文内称为X缓存器，亦有人用A(Addressing)缓存器。
   以下描述各缓存器功能。
   PSP,TOS：为数据堆栈相关缓存器，PSP为管理数据堆栈之指针器。

@@ -1,3 +1,4 @@
+{: the turbo script type and constants }
 unit uTurboScriptConsts;
 
 interface
@@ -12,34 +13,7 @@ const
   cDefaultStackSize = 127;
   cDefaultParamStackSize = 127; 
   cDefaultFreeMemSize = 1024 * 8; //the Free Memory 8kb
-  cMaxTurboVMDirectiveCount = 256; //the max turbo VM code directive count
-  
-const
-  cParameterStackBaseOffset = 0;
-  //the size is bytes
-  cParameterStackSizeOffset = cParameterStackBaseOffset + SizeOf(Pointer);
-  cReturnStackBaseOffset = cParameterStackSizeOffset + SizeOf(Integer);
-  //the size is bytes
-  cReturnStackSizeOffset = cReturnStackBaseOffset + SizeOf(Pointer);
-  cTIBLengthOffset = cReturnStackSizeOffset + SizeOf(Integer);
-  cToINOffset = cTIBLengthOffset + SizeOf(Integer);
-  cTIBOffset = cToINOffset + SizeOf(Integer);
-  cMAXTIBCount = 1024; //Bytes
-  cLastWordEntryOffset = cTIBOffset + cMAXTIBCount;
-
-type
-  PPreservedCodeMemory = ^ TPreservedCodeMemory;
-  //the typecast for code memory area to get the parameters
-  TPreservedCodeMemory = packed record
-    ParamStackBase: Pointer;
-    ParamStackSize: Integer; //bytes
-    ReturnStackBase: Pointer;
-    ReturnStackSize: Integer; //bytes
-    TIBLength: Integer; //the text buffer length
-    ToIn: Integer; //the text buffer current index
-    TIB: array [0..1023] of char;
-    LastWordEntry: Pointer;
-  end;
+  cMAXTIBCount = 1024;
   
 resourcestring
   rsMissFileHeaderError = 'Error: The file header is missed';
@@ -103,12 +77,18 @@ type
     inORInt,
     inXORInt,
 
-    {## Proc Operation Instruction }
-    inJMP,
-    inJZ,
+    {## Proc Operation Instruction: Flow Control }
+    inJMP, //JUMP Absolute address
+    inJMPByte, //JMP aByteInt(shortint offset)
+    inJMPWord, //JMP aWordInt(smallint offset)
+    inJMPInt,  //JMP aInt(offset)
+    inJZ, //jmp absolute address with condition(the TOS is 0) (n -- )
+    inJZByte,
+    inJZWord,
+    inJZInt,
     inJNZ,
-    inCall,
-    inReturn,
+    inExecute, //call(EXECUTE) the (User defined Forth word) (CFA -- )
+    //inReturn, //= inExit
     inNoop,
 
     {## Stack Operation Instuction }
@@ -153,11 +133,18 @@ type
     //CFA: LongWord;
     //ParameterFields: array of Integer; //大多数情况下是PForthWord，但是少数情况下是数据或VM Codes
   end;
-  {TForthProcessorState = (psRunning, psCompiling, psFinished, psNoData, psBadData, 
-    psBadOp, psDivZero, psOverFlow);
-  TForthProcessorStates = set of TForthProcessorState;
-  }
+  TTurboForthProcessorState = (psRunning, psStepping, psCompiling, psFinished, 
+    psBadInstruction, psDivZero, psOverFlow);
+  TTurboForthProcessorStates = set of TTurboForthProcessorState;
+  
 
+const
+  //For TTurboForthProcessorStates (put it into EBX Status Register).
+  cTurboScriptIsRunningBit        = [psRunning]; //=1
+  cTurboScriptIsSteppingBit       = [psStepping];  //=2
+  cTurboScriptIsBadInstructionBit = [psBadInstruction];
+  cMaxTurboVMInstructionCount = SizeOf(TTurboCoreWords) div SizeOf(TProcedure); //the max turbo VM code directive count
+  
 implementation
 
 

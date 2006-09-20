@@ -3,24 +3,17 @@
         }
 { Description
 对应关系如下：
-ESP,EBP: 返回堆栈
-EDI（栈指针）: 数据栈，基址指针放在内存某个单元中。EAX 为数据栈栈顶。不采用
-STOS EAX, 所以EDI总是指向栈顶的单元。
+ESP: 返回堆栈指针.记住压入减少，弹出增加地址。
+EBP: 数据栈指针，基址指针放在内存某个单元中。所以EBP总是指向次栈顶。
+EDX: 为数据栈栈顶。 
 ESI: 指向当前指令地址
-EBX: 状态寄存器 (0Bit: 是否运行；1Bit:是否调试)
-ECX: W Register 临时寄存器
-EDX: 临时寄存器。
+EBX: 状态寄存器 (0Bit: 是否运行；1Bit:是否调试) TTurboForthStates = set of
+TTurboForthState; TTurboForthState = (tfsRunning, tfsDebugging, tfsCompiling)
+EAX: W Register 临时寄存器
+ECX: 临时寄存器
+EDI: FMemory基址
 
 这些核心过程是用无参数的过程实现。
-规定（返回栈）：
-  EBP+4: 所指的是TTurboX86Interpreter实例所在地址。
-  EBP: 所指的是代码内存地址;
-//  EBP-4(SizeOf(Pointer)): 则是数据栈基址.
-
-PUSH EAX      '保存对象实例指针地址      
-PUSH FMemory  '保存代码内存地址指针
-MOV  EBP, ESP ' EBP 指的是代码内存地址 now.
-//PUSH FParameterStack
 
 采用什么形式 THREADING TECHNIQUE 来实现呢？核心虚拟指令采用查表字典的方式！
 用户自定义指令采用相对地址（由于我占用了代码区前面的至少1024个字节，所以地址不可能小于255）表示。
@@ -36,21 +29,23 @@ type //in uTurboScriptConsts
   PPreservedCodeMemory = ^ TPreservedCodeMemory;
   //the typecast for code memory area to get the parameters
   TPreservedCodeMemory = packed record
+    Executor: TCustomTurboExecutor;
     ParamStackBase: Pointer;
     ParamStackSize: Integer; //bytes
     ReturnStackBase: Pointer;
     ReturnStackSize: Integer; //bytes
     TIBLength: Integer; //the text buffer length
     ToIn: Integer; //the text buffer current index
-    TIB: array [0..1023] of char;
-    LastWordEntry: Pointer;
+    TIB: array [0..cMAXTIBCount-1] of char;
+    LastWordEntry: Pointer; //有名字的函数链表
+     LastVarEntry: Pointer; //有名字的变量链表
   end;
 }
 unit TurboInterpreter;
 
 interface
 
-{.$I Setting.inc}
+{$I TurboScript.inc}
 
 uses
   SysUtils, Classes
@@ -58,10 +53,6 @@ uses
   , uTurboExecutor
   ;
 
-const
-  //For EBX Status Register.
-  cIsRunningBit = 1;
-  cIsSteppedBit = 2; 
   
 type
   TTurboX86Interpreter = class(TCustomTurboExecutor)
@@ -107,42 +98,44 @@ begin
     CALL TCustomTurboExecutor.ExecuteCFA
     POP  EDX
     POP  EAX
-    MOV  [EAX].FOldESP, ESP
-    MOV  [EAX].FOldEBP, EBP
+
+    MOV  Self.FOldESP, ESP
+    MOV  Self.FOldEBP, EBP
     MOV  Self.FOldESI, ESI
     MOV  Self.FOldEDI, EDI
     MOV  Self.FOldEBX, EBX
     MOV  ESP, Self.FRP //return stack pointer: RP
     //PUSHAD
-    PUSH EAX
-    PUSH [EAX].FMemory
-    MOV  EBP, ESP
-    PUSH [EAX].FParameterStack
+    //PUSH EAX
+    //PUSH [EAX].FMemory
+    MOV  EDI, [EAX].FMemory
+    //PUSH [EAX].FParameterStack
 
-    MOV  ESI, [EAX].FMemory
+    MOV  ESI, EDI  //ESI: IP
     ADD  ESI, aCFA
-    MOV  EBX, cIsRunningBit
-    MOV  EDI, [EAX].FSP //SP the data stack pointer.
-    XOR  EAX, EAX
+    MOV  EBX, cTurboScriptIsRunningBit //EBX: FORTH Processor States
+    MOV  EBP, [EAX].FSP //SP the data stack pointer.
+    XOR  EDX, EDX //the TOS
     //MOV  EDX, EAX
     //STD  //the EDI will be decremented.
-
+    CLD //the esi will be incremented.
     //PUSH @@ReturnAdr
     CALL  iVMNext
   @@ReturnAdr:
     //数据总是指向栈顶
-    SUB EDI, Type(Integer)
-    MOV [EDI], EAX
-    //STOS EAX //STOSD  the EDI will be decremented automatically.
+    XCHG ESP, EBP
+    PUSH EDX
+    XCHG ESP, EBP
     //自己判断是否数据栈为空。
 
 
     //MOV [ESI]
-    POP EAX
-    POP EAX
-    POP EAX
+    //POP EAX
+    //POP EAX
+    //POP EAX
+    MOV  EAX, [EDI].TPreservedCodeMemory.Executor
     MOV  [EAX].TTurboX86Interpreter.FRP, ESP
-    MOV  [EAX].TTurboX86Interpreter.FSP, EDI
+    MOV  [EAX].TTurboX86Interpreter.FSP, EBP
     MOV  [EAX].TTurboX86Interpreter.FPC, ESI
 
     MOV  ESP, [EAX].TTurboX86Interpreter.FOldESP
@@ -165,35 +158,36 @@ end;
 procedure iVMEnter;
 asm
   PUSH ESI        //push the current IP.
-  MOV  ESI, ECX   //set the new IP
+  MOV  ESI, EAX   //set the new IP
   JMP iVMNext
 end;
 
 //the interpreter core here:
 procedure iVMNext;
 asm
-  TEST EBX, cIsRunningBit
+  TEST EBX, cTurboScriptIsRunningBit
   JZ @@Exit
 
-  MOV ECX, [ESI]  //the current instruction in W register
-  ADD ESI, Type(Pointer) //4 = INC PC INC PC INC PC INC PC
+  //MOV EAX, [ESI]  //the current instruction in W register
+  //ADD ESI, Type(Pointer) //4 = INC PC INC PC INC PC INC PC
+  LODSD
   
 @@ExecInstruction:
-  CMP  ECX, cMaxTurboVMDirectiveCount
-  LEA  EDX, GTurboCoreWords
+  CMP  EAX, cMaxTurboVMInstructionCount
+  LEA  ECX, GTurboCoreWords
   JAE   @@IsUserWord
 @@IsVMCode:
-  MOV  ECX, [EDX+ECX*4]
-  JMP  ECX
+  MOV  EAX, [ECX+EAX*4]
+  JMP  EAX
 @@IsUserWord:
-  ADD  ECX, [EBP] //指向用户定义的word入口
+  ADD  EAX, EDI //指向用户定义的word入口
   JMP  iVMEnter
 @@Exit:
 end;
 
 procedure iVMHalt;
 asm
-  BTR EBX, cIsRunningBit  //clear the cIsRunningBit to 0.
+  BTR EBX, cTurboScriptIsRunningBit  //clear the cIsRunningBit to 0.
   JMP iVMNext
 end;
 
@@ -203,41 +197,66 @@ asm
   JMP  iVMNext
 end;
 
+//call(EXECUTE) the user defined word
+//(CFA --- )
+procedure iVMExecute;
+asm
+  PUSH ESI        //push the current IP.
+  MOV  ESI, EDI   //set the new IP in the TOS
+
+  XCHG ESP, EBP
+  POP  EDX
+  XCHG ESP, EBP
+
+  JMP  iVMNext
+end;
+
 //this is a Push Integer(立即操作数) directive
 procedure iVMPushInt;
 asm
   //Decrement the data stack pointer.
   //push the second data to the data stack.
-  SUB  EDI, Type(Pointer)
-  MOV  [EDI], EAX
-  
-  MOV  EAX, [ESI]
+  XCHG ESP, EBP
+  PUSH EDX
+  XCHG ESP, EBP
+  {SUB  EBP, Type(Pointer)
+  MOV  [EBP], EDX
+  }
+ 
+  {
+  MOV  EDX, [ESI]
   ADD  ESI, Type(Integer)
+  }
+  LODSD
+  MOV  EDX, EAX
   JMP  iVMNext
 end;
 
 procedure iVMPopInt;
 asm
-  //move the top in stack to EAX 
-  MOV  EAX, [EDI] 
+  XCHG ESP, EBP
+  POP  EDX
+  XCHG ESP, EBP
+  {//move the top in stack to EAX 
+  MOV  EDX, [EBP] 
   //Increment the data stack pointer.
-  ADD  EDI, Type(Integer)
-  
+  ADD  EBP, Type(Integer)
+  }
   JMP  iVMNext
 end;
 
 //(n, n1) -- (n = n + n1)
 procedure iVMAddInt;
 asm
-  ADD EAX, [EDI]
-  ADD EDI, Type(Integer)
+  ADD EDX, [EBP]
+  ADD EBP, Type(Integer)
 end;
 
 //(n, n1) -- (n = n - n1)
 procedure iVMSubInt;
 asm
-  SUB EAX, [EDI]
-  ADD EDI, Type(Integer)
+  SUB EDX, [EBP]
+  ADD EBP, Type(Integer)
 end;
 
 // Unsigned multiply
@@ -245,8 +264,10 @@ end;
 //EAX(n): the result of Low orders; n1 the result of high orders
 procedure iVMMulUnsignedInt;
 asm
-  MUL  EAX, [EDI] //EDX:EAX = EAX * [EDI]
-  MOV  [EDI], EDX
+  MOV  EAX, EDX
+  MUL  EAX, [EBP] //EDX:EAX = EAX * [EDI]
+  MOV  [EBP], EDX
+  MOV  EDX, EAX
 end;
 
 procedure vFetch;

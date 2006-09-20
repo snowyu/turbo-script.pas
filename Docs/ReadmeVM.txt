@@ -24,24 +24,19 @@
 
 TurboInterpreter_S: Pure Pascal 实现，暂缓
 TurboInterpreter: 基于x86指令优化。核心指令汇编实现，寄存器采用x86的寄存器，对应关系如下：
-ESP,EBP: 返回堆栈.记住压入减少，弹出增加地址。
-EDI（栈指针）: 数据栈，基址指针放在内存某个单元中。EAX 为数据栈栈顶。不采用 STOS EAX, 所以EDI总是指向栈顶。
+ESP: 返回堆栈指针.记住压入减少，弹出增加地址。
+EBP: 数据栈指针，基址指针放在内存某个单元中。所以EBP总是指向次栈顶。
+EDX: 为数据栈栈顶。 
 ESI: 指向当前指令地址
-EBX: 状态寄存器 (0Bit: 是否运行；1Bit:是否调试)
-ECX: W Register 临时寄存器
-EDX: 临时寄存器
+EBX: 状态寄存器 (0Bit: 是否运行；1Bit:是否调试) TTurboForthStates = set of TTurboForthState; TTurboForthState = (tfsRunning, tfsDebugging, tfsCompiling)
+EAX: W Register 临时寄存器
+ECX: 临时寄存器
+
+EDI: FMemory基址
 
 可以用PUSHAD 将这些通用寄存器保存于堆栈，供调用其他系统的过程时采用。然后POPAD.
 现在我的问题，这些核心过程是用方法实现还是函数过程实现？用无参数的过程实现。
-规定：
-EBP+4: 所指的是TTurboX86Interpreter实例所在地址。
-EBP: 所指的是代码内存地址;
-//EBP-4(SizeOf(Pointer)): 则是数据栈基址.
 
-PUSH EAX      
-PUSH FMemory 
-MOV  EBP, ESP
-//PUSH FParameterStack
 
 采用什么形式 THREADING TECHNIQUE 来实现呢？基于核心虚拟指令采用查表字典的方式！用户自定义Word采用相对地址（由于我占用了代码区前面的至少1024个字节，所以地址不可能小于255）表示。
 那么我的函数表放在哪里好呢？全局变量的形式。
@@ -88,7 +83,7 @@ iVMHalt
 
 TCoreForthWords = array [Byte] of TProcedure;
 
-代码区内存镜像：
+Forth代码区内存镜像(TCustomTurboExecutor.Memory)：
 FParameterStackBase(Pointer:是数据栈基址) FParameterStackSize(Integer:是数据栈大小)  
 ReturnStackBase(Pointer: 返回栈基址) ReturnStackSize(Integer: 返回栈大小)
 TIBLength(Integer) ToIn(Integer) TIB(PChar: 1024) LastWordEntry(Pointer: 用户自定义单词链入口)
@@ -96,6 +91,7 @@ type //in TurboScriptConsts
   PPreservedCodeMemory = ^ TPreservedCodeMemory;
   //the typecast for code memory area to get the parameters
   TPreservedCodeMemory = packed record
+    Executor: TCustomTurboExecutor;
     ParamStackBase: Pointer;
     ParamStackSize: Integer; //bytes
     ReturnStackBase: Pointer;
@@ -112,8 +108,9 @@ type //in TurboScriptConsts
 
 pushInt 2 pushInt 3 AddInt Halt 
 
-性能 QueryPerformanceCounter 大概 7-8 QueryPerformanceCounter.
+运行性能 QueryPerformanceCounter 大概 6-8 QueryPerformanceCounter.
 而其他性能则要 400-800.QueryPerformanceCounter.
+而delphi 的 a:= 2+3 运行需要的时间 是 4-7,基本不相上下。
 
 变量区，代码区，都在FMemory中。
 可以看作是该executor的局部变量（或参数）。
