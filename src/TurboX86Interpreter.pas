@@ -77,10 +77,12 @@ var
 
 implementation
 
+procedure iVMInit;forward;
 procedure iVMNext;forward;
 procedure iVMHalt;forward;
 procedure iVMNextFullSpeed;forward;
 procedure iVMHaltFullSpeed;forward;
+procedure iVMEnter;forward;
 
 {
 ***************************** TTurboX86Interpreter *****************************
@@ -127,7 +129,7 @@ begin
     //STD  //the EDI will be decremented.
     CLD //the esi will be incremented.
     //PUSH @@ReturnAdr
-    CALL  iVMNext
+    CALL  iVMInit
   @@ReturnAdr:
     //数据总是指向栈顶
     XCHG ESP, EBP
@@ -165,11 +167,11 @@ end;
 
 {----Helper functions ----}
 
-procedure iVMEnter;
+procedure iVMInit;
 asm
-  PUSH ESI        //push the current IP.
-  MOV  ESI, EAX   //set the new IP
-  JMP iVMNext
+  MOV  [EDI].TPreservedCodeMemory.ReturnStackBottom, ESP
+  MOV  [EDI].TPreservedCodeMemory.ParamStackBottom, EBP
+  JMP  iVMNext
 end;
 
 procedure iVMNext;
@@ -207,6 +209,22 @@ asm
   ADD  EAX, EDI //指向用户定义的word入口
   JMP  iVMEnter
 @@Exit:
+  CMP  ESP, [EDI].TPreservedCodeMemory.ReturnStackBottom
+  JZ   @@byebye  //ok
+@@HaltErr:
+  BTS  EDX, errHalt
+  MOV  EAX, ESP
+  MOV  ESP, [EDI].TPreservedCodeMemory.ReturnStackBottom
+  MOV  [EDI].TPreservedCodeMemory.ReturnStackBottom, EAX
+@@byebye:
+
+end;
+
+procedure iVMEnter;
+asm
+  PUSH ESI        //push the current IP.
+  MOV  ESI, EAX   //set the new IP
+  JMP iVMNext
 end;
 
 procedure iVMHalt;
