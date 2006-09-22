@@ -26,11 +26,6 @@ uses
 type
   TTurboScriptOption = (soOptimize, soLoadOnDemand, soBindingRuntime);
   TTurboScriptOptions = set of TTurboScriptOption;
-  {: The current status of the turbo script }
-  {
-    @PARAM ssNotLoaded only the name and soem options loaded but the body(Memory) in not loaded yet.
-  }
-  TTurboScriptStatus = (ssNotLoaded, ssLoaded, ssRunning, ssPaused);
 
   TCustomTurboPEFormat = class;
   TCustomTurboExecutor = class;
@@ -82,8 +77,13 @@ type
   }
   TCustomTurboExecutor = class(TObject)
   private
+    function GetIsLoaded: Boolean;
+    function GetLastErrorCode: TTurboForthProcessorErrorCode;
+    function GetStatus: TTurboForthProcessorStates;
     function GetTIB: string;
+    procedure SetIsLoaded(const Value: Boolean);
     procedure SetMemorySize(Value: Integer);
+    procedure SetStatus(Value: TTurboForthProcessorStates);
     procedure SetTIB(Value: string);
   protected
     {: The Code Memory }
@@ -113,13 +113,13 @@ type
     FRP: Integer;
     {: the Parameter Stack(or data stack) Pointer }
     FSP: Integer;
-    FStatus: TTurboScriptStatus;
     {: The Current TIB Index }
     { Description
     FTIBIndex : Text[FTIBIndex]
     }
     FTextIndex: Integer;
     FUsedMemory: Integer;
+    procedure Grow;
   public
     constructor Create; virtual;
     destructor Destroy; override;
@@ -145,10 +145,19 @@ type
     }
     function ExecuteWord(const aWord: string): Integer;
     procedure FinalizeExecution; virtual;
+    function GetModuleMemoryAddr(aModuleIndex: Integer): Pointer;
     function GetWordCFA(const aWord: string): Integer; virtual;
     {: Init the Virtual Machine. }
     procedure InitExecution; virtual;
+    {: reset the stack pointers. }
+    procedure Reset;
     procedure Stop;
+    { Description
+    if not loaded, then only the name and some options loaded but the body(
+    Memory).
+    }
+    property IsLoaded: Boolean read GetIsLoaded write SetIsLoaded;
+    property LastErrorCode: TTurboForthProcessorErrorCode read GetLastErrorCode;
     {: The Code Memory }
     property Memory: Pointer read FMemory write FMemory;
     {: : the Memory Size. }
@@ -216,7 +225,7 @@ type
     {: the Parameter Stack(or data stack) Pointer }
     property SP: Integer read FSP write FSP;
     {: the current status of the script. }
-    property Status: TTurboScriptStatus read FStatus write FStatus;
+    property Status: TTurboForthProcessorStates read GetStatus write SetStatus;
     {: the script source(TIB) }
     { Description
     TIB: text input Buffer
@@ -237,7 +246,7 @@ type
     FParameterStackSize: Integer;
     FStack: Pointer;
     FStackSize: Integer;
-    FStatus: TTurboScriptStatus;
+    FStatus: TTurboForthProcessorStates;
     procedure SetExecutor(const Value: TCustomTurboExecutor);
     procedure SetParameterStackSize(const Value: Integer);
     procedure SetStackSize(const Value: Integer);
@@ -270,14 +279,17 @@ type
     {: : Return Stack Size }
     property StackSize: Integer read FStackSize write SetStackSize;
     {: the current status of the script. }
-    property Status: TTurboScriptStatus read FStatus write FStatus;
+    property Status: TTurboForthProcessorStates read FStatus write FStatus;
   end;
 
 
   PPreservedCodeMemory = ^ TPreservedCodeMemory;
   //the typecast for code memory area to get the parameters
   TPreservedCodeMemory = packed record
+    States: TTurboForthProcessorStates;
     Executor: TCustomTurboExecutor;
+    //this Module unique Index in this program, allocated by compiler.
+    ModuleIndex: Integer;
     ParamStackBase: Pointer;
     ParamStackSize: Integer; //bytes
     ReturnStackBase: Pointer;
@@ -285,7 +297,9 @@ type
     TIBLength: Integer; //#TIB the text buffer length
     ToIn: Integer; //>IN the text buffer current index
     TIB: array [0..cMAXTIBCount-1] of char; //'TIB
+    LastErrorCode: TTurboForthProcessorErrorCode;
     LastWordEntry: Pointer;
+    LastVarEntry: Pointer;
   end;
 
 implementation
@@ -296,6 +310,9 @@ implementation
 constructor TCustomTurboExecutor.Create;
 begin
   inherited Create;
+  //FStatus := [];
+  MemorySize := SizeOf(TPreservedCodeMemory) + cDefaultFreeMemSize;
+  FUsedMemory := SizeOf(TPreservedCodeMemory);
 end;
 
 destructor TCustomTurboExecutor.Destroy;
@@ -310,6 +327,8 @@ procedure TCustomTurboExecutor.AddIntToMem(const aInt: Integer);
 var
   p: Pointer;
 begin
+  if FUsedMemory >= FMemorySize then
+    Grow;
   Integer(p) := Integer(FMemory) + FUsedMemory;
   PInteger(P)^ := aInt;
   Inc(FUsedMemory, SizeOf(Integer));
@@ -318,8 +337,10 @@ end;
 function TCustomTurboExecutor.ExecuteCFA(const aCFA: Integer): Integer;
 begin
   Result := -1;
-  if FStatus >= ssRunning then
+  if (psRunning in Status) then
     raise ETurboScriptError.CreateRes(@rsTurboScriptAlreayRunningError);
+
+  Include(PPreservedCodeMemory(FMemory).States, psRunning);
 end;
 
 function TCustomTurboExecutor.ExecuteWord(const aWord: string): Integer;
@@ -335,6 +356,26 @@ end;
 
 procedure TCustomTurboExecutor.FinalizeExecution;
 begin
+end;
+
+function TCustomTurboExecutor.GetIsLoaded: Boolean;
+begin
+  Result := Assigned(FMemory) and (psLoaded in PPreservedCodeMemory(FMemory).States);
+end;
+
+function TCustomTurboExecutor.GetLastErrorCode: TTurboForthProcessorErrorCode;
+begin
+  Result := PPreservedCodeMemory(FMemory).LastErrorCode;
+end;
+
+function TCustomTurboExecutor.GetModuleMemoryAddr(aModuleIndex: Integer):
+        Pointer;
+begin
+end;
+
+function TCustomTurboExecutor.GetStatus: TTurboForthProcessorStates;
+begin
+  Result := PPreservedCodeMemory(FMemory).States;
 end;
 
 function TCustomTurboExecutor.GetTIB: string;
@@ -356,14 +397,17 @@ begin
   Result := -1;
 end;
 
+procedure TCustomTurboExecutor.Grow;
+begin
+  MemorySize := FMemorySize + FMemorySize div 4;
+end;
+
 procedure TCustomTurboExecutor.InitExecution;
 begin
-  if FStatus >= ssRunning then
+  if (psRunning in Status) then
     raise ETurboScriptError.CreateRes(@rsTurboScriptAlreayRunningError);
   //MemorySize := cLastWordEntryOffset + cDefaultFreeMemSize;
   //FUsedMemory := cLastWordEntryOffset;
-  MemorySize := SizeOf(TPreservedCodeMemory) + cDefaultFreeMemSize;
-  FUsedMemory := SizeOf(TPreservedCodeMemory);
 
 
   {PInteger(@FMemory[cTIBLengthOffset])^ := 0;
@@ -377,6 +421,7 @@ begin
     ToIn := 0;
     TIB[0] := #0;
     LastWordEntry := nil;
+    LastErrorCode := errNone;
   end;
   PPreservedCodeMemory(FMemory).Executor := Self;
   //FParameterStack := Prog.ParameterStack;
@@ -392,6 +437,22 @@ begin
   RP := Integer(FReturnStack) + FReturnStackSize;
 end;
 
+procedure TCustomTurboExecutor.Reset;
+begin
+  SP := Integer(FParameterStack) + FParameterStackSize;
+  RP := Integer(FReturnStack) + FReturnStackSize;
+  PPreservedCodeMemory(FMemory).LastErrorCode := errNone;
+end;
+
+procedure TCustomTurboExecutor.SetIsLoaded(const Value: Boolean);
+begin
+  if not Assigned(FMemory) then exit;
+  if Value then
+    Include(PPreservedCodeMemory(FMemory).States, psLoaded)
+  else
+    Exclude(PPreservedCodeMemory(FMemory).States, psLoaded);
+end;
+
 procedure TCustomTurboExecutor.SetMemorySize(Value: Integer);
 begin
   if FMemorySize <> Value then
@@ -399,6 +460,11 @@ begin
     FMemorySize := Value;
     ReallocMem(FMemory, FMemorySize);
   end;
+end;
+
+procedure TCustomTurboExecutor.SetStatus(Value: TTurboForthProcessorStates);
+begin
+  PPreservedCodeMemory(FMemory).States := Value;
 end;
 
 procedure TCustomTurboExecutor.SetTIB(Value: string);
@@ -426,6 +492,7 @@ end;
 
 procedure TCustomTurboExecutor.Stop;
 begin
+  Exclude(PPreservedCodeMemory(FMemory).States, psRunning);
 end;
 
 {
@@ -460,7 +527,7 @@ end;
 
 procedure TTurboProgram.SetParameterStackSize(const Value: Integer);
 begin
-  if (Status < ssRunning) and (FParameterStackSize <> Value) then
+  if not (psRunning in Status) and (FParameterStackSize <> Value) then
   begin
     FParameterStackSize := Value;
     ReallocMem(FParameterStack, (FParameterStackSize+1)*SizeOf(Pointer));
@@ -470,7 +537,7 @@ end;
 
 procedure TTurboProgram.SetStackSize(const Value: Integer);
 begin
-  if (Status < ssRunning) and (FStackSize <> Value) then
+  if not (psRunning in Status) and (FStackSize <> Value) then
   begin
     FStackSize := Value;
     ReallocMem(FStack, (FStackSize+1)*SizeOf(Pointer));
