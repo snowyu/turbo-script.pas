@@ -5,12 +5,14 @@
 对应关系如下：
 ESP: 返回堆栈指针.记住压入减少，弹出增加地址。
 EBP: 数据栈指针，基址指针放在内存某个单元中。所以EBP总是指向次栈顶。
-EDX: 为数据栈栈顶。 
+EBX: 为数据栈栈顶。 
 ESI: 指向当前指令地址
-EBX: 状态寄存器 (0Bit: 是否运行；1Bit:是否调试) TTurboForthStates = set of
-TTurboForthState; TTurboForthState = (tfsRunning, tfsDebugging, tfsCompiling)
+EDX: 状态寄存器(
+仅当条件编译指令：TurboScript_FullSpeed开启时使用，否则为临时寄存器)
+TTurboForthProcessorStates, 为了能控制停止,状态寄存器放于保留内存中了。
 EAX: W Register 临时寄存器
-ECX: 临时寄存器
+ECX:  临时寄存器
+
 EDI: FMemory基址
 
 这些核心过程是用无参数的过程实现。
@@ -76,6 +78,9 @@ var
 implementation
 
 procedure iVMNext;forward;
+procedure iVMHalt;forward;
+procedure iVMNextFullSpeed;forward;
+procedure iVMHaltFullSpeed;forward;
 
 {
 ***************************** TTurboX86Interpreter *****************************
@@ -113,9 +118,11 @@ begin
 
     MOV  ESI, EDI  //ESI: IP
     ADD  ESI, aCFA
-    MOV  EBX, cTurboScriptIsRunningBit //EBX: FORTH Processor States
+    {$ifdef TurboScript_FullSpeed}
+    MOV  DL, [EDI].TPreservedCodeMemory.States //EBX: FORTH Processor States
+    {$endif}
     MOV  EBP, [EAX].FSP //SP the data stack pointer.
-    XOR  EDX, EDX //the TOS
+    XOR  EBX, EBX //the TOS
     //MOV  EDX, EAX
     //STD  //the EDI will be decremented.
     CLD //the esi will be incremented.
@@ -124,7 +131,7 @@ begin
   @@ReturnAdr:
     //数据总是指向栈顶
     XCHG ESP, EBP
-    PUSH EDX
+    PUSH EBX
     XCHG ESP, EBP
     //自己判断是否数据栈为空。
 
@@ -137,6 +144,9 @@ begin
     MOV  [EAX].TTurboX86Interpreter.FRP, ESP
     MOV  [EAX].TTurboX86Interpreter.FSP, EBP
     MOV  [EAX].TTurboX86Interpreter.FPC, ESI
+    {$ifdef TurboScript_FullSpeed}
+    MOV  [EDI].TPreservedCodeMemory.States, DL
+    {$endif}
 
     MOV  ESP, [EAX].TTurboX86Interpreter.FOldESP
     MOV  EBP, [EAX].TTurboX86Interpreter.FOldEBP
@@ -162,11 +172,19 @@ asm
   JMP iVMNext
 end;
 
-//the interpreter core here:
 procedure iVMNext;
 asm
-  TEST EBX, cTurboScriptIsRunningBit
-  JZ @@Exit
+  {$ifndef TurboScript_FullSpeed}
+  MOV  DL, [EDI].TPreservedCodeMemory.States
+  {$endif}
+  JMP  iVMNextFullSpeed 
+end;
+
+//the interpreter core here:
+procedure iVMNextFullSpeed;
+asm
+  BT EDX, psRunning //cTurboScriptIsRunningBit
+  JNC @@Exit
 
   //MOV EAX, [ESI]  //the current instruction in W register
   //ADD ESI, Type(Pointer) //4 = INC PC INC PC INC PC INC PC
@@ -178,7 +196,13 @@ asm
   JAE   @@IsUserWord
 @@IsVMCode:
   MOV  EAX, [ECX+EAX*4]
+  CMP  EAX, 0
+  JZ   @@BadOpError
   JMP  EAX
+@@BadOpError:
+  MOV  [EDI].TPreservedCodeMemory.LastErrorCode, errBadInstruction
+  JMP  iVMHalt
+  //Bad OpCode: no procedure assigned to the OpCode.
 @@IsUserWord:
   ADD  EAX, EDI //指向用户定义的word入口
   JMP  iVMEnter
@@ -187,7 +211,15 @@ end;
 
 procedure iVMHalt;
 asm
-  BTR EBX, cTurboScriptIsRunningBit  //clear the cIsRunningBit to 0.
+  BTR EDX, psRunning //cTurboScriptIsRunningBit  //clear the cIsRunningBit to 0.
+  MOV [EDI].TPreservedCodeMemory.States, DL
+  JMP iVMNext
+end;
+
+procedure iVMHaltFullSpeed;
+asm
+  BTR EDX, psRunning //cTurboScriptIsRunningBit  //clear the cIsRunningBit to 0.
+  //MOV [EDI].TPreservedCodeMemory.States, DL
   JMP iVMNext
 end;
 
@@ -197,15 +229,72 @@ asm
   JMP  iVMNext
 end;
 
+procedure iVMExitFar;
+asm
+  POP  ESI
+  POP  EDI
+  JMP  iVMNext
+end;
+
+//在返回栈中保存EDI(旧的 FMemory 基址), 
+//根据 ModuleIndex 查找模块内存基址，如果找到就设置EDI成新的 FMemory 基址,
+//然后装入该函数的地址，其它就和VMEnter一样了，转去VMEnter。
+procedure iVMEnterFar;
+asm
+  PUSH EDI
+  LODSD
+  CMP  EAX, [EDI].TPreservedCodeMemory.ModuleIndex
+  JZ  @@DoLocalEnterFar
+@@GetModuleAddr:
+  PUSH EBX
+  PUSH ESI
+  {$ifdef TurboScript_FullSpeed}
+  PUSH EDX
+  {$endif}
+  PUSH EBP
+  
+  MOV  EDX, EAX
+  MOV  EAX, [EDI].TPreservedCodeMemory.Executor
+  //function TCustomTruboExecutor.GetModuleMemoryAddr(aModuleIndex: Integer): Pointer;
+  CALL TCustomTurboExecutor.GetModuleMemoryAddr
+  POP EBP
+  {$ifdef TurboScript_FullSpeed}
+  POP EDX
+  {$endif}
+  POP ESI
+  POP EBX
+
+  CMP  EAX, 0
+  JZ   @@NotFoundError
+  MOV  EDI, EAX
+  JMP @@Exit
+
+@@NotFoundError:
+  POP  EDI
+  MOV  [EDI].TPreservedCodeMemory.LastErrorCode, errModuleIndex
+  JMP  iVMHalt
+
+@@DoLocalEnterFar:
+
+@@Exit:
+  LODSD
+  ADD EAX, EDI
+  JMP iVMEnter
+end;
+
+
 //call(EXECUTE) the user defined word
 //(CFA --- )
 procedure iVMExecute;
 asm
-  PUSH ESI        //push the current IP.
-  MOV  ESI, EDI   //set the new IP in the TOS
+  //push the current IP.
+  PUSH ESI        
+  //set the new IP in the TOS
+  ADD  EBX, EDI
+  MOV  ESI, EBX   
 
   XCHG ESP, EBP
-  POP  EDX
+  POP  EBX
   XCHG ESP, EBP
 
   JMP  iVMNext
@@ -217,7 +306,7 @@ asm
   //Decrement the data stack pointer.
   //push the second data to the data stack.
   XCHG ESP, EBP
-  PUSH EDX
+  PUSH EBX
   XCHG ESP, EBP
   {SUB  EBP, Type(Pointer)
   MOV  [EBP], EDX
@@ -228,14 +317,14 @@ asm
   ADD  ESI, Type(Integer)
   }
   LODSD
-  MOV  EDX, EAX
+  MOV  EBX, EAX
   JMP  iVMNext
 end;
 
 procedure iVMPopInt;
 asm
   XCHG ESP, EBP
-  POP  EDX
+  POP  EBX
   XCHG ESP, EBP
   {//move the top in stack to EAX 
   MOV  EDX, [EBP] 
@@ -248,15 +337,17 @@ end;
 //(n, n1) -- (n = n + n1)
 procedure iVMAddInt;
 asm
-  ADD EDX, [EBP]
+  ADD EBX, [EBP]
   ADD EBP, Type(Integer)
+  JMP  iVMNext
 end;
 
 //(n, n1) -- (n = n - n1)
 procedure iVMSubInt;
 asm
-  SUB EDX, [EBP]
+  SUB EBX, [EBP]
   ADD EBP, Type(Integer)
+  JMP  iVMNext
 end;
 
 // Unsigned multiply
@@ -264,10 +355,17 @@ end;
 //EAX(n): the result of Low orders; n1 the result of high orders
 procedure iVMMulUnsignedInt;
 asm
-  MOV  EAX, EDX
+  MOV  EAX, EBX
+  {$ifdef TurboScript_FullSpeed}
+  PUSH EDX
+  {$endif}
   MUL  EAX, [EBP] //EDX:EAX = EAX * [EDI]
   MOV  [EBP], EDX
-  MOV  EDX, EAX
+  {$ifdef TurboScript_FullSpeed}
+  POP  EDX
+  {$endif}
+  MOV  EBX, EAX
+  JMP  iVMNext
 end;
 
 procedure vFetch;
@@ -288,10 +386,18 @@ end;
 
 procedure InitTurboCoreWordList;
 begin
-  GTurboCoreWords[inEnter] := iVMEnter;
+  {$ifdef TurboScript_FullSpeed}
+  GTurboCoreWords[inNext] := iVMNextFullSpeed;
+  GTurboCoreWords[inHalt] := iVMHaltFullSpeed;
+  {$else}
   GTurboCoreWords[inNext] := iVMNext;
   GTurboCoreWords[inHalt] := iVMHalt;
+  {$endif}
+  GTurboCoreWords[inEnter] := iVMEnter;
   GTurboCoreWords[inExit] := iVMExit;
+
+  GTurboCoreWords[inEnterFar] := iVMEnterFar;
+  GTurboCoreWords[inExitFar] := iVMExitFar;
   
   GTurboCoreWords[inAddInt] := iVMAddInt;
   GTurboCoreWords[inSubInt] := iVMSubInt;
