@@ -284,6 +284,48 @@ type
 
 
   PPreservedCodeMemory = ^ TPreservedCodeMemory;
+  PTurboVariableEntry = ^ TTurboVariableEntry;
+  PTurboModuleEntry = ^ TTurboModuleEntry;
+  PTurboWordEntry = ^ TTurboWordEntry;
+  PTurboSymbolEntry = ^ TTurboSymbolEntry;
+
+  //For type-cast the Mem
+  TTurboWordEntry = packed record
+    Prior: PTurboWordEntry; //前一个单词 0 means 为最前面。
+
+    Options: TTurboForthWordOptions;
+    //the Param Field Length
+    //该函数主体的长度 
+    ParamFieldLength: LongWord;
+    {NameLen: Byte;
+    Name: array [0..255] of char;}
+    Name: ShortString; //packed
+    //Name: String; it's a PChar, the last char is #0
+    //the following is ParameterFields   
+    //其实就是直接指向的某个单词的PFA，不过那个单词的PFA就是直接执行的机器码而已。
+    //CFA = ParameterFields[0]
+    //CFA: LongWord;
+    //ParameterFields: array of Integer; //大多数情况下是PForthWord，但是少数情况下是数据或VM Codes
+  end;
+
+  TTurboVariableEntry = packed record
+    Prior: PTurboVariableEntry; 
+  end;
+  
+  TTurboModuleEntry = packed record
+    Prior: PTurboModuleEntry; //nil means no more
+    ModuleIndex: integer;
+    Module: TCustomTurboExecutor; //nil means not assigned(or loaded).
+    Name: ShortString; //packed string, the full module name with path.
+  end;
+
+  TTurboSymbolEntry = packed record
+    Prior: PTurboSymbolEntry; //nil means no more
+    //ModuleIndex: integer;
+    //Module: TCustomTurboExecutor; //nil means not assigned(or loaded).
+    //Name: ShortString; //packed string, the full module name with path.
+  end;
+
   //the typecast for code memory area to get the parameters
   TPreservedCodeMemory = packed record
     States: TTurboForthProcessorStates;
@@ -292,15 +334,26 @@ type
     ModuleIndex: Integer;
     ParamStackBase: Pointer;
     ParamStackSize: Integer; //bytes
+    ParamStackBottom: Pointer;
     ReturnStackBase: Pointer;
     ReturnStackSize: Integer; //bytes
+    ReturnStackBottom: Pointer;
     TIBLength: Integer; //#TIB the text buffer length
     ToIn: Integer; //>IN the text buffer current index
     TIB: array [0..cMAXTIBCount-1] of char; //'TIB
     LastErrorCode: TTurboForthProcessorErrorCode;
-    LastWordEntry: Pointer;
-    LastVarEntry: Pointer;
+    //last Used(import) module entry.
+    LastModuleEntry: PTurboModuleEntry;
+    //有名字的函数链表，指向最后一个函数入口。
+    LastWordEntry: PTurboWordEntry;
+    //有名字的变量链表
+    LastVarEntry: PTurboVariableEntry;
+    //RTTI 符号表 链表
+    LastSymbolEntry: PTurboSymbolEntry;
   end;
+
+procedure TurboConvertAddrRelatedToAbsolute(Mem: Pointer);
+procedure TurboConvertAddrAbsoluteToRelated(Mem: Pointer);
 
 implementation
 
@@ -310,9 +363,16 @@ implementation
 constructor TCustomTurboExecutor.Create;
 begin
   inherited Create;
-  //FStatus := [];
   MemorySize := SizeOf(TPreservedCodeMemory) + cDefaultFreeMemSize;
   FUsedMemory := SizeOf(TPreservedCodeMemory);
+
+  with PPreservedCodeMemory(FMemory)^ do
+  begin
+    LastWordEntry := nil;
+    LastVarEntry := nil;
+    LastSymbolEntry := nil;
+    LastModuleEntry := nil;
+  end;
 end;
 
 destructor TCustomTurboExecutor.Destroy;
@@ -409,20 +469,19 @@ begin
   //MemorySize := cLastWordEntryOffset + cDefaultFreeMemSize;
   //FUsedMemory := cLastWordEntryOffset;
 
+  with PPreservedCodeMemory(FMemory)^ do
+  begin
+    TIBLength := 0;
+    ToIn := 0;
+    TIB[0] := #0;
+    LastErrorCode := errNone;
+  end;
 
   {PInteger(@FMemory[cTIBLengthOffset])^ := 0;
   PInteger(@FMemory[cToINOffset])^ := 0;
   PChar(@FMemory[cTIBOffset])^ := #0;
   PChar(@FMemory[cLastWordEntryOffset-1])^ := #0;
   }
-  with PPreservedCodeMemory(FMemory)^ do
-  begin
-    TIBLength := 0;
-    ToIn := 0;
-    TIB[0] := #0;
-    LastWordEntry := nil;
-    LastErrorCode := errNone;
-  end;
   PPreservedCodeMemory(FMemory).Executor := Self;
   //FParameterStack := Prog.ParameterStack;
   //FParamStackSize := Prog.ParameterStackSize*SizeOf(Pointer);
@@ -550,5 +609,86 @@ begin
   //sF
 end;
 
+
+type
+  TTurboEntry = packed record
+    Prior: Pointer;
+  end;
+
+procedure TurboConvertEntryRelatedToAbsolute(Mem: Pointer; aEntry: Pointer);
+asm
+  MOV  ECX, [EDX]
+
+  CMP  ECX, 0
+  JE   @@exit
+
+  ADD  ECX, EAX
+  MOV  [EDX], ECX
+
+@@Loop:
+  MOV  EDX, [ECX].TTurboEntry.Prior
+  CMP  EDX, 0
+  JE   @@exit
+  ADD  EDX, EAX
+  MOV  [ECX].TTurboEntry.Prior, EDX
+  MOV  ECX, EDX
+  JMP  @@Loop
+@@exit:
+end;
+
+procedure TurboConvertAddrRelatedToAbsolute(Mem: Pointer);
+asm
+  LEA  EDX, [EAX].TPreservedCodeMemory.LastWordEntry
+  CALL TurboConvertEntryRelatedToAbsolute 
+
+  LEA  EDX, [EAX].TPreservedCodeMemory.LastModuleEntry
+  CALL TurboConvertEntryRelatedToAbsolute 
+
+  LEA  EDX, [EAX].TPreservedCodeMemory.LastVarEntry
+  CALL TurboConvertEntryRelatedToAbsolute 
+
+  LEA  EDX, [EAX].TPreservedCodeMemory.LastSymbolEntry
+  CALL TurboConvertEntryRelatedToAbsolute 
+end;
+
+procedure TurboConvertEntryAbsoluteToRelated(Mem: Pointer; aEntry: Pointer);
+asm
+  PUSH EBX
+  MOV  ECX, [EDX]
+
+  CMP  ECX, 0
+  JE   @@exit
+
+  MOV  EBX, ECX
+  SUB  EBX, EAX
+  MOV  [EDX], EBX
+
+@@Loop:
+  MOV  EDX, [ECX].TTurboEntry.Prior
+  CMP  EDX, 0
+  JE   @@exit
+  MOV  EBX, EDX
+  SUB  EDX, EAX
+  MOV  [ECX].TTurboEntry.Prior, EDX
+  MOV  ECX, EBX
+  JMP  @@Loop
+@@exit:
+  POP  EBX
+end;
+
+procedure TurboConvertAddrAbsoluteToRelated(Mem: Pointer);
+asm
+  LEA  EDX, [EAX].TPreservedCodeMemory.LastWordEntry
+  CALL TurboConvertEntryAbsoluteToRelated 
+
+  LEA  EDX, [EAX].TPreservedCodeMemory.LastModuleEntry
+  CALL TurboConvertEntryAbsoluteToRelated 
+
+  LEA  EDX, [EAX].TPreservedCodeMemory.LastVarEntry
+  CALL TurboConvertEntryAbsoluteToRelated 
+
+  LEA  EDX, [EAX].TPreservedCodeMemory.LastSymbolEntry
+  CALL TurboConvertEntryAbsoluteToRelated 
+end;
 
 end.
