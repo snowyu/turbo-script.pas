@@ -1,9 +1,85 @@
+2006-9-21
+* 使用 寄存器作为状态寄存器，但是导致不能命令指令随时停止，所以，在将状态寄存器放入保留内存中，这样，就能命令停止了。EBX 成了临时寄存器。
+
+~ 有没有取得当前执行地址的x86指令？
+  答：不能，只能通过Call 间接取得。
++ 调用 register calling（delphi）写的函数：
+  CallReg: register
+  CallPascal: pascal
+  CallStd: stdcall
+  CallFast : fastcall
+  如何准备参数？那就必须要知道过程需要几个参数，才能从数据栈中取出需要的个数。也就是我需要得知ProcType, 必须的信息是：ParamCount(以Integer为单位的，不是真正意义上的参数个数)
+  CallReg Addr, CallReg 有一个操作数。 Addr 为该函数注册后的索引地址。
+
+~ 外来函数在 TProgram 上注册好，还是在 Executor 上注册好呢？还是在 Executor 上注册好，至于后期绑定的，那就无所谓了，可以自由发挥。
+  注册的函数结构： TTurboRegisteredFunctionRec = packed Record //合并后放在 LastWordEntry 中。
+  ParamCount: Integer; //以Integer为单位的，不是真正意义上的参数个数
+  CallingStyle: TCallingConvension;
+  TypeInfo: Pointer; //nil means no RTTI info.: 实际上是一个相对于FMemory的地址。
+
++ 当调用其他模块的函数时候，是否需要保存现场？
+  至少EDI(FMemory)和ESI(PC:Program Counter)需要保存。堆栈是共用，不需要保存。除非是delphi写的。
+  但是我返回的时候？如何才能返回？
+  回答：增加Far word, 和 near word, 对于私有过程（只在本模块内有效），采用 near word(默认, Enter, Exit); 对于能被其他模块访问的过程
+  则采用far word(EnterFar, ExitFar).
+  对于外部过程，调用的VM代码： EnterFar module-index cfa-address， 也就是说，对于near 调用，只需要直接写下地址，但是对于Far调用就必须要OpCode + OpRands
+  在保留内存区增加 Index, 用来保存ModuleIndex,这样对于自己内部调用EnterFar，就不必要去查找模块地址了.
+  这就是ForthDLL的链接方式调用！
+
+iVMEnterFar:
+在返回栈中保存EDI(旧的 FMemory 基址), 根据 ModuleIndex 查找模块内存基址，如果找到就设置EDI成新的 FMemory 基址,然后装入该函数的地址，其它就和VMEnter一样了，转去VMEnter。
+
+  PUSH EDI
+  LODSD
+  CMP  EAX, [EDI].TPreservedCodeMemory.ModuleIndex
+  JZ  @@DoLocalEnterFar
+@@GetModuleAddr:
+  PUSH EDX
+  PUSH ESI
+  PUSH EBX
+  PUSH EBP
+  
+  MOV  EDX, EAX
+  MOV  EAX, [EDI].TPreservedCodeMemory.Executor
+  //function TCustomTruboExecutor.GetModuleMemoryAddr(aModuleIndex: Integer): Pointer;
+  CALL TCustomTruboExecutor.GetModuleMemoryAddr
+  POP EBP
+  POP EBX
+  POP ESI
+  POP EDX
+
+  CMP  EAX, 0
+  JZ   @@NotFoundError
+  MOV  EDI, EAX
+  JMP @@Exit
+
+@@NotFoundError:
+  POP  EDI
+  MOV  [EDI].TPreservedCodeMemory.LastErrorCode, errModuleIndex
+  JMP  iVMHalt
+
+@@DoLocalEnterFar:
+
+@@Exit:
+  LODSD
+  ADD EAX, EDI
+  JMP iVMEnter
+
+iVMExitFar:
+  POP ESI
+  POP EDI
+  JMP iVMNext
+
 2006-9-20
 + 基本实现 TTurboX86Interpreter 解释器核心
   !+ 没有单步执行 ({$Define TurboScript_Stepping_Supports})
   !+ 返回栈＆数据栈没有溢出判断。 {$Define TurboScript_DataStack_Overflow_Inspect} {$Define TurboScript_ReturnStack_Overflow_Inspect}
   !+ 内存没有溢出判断 {$Define TurboScript_Memory_Overflow_Inspect}
 ~ 关于控制流程指令：到底转移地址是放在数据栈中还是操作数中？
+  想通了，JMP指令操作数放在内存中，GOTO指令操作数在数据栈中，而且GOTO的参数只是绝对地址。
+  GetBindingVar(str-addr -- addr) return the variable address(real absolute address). nil means not found.
+  GetBindingWord(str-addr -- callingConvention addr) callingConvention 是表明该word的调用类型
+  CallBinding (callingConvention addr -- ) 由于该函数可以在其它模块中，所以该地址为真实地址。
 
 2006-9-14
 ~如果参数栈＆返回栈使用全局内存，好处就是多个执行器可以共享数据，坏处就是多个执行器不能并行执行。

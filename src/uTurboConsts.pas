@@ -22,7 +22,8 @@ resourcestring
   rsReturnStackOverflowError = 'Return Stack overflow';
   rsParamStackUnderflowError = 'Parameter Stack underflow.';
   rsParamStackOverflowError = 'Parameter Stack overflow';
-
+  rsBadOpCodeError = 'Error: Bad OpCode Found.';
+  
 type
   ETurboScriptError = class(Exception);
   {: the Module Type }
@@ -35,7 +36,7 @@ type
   //the Forth Execution priority fpHighest means cfsImmediately
   TTurboForthPriority = (fpLowest, fpLower, fpLow, fpNormal, fpHigh, pfHigher, fpHighest);
   TTurboForthCallStyle = (csForth, csRegister, csPascal, csStdCall, csFastCall);
-  TTurboForthCodeFieldStyle = (cfsSysWord);
+  TTurboForthCodeFieldStyle = (cfsFunction, cfsVariable);
   TTurboForthCodeFieldStyles = set of TTurboForthCodeFieldStyle;
 
   { Summary the FORTH Virtual Mache Codes}
@@ -46,6 +47,10 @@ type
     inEnter,
     inExit,
     inNext,
+    //Far Call, 对于公开的供其他模块调用的函数全部使用该方式
+    //ForthDLL的模块链接方式调用
+    inEnterFar, //inEnterFar ModuleIndex Addr
+    inExitFar,  //对于远调用的返回指令必须是该指令! R: (MemoryBase PC -- )
     
     {## Memory Operation Instruction }
     inStoreInt, 
@@ -78,18 +83,21 @@ type
     inXORInt,
 
     {## Proc Operation Instruction: Flow Control }
-    inJMP, //JUMP Absolute address
-    inJMPByte, //JMP aByteInt(shortint offset)
-    inJMPWord, //JMP aWordInt(smallint offset)
-    inJMPInt,  //JMP aInt(offset)
+    inJMP, //JUMP Absolute address(related to FMemory)
+    //inJMPByte, //JMP aByteInt(shortint offset) 
+    //inJMPWord, //JMP aWordInt(smallint offset)
+    inJMPOffset,  //JMP aInt(offset) the real addr = FMemory + PC + offset
+    inGoto,   //(goto-addr -- )
     inJZ, //jmp absolute address with condition(the TOS is 0) (n -- )
-    inJZByte,
-    inJZWord,
-    inJZInt,
+    //inJZByte,
+    //inJZWord,
+    inJZOffset,
     inJNZ,
+    inJNZOffset,
     inExecute, //call(EXECUTE) the (User defined Forth word) (CFA -- )
     //inReturn, //= inExit
     inNoop,
+    //Call other module subroutes.
 
     {## Stack Operation Instuction }
     inPushInt,
@@ -107,7 +115,7 @@ type
 
   PTurboForthWord = ^ TTurboForthWord;
   TTurboForthWordOptions = packed record //a DWORD
-      //优先级, 0=low, 1=high equals 1 for an IMMEDIATE word
+      //优先级, highest means an IMMEDIATE word
       //1=True; 0=False; Smudge bit. used to prevent FIND from finding this word
       //this can be extent to private, protected, public, etc
       Precedence: TTurboForthPriority; 
@@ -115,7 +123,7 @@ type
       CallStyle: TTurboForthCallStyle;
       CodeFieldStyle: TTurboForthCodeFieldStyles;
   end;
-  //For cast the Mem
+  //For type-cast the Mem
   TTurboForthWord = packed record //ITC (Indirect Threaded Code)
     PriorWord: PTurboForthWord; //PForthWord; //前一个单词 0 means 为最前面。
 
@@ -133,16 +141,23 @@ type
     //CFA: LongWord;
     //ParameterFields: array of Integer; //大多数情况下是PForthWord，但是少数情况下是数据或VM Codes
   end;
-  TTurboForthProcessorState = (psRunning, psStepping, psCompiling, psFinished, 
-    psBadInstruction, psDivZero, psOverFlow);
+  TTurboForthProcessorState = (psLoaded, psRunning, psStepping, psCompiling
+    , psFinished 
+  );
   TTurboForthProcessorStates = set of TTurboForthProcessorState;
+  TTurboForthProcessorErrorCode = (errNone, errBadInstruction, errDizZero
+    , errMemOverFlow, errDataStackOverflow, errReturnStackOverflow
+    , errModuleIndex
+  );
   
 
 const
   //For TTurboForthProcessorStates (put it into EBX Status Register).
-  cTurboScriptIsRunningBit        = [psRunning]; //=1
-  cTurboScriptIsSteppingBit       = [psStepping];  //=2
-  cTurboScriptIsBadInstructionBit = [psBadInstruction];
+  {the psLoaded is used for the Executor, not for the VM processor.}
+  cTurboScriptIsLoadedBit       = psLoaded;
+  cTurboScriptIsRunningBit       = psRunning;
+  cTurboScriptIsSteppingBit      = psStepping;
+  //cTurboScriptBadInstructionBit  = [psBadInstruction];
   cMaxTurboVMInstructionCount = SizeOf(TTurboCoreWords) div SizeOf(TProcedure); //the max turbo VM code directive count
   
 implementation

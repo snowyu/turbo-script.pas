@@ -50,6 +50,17 @@ VM指令采用32位数据实现。一个VM指令至少占用4个字节。
   1、节约内存，系统的扩建主要是在用户自定义单词上，如果调用用户自定义单词的次数远远多于调用VM指令次数的时候，显然这种方式比较节约内存。
   2、便于扩充系统指令，方式2最多只能有256个指令，而且无法扩充。
 
+
+VM 处理器寄存器：
+SP, RP, PC, TOS, W, StatesRegister, 
+
+VM 处理器状态：
+  TTurboForthProcessorState = (psLoaded, psRunning, psStepping, psCompiling, psFinished);
+  TTurboForthProcessorStates = set of TTurboForthProcessorState;
+
+VM 处理器错误码：上次发生的错误存放在保留内存中 LastErrorCode。
+  TTurboForthProcessorErrorCode = (errNone, errBadInstruction, errDizZero, errMemOverFlow, errDataStackOverflow, errReturnStackOverflow);
+
 === VM指令详述 ===
 
 ==== 核心指令 ====

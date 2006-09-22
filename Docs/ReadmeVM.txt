@@ -26,11 +26,13 @@ TurboInterpreter_S: Pure Pascal 实现，暂缓
 TurboInterpreter: 基于x86指令优化。核心指令汇编实现，寄存器采用x86的寄存器，对应关系如下：
 ESP: 返回堆栈指针.记住压入减少，弹出增加地址。
 EBP: 数据栈指针，基址指针放在内存某个单元中。所以EBP总是指向次栈顶。
-EDX: 为数据栈栈顶。 
+EBX: 为数据栈栈顶。 
 ESI: 指向当前指令地址
-EBX: 状态寄存器 (0Bit: 是否运行；1Bit:是否调试) TTurboForthStates = set of TTurboForthState; TTurboForthState = (tfsRunning, tfsDebugging, tfsCompiling)
+EDX: 状态寄存器(仅当条件编译指令：TurboScript_FullSpeed开启时使用，否则为临时寄存器)；(0Bit: 是否运行；1Bit:是否调试) TTurboForthProcessorStates = set of TTurboForthProcessorState; TTurboForthState = (psLoaded, psRunning, tfsDebugging, tfsCompiling)
+     状态寄存器放于保留内存中了，为了能控制停止。不过这样一来执行性能下降了3。增加了条件编译指令：TurboScript_FullSpeed，开启时候启用 EDX 作为状态寄存器。
 EAX: W Register 临时寄存器
 ECX: 临时寄存器
+
 
 EDI: FMemory基址
 
@@ -50,18 +52,18 @@ iVMNext
   TEST EBX, cIsRunningBit
   JZ @@Exit
 
-  MOV ECX, [ESI]  //the current instruction in W register
+  MOV EAX, [ESI]  //the current instruction in W register
   ADD ESI, Type(Pointer) //4 = INC PC INC PC INC PC INC PC
   
 @@ExecInstruction:
-  CMP  ECX, cMaxTurboVMDirectiveCount
-  MOV  EDX, PTR GTurboCoreWords
+  CMP  EAX, cMaxTurboVMDirectiveCount
   JAE   @@IsUserWord
 @@IsVMCode:
-  MOV  ECX, [EDX+ECX]
-  JMP  [ECX]
+  MOV  ECX, PTR GTurboCoreWords
+  MOV  EAX, [ECX+EAX]
+  JMP  [EAX]
 @@IsUserWord:
-  ADD  ECX, [EBP] //指向用户定义的word入口
+  ADD  EAX, [EBP] //指向用户定义的word入口
   JMP  iVMEnter
 @@Exit:
 
@@ -69,7 +71,7 @@ iVMNext
 
 iVMEnter: push the current IP(ESI),set the new IP, and run the vmNext
   PUSH ESI        //push the current IP.
-  MOV  ESI, ECX   //set the new IP
+  MOV  ESI, EAX   //set the new IP
   JMP iVMNext
 
 
@@ -92,6 +94,7 @@ type //in TurboScriptConsts
   //the typecast for code memory area to get the parameters
   TPreservedCodeMemory = packed record
     Executor: TCustomTurboExecutor;
+    ModuleIndex: Integer; //this Module unique Index in this program, allocated by compiler.
     ParamStackBase: Pointer;
     ParamStackSize: Integer; //bytes
     ReturnStackBase: Pointer;
@@ -99,8 +102,9 @@ type //in TurboScriptConsts
     TIBLength: Integer; //the text buffer length
     ToIn: Integer; //the text buffer current index
     TIB: array [0..1023] of char;
-    LastWordEntry: Pointer; //有名字的函数链表
+    LastWordEntry: Pointer; //有名字的函数链表，指向最后一个函数入口。
     LastVarEntry: Pointer; //有名字的变量链表
+    LastSymbolEntry: Pointer; //RTTI 符号表 链表
   end;
 
 测试VM代码：
