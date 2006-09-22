@@ -811,7 +811,7 @@ begin
 
   if lastErr <> errNone then
     writeln('lasterr=', Integer(lasterr));
-  writeln('ScriptExecTime:',c,'; 12*300=', r);
+  writeln('ScriptExecTime:',c,'; Result=', r);
   c := 0;
     CFA := 12;
     QueryPerformanceCounter(tBegin);
@@ -1070,5 +1070,5 @@ begin
     QueryPerformanceCounter(tEnd);
     c := c + tEnd - tBegin;
 
-  writeln('Time:',c, '; Result=', CFA);
+  writeln('DelphiExecuteTime:',c, '; Result=', CFA);
 end.

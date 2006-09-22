@@ -113,8 +113,9 @@ type //in TurboScriptConsts
 pushInt 2 pushInt 3 AddInt Halt 
 
 运行性能 QueryPerformanceCounter 大概 6-8 QueryPerformanceCounter.
-而其他性能则要 400-800.QueryPerformanceCounter.
-而delphi 的 a:= 2+3 运行需要的时间 是 4-7,基本不相上下。
+而其他性能则要 400-800.QueryPerformanceCounter. 我的是他们的性能 ((1/6) / (1/400)) * 100 % = 6666 %。
+而delphi 的 a:= 2+3 运行需要的时间 是 4-7, 只比Delphi慢( (1- (1/16) / (1/9)) * 100 % = 43.75%)。
+现在我用了内存作为状态寄存器（为了能停止），性能下降了. 比Delphi慢了 【 1- (1/18) / (1/9) = 50% ProcessorStates = 1 byte】 【0.083(1/9-1/36) ProcessorStates = 1 word 】
 
 变量区，代码区，都在FMemory中。
 可以看作是该executor的局部变量（或参数）。

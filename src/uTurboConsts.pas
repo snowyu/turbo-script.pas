@@ -113,7 +113,6 @@ type
   {: 核心虚拟指令表 }
   TTurboCoreWords = array [TTurboVMInstruction] of TProcedure;
 
-  PTurboForthWord = ^ TTurboForthWord;
   TTurboForthWordOptions = packed record //a DWORD
       //优先级, highest means an IMMEDIATE word
       //1=True; 0=False; Smudge bit. used to prevent FIND from finding this word
@@ -123,32 +122,21 @@ type
       CallStyle: TTurboForthCallStyle;
       CodeFieldStyle: TTurboForthCodeFieldStyles;
   end;
-  //For type-cast the Mem
-  TTurboForthWord = packed record //ITC (Indirect Threaded Code)
-    PriorWord: PTurboForthWord; //PForthWord; //前一个单词 0 means 为最前面。
+  {
+  @param errHalt there are some data stil in return stack when Halt, the ESP should be point to
+    the stack bottom! put the current ESP to TPreservedCodeMemory.ReturnStackBottom.   
 
-    Options: TTurboForthWordOptions;
-    //the Param Field Length
-    //该函数主体的长度 
-    ParamFieldLength: LongWord;
-    {NameLen: Byte;
-    Name: array [0..255] of char;}
-    Name: ShortString; //packed
-    //Name: String; it's a PChar, the last char is #0
-    //the following is ParameterFields   
-    //其实就是直接指向的某个单词的PFA，不过那个单词的PFA就是直接执行的机器码而已。
-    //CFA = ParameterFields[0]
-    //CFA: LongWord;
-    //ParameterFields: array of Integer; //大多数情况下是PForthWord，但是少数情况下是数据或VM Codes
-  end;
+  Note: the state Must be a Byte for speed!!!
+  }
   TTurboForthProcessorState = (psLoaded, psRunning, psStepping, psCompiling
-    , psFinished 
+    //这些错误可能会同时出现，所以放在这里
+    , errHalt, errMemOverFlow, errDataStackOverflow, errReturnStackOverflow 
   );
   TTurboForthProcessorStates = set of TTurboForthProcessorState;
   TTurboForthProcessorErrorCode = (errNone, errBadInstruction, errDizZero
-    , errMemOverFlow, errDataStackOverflow, errReturnStackOverflow
     , errModuleIndex
   );
+
   
 
 const

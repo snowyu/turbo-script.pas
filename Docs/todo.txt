@@ -1,3 +1,26 @@
+2006-9-22
+~ 发现 如果将 States 控制在一个字节，那么速度将近会提升1倍
+  MOV BL, mem 速度要快于 MOV DX, mem，将近快1倍。
+
+~ Used Modules(Import Section):
+  LastModuleEntry: Pointer; //last Used module entry.
+  LastWordEntry: Pointer;   //所有这些Pointer都是相对FMemory的地址(当装入后是否考虑由装入者对该地址重定位？)
+  //Import Module Entry
+  TTurboModuleEntry = packed record
+    PriorModule: Pointer; //相对地址指针
+    ModuleIndex: integer;
+    Module: TCustomTurboExecutor; //nil means not assigned(or loaded).
+    Name: ShortString; //packed string, full module name with path.
+  end;
+  暂时不考虑地址重定位，总是作为相对Fmemory的地址存在。
+  但是我发现自己很难抵挡住这样的诱惑，重定位后可以提升速度。那么我必须考虑，重定位函数放在那里？
+  代码装载到内存后，需要重定位，代码保存到文件或其它地方，也需要将绝对地址转为相对地址。
+  RelocateTurboMem(RelatedAddrToAbsoluteAddr)
+  procedure TurboConvertAddrRelatedToAbsolute(const Mem: Pointer);
+  asm
+  end;
+  procedure TurboConvertAddrAbsoluteToRelated(const Mem: Pointer);
+
 2006-9-21
 * 使用 寄存器作为状态寄存器，但是导致不能命令指令随时停止，所以，在将状态寄存器放入保留内存中，这样，就能命令停止了。EBX 成了临时寄存器。
 
