@@ -105,6 +105,8 @@ type
     FTextIndex: Integer;
     FUsedMemory: Integer;
     FWRegister: Integer;
+    function iExecuteCFA(const aCFA: Integer): Integer; override;
+    procedure InitExecution; override;
     procedure InitProcList;
     { Description
     6.1.0705 ALIGN 
@@ -395,7 +397,6 @@ type
     procedure vToIN;
   public
     constructor Create(const aParamStack: TStack = nil); virtual;
-    function ExecuteCFA(const aCFA: Integer): Integer; override;
     {: : Only execute the instruction on the current IP  }
     { Description
     Run the Virtual Machine from the PC adress.
@@ -428,7 +429,6 @@ type
     iForthHeader(':');          FillInt(xdcoma);     FillInt(xPEXIT);
     }
     procedure iForthHeader(const aWordAttr: TForthWordRec);
-    procedure InitExecution; override;
     procedure LoadFromStream(const aStream: TStream); override;
     procedure SaveToStream(const aStream: TStream); override;
     property Instrunction: TForthMethod read FInstrunction;
@@ -509,14 +509,6 @@ begin
   TMethod(FInstrunction).Data := Self;
 end;
 
-function TTurboInterpreter.ExecuteCFA(const aCFA: Integer): Integer;
-begin
-  Assert(aCFA < FMemorySize, rsVisitMemoryExceed);
-  FIP := aCFA;
-  Include(FProcessorStates, psRunning);
-  iVMNext;
-end;
-
 procedure TTurboInterpreter.ExecuteInstruction;
 begin
   while (FPC < FMemorySize) and (psRunning in Status) do
@@ -557,6 +549,14 @@ end;
 function TTurboInterpreter.GetWordCFA(const aWord: string): Integer;
 begin
   Result := -1;
+end;
+
+function TTurboInterpreter.iExecuteCFA(const aCFA: Integer): Integer;
+begin
+  Assert(aCFA < FMemorySize, rsVisitMemoryExceed);
+  FIP := aCFA;
+  Include(FProcessorStates, psRunning);
+  iVMNext;
 end;
 
 procedure TTurboInterpreter.iForthHeader(const aWordAttr: TForthWordRec);

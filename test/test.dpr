@@ -29,10 +29,12 @@ begin
       GTurboExecutor.ReturnStackSize := cStackMaxSize;
       GetMem(p, cStackMaxSize);
       GTurboExecutor.ReturnStack := p;
-      GTurboExecutor.InitExecution;
+      //GTurboExecutor.InitExecution;
       with GTurboExecutor do
       begin
         CFA := UsedMemory;
+        IsLoaded := True;
+        Reset;
         //AddIntToMem(Integer(inNone));
         AddIntToMem(Integer(inPushInt));
         AddIntToMem(12);
@@ -792,6 +794,7 @@ begin
         AddIntToMem(Integer(inPushInt));
         AddIntToMem(300);
         AddIntToMem(Integer(inAddInt));
+        //}
         AddIntToMem(Integer(inHalt));
         //AddIntToMem(Integer(inMULUnsignedInt));
         QueryPerformanceCounter(tBegin);
