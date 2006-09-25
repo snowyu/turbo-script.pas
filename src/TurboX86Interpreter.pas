@@ -65,10 +65,10 @@ type
     FOldEDX: Integer;
     FOldESI: Integer;
     FOldESP: Integer;
+  protected
+    function iExecuteCFA(const aCFA: Integer): Integer; override;
   public
     destructor Destroy; override;
-    function ExecuteCFA(const aCFA: Integer): Integer; override;
-    procedure InitExecution; override;
   end;
 
 
@@ -92,7 +92,7 @@ begin
   inherited Destroy;
 end;
 
-function TTurboX86Interpreter.ExecuteCFA(const aCFA: Integer): Integer;
+function TTurboX86Interpreter.iExecuteCFA(const aCFA: Integer): Integer;
 
   {$ifdef NoSuchDef}
 
@@ -100,12 +100,12 @@ begin
   {$else}
   asm
   {$endif}
-    PUSH EAX
+  {  PUSH EAX
     PUSH EDX
     CALL TCustomTurboExecutor.ExecuteCFA
     POP  EDX
     POP  EAX
-
+  }
     MOV  Self.FOldESP, ESP
     MOV  Self.FOldEBP, EBP
     MOV  Self.FOldESI, ESI
@@ -120,23 +120,27 @@ begin
 
     MOV  ESI, EDI  //ESI: IP
     ADD  ESI, aCFA
+    //BTS  EDX, psRunning
+    //MOV  [EDI].TPreservedCodeMemory.States, DL
     {$ifdef TurboScript_FullSpeed}
     MOV  DL, [EDI].TPreservedCodeMemory.States //EBX: FORTH Processor States
     {$endif}
     MOV  EBP, [EAX].FSP //SP the data stack pointer.
-    XOR  EBX, EBX //the TOS
+    XOR  EBX, EBX //clear the TOS
     //MOV  EDX, EAX
     //STD  //the EDI will be decremented.
     CLD //the esi will be incremented.
     //PUSH @@ReturnAdr
     CALL  iVMInit
   @@ReturnAdr:
+    CMP  EBP, [EDI].TPreservedCodeMemory.ParamStackBottom
+    JE   @@skipStoreTOS
     //数据总是指向栈顶
+    //数据栈中，栈底的数据是无意义的。
     XCHG ESP, EBP
     PUSH EBX
     XCHG ESP, EBP
-    //自己判断是否数据栈为空。
-
+  @@skipStoreTOS:
 
     //MOV [ESI]
     //POP EAX
@@ -156,12 +160,6 @@ begin
     MOV  ESI, [EAX].TTurboX86Interpreter.FOldESI
     MOV  EDI, [EAX].TTurboX86Interpreter.FOldEDI
   //end;
-end;
-
-procedure TTurboX86Interpreter.InitExecution;
-begin
-  inherited InitExecution;
-  //
 end;
 
 

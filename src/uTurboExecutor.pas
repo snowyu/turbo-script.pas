@@ -77,12 +77,13 @@ type
   }
   TCustomTurboExecutor = class(TObject)
   private
-    function GetIsLoaded: Boolean;
+    FIsLoaded: Boolean;
     function GetLastErrorCode: TTurboForthProcessorErrorCode;
+    function GetModuleType: TTurboModuleType;
     function GetStatus: TTurboForthProcessorStates;
     function GetTIB: string;
-    procedure SetIsLoaded(const Value: Boolean);
     procedure SetMemorySize(Value: Integer);
+    procedure SetModuleType(Value: TTurboModuleType);
     procedure SetStatus(Value: TTurboForthProcessorStates);
     procedure SetTIB(Value: string);
   protected
@@ -90,7 +91,6 @@ type
     FMemory: Pointer;
     FMemorySize: Integer;
     FModuleDate: TTimeStamp;
-    FModuleType: TTurboScriptModuleType;
     FModuleVersion: LongWord;
     FName: string;
     FOptions: TTurboScriptOptions;
@@ -119,7 +119,19 @@ type
     }
     FTextIndex: Integer;
     FUsedMemory: Integer;
+    {: Finalize after the execution. }
+    procedure FinalizeExecution; virtual;
     procedure Grow;
+    {: : Run the CFA word. }
+    { Description
+    internal proc, not init.
+
+    @param aCFA the Code Field Address(related to FMemory).
+    相对于FMemory的偏移量。
+    }
+    function iExecuteCFA(const aCFA: Integer): Integer; virtual;
+    {: Init before the Execution. }
+    procedure InitExecution; virtual;
   public
     constructor Create; virtual;
     destructor Destroy; override;
@@ -135,7 +147,7 @@ type
     @param aCFA the Code Field Address(related to FMemory).
     相对于FMemory的偏移量。
     }
-    function ExecuteCFA(const aCFA: Integer): Integer; virtual;
+    function ExecuteCFA(const aCFA: Integer): Integer;
     {: : Run the Virtual Machine. }
     { Description
     Run the Virtual Machine from the PC adress.
@@ -144,19 +156,23 @@ type
     相对于FMemory的偏移量。
     }
     function ExecuteWord(const aWord: string): Integer;
-    procedure FinalizeExecution; virtual;
     function GetModuleMemoryAddr(aModuleIndex: Integer): Pointer;
     function GetWordCFA(const aWord: string): Integer; virtual;
-    {: Init the Virtual Machine. }
-    procedure InitExecution; virtual;
+    {: Load the VM Module from stream. }
+    { Description
+    @param Count 0 means all.
+    }
+    procedure LoadFromStream(const aStream: TStream; Count: Integer = 0);
     {: reset the stack pointers. }
     procedure Reset;
+    {: save FMemory to stream }
+    procedure SaveToStream(const aStream: TStream);
     procedure Stop;
     { Description
     if not loaded, then only the name and some options loaded but the body(
     Memory).
     }
-    property IsLoaded: Boolean read GetIsLoaded write SetIsLoaded;
+    property IsLoaded: Boolean read FIsLoaded write FIsLoaded;
     property LastErrorCode: TTurboForthProcessorErrorCode read GetLastErrorCode;
     {: The Code Memory }
     property Memory: Pointer read FMemory write FMemory;
@@ -171,8 +187,8 @@ type
     See Also TTimeStamp
     }
     property ModuleDate: TTimeStamp read FModuleDate write FModuleDate;
-    property ModuleType: TTurboScriptModuleType read FModuleType write
-            FModuleType;
+    property ModuleType: TTurboModuleType read GetModuleType write
+            SetModuleType;
     property ModuleVersion: LongWord read FModuleVersion write FModuleVersion;
     property Name: string read FName write FName;
     property Options: TTurboScriptOptions read FOptions write FOptions;
@@ -244,12 +260,12 @@ type
     FOptions: TTurboScriptOptions;
     FParameterStack: Pointer;
     FParameterStackSize: Integer;
-    FStack: Pointer;
-    FStackSize: Integer;
+    FReturnStack: Pointer;
+    FReturnStackSize: Integer;
     FStatus: TTurboForthProcessorStates;
     procedure SetExecutor(const Value: TCustomTurboExecutor);
     procedure SetParameterStackSize(const Value: Integer);
-    procedure SetStackSize(const Value: Integer);
+    procedure SetReturnStackSize(const Value: Integer);
   protected
     FExecutor: TCustomTurboExecutor;
   public
@@ -275,9 +291,10 @@ type
     property ParameterStackSize: Integer read FParameterStackSize write
             SetParameterStackSize;
     {: :Return Stack }
-    property Stack: Pointer read FStack write FStack;
+    property ReturnStack: Pointer read FReturnStack write FReturnStack;
     {: : Return Stack Size }
-    property StackSize: Integer read FStackSize write SetStackSize;
+    property ReturnStackSize: Integer read FReturnStackSize write
+            SetReturnStackSize;
     {: the current status of the script. }
     property Status: TTurboForthProcessorStates read FStatus write FStatus;
   end;
@@ -332,6 +349,7 @@ type
     Executor: TCustomTurboExecutor;
     //this Module unique Index in this program, allocated by compiler.
     ModuleIndex: Integer;
+    ModuleType: TTurboModuleType;
     ParamStackBase: Pointer;
     ParamStackSize: Integer; //bytes
     ParamStackBottom: Pointer;
@@ -342,18 +360,22 @@ type
     ToIn: Integer; //>IN the text buffer current index
     TIB: array [0..cMAXTIBCount-1] of char; //'TIB
     LastErrorCode: TTurboForthProcessorErrorCode;
+    //如果ModuleType是模块，那么就是装载运行该模块前执行的初始化过程，入口地址
+    //如果是函数，则是该函数的入口地址
+    InitializeProc: Pointer; 
+    FinalizeProc: Pointer; //如果是模块的话
     //last Used(import) module entry.
     LastModuleEntry: PTurboModuleEntry;
     //有名字的函数链表，指向最后一个函数入口。
     LastWordEntry: PTurboWordEntry;
     //有名字的变量链表
-    LastVarEntry: PTurboVariableEntry;
+    LastVariableEntry: PTurboVariableEntry;
     //RTTI 符号表 链表
     LastSymbolEntry: PTurboSymbolEntry;
   end;
 
-procedure TurboConvertAddrRelatedToAbsolute(Mem: Pointer);
-procedure TurboConvertAddrAbsoluteToRelated(Mem: Pointer);
+procedure TurboConvertAddrRelatedToAbsolute(Mem: PPreservedCodeMemory);
+procedure TurboConvertAddrAbsoluteToRelated(Mem: PPreservedCodeMemory);
 
 implementation
 
@@ -369,9 +391,10 @@ begin
   with PPreservedCodeMemory(FMemory)^ do
   begin
     LastWordEntry := nil;
-    LastVarEntry := nil;
+    LastVariableEntry := nil;
     LastSymbolEntry := nil;
     LastModuleEntry := nil;
+    States := [];
   end;
 end;
 
@@ -396,11 +419,9 @@ end;
 
 function TCustomTurboExecutor.ExecuteCFA(const aCFA: Integer): Integer;
 begin
-  Result := -1;
-  if (psRunning in Status) then
-    raise ETurboScriptError.CreateRes(@rsTurboScriptAlreayRunningError);
-
-  Include(PPreservedCodeMemory(FMemory).States, psRunning);
+  InitExecution;
+  Result := iExecuteCFA(aCFA);
+  FinalizeExecution;
 end;
 
 function TCustomTurboExecutor.ExecuteWord(const aWord: string): Integer;
@@ -416,11 +437,7 @@ end;
 
 procedure TCustomTurboExecutor.FinalizeExecution;
 begin
-end;
-
-function TCustomTurboExecutor.GetIsLoaded: Boolean;
-begin
-  Result := Assigned(FMemory) and (psLoaded in PPreservedCodeMemory(FMemory).States);
+  //Apply the SP to TProgram.SP.
 end;
 
 function TCustomTurboExecutor.GetLastErrorCode: TTurboForthProcessorErrorCode;
@@ -431,6 +448,11 @@ end;
 function TCustomTurboExecutor.GetModuleMemoryAddr(aModuleIndex: Integer):
         Pointer;
 begin
+end;
+
+function TCustomTurboExecutor.GetModuleType: TTurboModuleType;
+begin
+  Result := PPreservedCodeMemory(FMemory).ModuleType;
 end;
 
 function TCustomTurboExecutor.GetStatus: TTurboForthProcessorStates;
@@ -462,54 +484,91 @@ begin
   MemorySize := FMemorySize + FMemorySize div 4;
 end;
 
+function TCustomTurboExecutor.iExecuteCFA(const aCFA: Integer): Integer;
+begin
+  Result := -1;
+  //if (psRunning in Status) then
+    //raise ETurboScriptError.CreateRes(@rsTurboScriptAlreayRunningError);
+end;
+
 procedure TCustomTurboExecutor.InitExecution;
 begin
+  if not FIsLoaded then
+    raise ETurboScriptError.CreateRes(@rsTurboScriptNotLoadedError);
+
   if (psRunning in Status) then
     raise ETurboScriptError.CreateRes(@rsTurboScriptAlreayRunningError);
+
   //MemorySize := cLastWordEntryOffset + cDefaultFreeMemSize;
   //FUsedMemory := cLastWordEntryOffset;
-
+  {
   with PPreservedCodeMemory(FMemory)^ do
   begin
+    Executor := Self;
     TIBLength := 0;
     ToIn := 0;
     TIB[0] := #0;
     LastErrorCode := errNone;
   end;
-
-  {PInteger(@FMemory[cTIBLengthOffset])^ := 0;
-  PInteger(@FMemory[cToINOffset])^ := 0;
-  PChar(@FMemory[cTIBOffset])^ := #0;
-  PChar(@FMemory[cLastWordEntryOffset-1])^ := #0;
-  }
-  PPreservedCodeMemory(FMemory).Executor := Self;
   //FParameterStack := Prog.ParameterStack;
   //FParamStackSize := Prog.ParameterStackSize*SizeOf(Pointer);
   PPreservedCodeMemory(FMemory).ParamStackBase := FParameterStack;
   PPreservedCodeMemory(FMemory).ParamStackSize := FParameterStackSize;
-  SP := Integer(FParameterStack) + FParameterStackSize;
+  //if SP = 0 then
+    SP := Integer(FParameterStack) + FParameterStackSize;
 
   //FReturnStack := Prog.Stack;
   //FReturnStackSize := Prog.StackSize*SizeOf(Pointer);
   PPreservedCodeMemory(FMemory).ReturnStackBase := FReturnStack;
   PPreservedCodeMemory(FMemory).ReturnStackSize := FReturnStackSize;
-  RP := Integer(FReturnStack) + FReturnStackSize;
+  //if RP = 0 then
+    RP := Integer(FReturnStack) + FReturnStackSize;
+  //}
+
+  Include(PPreservedCodeMemory(FMemory).States, psRunning);
+end;
+
+procedure TCustomTurboExecutor.LoadFromStream(const aStream: TStream; Count:
+        Integer = 0);
+begin
+  if Count <= 0 then
+  begin
+    Count := aStream.Size;
+    aStream.Position := 0;
+  end;
+
+  if Count < SizeOf(TPreservedCodeMemory) then
+    raise ETurboScriptError.CreateRes(@rsInvalidTurboScriptStreamError);
+
+  MemorySize := Count;
+  aStream.ReadBuffer(FMemory^, Count);
+  Reset;
+  TurboConvertAddrRelatedToAbsolute(FMemory);
+
+  FIsLoaded := True;
 end;
 
 procedure TCustomTurboExecutor.Reset;
 begin
+  PPreservedCodeMemory(FMemory).ParamStackBase := FParameterStack;
+  PPreservedCodeMemory(FMemory).ParamStackSize := FParameterStackSize;
+
   SP := Integer(FParameterStack) + FParameterStackSize;
   RP := Integer(FReturnStack) + FReturnStackSize;
   PPreservedCodeMemory(FMemory).LastErrorCode := errNone;
+  PPreservedCodeMemory(FMemory).Executor := Self;
+
+  PPreservedCodeMemory(FMemory).States := [];
 end;
 
-procedure TCustomTurboExecutor.SetIsLoaded(const Value: Boolean);
+procedure TCustomTurboExecutor.SaveToStream(const aStream: TStream);
 begin
-  if not Assigned(FMemory) then exit;
-  if Value then
-    Include(PPreservedCodeMemory(FMemory).States, psLoaded)
-  else
-    Exclude(PPreservedCodeMemory(FMemory).States, psLoaded);
+  if not FIsLoaded then
+    raise ETurboScriptError.CreateRes(@rsTurboScriptNotLoadedError);
+
+  TurboConvertAddrAbsoluteToRelated(FMemory);
+  aStream.WriteBuffer(FMemory^, FUsedMemory);
+  TurboConvertAddrRelatedToAbsolute(FMemory);
 end;
 
 procedure TCustomTurboExecutor.SetMemorySize(Value: Integer);
@@ -519,6 +578,11 @@ begin
     FMemorySize := Value;
     ReallocMem(FMemory, FMemorySize);
   end;
+end;
+
+procedure TCustomTurboExecutor.SetModuleType(Value: TTurboModuleType);
+begin
+  PPreservedCodeMemory(FMemory).ModuleType := Value;
 end;
 
 procedure TCustomTurboExecutor.SetStatus(Value: TTurboForthProcessorStates);
@@ -564,8 +628,8 @@ end;
 
 destructor TTurboProgram.Destroy;
 begin
-  FreeMem(FStack);
-  FStack := nil;
+  FreeMem(FReturnStack);
+  FReturnStack := nil;
   FreeMem(FParameterStack);
   FParameterStack := nil;
   inherited Destroy;
@@ -594,12 +658,12 @@ begin
   end;
 end;
 
-procedure TTurboProgram.SetStackSize(const Value: Integer);
+procedure TTurboProgram.SetReturnStackSize(const Value: Integer);
 begin
-  if not (psRunning in Status) and (FStackSize <> Value) then
+  if not (psRunning in Status) and (FReturnStackSize <> Value) then
   begin
-    FStackSize := Value;
-    ReallocMem(FStack, (FStackSize+1)*SizeOf(Pointer));
+    FReturnStackSize := Value;
+    ReallocMem(FReturnStack, (FReturnStackSize+1)*SizeOf(Pointer));
     //if FSP > FParameterStackSize then FSP := FParameterStackSize;
   end;
 end;
@@ -611,47 +675,92 @@ end;
 
 
 type
+  PTurboEntry = ^ TTurboEntry;
   TTurboEntry = packed record
     Prior: Pointer;
   end;
 
-procedure TurboConvertEntryRelatedToAbsolute(Mem: Pointer; aEntry: Pointer);
+procedure TurboConvertEntryRelatedToAbsolute(Mem: Pointer; aEntry: PTurboEntry);
+{$IFDEF PUREPASCAL}
+begin
+  while aEntry.Prior <> nil do
+  begin
+    Integer(aEntry.Prior) := Integer(aEntry.Prior) + Integer(Mem);
+    aEntry := aEntry.Prior;   
+  end;
+end;
+{$ELSE PUREPASCAL}
 asm
-  MOV  ECX, [EDX]
-
+@@Loop:
+  MOV  ECX, [EDX].TTurboEntry.Prior
   CMP  ECX, 0
   JE   @@exit
 
   ADD  ECX, EAX
-  MOV  [EDX], ECX
-
-@@Loop:
+  MOV  [EDX].TTurboEntry.Prior, ECX
   MOV  EDX, [ECX].TTurboEntry.Prior
-  CMP  EDX, 0
-  JE   @@exit
-  ADD  EDX, EAX
-  MOV  [ECX].TTurboEntry.Prior, EDX
-  MOV  ECX, EDX
   JMP  @@Loop
 @@exit:
 end;
+{$ENDIF PUREPASCAL}
 
-procedure TurboConvertAddrRelatedToAbsolute(Mem: Pointer);
+procedure TurboConvertAddrRelatedToAbsolute(Mem: PPreservedCodeMemory);
+{$IFDEF PUREPASCAL}
+begin
+  if Assigned(Mem.InitializeProc) then
+    Inc(Integer(Mem.InitializeProc), Integer(Mem));
+  if Assigned(Mem.FinalizeProc) then
+    Inc(Integer(Mem.FinalizeProc), Integer(Mem));
+
+  TurboConvertEntryRelatedToAbsolute(Mem, Mem.LastWordEntry);  
+  TurboConvertEntryRelatedToAbsolute(Mem, Mem.LastModuleEntry);  
+  TurboConvertEntryRelatedToAbsolute(Mem, Mem.LastVariableEntry);  
+  TurboConvertEntryRelatedToAbsolute(Mem, Mem.LastSymbolEntry);  
+end;
+{$ELSE PUREPASCAL}
 asm
+  MOV  EDX, [EAX].TPreservedCodeMemory.InitializeProc
+  CMP  EDX, 0
+  JE   @@Skip
+  ADD  EDX, EAX
+  MOV  [EAX].TPreservedCodeMemory.InitializeProc, EDX
+@@Skip:
+  MOV  EDX, [EAX].TPreservedCodeMemory.FinalizeProc
+  CMP  EDX, 0
+  JE   @@Skip2
+  ADD  EDX, EAX
+  MOV  [EAX].TPreservedCodeMemory.FinalizeProc, EDX
+
+@@Skip2:
   LEA  EDX, [EAX].TPreservedCodeMemory.LastWordEntry
   CALL TurboConvertEntryRelatedToAbsolute 
 
   LEA  EDX, [EAX].TPreservedCodeMemory.LastModuleEntry
   CALL TurboConvertEntryRelatedToAbsolute 
 
-  LEA  EDX, [EAX].TPreservedCodeMemory.LastVarEntry
+  LEA  EDX, [EAX].TPreservedCodeMemory.LastVariableEntry
   CALL TurboConvertEntryRelatedToAbsolute 
 
   LEA  EDX, [EAX].TPreservedCodeMemory.LastSymbolEntry
   CALL TurboConvertEntryRelatedToAbsolute 
 end;
+{$ENDIF PUREPASCAL}
 
-procedure TurboConvertEntryAbsoluteToRelated(Mem: Pointer; aEntry: Pointer);
+procedure TurboConvertEntryAbsoluteToRelated(Mem: Pointer; aEntry: PTurboEntry);
+{$IFDEF PUREPASCAL}
+var
+  P: PTurboEntry;
+begin
+ 
+  while aEntry.Prior <> nil do
+  begin
+    p := aEntry.Prior;
+    Integer(aEntry.Prior) := Integer(aEntry.Prior) - Integer(Mem);
+    //aEntry.Prior := t;
+    aEntry := P.Prior;   
+  end;
+end;
+{$ELSE PUREPASCAL}
 asm
   PUSH EBX
   MOV  ECX, [EDX]
@@ -675,20 +784,47 @@ asm
 @@exit:
   POP  EBX
 end;
+{$ENDIF PUREPASCAL}
 
-procedure TurboConvertAddrAbsoluteToRelated(Mem: Pointer);
+procedure TurboConvertAddrAbsoluteToRelated(Mem: PPreservedCodeMemory);
+{$IFDEF PUREPASCAL}
+begin
+  if Assigned(Mem.InitializeProc) then
+    Dec(Integer(Mem.InitializeProc), Integer(Mem));
+  if Assigned(Mem.FinalizeProc) then
+    Dec(Integer(Mem.FinalizeProc), Integer(Mem));
+  TurboConvertEntryAbsoluteToRelated(Mem, Mem.LastWordEntry);  
+  TurboConvertEntryAbsoluteToRelated(Mem, Mem.LastModuleEntry);  
+  TurboConvertEntryAbsoluteToRelated(Mem, Mem.LastVariableEntry);  
+  TurboConvertEntryAbsoluteToRelated(Mem, Mem.LastSymbolEntry);  
+end;
+{$ELSE PUREPASCAL}
 asm
+  MOV  EDX, [EAX].TPreservedCodeMemory.InitializeProc
+  CMP  EDX, 0
+  JE   @@Skip
+  SUB  EDX, EAX
+  MOV  [EAX].TPreservedCodeMemory.InitializeProc, EDX
+@@Skip:
+  MOV  EDX, [EAX].TPreservedCodeMemory.FinalizeProc
+  CMP  EDX, 0
+  JE   @@Skip2
+  SUB  EDX, EAX
+  MOV  [EAX].TPreservedCodeMemory.FinalizeProc, EDX
+
+@@Skip2:
   LEA  EDX, [EAX].TPreservedCodeMemory.LastWordEntry
   CALL TurboConvertEntryAbsoluteToRelated 
 
   LEA  EDX, [EAX].TPreservedCodeMemory.LastModuleEntry
   CALL TurboConvertEntryAbsoluteToRelated 
 
-  LEA  EDX, [EAX].TPreservedCodeMemory.LastVarEntry
+  LEA  EDX, [EAX].TPreservedCodeMemory.LastVariableEntry
   CALL TurboConvertEntryAbsoluteToRelated 
 
   LEA  EDX, [EAX].TPreservedCodeMemory.LastSymbolEntry
   CALL TurboConvertEntryAbsoluteToRelated 
 end;
+{$ENDIF PUREPASCAL}
 
 end.

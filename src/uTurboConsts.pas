@@ -18,6 +18,8 @@ const
 resourcestring
   rsMissFileHeaderError = 'Error: The file header is missed';
   rsTurboScriptAlreayRunningError = 'Error: The Turbo Script is already running.';
+  rsTurboScriptNotLoadedError = 'Error: The Turbo Script is not loaded yet.';
+  rsInvalidTurboScriptStreamError = 'Turbo Script LoadStream Error: the stream invalid.';
   rsReturnStackUnderflowError = 'Return Stack underflow.';
   rsReturnStackOverflowError = 'Return Stack overflow';
   rsParamStackUnderflowError = 'Parameter Stack underflow.';
@@ -30,7 +32,7 @@ type
   {
     @param mtFunction         the script function(word).
   }
-  TTurboScriptModuleType = (mtUnknown, mtProgram, mtLib, mtFunction);
+  TTurboModuleType = (mtUnknown, mtProgram, mtLib, mtFunction);
 
   TTurboForthVisibility = (fvDefault, fvHide, fvPrivate, fvProtected, fvPublic, fvPublished);
   //the Forth Execution priority fpHighest means cfsImmediately
@@ -128,7 +130,7 @@ type
 
   Note: the state Must be a Byte for speed!!!
   }
-  TTurboForthProcessorState = (psLoaded, psRunning, psStepping, psCompiling
+  TTurboForthProcessorState = (psRunning, psStepping, psCompiling
     //这些错误可能会同时出现，所以放在这里
     , errHalt, errMemOverFlow, errDataStackOverflow, errReturnStackOverflow 
   );
@@ -142,7 +144,7 @@ type
 const
   //For TTurboForthProcessorStates (put it into EBX Status Register).
   {the psLoaded is used for the Executor, not for the VM processor.}
-  cTurboScriptIsLoadedBit       = psLoaded;
+  //cTurboScriptIsLoadedBit       = psLoaded;
   cTurboScriptIsRunningBit       = psRunning;
   cTurboScriptIsSteppingBit      = psStepping;
   //cTurboScriptBadInstructionBit  = [psBadInstruction];
