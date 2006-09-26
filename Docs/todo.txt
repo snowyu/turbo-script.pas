@@ -1,3 +1,12 @@
+2006-9-25
++ TurboModule Stream Header
+!+ 构思 TurboModuleAccessor 架构
+* [VM] 修订 EnterFar ModuleIndex cfa-addr 改为 MemBase-addr(另一模块的内存基址) cfa-addr
+- [VM] 放弃 ModuleIndex 机制，因为我希望我的脚本(Program)能够在内存中并行工作，并且尽量节约内存：我采用的是一个Module只在内存中存在一份拷贝。
+  而显然不通的Program ModuleIndex是不同的。所以放弃 ModuleIndex, 转而使用 LastModuleEntry-addr
++ [VM] CALLFAR PTurboModuleEntry cfa-addr: if PTurboModuleEntry = nil means it's self, do not lookup.  
++ TCustomTurboObject: FreeNotification
+
 2006-9-23
 ~ 装入后的流，以流的大小作为 UsedMemory.
 在Executor执行脚本前，必须做的事情有？
@@ -41,7 +50,7 @@
 
 ~ 有没有取得当前执行地址的x86指令？
   答：不能，只能通过Call 间接取得。
-+ 调用 register calling（delphi）写的函数：
++ [VM] 调用 register calling（delphi）写的函数：
   CallReg: register
   CallPascal: pascal
   CallStd: stdcall
@@ -55,7 +64,7 @@
   CallingStyle: TCallingConvension;
   TypeInfo: Pointer; //nil means no RTTI info.: 实际上是一个相对于FMemory的地址。
 
-+ 当调用其他模块的函数时候，是否需要保存现场？
++ [VM] 当调用其他模块的函数时候，是否需要保存现场？
   至少EDI(FMemory)和ESI(PC:Program Counter)需要保存。堆栈是共用，不需要保存。除非是delphi写的。
   但是我返回的时候？如何才能返回？
   回答：增加Far word, 和 near word, 对于私有过程（只在本模块内有效），采用 near word(默认, Enter, Exit); 对于能被其他模块访问的过程

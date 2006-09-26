@@ -149,6 +149,18 @@ pushInt 2 pushInt 3 AddInt Halt
 ForthDLL：与DLL类似，不过里面的代码不是机器码，而是Forth的VM码。
 
 
+uTurboScriptAccessor(模块装入保存机制详述):
+
+TTurboModuleAccessor: abstract class  <-- TTurboModuleFileAccessor, TTurboModuleDataSetAccessor
+TTurboModuleAccessorClasses: register the accessor to here.
+
+TTurboModuleManager: manage the Turbo Module Accessores.
+  Require(aModuleName: string): TCustomTurboExecutor; //find and load the module into memory.
+
+函数说明：
+RegisterTurboModuleAccessor(aClass: TTurboModuleAccessorClass);
+
+
 类的说明:
 
 { Summary the module for the TurboScript.}
