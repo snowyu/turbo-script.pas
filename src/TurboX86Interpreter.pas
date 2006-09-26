@@ -165,6 +165,9 @@ end;
 
 {----Helper functions ----}
 
+type
+  TTurboExecutorAccess = class(TCustomTurboExecutor);
+  
 procedure iVMInit;
 asm
   MOV  [EDI].TPreservedCodeMemory.ReturnStackBottom, ESP
@@ -252,16 +255,35 @@ asm
   JMP  iVMNext
 end;
 
-//在返回栈中保存EDI(旧的 FMemory 基址), 
-//根据 ModuleIndex 查找模块内存基址，如果找到就设置EDI成新的 FMemory 基址,
-//然后装入该函数的地址，其它就和VMEnter一样了，转去VMEnter。
 procedure iVMEnterFar;
 asm
-  PUSH EDI
+  PUSH EDI //save the current MemoryBase.
   LODSD
-  CMP  EAX, [EDI].TPreservedCodeMemory.ModuleIndex
+  MOV  EDI, EAX //load the new MemoryBase
+  LODSD
+  ADD EAX, EDI
+  JMP iVMEnter
+end;
+
+//CALLFAR PTurboModuleEntry cfa-addr
+//if PTurboModuleEntry = nil means it's self, do not lookup.  
+//在返回栈中保存EDI(旧的 FMemory 基址), 
+//根据 PTurboModuleEntry 查找模块内存基址，如果找到就设置EDI成新的 FMemory 基址,
+//然后装入该函数的地址，其它就和VMEnter一样了，转去VMEnter。
+procedure iVMCallFar;
+asm
+  PUSH EDI //save the current MemoryBase.
+  LODSD    //EAX= PTurboModuleEntry
+  CMP  EAX, 0
   JZ  @@DoLocalEnterFar
-@@GetModuleAddr:
+  ADD  EAX, EDI //PTurboModuleEntry real addr
+  MOV  ECX, [EAX].TTurboModuleEntry.Module
+  CMP  ECX, 0
+  JZ   @@RequireModuleExecutor
+  MOV  EDI, [ECX].TTurboExecutorAccess.FMemory
+  JMP  @@exit
+
+@@RequireModuleExecutor: //find and load the module into the memory.
   PUSH EBX
   PUSH ESI
   {$ifdef TurboScript_FullSpeed}
@@ -270,9 +292,10 @@ asm
   PUSH EBP
   
   MOV  EDX, EAX
+  ADD  EDX, Offset TTurboModuleEntry.Name
   MOV  EAX, [EDI].TPreservedCodeMemory.Executor
   //function TCustomTruboExecutor.GetModuleMemoryAddr(aModuleIndex: Integer): Pointer;
-  CALL TCustomTurboExecutor.GetModuleMemoryAddr
+  CALL TCustomTurboExecutor.RequireModule
   POP EBP
   {$ifdef TurboScript_FullSpeed}
   POP EDX
@@ -282,12 +305,13 @@ asm
 
   CMP  EAX, 0
   JZ   @@NotFoundError
-  MOV  EDI, EAX
+
+  MOV  EDI, [EAX].TTurboExecutorAccess.FMemory
   JMP @@Exit
 
 @@NotFoundError:
   POP  EDI
-  MOV  [EDI].TPreservedCodeMemory.LastErrorCode, errModuleIndex
+  MOV  [EDI].TPreservedCodeMemory.LastErrorCode, errModuleNotFound
   JMP  iVMHalt
 
 @@DoLocalEnterFar:
