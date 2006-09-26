@@ -8,7 +8,8 @@ uses
   ;
 
 const
-  cFORTHHeaderMagicWord = 'TURBO4TH';
+  cFORTHHeaderMagicId = 'TURBO4TH';
+  cFORTHHeaderMagicIdLen = 8; 
   //cFORTHMagicWordSize = SizeOf(cFORTHHeaderMagicWord);
   cDefaultStackSize = 127;
   cDefaultParamStackSize = 127; 
@@ -51,7 +52,7 @@ type
     inNext,
     //Far Call, 对于公开的供其他模块调用的函数全部使用该方式
     //ForthDLL的模块链接方式调用
-    inEnterFar, //inEnterFar ModuleIndex Addr
+    inEnterFar, //inEnterFar ModuleMemBase-addr Addr
     inExitFar,  //对于远调用的返回指令必须是该指令! R: (MemoryBase PC -- )
     
     {## Memory Operation Instruction }
@@ -136,10 +137,24 @@ type
   );
   TTurboForthProcessorStates = set of TTurboForthProcessorState;
   TTurboForthProcessorErrorCode = (errNone, errBadInstruction, errDizZero
-    , errModuleIndex
+    , errModuleNotFound
   );
 
   
+  {: FreeNotify }
+  TCustomTurboObject = class(TObject)
+  private
+    FFreeNotifies: TList;
+  protected
+    procedure SendFreeNotification;
+  public
+    constructor Create;
+    destructor Destroy; override;
+    function FindFreeNotification(aProc: TNotifyEvent): Integer;
+    procedure FreeNotification(aProc: TNotifyEvent);
+    procedure RemoveFreeNotification(aProc: TNotifyEvent);
+  end;
+
 
 const
   //For TTurboForthProcessorStates (put it into EBX Status Register).
@@ -151,6 +166,69 @@ const
   cMaxTurboVMInstructionCount = SizeOf(TTurboCoreWords) div SizeOf(TProcedure); //the max turbo VM code directive count
   
 implementation
+
+{
+****************************** TCustomTurboObject ******************************
+}
+constructor TCustomTurboObject.Create;
+begin
+  inherited Create;
+  FFreeNotifies := TList.Create;
+end;
+
+destructor TCustomTurboObject.Destroy;
+begin
+  SendFreeNotification;
+  FFreeNotifies.Free;
+  FFreeNotifies := nil;
+  inherited Destroy;
+end;
+
+function TCustomTurboObject.FindFreeNotification(aProc: TNotifyEvent): Integer;
+var
+  ProcMethod: TMethod;
+begin
+  for Result := 0 to FFreeNotifies.Count div 2 - 1 do
+  begin
+    ProcMethod.Code := FFreeNotifies.Items[Result * 2];
+    ProcMethod.Data := FFreeNotifies.Items[Result * 2 + 1];
+    if (ProcMethod.Code = TMethod(aProc).Code) and (ProcMethod.Data = TMethod(aProc).Data) then
+      Exit;
+  end;
+  Result := -1;
+end;
+
+procedure TCustomTurboObject.FreeNotification(aProc: TNotifyEvent);
+begin
+  if FindFreeNotification(aProc) < 0 then
+  begin
+    FFreeNotifies.Insert(0, Pointer(TMethod(aProc).Data));
+    FFreeNotifies.Insert(0, Pointer(TMethod(aProc).Code));
+  end;
+end;
+
+procedure TCustomTurboObject.RemoveFreeNotification(aProc: TNotifyEvent);
+var
+  I: Integer;
+begin
+  i := FindFreeNotification(aProc);
+  if i >= 0 then
+    FFreeNotifies.Delete(i);
+end;
+
+procedure TCustomTurboObject.SendFreeNotification;
+var
+  I: Integer;
+  ProcMethod: TMethod;
+  Proc: TNotifyEvent Absolute ProcMethod;
+begin
+  for I := 0 to FFreeNotifies.Count div 2 - 1 do
+  begin
+    ProcMethod.Code := FFreeNotifies.Items[I * 2];
+    ProcMethod.Data := FFreeNotifies.Items[I * 2 + 1];
+    Proc(Self);
+  end;
+end;
 
 
 end.
