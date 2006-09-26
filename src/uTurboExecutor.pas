@@ -75,7 +75,7 @@ type
 
   Note:为了避免重新计算地址，全部采用相对偏移量！
   }
-  TCustomTurboExecutor = class(TObject)
+  TCustomTurboExecutor = class(TCustomTurboObject)
   private
     FIsLoaded: Boolean;
     function GetLastErrorCode: TTurboForthProcessorErrorCode;
@@ -91,6 +91,7 @@ type
     FMemory: Pointer;
     FMemorySize: Integer;
     FModuleDate: TTimeStamp;
+    FModuleUnloadNotifies: TList;
     FModuleVersion: LongWord;
     FName: string;
     FOptions: TTurboScriptOptions;
@@ -132,6 +133,7 @@ type
     function iExecuteCFA(const aCFA: Integer): Integer; virtual;
     {: Init before the Execution. }
     procedure InitExecution; virtual;
+    procedure SendUnloadNotification;
   public
     constructor Create; virtual;
     destructor Destroy; override;
@@ -140,6 +142,8 @@ type
     Note: you must InitExecution first.
     }
     procedure AddIntToMem(const aInt: Integer);
+    {: reduce the memory size to initialization state }
+    procedure ClearMemory;
     {: : Run the CFA word. }
     { Description
     internal proc, not init.
@@ -156,18 +160,34 @@ type
     相对于FMemory的偏移量。
     }
     function ExecuteWord(const aWord: string): Integer;
-    function GetModuleMemoryAddr(aModuleIndex: Integer): Pointer;
+    function FindUnloadNotification(aProc: TNotifyEvent): Integer;
     function GetWordCFA(const aWord: string): Integer; virtual;
     {: Load the VM Module from stream. }
     { Description
     @param Count 0 means all.
     }
     procedure LoadFromStream(const aStream: TStream; Count: Integer = 0);
+    {: //triggered when some module is free, remove if from the UnloadNotifies list. }
+    procedure NotifyModuleFree(Sender: TObject);
+    {: //triggered when some module is unloaded  }
+    procedure NotifyModuleUnloaded(Sender: TObject);
+    procedure RemoveUnloadNotification(aProc: TNotifyEvent);
+    {: find and load the module into memory. }
+    { Description
+    add self to the module Unload notification.
+    }
+    function RequireModule(const aModuleName: ShortString):
+            TCustomTurboExecutor;
     {: reset the stack pointers. }
     procedure Reset;
     {: save FMemory to stream }
     procedure SaveToStream(const aStream: TStream);
     procedure Stop;
+    {: unload from memory }
+    procedure Unload;
+    {: Ensures that a object is notified that the executor is going to be
+            unloaded. }
+    procedure UnloadNotification(aProc: TNotifyEvent);
     { Description
     if not loaded, then only the name and some options loaded but the body(
     Memory).
@@ -331,24 +351,21 @@ type
   
   TTurboModuleEntry = packed record
     Prior: PTurboModuleEntry; //nil means no more
-    ModuleIndex: integer;
+    //ModuleIndex: integer;
     Module: TCustomTurboExecutor; //nil means not assigned(or loaded).
     Name: ShortString; //packed string, the full module name with path.
   end;
 
   TTurboSymbolEntry = packed record
     Prior: PTurboSymbolEntry; //nil means no more
-    //ModuleIndex: integer;
-    //Module: TCustomTurboExecutor; //nil means not assigned(or loaded).
-    //Name: ShortString; //packed string, the full module name with path.
   end;
 
   //the typecast for code memory area to get the parameters
   TPreservedCodeMemory = packed record
     States: TTurboForthProcessorStates;
     Executor: TCustomTurboExecutor;
-    //this Module unique Index in this program, allocated by compiler.
-    ModuleIndex: Integer;
+    //##abondoned:this Module unique Index in this program, allocated by compiler.
+    //##ModuleIndex: Integer;
     ModuleType: TTurboModuleType;
     ParamStackBase: Pointer;
     ParamStackSize: Integer; //bytes
@@ -356,8 +373,8 @@ type
     ReturnStackBase: Pointer;
     ReturnStackSize: Integer; //bytes
     ReturnStackBottom: Pointer;
-    TIBLength: Integer; //#TIB the text buffer length
     ToIn: Integer; //>IN the text buffer current index
+    TIBLength: Integer; //#TIB the text buffer length
     TIB: array [0..cMAXTIBCount-1] of char; //'TIB
     LastErrorCode: TTurboForthProcessorErrorCode;
     //如果ModuleType是模块，那么就是装载运行该模块前执行的初始化过程，入口地址
@@ -373,7 +390,13 @@ type
     //RTTI 符号表 链表
     LastSymbolEntry: PTurboSymbolEntry;
   end;
-
+  
+  TTurboModuleStreamHeader = packed record
+    Id: array [0..cFORTHHeaderMagicIdLen-1] of char;
+    Version: LongWord;
+    BuildDate: TTimeStamp;
+  end;
+  
 procedure TurboConvertAddrRelatedToAbsolute(Mem: PPreservedCodeMemory);
 procedure TurboConvertAddrAbsoluteToRelated(Mem: PPreservedCodeMemory);
 
@@ -385,21 +408,15 @@ implementation
 constructor TCustomTurboExecutor.Create;
 begin
   inherited Create;
-  MemorySize := SizeOf(TPreservedCodeMemory) + cDefaultFreeMemSize;
-  FUsedMemory := SizeOf(TPreservedCodeMemory);
+  FModuleUnloadNotifies := TList.Create;
 
-  with PPreservedCodeMemory(FMemory)^ do
-  begin
-    LastWordEntry := nil;
-    LastVariableEntry := nil;
-    LastSymbolEntry := nil;
-    LastModuleEntry := nil;
-    States := [];
-  end;
+  ClearMemory;
 end;
 
 destructor TCustomTurboExecutor.Destroy;
 begin
+  Unload;
+
   FreeMem(FMemory);
   FMemory := nil;
   FMemorySize := 0;
@@ -415,6 +432,21 @@ begin
   Integer(p) := Integer(FMemory) + FUsedMemory;
   PInteger(P)^ := aInt;
   Inc(FUsedMemory, SizeOf(Integer));
+end;
+
+procedure TCustomTurboExecutor.ClearMemory;
+begin
+  MemorySize := SizeOf(TPreservedCodeMemory) + cDefaultFreeMemSize;
+  FUsedMemory := SizeOf(TPreservedCodeMemory);
+
+  with PPreservedCodeMemory(FMemory)^ do
+  begin
+    LastWordEntry := nil;
+    LastVariableEntry := nil;
+    LastSymbolEntry := nil;
+    LastModuleEntry := nil;
+    States := [];
+  end;
 end;
 
 function TCustomTurboExecutor.ExecuteCFA(const aCFA: Integer): Integer;
@@ -440,14 +472,24 @@ begin
   //Apply the SP to TProgram.SP.
 end;
 
+function TCustomTurboExecutor.FindUnloadNotification(aProc: TNotifyEvent):
+        Integer;
+var
+  ProcMethod: TMethod;
+begin
+  for Result := 0 to FModuleUnloadNotifies.Count div 2 - 1 do
+  begin
+    ProcMethod.Code := FModuleUnloadNotifies.Items[Result * 2];
+    ProcMethod.Data := FModuleUnloadNotifies.Items[Result * 2 + 1];
+    if (ProcMethod.Code = TMethod(aProc).Code) and (ProcMethod.Data = TMethod(aProc).Data) then
+      Exit;
+  end;
+  Result := -1;
+end;
+
 function TCustomTurboExecutor.GetLastErrorCode: TTurboForthProcessorErrorCode;
 begin
   Result := PPreservedCodeMemory(FMemory).LastErrorCode;
-end;
-
-function TCustomTurboExecutor.GetModuleMemoryAddr(aModuleIndex: Integer):
-        Pointer;
-begin
 end;
 
 function TCustomTurboExecutor.GetModuleType: TTurboModuleType;
@@ -530,6 +572,8 @@ end;
 
 procedure TCustomTurboExecutor.LoadFromStream(const aStream: TStream; Count:
         Integer = 0);
+var
+  vHeader: TTurboModuleStreamHeader;
 begin
   if Count <= 0 then
   begin
@@ -537,8 +581,16 @@ begin
     aStream.Position := 0;
   end;
 
-  if Count < SizeOf(TPreservedCodeMemory) then
+  if Count < (SizeOf(TPreservedCodeMemory)+ SizeOf(TTurboModuleStreamHeader)) then
     raise ETurboScriptError.CreateRes(@rsInvalidTurboScriptStreamError);
+
+  aStream.ReadBuffer(vHeader, SizeOf(TTurboModuleStreamHeader));
+
+  if vHeader.Id <> cFORTHHeaderMagicId then
+    raise ETurboScriptError.CreateRes(@rsInvalidTurboScriptStreamError);
+
+  ModuleVersion := vHeader.Version;
+  ModuleDate := vHeader.BuildDate;
 
   MemorySize := Count;
   aStream.ReadBuffer(FMemory^, Count);
@@ -546,6 +598,38 @@ begin
   TurboConvertAddrRelatedToAbsolute(FMemory);
 
   FIsLoaded := True;
+end;
+
+procedure TCustomTurboExecutor.NotifyModuleFree(Sender: TObject);
+var
+  I: Integer;
+begin
+  RemoveUnloadNotification(TCustomTurboExecutor(Sender).NotifyModuleUnloaded);
+end;
+
+procedure TCustomTurboExecutor.NotifyModuleUnloaded(Sender: TObject);
+begin
+  //TODO: apply the TTurboModuleEntry Executor to nil!!
+end;
+
+procedure TCustomTurboExecutor.RemoveUnloadNotification(aProc: TNotifyEvent);
+var
+  I: Integer;
+begin
+  i := FindUnloadNotification(aProc);
+  if i >= 0 then
+    FModuleUnloadNotifies.Delete(i);
+end;
+
+function TCustomTurboExecutor.RequireModule(const aModuleName: ShortString):
+        TCustomTurboExecutor;
+begin
+  //Result := Lib.Require(aModuleName);
+  if Assigned(Result) then
+  begin
+    Result.UnloadNotification(NotifyModuleUnloaded);
+    FreeNotification(Result.NotifyModuleFree);
+  end;
 end;
 
 procedure TCustomTurboExecutor.Reset;
@@ -562,13 +646,34 @@ begin
 end;
 
 procedure TCustomTurboExecutor.SaveToStream(const aStream: TStream);
+var
+  vHeader: TTurboModuleStreamHeader;
 begin
   if not FIsLoaded then
     raise ETurboScriptError.CreateRes(@rsTurboScriptNotLoadedError);
 
+  vHeader.Id := cFORTHHeaderMagicId;
+  vHeader.Version := ModuleVersion;
+  vHeader.BuildDate := ModuleDate;
+  aStream.WriteBuffer(vHeader, SizeOf(TTurboModuleStreamHeader));
   TurboConvertAddrAbsoluteToRelated(FMemory);
   aStream.WriteBuffer(FMemory^, FUsedMemory);
   TurboConvertAddrRelatedToAbsolute(FMemory);
+end;
+
+procedure TCustomTurboExecutor.SendUnloadNotification;
+var
+  I: Integer;
+  ProcMethod: TMethod;
+  Proc: TNotifyEvent Absolute ProcMethod;
+begin
+  for I := 0 to FModuleUnloadNotifies.Count div 2 - 1 do
+  begin
+    ProcMethod.Code := FModuleUnloadNotifies.Items[I * 2];
+    ProcMethod.Data := FModuleUnloadNotifies.Items[I * 2 + 1];
+    Proc(Self);
+  end;
+  FModuleUnloadNotifies.Clear;
 end;
 
 procedure TCustomTurboExecutor.SetMemorySize(Value: Integer);
@@ -616,6 +721,25 @@ end;
 procedure TCustomTurboExecutor.Stop;
 begin
   Exclude(PPreservedCodeMemory(FMemory).States, psRunning);
+end;
+
+procedure TCustomTurboExecutor.Unload;
+begin
+  if FIsLoaded then
+  begin
+    SendUnloadNotification;
+    ClearMemory;
+    FIsLoaded := False;
+  end;
+end;
+
+procedure TCustomTurboExecutor.UnloadNotification(aProc: TNotifyEvent);
+begin
+  if FindUnloadNotification(aProc) < 0 then
+  begin
+    FModuleUnloadNotifies.Insert(0, Pointer(TMethod(aProc).Data));
+    FModuleUnloadNotifies.Insert(0, Pointer(TMethod(aProc).Code));
+  end;
 end;
 
 {
