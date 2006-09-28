@@ -2,7 +2,7 @@ unit uTurboScriptAccessor;
 
 interface
 
-{$I Setting.inc}
+{$I TurboScript.inc}
 
 uses
   SysUtils, Classes
@@ -11,93 +11,183 @@ uses
   ;
 
 type
+  TTurboScriptAccessorClass = class of TTurboScriptAccessor; 
+  TTurboModuleAccessorClass = class of TTurboModuleAccessor;
+ 
   TTurboScriptAccessor = class;
-  {1 模块装入保存机制 }
-  {{
+  {: 模块装入保存机制 }
+  { Description
   实际的装载、卸载发生在这里，管理从文件或数据库加载模块，模块的唯一性。
   }
   TTurboScriptAccessor = class(TObject)
   public
-    {1 : Load the Virtual Machine Codes from the File. }
-    procedure LoadFromFile(const aFileName: String);
-    {1 : Load the Virtual Machine Codes from the Stream. }
-    procedure LoadFromStream(const aStream: TStream); virtual;
-    {1 : save the Virtual Machine Codes to file. }
-    procedure SaveToFile(const aFileName: String);
-    {1 : save the Virtual Machine Codes to Stream. }
-    procedure SaveToStream(const aStream: TStream); virtual;
+    {: if find then create and return the module Executor else return nil. }
+    { Description
+    @param IsLoaded whether load the module body to memory.
+     
+    if IsLoaded then means Delphi "uses unit".
+    }
+    function Require(const aModuleName: String; const IsLoaded: Boolean):
+            TCustomTurboExecutor; virtual; abstract;
   end;
-  
+
+  TTurboModuleAccessor = class(TTurboScriptAccessor)
+  public
+    {: Load the Module body into Module.Memory. }
+    procedure LoadModule(const aModule: TCustomTurboExecutor);
+    {: load the module to the aStream }
+    function LoadModuleStream(const aModuleName: String; const aStream:
+            TStream): Boolean; virtual; abstract;
+  end;
+
+  TTurboModuleManager = class(TTurboScriptAccessor)
+  private
+    FModules: TList;
+    function GetItems(Index: Integer): TCustomTurboExecutor;
+  protected
+    procedure DoBeforeTheModuleFree(Sender: TObject);
+    property Modules: TList read FModules;
+  public
+    constructor Create;
+    destructor Destroy; override;
+    {: Clear and Free all Modules. }
+    procedure Clear;
+    {: Return the Module Count }
+    function Count: Integer;
+    function Require(const aModuleName: String; const IsLoaded: Boolean):
+            TCustomTurboExecutor; override;
+    property Items[Index: Integer]: TCustomTurboExecutor read GetItems; default;
+  end;
+
+  TTurboModuleAccessorList = class(TList)
+  public
+    destructor Destroy; override;
+  end;
+
+
+function GTurboModuleAccessorClasses: TTurboModuleAccessorList;
+
+procedure RegisterModuleAccessor(const Accessor: TTurboModuleAccessor);
 
 implementation
 
-{
-***************************** TTurboScriptAccessor *****************************
-}
-procedure TTurboScriptAccessor.LoadFromFile(const aFileName: String);
 var
-  aFileStream: TFileStream;
+  FTurboModuleAccessorClasses: TTurboModuleAccessorList;
+
+function GTurboModuleAccessorClasses: TTurboModuleAccessorList;
 begin
-  aFileStream := TFileStream.Create(aFileName, fmOpenRead);
-  try
-    LoadFromStream(aFileStream);
-  finally
-    aFileStream.Free;
-  end;
+  if FTurboModuleAccessorClasses = nil then
+    FTurboModuleAccessorClasses := TTurboModuleAccessorList.Create;
+  Result := FTurboModuleAccessorClasses;
 end;
 
-procedure TTurboScriptAccessor.LoadFromStream(const aStream: TStream);
+procedure RegisterModuleAccessor(const Accessor: TTurboModuleAccessor);
 var
-  Lstr: string;
-  L: Byte;
+  i: integer;
 begin
-  L := Length(cFORTHHeaderMagicWord);
-  SetLength(Lstr, L);
-  with aStream do
+  i := GTurboModuleAccessorClasses.IndexOf(Accessor);
+  if i < 0 then
   begin
-    Read(Lstr[1], L);
-    if Lstr <> cFORTHHeaderMagicWord then
-      Raise ESuperScriptError.Create(rsMissFileHeaderError);
-  
-    //Get the Unit(Program) Name.
-    Read(L, SizeOf(L));
-    SetLength(FName, L);
-    if L<>0 then
-      Read(FName[1], L);
-  
-    //Read(FModuleType, SizeOf(FModuleType)); //abondon
-    Read(FFileVersion, SizeOf(FFileVersion));
-    Read(FFileDate, SizeOf(FFileDate));
+    FTurboModuleAccessorClasses.Add(Accessor);
   end;
 end;
 
-procedure TTurboScriptAccessor.SaveToFile(const aFileName: String);
+{
+***************************** TTurboModuleAccessor *****************************
+}
+procedure TTurboModuleAccessor.LoadModule(const aModule: TCustomTurboExecutor);
 var
-  aFileStream: TFileStream;
+  vStream: TMemoryStream;
 begin
-  aFileStream := TFileStream.Create(aFileName, fmCreate);
+  vStream := TMemoryStream.Create;
   try
-    SaveToStream(aFileStream);
+    if LoadModuleStream(aModule.Name, vStream) then
+    begin
+      aModule.LoadFromStream(vStream);
+    end;
   finally
-    aFileStream.Free;
+    vStream.Free;
   end;
 end;
 
-procedure TTurboScriptAccessor.SaveToStream(const aStream: TStream);
-var
-  L: Byte;
+{
+***************************** TTurboModuleManager ******************************
+}
+constructor TTurboModuleManager.Create;
 begin
-  aStream.Write(cFORTHHeaderMagicWord[1], Length(cFORTHHeaderMagicWord));
-  //Get the Unit(Program) Name.
-  L := Length(FName);
-  aStream.Write(L, SizeOf(L));
-  if L<>0 then
-    aStream.Write(PChar(FName)^, L);
-  
-  //aStream.Write(FModuleType, SizeOf(FModuleType));
-  aStream.Write(FFileVersion, SizeOf(FFileVersion));
-  aStream.Write(FFileDate, SizeOf(FFileDate));
+  inherited Create;
+  FModules := TList.Create;
+end;
+
+destructor TTurboModuleManager.Destroy;
+begin
+  Clear;
+  FreeAndNil(FModules);
+  inherited Destroy;
+end;
+
+procedure TTurboModuleManager.Clear;
+begin
+  while FModules.Count > 0 do
+    TCustomTurboExecutor(FModules[0]).Free;
+end;
+
+function TTurboModuleManager.Count: Integer;
+begin
+  Result := FModules.Count;
+end;
+
+procedure TTurboModuleManager.DoBeforeTheModuleFree(Sender: TObject);
+begin
+  FModules.Remove(Sender);
+end;
+
+function TTurboModuleManager.GetItems(Index: Integer): TCustomTurboExecutor;
+begin
+  Result := TCustomTurboExecutor(FModules[Index]);
+end;
+
+function TTurboModuleManager.Require(const aModuleName: String; const IsLoaded:
+        Boolean): TCustomTurboExecutor;
+var
+  I: Integer;
+begin
+  For i := 0 to FModules.Count - 1 do
+  begin
+    Result := TCustomTurboExecutor(FModules[i]);
+    if Result.Name = aMoudleName then
+    begin
+      if IsLoaded and not Result.IsLoaded then
+        Result.Load;
+      Exit;
+    end;
+  end;
+
+  for i := 0 to GTurboModuleAccessorClasses.Count - 1 do
+  begin
+    Result := TTurboScriptAccessor(FTurboModuleAccessorClasses[i]).Require(aModuleName, IsLoaded);
+    if Result <> nil then
+    begin
+      FModules.Add(Result);
+      Result.FreeNotification(DoBeforeTheModuleFree);
+      Exit;
+    end;
+  end;
+  Result := nil;
+end;
+
+{
+*************************** TTurboModuleAccessorList ***************************
+}
+destructor TTurboModuleAccessorList.Destroy;
+begin
+  FTurboModuleAccessorClasses := nil;
+  inherited Destroy;
 end;
 
 
+initialization
+  FTurboModuleAccessorClasses := TTurboModuleAccessorList.Create;
+finalization
+  FreeAndNil(FTurboModuleAccessorClasses);
 end.
