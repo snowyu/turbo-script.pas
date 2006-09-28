@@ -18,6 +18,8 @@ unit uTurboExecutor;
 
 interface
 
+{$I TurboScript.inc}
+
 uses
   SysUtils, Classes
   , uTurboScriptConsts
@@ -77,6 +79,7 @@ type
   }
   TCustomTurboExecutor = class(TCustomTurboObject)
   private
+    FAccessor: TTurboModuleAccessor;
     FIsLoaded: Boolean;
     function GetLastErrorCode: TTurboForthProcessorErrorCode;
     function GetModuleType: TTurboModuleType;
@@ -162,6 +165,11 @@ type
     function ExecuteWord(const aWord: string): Integer;
     function FindUnloadNotification(aProc: TNotifyEvent): Integer;
     function GetWordCFA(const aWord: string): Integer; virtual;
+    {: Load the body into the memory. }
+    { Description
+    Note: accessor must be assigned first.
+    }
+    procedure Load;
     {: Load the VM Module from stream. }
     { Description
     @param Count 0 means all.
@@ -188,6 +196,7 @@ type
     {: Ensures that a object is notified that the executor is going to be
             unloaded. }
     procedure UnloadNotification(aProc: TNotifyEvent);
+    property Accessor: TTurboModuleAccessor read FAccessor write FAccessor;
     { Description
     if not loaded, then only the name and some options loaded but the body(
     Memory).
@@ -210,6 +219,7 @@ type
     property ModuleType: TTurboModuleType read GetModuleType write
             SetModuleType;
     property ModuleVersion: LongWord read FModuleVersion write FModuleVersion;
+    {: the module full name(include path: Module.SubModule.ModuleName) }
     property Name: string read FName write FName;
     property Options: TTurboScriptOptions read FOptions write FOptions;
     {: : the Parameter Stack }
@@ -402,6 +412,9 @@ procedure TurboConvertAddrAbsoluteToRelated(Mem: PPreservedCodeMemory);
 
 implementation
 
+uses
+  uTurboScriptAccessor;
+
 {
 ***************************** TCustomTurboExecutor *****************************
 }
@@ -447,6 +460,8 @@ begin
     LastModuleEntry := nil;
     States := [];
   end;
+
+  IsLoaded := False;
 end;
 
 function TCustomTurboExecutor.ExecuteCFA(const aCFA: Integer): Integer;
@@ -568,6 +583,14 @@ begin
   //}
 
   Include(PPreservedCodeMemory(FMemory).States, psRunning);
+end;
+
+procedure TCustomTurboExecutor.Load;
+begin
+  if not IsLoaded and Assigned(FAccessor) then
+  begin
+    Accessor.LoadModule(Self);
+  end;
 end;
 
 procedure TCustomTurboExecutor.LoadFromStream(const aStream: TStream; Count:
@@ -729,7 +752,6 @@ begin
   begin
     SendUnloadNotification;
     ClearMemory;
-    FIsLoaded := False;
   end;
 end;
 
