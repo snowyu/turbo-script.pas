@@ -1,3 +1,19 @@
+2006-9-28
+!+ 移植到MeScript
+!+ 构造编译器中的模块类:
+   TTurboModuleSymbol
+
+2006-9-27
+!+ 建立TurboScript异常处理中心机制
+
+分析 Delphi 异常处理中心机制
+分析的结果就是我必须在完成对象等类型处理后,才能进行,它是放在SysUtils单元中..
+
++ 构思出了 TurboModuleAccessor 架构 in uTurboScriptAccessor.pas
+
+~ 想法简化直接调用Delphi函数,这样就可以直接用Delphi的异常处理机制.直接用是做梦,不过可以参考编译产生的汇编.
+开始构思语法树(独立于语言之外的)
+
 2006-9-25
 + TurboModule Stream Header
 !+ 构思 TurboModuleAccessor 架构

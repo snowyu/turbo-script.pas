@@ -130,7 +130,7 @@ pushInt 2 pushInt 3 AddInt Halt
   2、便于扩充系统指令，方式2最多只能有256个指令，而且无法扩充。
 
 文件支持层: 
-  uTurboScriptAccessor(模块装入保存机制); 
+  uTurboModuleAccessor(模块装入保存机制); 
   实际的装载、卸载发生在这里，管理从文件或数据库加载模块，模块的唯一性。
   uTurboPEFormat.pas(俺的格式); uTurboWin32PEFormat(windows32的PE格式);
 编译后的可执行文件格式, PE: Portable Executable File Format 
@@ -149,10 +149,10 @@ pushInt 2 pushInt 3 AddInt Halt
 ForthDLL：与DLL类似，不过里面的代码不是机器码，而是Forth的VM码。
 
 
-uTurboScriptAccessor(模块装入保存机制详述):
+uTurboModuleAccessor(模块装入保存机制详述):
 
 TTurboModuleAccessor: abstract class  <-- TTurboModuleFileAccessor, TTurboModuleDataSetAccessor
-TTurboModuleAccessorClasses: register the accessor to here.
+TTurboModuleAccessorClasses: register the accessor class to here.
 
 TTurboModuleManager: manage the Turbo Module Accessores.
   Require(aModuleName: string): TCustomTurboExecutor; //find and load the module into memory.
@@ -160,6 +160,7 @@ TTurboModuleManager: manage the Turbo Module Accessores.
 函数说明：
 RegisterTurboModuleAccessor(aClass: TTurboModuleAccessorClass);
 
+uTurboModuleFileAccessor
 
 类的说明:
 
@@ -376,4 +377,12 @@ TurboScript 标准库文件 Lib 格式：
 System.tcu (TurboScript Compiled Unit)
 对于内部核心关键字应该是如何办啊？必须有一套汇编指令。既然是Forth机器，那么汇编指令就是Forth核心指令。
 
-tcu<VersionNo>
+文件头格式：
+  TTurboModuleStreamHeader = packed record
+    Id: array [0..cFORTHHeaderMagicIdLen-1] of char; //MagicWord: 辨别是否为TurboScript文件格式。
+    Version: LongWord;
+    BuildDate: TTimeStamp;
+  end;
+
+紧接着的内容就是：Forth代码区内存镜像(TCustomTurboExecutor.Memory)。
+

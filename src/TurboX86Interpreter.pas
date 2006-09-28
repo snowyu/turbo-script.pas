@@ -330,7 +330,7 @@ asm
   //push the current IP.
   PUSH ESI        
   //set the new IP in the TOS
-  ADD  EBX, EDI
+  ADD  EBX, EDI //EBX: TOS
   MOV  ESI, EBX   
 
   XCHG ESP, EBP

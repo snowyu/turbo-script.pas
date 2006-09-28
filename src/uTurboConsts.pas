@@ -97,19 +97,34 @@ type
     inJZOffset,
     inJNZ,
     inJNZOffset,
-    inExecute, //call(EXECUTE) the (User defined Forth word) (CFA -- )
+    inTestIfFalse,//(bool -- bool) Jump if current data-stack is false, without removing value from stack
+    inTestIfTrue, //(bool -- bool) Jump if current data-stack is true, without removing value from stack
+    inExecute, //call(EXECUTE) the private word (CFA -- )
+    inCallFar,  //inCallFar PTurboModuleEntry(offset of Memory) cfa-addr
     //inReturn, //= inExit
+    inWhile, //inWhile whileEnd-addr (bool -- )
+    inRepeat, //inRepeat RepeatEnd-addr (bool -- )
+    inFor,  //inFor ForEnd-addr (start, end -- )
     inNoop,
+    inTryFinally, // inTryFinally inTryEnd-addr inFinallyEnd-addr
+    inTryExcept,  // inTryExcept inTryEnd-addr inExceptEnd-addr
     //Call other module subroutes.
 
-    {## Stack Operation Instuction }
+    {## data Stack Operation Instuction }
+    inPushByte, //in fact it will be expand to int, then push
+    inPushWord,
     inPushInt,
+    inPushQWord, //two integer(int64).
     inPopInt,
     inDropInt,
     inDUPInt,
     inSWAPInt,
     inOVERInt,
     inROTInt
+
+    {## Return Stack Operation Instuction }
+    , RPushInt //R(-- int)
+    , RPopInt  //R(int --)
   ); 
 
   //the Core procedure List, maybe procedure or method.
@@ -133,7 +148,7 @@ type
   }
   TTurboForthProcessorState = (psRunning, psStepping, psCompiling
     //这些错误可能会同时出现，所以放在这里
-    , errHalt, errMemOverFlow, errDataStackOverflow, errReturnStackOverflow 
+    , errHalt, errOutOfMem, errOutOfDataStack, errOutOfReturnStack 
   );
   TTurboForthProcessorStates = set of TTurboForthProcessorState;
   TTurboForthProcessorErrorCode = (errNone, errBadInstruction, errDizZero
