@@ -26,11 +26,8 @@ uses
   ;
 
 type
-  TTurboScriptOption = (soOptimize, soLoadOnDemand, soBindingRuntime);
-  TTurboScriptOptions = set of TTurboScriptOption;
-
   TCustomTurboPEFormat = class;
-  TCustomTurboExecutor = class;
+  TCustomTurboModule = class;
   TTurboProgram = class;
   {: the abstract Portable Executable File Format. }
   { Description
@@ -59,25 +56,13 @@ type
     property ImageBase: Integer read FImageBase write FImageBase;
   end;
 
-  {: the abstract turbo script executor. }
+  {: the abstract turbo script Module. }
   { Description
-  Load the script into memory, and execute the script(maybe translate it into
-  native language first).
+  没有执行机构/
 
-  如果该模块引用了其他模块（函数，变量）怎么办？
-  答；无所谓，这就是后期绑定做的事情。
-
-  是否支持嵌套子模块？
-  答：如果支持，那么就必须在这里加上Modules属性，这样即可实现。
-  如果要调用嵌套子模块内的函数那么就要: Module.SubModule.Func.
-  但是这样就增加装载的复杂度，加大时间，降低效率。
-  我的想法则是：在文件中以相对子目录的形式实现子模块。当然还有数据库也是如法炮制。
-  另外对于子模块装入的时候只装入名字，其他的主体则在执行时候按需要装入。
-  我准备将模块装入保存机制，从Executor上分离： TTurboScriptAccessor。
-
-  Note:为了避免重新计算地址，全部采用相对偏移量！
+  Load the script into memory
   }
-  TCustomTurboExecutor = class(TCustomTurboObject)
+  TCustomTurboModule = class(TCustomTurboObject)
   private
     FAccessor: TTurboModuleAccessor;
     FIsLoaded: Boolean;
@@ -184,8 +169,7 @@ type
     { Description
     add self to the module Unload notification.
     }
-    function RequireModule(const aModuleName: ShortString):
-            TCustomTurboExecutor;
+    function RequireModule(const aModuleName: ShortString): TCustomTurboModule;
     {: reset the stack pointers. }
     procedure Reset;
     {: save FMemory to stream }
@@ -285,6 +269,29 @@ type
     property UsedMemory: Integer read FUsedMemory write FUsedMemory;
   end;
 
+  {: the abstract turbo script executor. }
+  { Description
+  没有执行机构/
+
+  Load the script into memory, and execute the script(maybe translate it into
+  native language first).
+
+  如果该模块引用了其他模块（函数，变量）怎么办？
+  答；无所谓，这就是后期绑定做的事情。
+
+  是否支持嵌套子模块？
+  答：如果支持，那么就必须在这里加上Modules属性，这样即可实现。
+  如果要调用嵌套子模块内的函数那么就要: Module.SubModule.Func.
+  但是这样就增加装载的复杂度，加大时间，降低效率。
+  我的想法则是：在文件中以相对子目录的形式实现子模块。当然还有数据库也是如法炮制。
+  另外对于子模块装入的时候只装入名字，其他的主体则在执行时候按需要装入。
+  我准备将模块装入保存机制，从Executor上分离： TTurboScriptAccessor。
+
+  Note:为了避免重新计算地址，全部采用相对偏移量！
+  }
+  TCustomTurboExecutor = class(TCustomTurboModule)
+  end;
+
   TTurboProgram = class(TObject)
   private
     FOptions: TTurboScriptOptions;
@@ -293,11 +300,11 @@ type
     FReturnStack: Pointer;
     FReturnStackSize: Integer;
     FStatus: TTurboForthProcessorStates;
-    procedure SetExecutor(const Value: TCustomTurboExecutor);
+    procedure SetExecutor(const Value: TCustomTurboModule);
     procedure SetParameterStackSize(const Value: Integer);
     procedure SetReturnStackSize(const Value: Integer);
   protected
-    FExecutor: TCustomTurboExecutor;
+    FExecutor: TCustomTurboModule;
   public
     { Description
     为了在多个 executor 中管理共享数据栈＆返回栈以及运行参数。
@@ -315,7 +322,7 @@ type
     won't stop until this procedure returns.
     }
     procedure Stop;
-    property Executor: TCustomTurboExecutor read FExecutor write SetExecutor;
+    property Executor: TCustomTurboModule read FExecutor write SetExecutor;
     property Options: TTurboScriptOptions read FOptions write FOptions;
     property ParameterStack: Pointer read FParameterStack write FParameterStack;
     property ParameterStackSize: Integer read FParameterStackSize write
@@ -362,7 +369,7 @@ type
   TTurboModuleEntry = packed record
     Prior: PTurboModuleEntry; //nil means no more
     //ModuleIndex: integer;
-    Module: TCustomTurboExecutor; //nil means not assigned(or loaded).
+    Module: TCustomTurboModule; //nil means not assigned(or loaded).
     Name: ShortString; //packed string, the full module name with path.
   end;
 
@@ -373,7 +380,7 @@ type
   //the typecast for code memory area to get the parameters
   TPreservedCodeMemory = packed record
     States: TTurboForthProcessorStates;
-    Executor: TCustomTurboExecutor;
+    Executor: TCustomTurboModule;
     //##abondoned:this Module unique Index in this program, allocated by compiler.
     //##ModuleIndex: Integer;
     ModuleType: TTurboModuleType;
@@ -416,9 +423,9 @@ uses
   uTurboScriptAccessor;
 
 {
-***************************** TCustomTurboExecutor *****************************
+****************************** TCustomTurboModule ******************************
 }
-constructor TCustomTurboExecutor.Create;
+constructor TCustomTurboModule.Create;
 begin
   inherited Create;
   FModuleUnloadNotifies := TList.Create;
@@ -426,7 +433,7 @@ begin
   ClearMemory;
 end;
 
-destructor TCustomTurboExecutor.Destroy;
+destructor TCustomTurboModule.Destroy;
 begin
   Unload;
 
@@ -436,7 +443,7 @@ begin
   inherited Destroy;
 end;
 
-procedure TCustomTurboExecutor.AddIntToMem(const aInt: Integer);
+procedure TCustomTurboModule.AddIntToMem(const aInt: Integer);
 var
   p: Pointer;
 begin
@@ -447,7 +454,7 @@ begin
   Inc(FUsedMemory, SizeOf(Integer));
 end;
 
-procedure TCustomTurboExecutor.ClearMemory;
+procedure TCustomTurboModule.ClearMemory;
 begin
   MemorySize := SizeOf(TPreservedCodeMemory) + cDefaultFreeMemSize;
   FUsedMemory := SizeOf(TPreservedCodeMemory);
@@ -464,14 +471,14 @@ begin
   IsLoaded := False;
 end;
 
-function TCustomTurboExecutor.ExecuteCFA(const aCFA: Integer): Integer;
+function TCustomTurboModule.ExecuteCFA(const aCFA: Integer): Integer;
 begin
   InitExecution;
   Result := iExecuteCFA(aCFA);
   FinalizeExecution;
 end;
 
-function TCustomTurboExecutor.ExecuteWord(const aWord: string): Integer;
+function TCustomTurboModule.ExecuteWord(const aWord: string): Integer;
 var
   aCFA: Integer;
 begin
@@ -482,12 +489,12 @@ begin
     Result := -1;
 end;
 
-procedure TCustomTurboExecutor.FinalizeExecution;
+procedure TCustomTurboModule.FinalizeExecution;
 begin
   //Apply the SP to TProgram.SP.
 end;
 
-function TCustomTurboExecutor.FindUnloadNotification(aProc: TNotifyEvent):
+function TCustomTurboModule.FindUnloadNotification(aProc: TNotifyEvent):
         Integer;
 var
   ProcMethod: TMethod;
@@ -502,22 +509,22 @@ begin
   Result := -1;
 end;
 
-function TCustomTurboExecutor.GetLastErrorCode: TTurboForthProcessorErrorCode;
+function TCustomTurboModule.GetLastErrorCode: TTurboForthProcessorErrorCode;
 begin
   Result := PPreservedCodeMemory(FMemory).LastErrorCode;
 end;
 
-function TCustomTurboExecutor.GetModuleType: TTurboModuleType;
+function TCustomTurboModule.GetModuleType: TTurboModuleType;
 begin
   Result := PPreservedCodeMemory(FMemory).ModuleType;
 end;
 
-function TCustomTurboExecutor.GetStatus: TTurboForthProcessorStates;
+function TCustomTurboModule.GetStatus: TTurboForthProcessorStates;
 begin
   Result := PPreservedCodeMemory(FMemory).States;
 end;
 
-function TCustomTurboExecutor.GetTIB: string;
+function TCustomTurboModule.GetTIB: string;
 var
   I: Integer;
 begin
@@ -531,24 +538,24 @@ begin
     Result := '';
 end;
 
-function TCustomTurboExecutor.GetWordCFA(const aWord: string): Integer;
+function TCustomTurboModule.GetWordCFA(const aWord: string): Integer;
 begin
   Result := -1;
 end;
 
-procedure TCustomTurboExecutor.Grow;
+procedure TCustomTurboModule.Grow;
 begin
   MemorySize := FMemorySize + FMemorySize div 4;
 end;
 
-function TCustomTurboExecutor.iExecuteCFA(const aCFA: Integer): Integer;
+function TCustomTurboModule.iExecuteCFA(const aCFA: Integer): Integer;
 begin
   Result := -1;
   //if (psRunning in Status) then
     //raise ETurboScriptError.CreateRes(@rsTurboScriptAlreayRunningError);
 end;
 
-procedure TCustomTurboExecutor.InitExecution;
+procedure TCustomTurboModule.InitExecution;
 begin
   if not FIsLoaded then
     raise ETurboScriptError.CreateRes(@rsTurboScriptNotLoadedError);
@@ -585,7 +592,7 @@ begin
   Include(PPreservedCodeMemory(FMemory).States, psRunning);
 end;
 
-procedure TCustomTurboExecutor.Load;
+procedure TCustomTurboModule.Load;
 begin
   if not IsLoaded and Assigned(FAccessor) then
   begin
@@ -593,7 +600,7 @@ begin
   end;
 end;
 
-procedure TCustomTurboExecutor.LoadFromStream(const aStream: TStream; Count:
+procedure TCustomTurboModule.LoadFromStream(const aStream: TStream; Count:
         Integer = 0);
 var
   vHeader: TTurboModuleStreamHeader;
@@ -623,19 +630,19 @@ begin
   FIsLoaded := True;
 end;
 
-procedure TCustomTurboExecutor.NotifyModuleFree(Sender: TObject);
+procedure TCustomTurboModule.NotifyModuleFree(Sender: TObject);
 var
   I: Integer;
 begin
-  RemoveUnloadNotification(TCustomTurboExecutor(Sender).NotifyModuleUnloaded);
+  RemoveUnloadNotification(TCustomTurboModule(Sender).NotifyModuleUnloaded);
 end;
 
-procedure TCustomTurboExecutor.NotifyModuleUnloaded(Sender: TObject);
+procedure TCustomTurboModule.NotifyModuleUnloaded(Sender: TObject);
 begin
   //TODO: apply the TTurboModuleEntry Executor to nil!!
 end;
 
-procedure TCustomTurboExecutor.RemoveUnloadNotification(aProc: TNotifyEvent);
+procedure TCustomTurboModule.RemoveUnloadNotification(aProc: TNotifyEvent);
 var
   I: Integer;
 begin
@@ -644,8 +651,8 @@ begin
     FModuleUnloadNotifies.Delete(i);
 end;
 
-function TCustomTurboExecutor.RequireModule(const aModuleName: ShortString):
-        TCustomTurboExecutor;
+function TCustomTurboModule.RequireModule(const aModuleName: ShortString):
+        TCustomTurboModule;
 begin
   //Result := Lib.Require(aModuleName);
   if Assigned(Result) then
@@ -655,7 +662,7 @@ begin
   end;
 end;
 
-procedure TCustomTurboExecutor.Reset;
+procedure TCustomTurboModule.Reset;
 begin
   PPreservedCodeMemory(FMemory).ParamStackBase := FParameterStack;
   PPreservedCodeMemory(FMemory).ParamStackSize := FParameterStackSize;
@@ -668,7 +675,7 @@ begin
   PPreservedCodeMemory(FMemory).States := [];
 end;
 
-procedure TCustomTurboExecutor.SaveToStream(const aStream: TStream);
+procedure TCustomTurboModule.SaveToStream(const aStream: TStream);
 var
   vHeader: TTurboModuleStreamHeader;
 begin
@@ -684,7 +691,7 @@ begin
   TurboConvertAddrRelatedToAbsolute(FMemory);
 end;
 
-procedure TCustomTurboExecutor.SendUnloadNotification;
+procedure TCustomTurboModule.SendUnloadNotification;
 var
   I: Integer;
   ProcMethod: TMethod;
@@ -699,7 +706,7 @@ begin
   FModuleUnloadNotifies.Clear;
 end;
 
-procedure TCustomTurboExecutor.SetMemorySize(Value: Integer);
+procedure TCustomTurboModule.SetMemorySize(Value: Integer);
 begin
   if FMemorySize <> Value then
   begin
@@ -708,17 +715,17 @@ begin
   end;
 end;
 
-procedure TCustomTurboExecutor.SetModuleType(Value: TTurboModuleType);
+procedure TCustomTurboModule.SetModuleType(Value: TTurboModuleType);
 begin
   PPreservedCodeMemory(FMemory).ModuleType := Value;
 end;
 
-procedure TCustomTurboExecutor.SetStatus(Value: TTurboForthProcessorStates);
+procedure TCustomTurboModule.SetStatus(Value: TTurboForthProcessorStates);
 begin
   PPreservedCodeMemory(FMemory).States := Value;
 end;
 
-procedure TCustomTurboExecutor.SetTIB(Value: string);
+procedure TCustomTurboModule.SetTIB(Value: string);
 var
   I: Integer;
 begin
@@ -741,12 +748,12 @@ begin
   end;
 end;
 
-procedure TCustomTurboExecutor.Stop;
+procedure TCustomTurboModule.Stop;
 begin
   Exclude(PPreservedCodeMemory(FMemory).States, psRunning);
 end;
 
-procedure TCustomTurboExecutor.Unload;
+procedure TCustomTurboModule.Unload;
 begin
   if FIsLoaded then
   begin
@@ -755,7 +762,7 @@ begin
   end;
 end;
 
-procedure TCustomTurboExecutor.UnloadNotification(aProc: TNotifyEvent);
+procedure TCustomTurboModule.UnloadNotification(aProc: TNotifyEvent);
 begin
   if FindUnloadNotification(aProc) < 0 then
   begin
@@ -785,7 +792,7 @@ procedure TTurboProgram.Execute(aTimeOut : Integer = 0);
 begin
 end;
 
-procedure TTurboProgram.SetExecutor(const Value: TCustomTurboExecutor);
+procedure TTurboProgram.SetExecutor(const Value: TCustomTurboModule);
 begin
   if FExecutor <> Value then
   begin
