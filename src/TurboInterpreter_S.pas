@@ -59,7 +59,7 @@ type
     PInteger(SP)^ := aInt;
     Inc(SP, SizeOf(Integer));
   }
-  TTurboInterpreter = class(TCustomTurboExecutor)
+  TTurboInterpreter = class(TCustomTurboModule)
   private
     function GetPLibEntry: PForthWord;
     function GetTIB: string;

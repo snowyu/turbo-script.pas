@@ -85,7 +85,7 @@ type
     PInteger(SP)^ := aInt;
     Inc(SP, SizeOf(Integer));
   }
-  TCustomTurboInterpreter = class(TCustomTurboExecutor)
+  TCustomTurboInterpreter = class(TCustomTurboModule)
   private
     function GetPLibEntry: PForthWord;
     procedure SetParameterStackSize(const Value: Integer);

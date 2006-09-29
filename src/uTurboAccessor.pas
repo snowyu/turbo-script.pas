@@ -19,7 +19,7 @@ type
   { Description
   实际的装载、卸载发生在这里，管理从文件或数据库加载模块，模块的唯一性。
   }
-  TTurboScriptAccessor = class(TObject)
+  TTurboScriptAccessor = class(TCustomTurboObject)
   public
     {: if find then create and return the module Executor else return nil. }
     { Description
@@ -28,13 +28,16 @@ type
     if IsLoaded then means Delphi "uses unit".
     }
     function Require(const aModuleName: String; const IsLoaded: Boolean):
-            TCustomTurboExecutor; virtual; abstract;
+            TCustomTurboModule; virtual; abstract;
+    {: load the module to the aStream }
+    function SaveModule(const aModule: TCustomTurboModule): Boolean; virtual;
+            abstract;
   end;
 
   TTurboModuleAccessor = class(TTurboScriptAccessor)
   public
     {: Load the Module body into Module.Memory. }
-    procedure LoadModule(const aModule: TCustomTurboExecutor);
+    procedure LoadModule(const aModule: TCustomTurboModule);
     {: load the module to the aStream }
     function LoadModuleStream(const aModuleName: String; const aStream:
             TStream): Boolean; virtual; abstract;
@@ -43,7 +46,7 @@ type
   TTurboModuleManager = class(TTurboScriptAccessor)
   private
     FModules: TList;
-    function GetItems(Index: Integer): TCustomTurboExecutor;
+    function GetItems(Index: Integer): TCustomTurboModule;
   protected
     procedure DoBeforeTheModuleFree(Sender: TObject);
     property Modules: TList read FModules;
@@ -55,8 +58,9 @@ type
     {: Return the Module Count }
     function Count: Integer;
     function Require(const aModuleName: String; const IsLoaded: Boolean):
-            TCustomTurboExecutor; override;
-    property Items[Index: Integer]: TCustomTurboExecutor read GetItems; default;
+            TCustomTurboModule; override;
+    function SaveModule(const aModule: TCustomTurboModule): Boolean; override;
+    property Items[Index: Integer]: TCustomTurboModule read GetItems; default;
   end;
 
   TTurboModuleAccessorList = class(TList)
@@ -66,22 +70,34 @@ type
 
 
 function GTurboModuleAccessorClasses: TTurboModuleAccessorList;
+function DefaultTurboModuleAccessor: TTurboModuleAccessor;
 
-procedure RegisterModuleAccessor(const Accessor: TTurboModuleAccessor);
+procedure RegisterModuleAccessor(const Accessor: TTurboModuleAccessor; const
+        IsDefault: Boolean = False);
 
 implementation
 
 var
   FTurboModuleAccessorClasses: TTurboModuleAccessorList;
+  FDefaultModuleAccessor: TTurboModuleAccessor;
+  
+function DefaultTurboModuleAccessor: TTurboModuleAccessor;
+begin
+  Result := FDefaultModuleAccessor;
+end;
 
 function GTurboModuleAccessorClasses: TTurboModuleAccessorList;
 begin
   if FTurboModuleAccessorClasses = nil then
+  begin
+    FDefaultModuleAccessor := nil;
     FTurboModuleAccessorClasses := TTurboModuleAccessorList.Create;
+  end;
   Result := FTurboModuleAccessorClasses;
 end;
 
-procedure RegisterModuleAccessor(const Accessor: TTurboModuleAccessor);
+procedure RegisterModuleAccessor(const Accessor: TTurboModuleAccessor; const
+        IsDefault: Boolean);
 var
   i: integer;
 begin
@@ -89,13 +105,14 @@ begin
   if i < 0 then
   begin
     FTurboModuleAccessorClasses.Add(Accessor);
+    if IsDefault then FDefaultModuleAccessor := Accessor;
   end;
 end;
 
 {
 ***************************** TTurboModuleAccessor *****************************
 }
-procedure TTurboModuleAccessor.LoadModule(const aModule: TCustomTurboExecutor);
+procedure TTurboModuleAccessor.LoadModule(const aModule: TCustomTurboModule);
 var
   vStream: TMemoryStream;
 begin
@@ -129,7 +146,7 @@ end;
 procedure TTurboModuleManager.Clear;
 begin
   while FModules.Count > 0 do
-    TCustomTurboExecutor(FModules[0]).Free;
+    TCustomTurboModule(FModules[0]).Free;
 end;
 
 function TTurboModuleManager.Count: Integer;
@@ -142,19 +159,19 @@ begin
   FModules.Remove(Sender);
 end;
 
-function TTurboModuleManager.GetItems(Index: Integer): TCustomTurboExecutor;
+function TTurboModuleManager.GetItems(Index: Integer): TCustomTurboModule;
 begin
-  Result := TCustomTurboExecutor(FModules[Index]);
+  Result := TCustomTurboModule(FModules[Index]);
 end;
 
 function TTurboModuleManager.Require(const aModuleName: String; const IsLoaded:
-        Boolean): TCustomTurboExecutor;
+        Boolean): TCustomTurboModule;
 var
   I: Integer;
 begin
   For i := 0 to FModules.Count - 1 do
   begin
-    Result := TCustomTurboExecutor(FModules[i]);
+    Result := TCustomTurboModule(FModules[i]);
     if Result.Name = aMoudleName then
     begin
       if IsLoaded and not Result.IsLoaded then
@@ -174,6 +191,12 @@ begin
     end;
   end;
   Result := nil;
+end;
+
+function TTurboModuleManager.SaveModule(const aModule: TCustomTurboModule):
+        Boolean;
+begin
+  Result := DefaultTurboModuleAccessor.SaveModule(aModule);
 end;
 
 {

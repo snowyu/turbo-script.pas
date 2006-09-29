@@ -33,12 +33,15 @@ type
   {
     @param mtFunction         the script function(word).
   }
-  TTurboModuleType = (mtUnknown, mtProgram, mtLib, mtFunction);
+  TTurboModuleType = (mtUnknown, mtProgram, mtLib, mtObject, mtFunction);
+
+  TTurboScriptOption = (soOptimize, soLoadOnDemand, soBindingRuntime, soBindingCompileTime);
+  TTurboScriptOptions = set of TTurboScriptOption;
 
   TTurboForthVisibility = (fvDefault, fvHide, fvPrivate, fvProtected, fvPublic, fvPublished);
   //the Forth Execution priority fpHighest means cfsImmediately
   TTurboForthPriority = (fpLowest, fpLower, fpLow, fpNormal, fpHigh, pfHigher, fpHighest);
-  TTurboForthCallStyle = (csForth, csRegister, csPascal, csStdCall, csFastCall);
+  TTurboForthCallStyle = (csForth, csRegister, csPascal, csCdecl, csStdCall, csFastCall);
   TTurboForthCodeFieldStyle = (cfsFunction, cfsVariable);
   TTurboForthCodeFieldStyles = set of TTurboForthCodeFieldStyle;
 
@@ -58,8 +61,14 @@ type
     {## Memory Operation Instruction }
     inStoreInt, 
     inStoreByte, //CStore
+    inStoreWord, //inStoreWord aWord-addr (aWord --)
+    inStoreQWord, //int64, inStoreQWord aQWord-addr (aQWord --)
     inFetchInt,
     inFetchByte, //CFetch
+    inFetchWord, //inFetchWord aWord-addr (-- aWord) 
+    inFetchQWord,
+    //Copies bytes from a source to a destination.
+    inMove, //Move(src-addr, dest-addr, count --) 
 
     {## Arithmatic instructions }
     {## for Integer}

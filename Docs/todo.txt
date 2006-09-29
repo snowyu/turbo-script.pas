@@ -1,7 +1,23 @@
 2006-9-28
 !+ 移植到MeScript
-!+ 构造编译器中的模块类:
-   TTurboModuleSymbol
+!+ 构造编译器中的模块类: uTurboCompiler.pas
+   TTurboModule = Class(TCustomTurboModule)
+     Childs: TTurboModuleList; //被 Parser 使用!
+     Parent: TTurboModule; //同上. nil means root.
+     UsedModules: TList;
+     Words: TTurboWordList;
+     Variables: TTurbovariableList
+     Symbols: TTurboTypeList;
+     //根据编译开关将这些列表的类编译进入Memory. 比如如果该模块的Accessor为DBAccessor,那么就只能使用后期绑定的形式编译.
+     //还有如果该模块的编译开关要求函数分别
+     procedure Compile; 
+     //放到TCustomTurboExecutor中:
+     //property LastWordEntry: PTurboWordEntry;
+     //property LastVariableEntry: PTurboVariableEntry;
+   TCustomTurboWord = Class(TCustomTurboSymbol);
+   TCustomTurboVMWord = Class(TCustomTurboWord); //机器码只有操作符。也许不必考虑机器码。
+   TTurboWord_JMP = Class(TCustomTurboWord); //下划线开始的为VM 机器码.
+  至于类型我准备用uMeTypes的.
 
 2006-9-27
 !+ 建立TurboScript异常处理中心机制

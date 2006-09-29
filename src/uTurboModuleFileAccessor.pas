@@ -26,7 +26,7 @@ type
     function LoadModuleStream(const aModuleName: String; const aStream:
             TStream): Boolean; override;
     function Require(const aModuleName: String; const IsLoaded: Boolean):
-            TCustomTurboExecutor; override;
+            TCustomTurboModule; override;
     property IncludeDirs: string read GetIncludeDirs write SetIncludeDirs;
   end;
 
@@ -64,7 +64,7 @@ begin
 end;
 
 function TTurboModuleFileAccessor.Require(const aModuleName: String; const
-        IsLoaded: Boolean): TCustomTurboExecutor;
+        IsLoaded: Boolean): TCustomTurboModule;
 begin
 end;
 

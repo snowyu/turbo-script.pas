@@ -57,7 +57,7 @@ uses
 
   
 type
-  TTurboX86Interpreter = class(TCustomTurboExecutor)
+  TTurboX86Interpreter = class(TCustomTurboModule)
   private
     FOldEBP: Integer;
     FOldEBX: Integer;
@@ -102,7 +102,7 @@ begin
   {$endif}
   {  PUSH EAX
     PUSH EDX
-    CALL TCustomTurboExecutor.ExecuteCFA
+    CALL TCustomTurboModule.ExecuteCFA
     POP  EDX
     POP  EAX
   }
