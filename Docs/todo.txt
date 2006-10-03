@@ -1,3 +1,37 @@
+2006-10-2
++ 设计语法树类
+   TTurboWord = Class(TCustomTurboModule); //用户自定义单词
+     Childs: TTurboWordList; //被 Parser 使用!
+     Parent: TTurboWord; //同上. nil means root.
+     Variables: TTurbovariableList
+     Symbols: TTurboTypeList;
+     //根据编译开关将这些列表的类编译进入Memory. 比如如果该模块的Accessor为DBAccessor,那么就只能使用后期绑定的形式编译.
+     //还有如果该模块的编译开关要求函数分别
+     procedure Compile; 
+
+   TTurboModule = Class(TTurboWord)
+     UsedModules: TList;
+     Words: TTurboWordList;
+   //TTurboVMWord = Class(TCustomTurboSymbol); //机器码只有操作符。也许不必考虑机器码。
+
+2006-9-29
+* [uTurboAccessor]
+  * rename  uTurboScriptAccessor to uTurboAccessor
+  * RegisterAccessor 放入Module管理器了
+  + GTurboModuleManager
+* rename uTurboScriptConsts to uTurboConsts
+
+通知(释放通知,卸载通知)是否能作为AOP 功能加入?我现在的AOP是基于类添加功能的,换句话说,同一类的不同实例将共享同样的AOP对象.
+通知定义: 当对象实例的某事件发生的时候,通知预定了该事件的对象实例.
+
+看样子我必须将基于实例的AOP功能类早日拿出来,不然够呛(不得不在Feature上区分具体是那一个实例):
+  TMeCustomInstanceFeature = 基于实例的AOP功能类,这样可以为每一对象实例添加新的属性.
+  或者将基于Class的叫做功能类: TMeCustomFeatureClass
+  还有一个方法就是修改VMT, 增加Object记录的大小,这样我就可以存放附加数据了.不过这样的话,必须要小心,在注入前不能有任何已经创建的注入对象!
+  TMeNotificationFeature = Class(TMeCustomInstanceFeature)
+  end;
+
+
 2006-9-28
 !+ 移植到MeScript
 !+ 构造编译器中的模块类: uTurboCompiler.pas

@@ -1,5 +1,5 @@
 {: the turbo script type and constants }
-unit uTurboScriptConsts;
+unit uTurboConsts;
 
 interface
 
@@ -76,7 +76,7 @@ type
     inSubInt, //subtract
     inIncInt, //add 1
     inDecInt, //subtract 1
-    inMULUnsignedInt, //Unsigned multiply 
+    inMULUnsignedInt, //Unsigned multiply(n1, n2 -- int64 ) 
     inDIVInt, //divide
     inIncNInt, //add N
     inDecNInt, //subtract N
@@ -155,13 +155,13 @@ type
 
   Note: the state Must be a Byte for speed!!!
   }
-  TTurboForthProcessorState = (psRunning, psStepping, psCompiling
-    //这些错误可能会同时出现，所以放在这里
-    , errHalt, errOutOfMem, errOutOfDataStack, errOutOfReturnStack 
+  TTurboProcessorState = (psRunning, psStepping, psCompiling
+    , errHalt
   );
-  TTurboForthProcessorStates = set of TTurboForthProcessorState;
-  TTurboForthProcessorErrorCode = (errNone, errBadInstruction, errDizZero
+  TTurboProcessorStates = set of TTurboProcessorState;
+  TTurboProcessorErrorCode = (errNone, errBadInstruction, errDizZero
     , errModuleNotFound
+    , errOutOfMem, errOutOfDataStack, errOutOfReturnStack 
   );
 
   

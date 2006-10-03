@@ -117,6 +117,34 @@ pushInt 2 pushInt 3 AddInt Halt
 而delphi 的 a:= 2+3 运行需要的时间 是 4-7, 只比Delphi慢( (1- (1/16) / (1/9)) * 100 % = 43.75%)。
 现在我用了内存作为状态寄存器（为了能停止），性能下降了. 比Delphi慢了 【 1- (1/18) / (1/9) = 50% ProcessorStates = 1 byte】 【 1 - (1/36)/(1/9) = 75% ProcessorStates = 1 word 】
 
+Luna5: Delphi 1-((1/6.57)/(1/0.61))= 1-0.0928 只是Delphi 性能的 9.28%,比delphi慢了90.72%.
+
+
+-- $Id$
+-- http://www.bagley.org/~doug/shootout/
+-- contributed by Roberto Ierusalimschy
+
+local sum = 0
+for line in io.lines() do
+  sum = sum + line
+end
+print(sum)
+
+Luna5 CPU Time 6.57
+
+Delphi CPU Time: 0.61
+program sumcol;
+var
+  num, tot: integer;
+begin
+  tot:=0;
+  while not Eof(input) do begin
+    readLn(input, num);
+    tot := tot + num;
+  end;
+  WriteLn(tot);
+end.
+
 变量区，代码区，都在FMemory中。
 可以看作是该executor的局部变量（或参数）。
 里面的变量、函数可以有名字，也可以没有。有名字的以链表的形式聚集在一起。

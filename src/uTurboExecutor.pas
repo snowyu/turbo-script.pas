@@ -64,15 +64,15 @@ type
   }
   TCustomTurboModule = class(TCustomTurboObject)
   private
-    FAccessor: TTurboModuleAccessor;
+    FAccessor: TObject;
     FIsLoaded: Boolean;
     function GetLastErrorCode: TTurboForthProcessorErrorCode;
     function GetModuleType: TTurboModuleType;
-    function GetStatus: TTurboForthProcessorStates;
+    function GetStatus: TTurboProcessorStates;
     function GetTIB: string;
     procedure SetMemorySize(Value: Integer);
     procedure SetModuleType(Value: TTurboModuleType);
-    procedure SetStatus(Value: TTurboForthProcessorStates);
+    procedure SetStatus(Value: TTurboProcessorStates);
     procedure SetTIB(Value: string);
   protected
     {: The Code Memory }
@@ -180,7 +180,8 @@ type
     {: Ensures that a object is notified that the executor is going to be
             unloaded. }
     procedure UnloadNotification(aProc: TNotifyEvent);
-    property Accessor: TTurboModuleAccessor read FAccessor write FAccessor;
+    {: the TurboModuleAccessor }
+    property Accessor: TObject read FAccessor write FAccessor;
     { Description
     if not loaded, then only the name and some options loaded but the body(
     Memory).
@@ -255,7 +256,7 @@ type
     {: the Parameter Stack(or data stack) Pointer }
     property SP: Integer read FSP write FSP;
     {: the current status of the script. }
-    property Status: TTurboForthProcessorStates read GetStatus write SetStatus;
+    property Status: TTurboProcessorStates read GetStatus write SetStatus;
     {: the script source(TIB) }
     { Description
     TIB: text input Buffer
@@ -379,7 +380,7 @@ type
 
   //the typecast for code memory area to get the parameters
   TPreservedCodeMemory = packed record
-    States: TTurboForthProcessorStates;
+    States: TTurboProcessorStates;
     Executor: TCustomTurboModule;
     //##abondoned:this Module unique Index in this program, allocated by compiler.
     //##ModuleIndex: Integer;
@@ -393,7 +394,7 @@ type
     ToIn: Integer; //>IN the text buffer current index
     TIBLength: Integer; //#TIB the text buffer length
     TIB: array [0..cMAXTIBCount-1] of char; //'TIB
-    LastErrorCode: TTurboForthProcessorErrorCode;
+    LastErrorCode: TTurboProcessorErrorCode;
     //如果ModuleType是模块，那么就是装载运行该模块前执行的初始化过程，入口地址
     //如果是函数，则是该函数的入口地址
     InitializeProc: Pointer; 
@@ -519,7 +520,7 @@ begin
   Result := PPreservedCodeMemory(FMemory).ModuleType;
 end;
 
-function TCustomTurboModule.GetStatus: TTurboForthProcessorStates;
+function TCustomTurboModule.GetStatus: TTurboProcessorStates;
 begin
   Result := PPreservedCodeMemory(FMemory).States;
 end;
@@ -596,7 +597,7 @@ procedure TCustomTurboModule.Load;
 begin
   if not IsLoaded and Assigned(FAccessor) then
   begin
-    Accessor.LoadModule(Self);
+    TTurboModuleAccessor(FAccessor).LoadModule(Self);
   end;
 end;
 
@@ -654,7 +655,7 @@ end;
 function TCustomTurboModule.RequireModule(const aModuleName: ShortString):
         TCustomTurboModule;
 begin
-  //Result := Lib.Require(aModuleName);
+  Result := GTurboModuleManager.Require(aModuleName, True);
   if Assigned(Result) then
   begin
     Result.UnloadNotification(NotifyModuleUnloaded);
@@ -720,7 +721,7 @@ begin
   PPreservedCodeMemory(FMemory).ModuleType := Value;
 end;
 
-procedure TCustomTurboModule.SetStatus(Value: TTurboForthProcessorStates);
+procedure TCustomTurboModule.SetStatus(Value: TTurboProcessorStates);
 begin
   PPreservedCodeMemory(FMemory).States := Value;
 end;

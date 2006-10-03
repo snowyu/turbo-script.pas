@@ -18,6 +18,8 @@ type
     procedure SetIncludeDirs(const Value: string);
   protected
     FIncludeDirs: TStringList;
+    function iRequire(const aModuleName: String; const IsLoaded: Boolean):
+            TCustomTurboModule; override;
     {: trim invalid includes paths. }
     procedure TrimInvalidPaths;
   public
@@ -25,8 +27,6 @@ type
     destructor Destroy; override;
     function LoadModuleStream(const aModuleName: String; const aStream:
             TStream): Boolean; override;
-    function Require(const aModuleName: String; const IsLoaded: Boolean):
-            TCustomTurboModule; override;
     property IncludeDirs: string read GetIncludeDirs write SetIncludeDirs;
   end;
 
@@ -58,13 +58,13 @@ begin
   Result := FIncludeDirs.DelimitedText;
 end;
 
-function TTurboModuleFileAccessor.LoadModuleStream(const aModuleName: String;
-        const aStream: TStream): Boolean;
+function TTurboModuleFileAccessor.iRequire(const aModuleName: String; const
+        IsLoaded: Boolean): TCustomTurboModule;
 begin
 end;
 
-function TTurboModuleFileAccessor.Require(const aModuleName: String; const
-        IsLoaded: Boolean): TCustomTurboModule;
+function TTurboModuleFileAccessor.LoadModuleStream(const aModuleName: String;
+        const aStream: TStream): Boolean;
 begin
 end;
 
