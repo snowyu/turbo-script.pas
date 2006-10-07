@@ -38,12 +38,12 @@ type
   TTurboScriptOption = (soOptimize, soLoadOnDemand, soBindingRuntime, soBindingCompileTime);
   TTurboScriptOptions = set of TTurboScriptOption;
 
-  TTurboForthVisibility = (fvDefault, fvHide, fvPrivate, fvProtected, fvPublic, fvPublished);
+  TTurboVisibility = (fvHide, fvPrivate, fvProtected, fvPublic, fvPublished);
   //the Forth Execution priority fpHighest means cfsImmediately
-  TTurboForthPriority = (fpLowest, fpLower, fpLow, fpNormal, fpHigh, pfHigher, fpHighest);
-  TTurboForthCallStyle = (csForth, csRegister, csPascal, csCdecl, csStdCall, csFastCall);
-  TTurboForthCodeFieldStyle = (cfsFunction, cfsVariable);
-  TTurboForthCodeFieldStyles = set of TTurboForthCodeFieldStyle;
+  TTurboPriority = (fpLowest, fpLower, fpLow, fpNormal, fpHigh, pfHigher, fpHighest);
+  TTurboCallStyle = (csForth, csRegister, csPascal, csCdecl, csStdCall, csFastCall);
+  TTurboCodeFieldStyle = (cfsFunction, cfsVariable);
+  TTurboCodeFieldStyles = set of TTurboCodeFieldStyle;
 
   { Summary the FORTH Virtual Mache Codes}
   TTurboVMInstruction = (
@@ -58,15 +58,26 @@ type
     inEnterFar, //inEnterFar ModuleMemBase-addr Addr
     inExitFar,  //对于远调用的返回指令必须是该指令! R: (MemoryBase PC -- )
     
+    inPushByte, //in fact it will be expand to int, then inPush Byte (-- n)
+    inPushWord,
+    inPushInt,  // inPushInt Int (-- n)
+    inPushQWord, //two integer(int64).
+    inPopByte, //inPopByte ByteVar-Addr (n --)
+    inPopWord, //inPopWord WordVar-Addr (n --)
+    inPopInt, //inPopInt IntVar-Addr (n --)
+    inPopQWord, //inPopQWord QWordVar-Addr (n --)
+
     {## Memory Operation Instruction }
-    inStoreInt, 
-    inStoreByte, //CStore
-    inStoreWord, //inStoreWord aWord-addr (aWord --)
-    inStoreQWord, //int64, inStoreQWord aQWord-addr (aQWord --)
-    inFetchInt,
+    inStoreInt,  //! Store a Integer,pop data to memory (aInt addr --)
+    inStoreByte, //C! CStore
+    inStoreWord, //inStoreWord  (aWord aWord-addr --)
+    inStoreQWord, //int64, inStoreQWord (aQWord aQWord-addr --)
+    inStoreRP, //RP! Set return stack pointer (addr -- )
+    inFetchInt,  //Fetch, push a integer from memory. (addr -- aInt)
     inFetchByte, //CFetch
-    inFetchWord, //inFetchWord aWord-addr (-- aWord) 
+    inFetchWord, //inFetchWord (aWord-addr -- aWord) 
     inFetchQWord,
+    inFetchRP, //RP@ Push current RP(returnStacck Poiinter) as data (-- RP)
     //Copies bytes from a source to a destination.
     inMove, //Move(src-addr, dest-addr, count --) 
 
@@ -83,13 +94,14 @@ type
 
     {## Logical instructions }
     {## for Integer}
-    inEQUInt,
+    inLess0, //return true if n < 0 (n -- t)
+    inEQUInt, // return true if n1 = n2 (n1 n2 -- t)
     inNEQInt, // not equ
     inLESInt, //less than
     inLEQInt, //less than and equ
     inGERInt, //greater than
     inGEQInt, //greater than and equ
-    inNOTInt, //Negate(NOT)
+    inNOTInt, //Negate(NOT) n (n -- n1)
     inANDInt,
     inORInt,
     inXORInt,
@@ -120,34 +132,31 @@ type
     //Call other module subroutes.
 
     {## data Stack Operation Instuction }
-    inPushByte, //in fact it will be expand to int, then push
-    inPushWord,
-    inPushInt,
-    inPushQWord, //two integer(int64).
-    inPopInt,
-    inDropInt,
-    inDUPInt,
-    inSWAPInt,
-    inOVERInt,
+    inDropInt,  //Discard top of stack (int --) 
+    inDropQWord,  //Discard top of stack (int64 --) 
+    inDUPInt,  //Duplicate the TOS (int -- int int)
+    inSWAPInt, //Exchange top two of stack (int1 int2 -- int2 int1)
+    inOVERInt,  //Duplicate second of stack (i1 i2 -- i1 i2 i1)
     inROTInt
 
     {## Return Stack Operation Instuction }
-    , RPushInt //R(-- int)
-    , RPopInt  //R(int --)
+    , RPushInt //>R: push to return stack  (int --) R(-- int)
+    , RPopInt  //R>: Pop from return stack (-- int) R(int --)
+    , RCopyInt //R@: Copy the TOS of return stack (-- int) R (int -- int)
   ); 
 
   //the Core procedure List, maybe procedure or method.
   {: 核心虚拟指令表 }
   TTurboCoreWords = array [TTurboVMInstruction] of TProcedure;
 
-  TTurboForthWordOptions = packed record //a DWORD
+  TTurboWordOptions = packed record //a DWORD
       //优先级, highest means an IMMEDIATE word
       //1=True; 0=False; Smudge bit. used to prevent FIND from finding this word
       //this can be extent to private, protected, public, etc
-      Precedence: TTurboForthPriority; 
-      Visibility: TTurboForthVisibility; 
-      CallStyle: TTurboForthCallStyle;
-      CodeFieldStyle: TTurboForthCodeFieldStyles;
+      Precedence: TTurboPriority; 
+      Visibility: TTurboVisibility; 
+      CallStyle: TTurboCallStyle;
+      CodeFieldStyle: TTurboCodeFieldStyles;
   end;
   {
   @param errHalt there are some data stil in return stack when Halt, the ESP should be point to

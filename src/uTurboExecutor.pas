@@ -22,6 +22,7 @@ interface
 
 uses
   SysUtils, Classes
+  , uMeTypes
   , uTurboScriptConsts
   ;
 
@@ -342,18 +343,16 @@ type
   PTurboVariableEntry = ^ TTurboVariableEntry;
   PTurboModuleEntry = ^ TTurboModuleEntry;
   PTurboWordEntry = ^ TTurboWordEntry;
-  PTurboSymbolEntry = ^ TTurboSymbolEntry;
+  PTurboTypeInfoEntry = ^ TTurboTypeInfoEntry;
 
   //For type-cast the Mem
   TTurboWordEntry = packed record
     Prior: PTurboWordEntry; //前一个单词 0 means 为最前面。
 
-    Options: TTurboForthWordOptions;
+    Options: TTurboWordOptions;
     //the Param Field Length
     //该函数主体的长度 
     ParamFieldLength: LongWord;
-    {NameLen: Byte;
-    Name: array [0..255] of char;}
     Name: ShortString; //packed
     //Name: String; it's a PChar, the last char is #0
     //the following is ParameterFields   
@@ -365,6 +364,10 @@ type
 
   TTurboVariableEntry = packed record
     Prior: PTurboVariableEntry; 
+    Addr: Pointer;
+    Size: Integer;
+    TypeInfo: PTurboTypeInfoEntry; //TODO: relocate it.
+    Name: ShortString;//packed
   end;
   
   TTurboModuleEntry = packed record
@@ -374,8 +377,13 @@ type
     Name: ShortString; //packed string, the full module name with path.
   end;
 
-  TTurboSymbolEntry = packed record
+  TTurboTypeInfoEntry = packed record
     Prior: PTurboSymbolEntry; //nil means no more
+    //## abondoned following fields are TypeInfo: PMeType
+    //## MeType: Pointer; //PMeType(@TTurboSymbolEntry.MeType) 
+    TypeKind: TMeTypeKind;
+    Name: ShortString; //packed ; maybe nil.
+    //other additional fields}
   end;
 
   //the typecast for code memory area to get the parameters
@@ -405,8 +413,8 @@ type
     LastWordEntry: PTurboWordEntry;
     //有名字的变量链表
     LastVariableEntry: PTurboVariableEntry;
-    //RTTI 符号表 链表
-    LastSymbolEntry: PTurboSymbolEntry;
+    //RTTI TypeInfo 链表
+    LastTypeInfoEntry: PTurboTypeInfoEntry;
   end;
   
   TTurboModuleStreamHeader = packed record
@@ -457,7 +465,7 @@ end;
 
 procedure TCustomTurboModule.ClearMemory;
 begin
-  MemorySize := SizeOf(TPreservedCodeMemory) + cDefaultFreeMemSize;
+  MemorySize := SizeOf(TPreservedCodeMemory); //+ cDefaultFreeMemSize;
   FUsedMemory := SizeOf(TPreservedCodeMemory);
 
   with PPreservedCodeMemory(FMemory)^ do
@@ -837,14 +845,17 @@ type
 procedure TurboConvertEntryRelatedToAbsolute(Mem: Pointer; aEntry: PTurboEntry);
 {$IFDEF PUREPASCAL}
 begin
-  while aEntry.Prior <> nil do
-  begin
-    Integer(aEntry.Prior) := Integer(aEntry.Prior) + Integer(Mem);
-    aEntry := aEntry.Prior;   
-  end;
+  if Assigned(aEntry) then
+    while aEntry.Prior <> nil do
+    begin
+      Integer(aEntry.Prior) := Integer(aEntry.Prior) + Integer(Mem);
+      aEntry := aEntry.Prior;   
+    end;
 end;
 {$ELSE PUREPASCAL}
 asm
+  CMP  EDX, 0
+  JE   @@exit
 @@Loop:
   MOV  ECX, [EDX].TTurboEntry.Prior
   CMP  ECX, 0
@@ -852,6 +863,42 @@ asm
 
   ADD  ECX, EAX
   MOV  [EDX].TTurboEntry.Prior, ECX
+  MOV  EDX, [ECX].TTurboEntry.Prior
+  JMP  @@Loop
+@@exit:
+end;
+{$ENDIF PUREPASCAL}
+
+procedure TurboConvertVarEntryRelatedToAbsolute(Mem: Pointer; aEntry: PTurboVariableEntry);
+{$IFDEF PUREPASCAL}
+begin
+  if Assigned(aEntry) then
+    while aEntry.Prior <> nil do
+    begin
+      Integer(aEntry.Prior) := Integer(aEntry.Prior) + Integer(Mem);
+      if Assigned(aEntry.TypeInfo) then
+        Integer(aEntry.TypeInfo) := Integer(aEntry.TypeInfo) + Integer(Mem);  
+      aEntry := aEntry.Prior;   
+    end;
+end;
+{$ELSE PUREPASCAL}
+asm
+  CMP  EDX, 0
+  JE   @@exit
+@@Loop:
+  MOV  ECX, [EDX].TTurboEntry.Prior
+  CMP  ECX, 0
+  JE   @@exit
+
+  ADD  ECX, EAX
+  MOV  [EDX].TTurboEntry.Prior, ECX
+  CMP  [EDX].TTurboVariableEntry.TypeInfo, 0
+  JE   @@skip
+  MOV  ECX, [EDX].TTurboVariableEntry.TypeInfo
+  ADD  ECX, EAX
+  MOV  [EDX].TTurboVariableEntry.TypeInfo, ECX
+  MOV  ECX, [EDX].TTurboEntry.Prior
+@@skip:  
   MOV  EDX, [ECX].TTurboEntry.Prior
   JMP  @@Loop
 @@exit:
@@ -866,10 +913,11 @@ begin
   if Assigned(Mem.FinalizeProc) then
     Inc(Integer(Mem.FinalizeProc), Integer(Mem));
 
+  //TODO: 
+  TurboConvertEntryRelatedToAbsolute(Mem, Mem.LastTypeInfoEntry);  
+  TurboConvertVarEntryRelatedToAbsolute(Mem, Mem.LastVariableEntry);  
   TurboConvertEntryRelatedToAbsolute(Mem, Mem.LastWordEntry);  
   TurboConvertEntryRelatedToAbsolute(Mem, Mem.LastModuleEntry);  
-  TurboConvertEntryRelatedToAbsolute(Mem, Mem.LastVariableEntry);  
-  TurboConvertEntryRelatedToAbsolute(Mem, Mem.LastSymbolEntry);  
 end;
 {$ELSE PUREPASCAL}
 asm
@@ -886,17 +934,19 @@ asm
   MOV  [EAX].TPreservedCodeMemory.FinalizeProc, EDX
 
 @@Skip2:
+  LEA  EDX, [EAX].TPreservedCodeMemory.LastTypeInfoEntry
+  CALL TurboConvertEntryRelatedToAbsolute 
+
+  LEA  EDX, [EAX].TPreservedCodeMemory.LastVariableEntry
+  CALL TurboConvertVarEntryRelatedToAbsolute 
+
   LEA  EDX, [EAX].TPreservedCodeMemory.LastWordEntry
   CALL TurboConvertEntryRelatedToAbsolute 
 
   LEA  EDX, [EAX].TPreservedCodeMemory.LastModuleEntry
   CALL TurboConvertEntryRelatedToAbsolute 
 
-  LEA  EDX, [EAX].TPreservedCodeMemory.LastVariableEntry
-  CALL TurboConvertEntryRelatedToAbsolute 
 
-  LEA  EDX, [EAX].TPreservedCodeMemory.LastSymbolEntry
-  CALL TurboConvertEntryRelatedToAbsolute 
 end;
 {$ENDIF PUREPASCAL}
 
@@ -905,26 +955,29 @@ procedure TurboConvertEntryAbsoluteToRelated(Mem: Pointer; aEntry: PTurboEntry);
 var
   P: PTurboEntry;
 begin
- 
-  while aEntry.Prior <> nil do
-  begin
-    p := aEntry.Prior;
-    Integer(aEntry.Prior) := Integer(aEntry.Prior) - Integer(Mem);
-    //aEntry.Prior := t;
-    aEntry := P.Prior;   
-  end;
+  if Assigned(aEntry) then
+    while aEntry.Prior <> nil do
+    begin
+      p := aEntry.Prior;
+      Integer(aEntry.Prior) := Integer(aEntry.Prior) - Integer(Mem);
+      //aEntry.Prior := t;
+      aEntry := P.Prior;   
+    end;
 end;
 {$ELSE PUREPASCAL}
 asm
+  CMP  EDX, 0
+  JE   @@exit1
+
   PUSH EBX
-  MOV  ECX, [EDX]
+  MOV  ECX, [EDX].TTurboEntry.Prior
 
   CMP  ECX, 0
   JE   @@exit
 
   MOV  EBX, ECX
   SUB  EBX, EAX
-  MOV  [EDX], EBX
+  MOV  [EDX].TTurboEntry.Prior, EBX
 
 @@Loop:
   MOV  EDX, [ECX].TTurboEntry.Prior
@@ -937,6 +990,65 @@ asm
   JMP  @@Loop
 @@exit:
   POP  EBX
+@@exit1:
+end;
+{$ENDIF PUREPASCAL}
+
+procedure TurboConvertVarEntryAbsoluteToRelated(Mem: Pointer; aEntry: PTurboVariableEntry);
+{$IFDEF PUREPASCAL}
+var
+  P: PTurboVariableEntry;
+begin
+  if Assigned(aEntry) then
+    while aEntry.Prior <> nil do
+    begin
+      p := aEntry.Prior;
+      Integer(aEntry.Prior) := Integer(aEntry.Prior) - Integer(Mem);
+      if Assign(aEntry.TypeInfo) then
+        Integer(aEntry.TypeInfo) := Integer(aEntry.TypeInfo) - Integer(Mem);
+      //aEntry.Prior := t;
+      aEntry := P.Prior;   
+    end;
+end;
+{$ELSE PUREPASCAL}
+asm
+  CMP  ECX, 0
+  JE   @@exit1
+
+  PUSH EBX
+  MOV  ECX, [EDX].TTurboEntry.Prior
+
+  CMP  ECX, 0
+  JE   @@exit
+
+  MOV  EBX, [EDX].TTurboVariableEntry.TypeInfo 
+  CMP  EBX, 0
+  JE   @@skip1
+  SUB  EBX, EAX
+  MOV  [EDX].TTurboVariableEntry.TypeInfo, EBX 
+@@skip1:
+  MOV  EBX, ECX
+  SUB  EBX, EAX
+  MOV  [EDX].TTurboEntry.Prior, EBX
+
+@@Loop:
+  MOV  EDX, [ECX].TTurboEntry.Prior
+  CMP  EDX, 0
+  JE   @@exit
+  MOV  EBX, [ECX].TTurboVariableEntry.TypeInfo 
+  CMP  EBX, 0
+  JE   @@skip
+  SUB  EBX, EAX
+  MOV  [ECX].TTurboVariableEntry.TypeInfo, EBX 
+@@skip:
+  MOV  EBX, EDX
+  SUB  EDX, EAX
+  MOV  [ECX].TTurboEntry.Prior, EDX
+  MOV  ECX, EBX
+  JMP  @@Loop
+@@exit:
+  POP  EBX
+@@exit1:
 end;
 {$ENDIF PUREPASCAL}
 
@@ -950,7 +1062,7 @@ begin
   TurboConvertEntryAbsoluteToRelated(Mem, Mem.LastWordEntry);  
   TurboConvertEntryAbsoluteToRelated(Mem, Mem.LastModuleEntry);  
   TurboConvertEntryAbsoluteToRelated(Mem, Mem.LastVariableEntry);  
-  TurboConvertEntryAbsoluteToRelated(Mem, Mem.LastSymbolEntry);  
+  TurboConvertEntryAbsoluteToRelated(Mem, Mem.LastTypeInfoEntry);  
 end;
 {$ELSE PUREPASCAL}
 asm
@@ -976,7 +1088,7 @@ asm
   LEA  EDX, [EAX].TPreservedCodeMemory.LastVariableEntry
   CALL TurboConvertEntryAbsoluteToRelated 
 
-  LEA  EDX, [EAX].TPreservedCodeMemory.LastSymbolEntry
+  LEA  EDX, [EAX].TPreservedCodeMemory.LastTypeInfoEntry
   CALL TurboConvertEntryAbsoluteToRelated 
 end;
 {$ENDIF PUREPASCAL}

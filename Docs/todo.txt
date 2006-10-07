@@ -1,7 +1,13 @@
+2006-10-5
+* 继续设计 uTurboCompiler 语法树 
+
+2006-10-4
+~ 对于私有Module, 那么该Module 实际上是不存在被合并到Parent
+
 2006-10-2
 + 设计语法树类
    TTurboWord = Class(TCustomTurboModule); //用户自定义单词
-     Childs: TTurboWordList; //被 Parser 使用!
+     Words: TTurboWordList; //嵌套子过程
      Parent: TTurboWord; //同上. nil means root.
      Variables: TTurbovariableList
      Symbols: TTurboTypeList;
@@ -10,9 +16,10 @@
      procedure Compile; 
 
    TTurboModule = Class(TTurboWord)
+     Childs: TTurboModuleList; //被 Parser 使用!
      UsedModules: TList;
-     Words: TTurboWordList;
    //TTurboVMWord = Class(TCustomTurboSymbol); //机器码只有操作符。也许不必考虑机器码。
+   TTurboOpCode
 
 2006-9-29
 * [uTurboAccessor]

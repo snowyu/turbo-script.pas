@@ -6,6 +6,8 @@ Feature:
   * 平台无关：采用 Forth Virtual Machine Codes 指令集；
   * 高速执行：各种 TurboExecutor 可以根据 VM codes 翻译成不同CPU的真实指令集，直接运行，也有解释执行的Executor类。
   * TurboInterpreter： 以解释方式执行VMCode是基于x86 机器代码优化，执行速度直逼C++，Delphi等高级编译语言。
+    * 可以在脚本中调用宿主程序或DLL中的函数(支持Register, pascal, stdcall, cdecl, fastcall调用约定)
+    * 可以在宿主程序调用脚本中的任一过程!
 
 
 == Forth代码区流（文件）镜像 ==
@@ -100,7 +102,7 @@ iVMNext:
 Forth执行器的核心, 装入指令，调度指令
 
 iVMEnter:
-用户自定义函数入口，由 iVMNext 在进入用户自定义函数前调用
+用户自定义私有函数入口，由 iVMNext 在进入用户自定义函数前调用
 push the current IP(ESI),set the new IP, and run the vmNext
 
 iVMExit:
@@ -109,6 +111,15 @@ pop to the IP(ESI),and run the vmNext.
 
 iVMHalt: 
 终止Forth机器执行.
+
+EnterFar:  MemBase-addr(另一模块的内存基址) cfa-addr 
+调用本地用户非私有函数(可以被其它模块调用的)入口
+
+ExitFar
+用户非私有函数(可以被其它模块调用的)本地出口
+
+iVMCallFar: PTurboModuleEntry cfa-addr
+调用其它模块的用户非私有函数(可以被其它模块调用的)
 
 ==== 流程控制指令 ====
 Flow Control Directives
@@ -122,7 +133,7 @@ ESP: 返回堆栈指针.记住压入减少，弹出增加地址。
 EBP: 数据栈指针，基址指针放在内存某个单元中。所以EBP总是指向次栈顶。
 EDX: 为数据栈栈顶。 
 ESI: 指向当前指令地址
-EBX: 状态寄存器 (0Bit: 是否运行；1Bit:是否调试) TTurboForthStates = set of TTurboForthState; TTurboForthState = (tfsRunning, tfsDebugging, tfsCompiling)
+EBX: 状态寄存器 (0Bit: 是否运行；1Bit:是否调试) TTurboProcessorStates = set of TTurboProcessorState; TTurboProcessorState = (psRunning, psDebugging, psCompiling)
 EAX: W Register 临时寄存器
 ECX: 临时寄存器
 EDI: FMemory基址
