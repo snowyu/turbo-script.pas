@@ -67,18 +67,21 @@ type
   private
     FAccessor: TObject;
     FIsLoaded: Boolean;
+    FParent: TCustomTurboModule;
     function GetLastErrorCode: TTurboForthProcessorErrorCode;
+    function GetMemorySize: Integer;
     function GetModuleType: TTurboModuleType;
     function GetStatus: TTurboProcessorStates;
     function GetTIB: string;
+    function GetUsedMemory: Integer;
     procedure SetMemorySize(Value: Integer);
     procedure SetModuleType(Value: TTurboModuleType);
     procedure SetStatus(Value: TTurboProcessorStates);
     procedure SetTIB(Value: string);
+    procedure SetUsedMemory(Value: Integer);
   protected
     {: The Code Memory }
     FMemory: Pointer;
-    FMemorySize: Integer;
     FModuleDate: TTimeStamp;
     FModuleUnloadNotifies: TList;
     FModuleVersion: LongWord;
@@ -108,20 +111,7 @@ type
     FTIBIndex : Text[FTIBIndex]
     }
     FTextIndex: Integer;
-    FUsedMemory: Integer;
-    {: Finalize after the execution. }
-    procedure FinalizeExecution; virtual;
     procedure Grow;
-    {: : Run the CFA word. }
-    { Description
-    internal proc, not init.
-
-    @param aCFA the Code Field Address(related to FMemory).
-    相对于FMemory的偏移量。
-    }
-    function iExecuteCFA(const aCFA: Integer): Integer; virtual;
-    {: Init before the Execution. }
-    procedure InitExecution; virtual;
     procedure SendUnloadNotification;
   public
     constructor Create; virtual;
@@ -133,22 +123,6 @@ type
     procedure AddIntToMem(const aInt: Integer);
     {: reduce the memory size to initialization state }
     procedure ClearMemory;
-    {: : Run the CFA word. }
-    { Description
-    internal proc, not init.
-
-    @param aCFA the Code Field Address(related to FMemory).
-    相对于FMemory的偏移量。
-    }
-    function ExecuteCFA(const aCFA: Integer): Integer;
-    {: : Run the Virtual Machine. }
-    { Description
-    Run the Virtual Machine from the PC adress.
-
-    @param aCFA the Code Field Address(related to FMemory).
-    相对于FMemory的偏移量。
-    }
-    function ExecuteWord(const aWord: string): Integer;
     function FindUnloadNotification(aProc: TNotifyEvent): Integer;
     function GetWordCFA(const aWord: string): Integer; virtual;
     {: Load the body into the memory. }
@@ -175,7 +149,8 @@ type
     procedure Reset;
     {: save FMemory to stream }
     procedure SaveToStream(const aStream: TStream);
-    procedure Stop;
+    {: 是否被存放在Parent 中. }
+    function StoredInParent: Boolean;
     {: unload from memory }
     procedure Unload;
     {: Ensures that a object is notified that the executor is going to be
@@ -195,7 +170,7 @@ type
     { Description
     warining: if in the running status, you may be get trouble!!
     }
-    property MemorySize: Integer read FMemorySize write SetMemorySize;
+    property MemorySize: Integer read GetMemorySize write SetMemorySize;
     { Description
     (The ModuleDate field indicates the number of calendar days since the start
     of the calendar (the number of days since 1/1/0001 plus one).)
@@ -221,6 +196,11 @@ type
     }
     property ParameterStackSize: Integer read FParameterStackSize write
             FParameterStackSize;
+    {: 它的父亲:被 Parser 或Tree使用. nil means root. }
+    { Description
+    如果该模块是私有的,那么内存就是使用的父亲的内存.
+    }
+    property Parent: TCustomTurboModule read FParent write FParent;
     {: : program counter. }
     { Description
     program counter, which contains the address 
@@ -268,7 +248,7 @@ type
     也就是指向最大的可用内存：
     从该地址起的内存未用：FMemory[UsedMemory] 
     }
-    property UsedMemory: Integer read FUsedMemory write FUsedMemory;
+    property UsedMemory: Integer read GetUsedMemory write SetUsedMemory;
   end;
 
   {: the abstract turbo script executor. }
@@ -292,6 +272,37 @@ type
   Note:为了避免重新计算地址，全部采用相对偏移量！
   }
   TCustomTurboExecutor = class(TCustomTurboModule)
+  protected
+    {: Finalize after the execution. }
+    procedure FinalizeExecution; virtual;
+    {: : Run the CFA word. }
+    { Description
+    internal proc, not init.
+
+    @param aCFA the Code Field Address(related to FMemory).
+    相对于FMemory的偏移量。
+    }
+    function iExecuteCFA(const aCFA: Integer): Integer; virtual;
+    {: Init before the Execution. }
+    procedure InitExecution; virtual;
+  public
+    {: : Run the CFA word. }
+    { Description
+    internal proc, not init.
+
+    @param aCFA the Code Field Address(related to FMemory).
+    相对于FMemory的偏移量。
+    }
+    function ExecuteCFA(const aCFA: Integer): Integer;
+    {: : Run the Virtual Machine. }
+    { Description
+    Run the Virtual Machine from the PC adress.
+
+    @param aCFA the Code Field Address(related to FMemory).
+    相对于FMemory的偏移量。
+    }
+    function ExecuteWord(const aWord: string): Integer;
+    procedure Stop;
   end;
 
   TTurboProgram = class(TObject)
@@ -399,6 +410,8 @@ type
     ReturnStackBase: Pointer;
     ReturnStackSize: Integer; //bytes
     ReturnStackBottom: Pointer;
+    UsedMemory: Integer;
+    MemorySize: Integer; 
     ToIn: Integer; //>IN the text buffer current index
     TIBLength: Integer; //#TIB the text buffer length
     TIB: array [0..cMAXTIBCount-1] of char; //'TIB
@@ -448,7 +461,6 @@ begin
 
   FreeMem(FMemory);
   FMemory := nil;
-  FMemorySize := 0;
   inherited Destroy;
 end;
 
@@ -456,17 +468,17 @@ procedure TCustomTurboModule.AddIntToMem(const aInt: Integer);
 var
   p: Pointer;
 begin
-  if FUsedMemory >= FMemorySize then
+  if PPreservedCodeMemory(FMemory).UsedMemory >= MemorySize then
     Grow;
-  Integer(p) := Integer(FMemory) + FUsedMemory;
+  Integer(p) := Integer(FMemory) + PPreservedCodeMemory(FMemory).UsedMemory;
   PInteger(P)^ := aInt;
-  Inc(FUsedMemory, SizeOf(Integer));
+  Inc(PPreservedCodeMemory(FMemory).UsedMemory, SizeOf(Integer));
 end;
 
 procedure TCustomTurboModule.ClearMemory;
 begin
   MemorySize := SizeOf(TPreservedCodeMemory); //+ cDefaultFreeMemSize;
-  FUsedMemory := SizeOf(TPreservedCodeMemory);
+  UsedMemory := SizeOf(TPreservedCodeMemory);
 
   with PPreservedCodeMemory(FMemory)^ do
   begin
@@ -478,29 +490,6 @@ begin
   end;
 
   IsLoaded := False;
-end;
-
-function TCustomTurboModule.ExecuteCFA(const aCFA: Integer): Integer;
-begin
-  InitExecution;
-  Result := iExecuteCFA(aCFA);
-  FinalizeExecution;
-end;
-
-function TCustomTurboModule.ExecuteWord(const aWord: string): Integer;
-var
-  aCFA: Integer;
-begin
-  aCFA := GetWordCFA(aWord);
-  if aCFA >=0 then
-    Result := ExecuteCFA(aCFA)
-  else
-    Result := -1;
-end;
-
-procedure TCustomTurboModule.FinalizeExecution;
-begin
-  //Apply the SP to TProgram.SP.
 end;
 
 function TCustomTurboModule.FindUnloadNotification(aProc: TNotifyEvent):
@@ -521,6 +510,11 @@ end;
 function TCustomTurboModule.GetLastErrorCode: TTurboForthProcessorErrorCode;
 begin
   Result := PPreservedCodeMemory(FMemory).LastErrorCode;
+end;
+
+function TCustomTurboModule.GetMemorySize: Integer;
+begin
+  Result := PPreservedCodeMemory(FMemory).MemorySize;
 end;
 
 function TCustomTurboModule.GetModuleType: TTurboModuleType;
@@ -547,6 +541,11 @@ begin
     Result := '';
 end;
 
+function TCustomTurboModule.GetUsedMemory: Integer;
+begin
+  Result := PPreservedCodeMemory(FMemory).UsedMemory;
+end;
+
 function TCustomTurboModule.GetWordCFA(const aWord: string): Integer;
 begin
   Result := -1;
@@ -554,51 +553,7 @@ end;
 
 procedure TCustomTurboModule.Grow;
 begin
-  MemorySize := FMemorySize + FMemorySize div 4;
-end;
-
-function TCustomTurboModule.iExecuteCFA(const aCFA: Integer): Integer;
-begin
-  Result := -1;
-  //if (psRunning in Status) then
-    //raise ETurboScriptError.CreateRes(@rsTurboScriptAlreayRunningError);
-end;
-
-procedure TCustomTurboModule.InitExecution;
-begin
-  if not FIsLoaded then
-    raise ETurboScriptError.CreateRes(@rsTurboScriptNotLoadedError);
-
-  if (psRunning in Status) then
-    raise ETurboScriptError.CreateRes(@rsTurboScriptAlreayRunningError);
-
-  //MemorySize := cLastWordEntryOffset + cDefaultFreeMemSize;
-  //FUsedMemory := cLastWordEntryOffset;
-  {
-  with PPreservedCodeMemory(FMemory)^ do
-  begin
-    Executor := Self;
-    TIBLength := 0;
-    ToIn := 0;
-    TIB[0] := #0;
-    LastErrorCode := errNone;
-  end;
-  //FParameterStack := Prog.ParameterStack;
-  //FParamStackSize := Prog.ParameterStackSize*SizeOf(Pointer);
-  PPreservedCodeMemory(FMemory).ParamStackBase := FParameterStack;
-  PPreservedCodeMemory(FMemory).ParamStackSize := FParameterStackSize;
-  //if SP = 0 then
-    SP := Integer(FParameterStack) + FParameterStackSize;
-
-  //FReturnStack := Prog.Stack;
-  //FReturnStackSize := Prog.StackSize*SizeOf(Pointer);
-  PPreservedCodeMemory(FMemory).ReturnStackBase := FReturnStack;
-  PPreservedCodeMemory(FMemory).ReturnStackSize := FReturnStackSize;
-  //if RP = 0 then
-    RP := Integer(FReturnStack) + FReturnStackSize;
-  //}
-
-  Include(PPreservedCodeMemory(FMemory).States, psRunning);
+  MemorySize := MemorySize + MemorySize div 4;
 end;
 
 procedure TCustomTurboModule.Load;
@@ -717,10 +672,10 @@ end;
 
 procedure TCustomTurboModule.SetMemorySize(Value: Integer);
 begin
-  if FMemorySize <> Value then
+  if PPreservedCodeMemory(FMemory).MemorySize <> Value then
   begin
-    FMemorySize := Value;
-    ReallocMem(FMemory, FMemorySize);
+    PPreservedCodeMemory(FMemory).MemorySize := Value;
+    ReallocMem(FMemory, Value);
   end;
 end;
 
@@ -757,9 +712,17 @@ begin
   end;
 end;
 
-procedure TCustomTurboModule.Stop;
+procedure TCustomTurboModule.SetUsedMemory(Value: Integer);
 begin
-  Exclude(PPreservedCodeMemory(FMemory).States, psRunning);
+  if Value < SizeOf(TPreservedCodeMemory) then
+    Value  := SizeOf(TPreservedCodeMemory);
+  PPreservedCodeMemory(FMemory).UsedMemory := Value;
+end;
+
+function TCustomTurboModule.StoredInParent: Boolean;
+begin
+  Result := Assigned(Parent) and
+     ((Parent.ModuleType = mtFunction) or (Visibility <= fvPrivate));
 end;
 
 procedure TCustomTurboModule.Unload;
@@ -778,6 +741,81 @@ begin
     FModuleUnloadNotifies.Insert(0, Pointer(TMethod(aProc).Data));
     FModuleUnloadNotifies.Insert(0, Pointer(TMethod(aProc).Code));
   end;
+end;
+
+{
+***************************** TCustomTurboExecutor *****************************
+}
+function TCustomTurboExecutor.ExecuteCFA(const aCFA: Integer): Integer;
+begin
+  InitExecution;
+  Result := iExecuteCFA(aCFA);
+  FinalizeExecution;
+end;
+
+function TCustomTurboExecutor.ExecuteWord(const aWord: string): Integer;
+var
+  aCFA: Integer;
+begin
+  aCFA := GetWordCFA(aWord);
+  if aCFA >=0 then
+    Result := ExecuteCFA(aCFA)
+  else
+    Result := -1;
+end;
+
+procedure TCustomTurboExecutor.FinalizeExecution;
+begin
+  //Apply the SP to TProgram.SP.
+end;
+
+function TCustomTurboExecutor.iExecuteCFA(const aCFA: Integer): Integer;
+begin
+  Result := -1;
+  //if (psRunning in Status) then
+    //raise ETurboScriptError.CreateRes(@rsTurboScriptAlreayRunningError);
+end;
+
+procedure TCustomTurboExecutor.InitExecution;
+begin
+  if not FIsLoaded then
+    raise ETurboScriptError.CreateRes(@rsTurboScriptNotLoadedError);
+
+  if (psRunning in Status) then
+    raise ETurboScriptError.CreateRes(@rsTurboScriptAlreayRunningError);
+
+  //MemorySize := cLastWordEntryOffset + cDefaultFreeMemSize;
+  //FUsedMemory := cLastWordEntryOffset;
+  {
+  with PPreservedCodeMemory(FMemory)^ do
+  begin
+    Executor := Self;
+    TIBLength := 0;
+    ToIn := 0;
+    TIB[0] := #0;
+    LastErrorCode := errNone;
+  end;
+  //FParameterStack := Prog.ParameterStack;
+  //FParamStackSize := Prog.ParameterStackSize*SizeOf(Pointer);
+  PPreservedCodeMemory(FMemory).ParamStackBase := FParameterStack;
+  PPreservedCodeMemory(FMemory).ParamStackSize := FParameterStackSize;
+  //if SP = 0 then
+    SP := Integer(FParameterStack) + FParameterStackSize;
+
+  //FReturnStack := Prog.Stack;
+  //FReturnStackSize := Prog.StackSize*SizeOf(Pointer);
+  PPreservedCodeMemory(FMemory).ReturnStackBase := FReturnStack;
+  PPreservedCodeMemory(FMemory).ReturnStackSize := FReturnStackSize;
+  //if RP = 0 then
+    RP := Integer(FReturnStack) + FReturnStackSize;
+  //}
+
+  Include(PPreservedCodeMemory(FMemory).States, psRunning);
+end;
+
+procedure TCustomTurboExecutor.Stop;
+begin
+  Exclude(PPreservedCodeMemory(FMemory).States, psRunning);
 end;
 
 {

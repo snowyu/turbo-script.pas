@@ -79,7 +79,8 @@ type
     inFetchQWord,
     inFetchRP, //RP@ Push current RP(returnStacck Poiinter) as data (-- RP)
     //Copies bytes from a source to a destination.
-    inMove, //Move(src-addr, dest-addr, count --) 
+    inMove, //Move(src-addr, dest-addr, count --)
+    inALLOT, //Allocate n bytes : usedMemory+n (n --) 
 
     {## Arithmatic instructions }
     {## for Integer}
@@ -87,10 +88,21 @@ type
     inSubInt, //subtract
     inIncInt, //add 1
     inDecInt, //subtract 1
-    inMULUnsignedInt, //Unsigned multiply(n1, n2 -- int64 ) 
-    inDIVInt, //divide
+    inUMULInt, //UM* Unsigned multiply(un1, un2 -- u-int64 ) 
+    inMULInt, //(n n -- n)
+    inMULInt64, //(n n -- int64)
+    inDIVInt, //divide (n n -- q)
+    inModInt, //(n n -- r)
+    inDivModInt, //(n n -- r q)
+    inDivModInt64, //M/Mod (int64 n -- r q) int64/n
+    inUDivModInt64, //UM/Mod (unsigned-int64 n -- unsigned-r unsigned-q)
+    inMULDIVMODInt, //n1*n2/n3 (n1 n2 n3 -- r q)
+    InMULDIVInt, // n1*n2/n3 (n1 n2 n3 -- q)
     inIncNInt, //add N
     inDecNInt, //subtract N
+    inMinInt, //Return the smaller of top two n1<n2 (n1,n2 -- n1)
+    inMaxInt, //Return the bigger of top two n1<n2 (n1,n2 -- n2)
+    inWithinUnsignedInt, //( u ul uh -- t )          Return true if ul <= u < uh …^égƒÈ
 
     {## Logical instructions }
     {## for Integer}
@@ -101,11 +113,14 @@ type
     inLEQInt, //less than and equ
     inGERInt, //greater than
     inGEQInt, //greater than and equ
-    inNOTInt, //Negate(NOT) n (n -- n1)
+    inNOTInt, //logic NOT n (n -- n1)
     inANDInt,
     inORInt,
     inXORInt,
-
+    inNEGATEInt, // Two's complement of top of stack (n -- -n)
+    inNegateInt64, // Two's complement of top of stack (int64 -- -int64)
+    inABS, //(n -- |n|)
+    
     {## Proc Operation Instruction: Flow Control }
     inJMP, //JUMP Absolute address(related to FMemory)
     //inJMPByte, //JMP aByteInt(shortint offset) 
@@ -143,6 +158,7 @@ type
     , RPushInt //>R: push to return stack  (int --) R(-- int)
     , RPopInt  //R>: Pop from return stack (-- int) R(int --)
     , RCopyInt //R@: Copy the TOS of return stack (-- int) R (int -- int)
+
   ); 
 
   //the Core procedure List, maybe procedure or method.

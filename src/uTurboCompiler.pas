@@ -30,7 +30,6 @@ type
   TTurboWordSymbol = class;
   TCustomTurboWord = class(TCustomTurboModule)
   private
-    FParent: TCustomTurboWord;
     FSymbols: TList;
     FUsedModules: TList;
     FVariables: TList;
@@ -51,9 +50,6 @@ type
       Options
     }
     procedure Compile; virtual;
-    function StoredInParent: Boolean;
-    {: 它的父亲:被 Parser 或Tree使用. nil means root. }
-    property Parent: TCustomTurboWord read FParent write FParent;
     property Symbols: TList read FSymbols write FSymbols;
     property UsedModules: TList read FUsedModules write FUsedModules;
     property Variables: TList read FVariables write FVariables;
@@ -264,11 +260,6 @@ end;
 class procedure TCustomTurboWord.InitModuleType;
 begin
   FModuleType := mtUnknown;
-end;
-
-function TCustomTurboWord.StoredInParent: Boolean;
-begin
-  Result := (Parent.ModuleType = mtFunction) or (Visibility <= fvPrivate);
 end;
 
 {
