@@ -1,3 +1,64 @@
+2006-10-13
+~ [COCO/R]
+  如何获得当前的分析处的字符串!
+  使用 TParser.LexString 函数
+  例子:
+
+SQLName <var aName : string> 
+      =
+           ident                                                                (. aName := LexString; .) 
+           | SQLNameString                                                      (. aName := StripQuotes(LexString); .)
+
+AssertStatement<Parent: TnxSqlNode; var Assertion: TnxSqlRootNode>              (. var TableName: string; .)
+  =                                                                             (. Assertion := TnxSqlAssertion.Create(Parent); .)
+    "ASSERT" "TABLE" SQLName<TableName>                                         (. TnxSqlAssertion(Assertion).TableName1 := TableName; .)
+    "=" "TABLE" SQLName<TableName>                                              (. TnxSqlAssertion(Assertion).TableName2 := TableName; .)
+
+  {} 表示 0个 或任意个.
+2006-10-12
+~  heap 使用Delphi的heap和相应的函数，字符串管理也使用Delphi的。
+
+2006-10-11
+!+ 定义汇编语言,编写汇编语言编译器.
+   支持的类型: Byte, Word, DWord, Integer, Char, ShortString, AnsiString
+   不支持自定义类型
+   决定采用类似于Delphi的结构,而不是类似于汇编的.
+   
+   [标号] 操作码 [操作数]
+   [[Published] 标号] DB [初值[,初值,初值]] //预留Byte 发布的将联入变量表 
+   [标号] DW [初值] //预留字
+   [标号] DDW [初值] //预留双字 
+   [标号] DSS ['字符串初值'|Length] //预留短字符串 
+   [标号] DS ['字符串初值'] //预留AnsiString字符串 
+   :[Published] DefinedWord 
+   ;
+
+  类似于Delphi的:
+  Lib aName;
+  Const aConstName = Value;
+  [Published] Var aVarName: Type [= InitValue];
+  : [Published] DefinedWord
+     [标号] 操作码 [操作数]
+  ;
+  
+  initilization
+  finalization
+  End. //lib 
+
+2006-10-9
+~ [语法树] 
+  如果是模块,首先编译使用的模块列表(UsedModules)
+  首先需要编译有些Types信息(已经发布的RTTI, 并不是动态绑定的类型)进入内存 TTurboTypeSymbolList.Compile;
+  {$TYPEINFO ON}, {$DynamicBinding ON}
+  接着编译变量和类型常量进入内存.如果是$TYPEINFO ON,并且该类型也是发布的那么该变量的类型指针也被编入,否则如果只有变量是发布的,那么将只是TMeTypeKind的值被编入指示其基本类型; 动态绑定的变量不会编入内存!
+  接着编入子过程,如果不是StoredInParent并且发现名为@@__Initilization__@@ 和 @@__Finalization__@@ 的过程则将相对地址连入保留内存!
+  最后如果是过程,那么就编译自己,如果是模块,那么就编译子模块.
+
+~ 源程序文件与数据库的同步问题?
+  当通过语法树产生虚拟机器码的时候,如果数据库有效,是否需要将它们同步到数据库中?
+  不需要在此时吧,提供一个方法,在编译成功后,调用该方法就可以保存到数据库中.
+  其实就是更改AccessorMgr上的默认Accessor指向DBAccessor,然后save 即可.
+
 2006-10-5
 * 继续设计 uTurboCompiler 语法树 
 

@@ -10,7 +10,7 @@ interface
 
 uses
   SysUtils, Classes
-  , uTurboScriptConsts
+  , uTurboConsts
   , uTurboExecutor 
   ;
 
@@ -105,6 +105,11 @@ function GTurboModuleAccessors: TTurboModuleAccessorList;
 
 implementation
 
+var
+  FTurboModuleAccessors: TTurboModuleAccessorList;
+  FTurboModuleMgr: TTurboModuleManager;
+  
+
 {
 ***************************** TTurboModuleAccessor *****************************
 }
@@ -176,7 +181,7 @@ begin
   For i := 0 to FModules.Count - 1 do
   begin
     Result := TCustomTurboModule(FModules[i]);
-    if Result.Name = aMoudleName then
+    if Result.Name = aModuleName then
     begin
       if IsLoaded and not Result.IsLoaded then
         Result.Load;
@@ -184,7 +189,7 @@ begin
     end;
   end;
 
-  for i := 0 to GTurboModuleAccessorClasses.Count - 1 do
+  for i := 0 to GTurboModuleAccessors.Count - 1 do
   begin
     Result := TTurboModuleAccessor(FTurboModuleAccessors[i]).Require(aModuleName, IsLoaded);
     if Result <> nil then
@@ -216,7 +221,7 @@ begin
         FreeAndNil(vAccessor);
         raise;
       end;
-      if IsDefault then DefaultModuleAccessor := vAccessor;
+      if IsDefault then DefaultAccessor := vAccessor;
       Result := True;
     end;
   end;
@@ -262,10 +267,6 @@ begin
 end;
 
 
-var
-  FTurboModuleAccessors: TTurboModuleAccessorList;
-  FTurboModuleMgr: TTurboModuleManager;
-  
 
 function GTurboModuleManager: TTurboModuleManager;
 begin
@@ -286,7 +287,7 @@ begin
 end;
 
 initialization
-  FTurboModuleAccessorClasses := TTurboModuleAccessorList.Create;
+  FTurboModuleAccessors := TTurboModuleAccessorList.Create;
 finalization
-  FreeAndNil(FTurboModuleAccessorClasses);
+  FreeAndNil(FTurboModuleAccessors);
 end.

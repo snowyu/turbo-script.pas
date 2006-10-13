@@ -22,6 +22,92 @@ Feature:
 对于存放于数据库中的模块名称，如果以流中的名称为准，那么改名字的时候就麻烦了，因为是Full Name,如果路径有改变，流中的名称也要改！！
 所以在流中不设模块名称，模块名称由Accessor单独处理！
 
+== Forth代码源文件编写指南 ==
+
+=== 库文件 ===
+类似于Delphi的:
+Lib aName;
+  Const aConstName = Value;
+  [Published] Var aVarName: Type [= InitValue];
+  : [Published] DefinedWord
+     [标号] 操作码 [操作数]
+  ;
+  
+  initilization
+  finalization
+End. //lib 
+
+
+==== 文法产生式 ====
+IGNORE CASE
+
+CHARACTERS
+  eol     = CHR(13) .
+  Special = '"' + "%&'()*+,-./:;<=>?|[]". 
+  Digit   = "0123456789" .
+  HexDigit = "0123456789ABCDEF" .
+  Letter  = CHR(33)..CHR(255) - Special - Digit .
+  noQuote = ANY - "'" .
+  noDblQuote = ANY - '"' .               
+
+TOKENS
+  IdentName     = Letter { Letter | Digit }.
+  integer_  = Digit { Digit }.
+  HexNumber = "$" HexDigit {HexDigit}.
+  float_    = [Digit { Digit }] "." Digit { Digit } [ 'E' [ ('+' | '-') ] Digit { Digit } ].
+  String = "'" { noQuote | "''" } "'" .
+  //String2 = '"' { noDblQuote } '"' . 
+  //BlobString = '[' HexDigit HexDigit { HexDigit HexDigit } ']'.
+  CharNumber = "#" digit{digit} | "#" digit{digit}.
+
+PRODUCTIONS
+
+Lib = 
+  "Lib" IdentName  ";"
+  [Declaration{";" Declaration}]
+  ["Initilization"]
+  ["Finalization"]
+  "End."
+
+Declaration = 
+  ConstDeclaration
+  |VarDeclaration
+  |WordDeclaration
+
+ConstDeclaration = 
+  "Const" IdentName "=" Value
+
+VarDeclaration = 
+  "Var" IdentName ":" TypeName ["=" Value]
+
+WordDeclaration =
+  ":" [Visibility] IdentName
+  [Statement { Statement}]
+  ";" 
+
+Statement = 
+  [LabelDeclaration] 
+   PushIntStatement
+  |AddIntStatement
+
+Value = 
+  IdentName
+  |Integer_
+  |Float_
+  |String
+
+Visibility =
+  "Published"
+  |"Public"
+
+TypeName =
+   "Byte"
+  |"Char"
+  |"Word"
+  |"DWord"
+  |"Integer"
+  |"String"
+  |"ShortString"
 
 == Forth代码区内存镜像(TCustomTurboExecutor.Memory) ==
 
@@ -120,6 +206,9 @@ ExitFar
 
 iVMCallFar: PTurboModuleEntry cfa-addr
 调用其它模块的用户非私有函数(可以被其它模块调用的)
+
+iVMCallExt: PTurboWordEntry
+通用的调用函数, 可以调用 外部过程(Register,pascal, stdcall, fastcall 约定)
 
 ==== 流程控制指令 ====
 Flow Control Directives

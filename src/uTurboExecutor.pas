@@ -23,7 +23,7 @@ interface
 uses
   SysUtils, Classes
   , uMeTypes
-  , uTurboScriptConsts
+  , uTurboConsts
   ;
 
 type
@@ -68,7 +68,8 @@ type
     FAccessor: TObject;
     FIsLoaded: Boolean;
     FParent: TCustomTurboModule;
-    function GetLastErrorCode: TTurboForthProcessorErrorCode;
+    FVisibility: TTurboVisibility;
+    function GetLastErrorCode: TTurboProcessorErrorCode;
     function GetMemorySize: Integer;
     function GetModuleType: TTurboModuleType;
     function GetStatus: TTurboProcessorStates;
@@ -163,7 +164,7 @@ type
     Memory).
     }
     property IsLoaded: Boolean read FIsLoaded write FIsLoaded;
-    property LastErrorCode: TTurboForthProcessorErrorCode read GetLastErrorCode;
+    property LastErrorCode: TTurboProcessorErrorCode read GetLastErrorCode;
     {: The Code Memory }
     property Memory: Pointer read FMemory write FMemory;
     {: : the Memory Size. }
@@ -249,6 +250,7 @@ type
     从该地址起的内存未用：FMemory[UsedMemory] 
     }
     property UsedMemory: Integer read GetUsedMemory write SetUsedMemory;
+    property Visibility: TTurboVisibility read FVisibility write FVisibility;
   end;
 
   {: the abstract turbo script executor. }
@@ -312,7 +314,7 @@ type
     FParameterStackSize: Integer;
     FReturnStack: Pointer;
     FReturnStackSize: Integer;
-    FStatus: TTurboForthProcessorStates;
+    FStatus: TTurboProcessorStates;
     procedure SetExecutor(const Value: TCustomTurboModule);
     procedure SetParameterStackSize(const Value: Integer);
     procedure SetReturnStackSize(const Value: Integer);
@@ -346,7 +348,7 @@ type
     property ReturnStackSize: Integer read FReturnStackSize write
             SetReturnStackSize;
     {: the current status of the script. }
-    property Status: TTurboForthProcessorStates read FStatus write FStatus;
+    property Status: TTurboProcessorStates read FStatus write FStatus;
   end;
 
 
@@ -356,6 +358,10 @@ type
   PTurboWordEntry = ^ TTurboWordEntry;
   PTurboTypeInfoEntry = ^ TTurboTypeInfoEntry;
 
+  TTurboExteralWordPFA = packed record
+    ParamCount: Integer; 
+    TypeInfo: PTurboTypeInfoEntry;  //nil means no RTTI info. the address is related.
+  end;
   //For type-cast the Mem
   TTurboWordEntry = packed record
     Prior: PTurboWordEntry; //前一个单词 0 means 为最前面。
@@ -365,6 +371,13 @@ type
     //该函数主体的长度 
     ParamFieldLength: LongWord;
     Name: ShortString; //packed
+    {if CallStyle <> csForth then //external procedure
+      //PFA: TTurboExteralWordPFA
+      //ForStack 以Integer为单位的，不是真正意义上的参数个数
+      //这些参数将从数据栈弹出
+      ParamCount: Integer; 
+      TypeInfo: PTuroboTypeInfoEntry;  //nil means no RTTI info. the address is related.
+    }
     //Name: String; it's a PChar, the last char is #0
     //the following is ParameterFields   
     //其实就是直接指向的某个单词的PFA，不过那个单词的PFA就是直接执行的机器码而已。
@@ -389,7 +402,7 @@ type
   end;
 
   TTurboTypeInfoEntry = packed record
-    Prior: PTurboSymbolEntry; //nil means no more
+    Prior: PTurboTypeInfoEntry; //nil means no more
     //## abondoned following fields are TypeInfo: PMeType
     //## MeType: Pointer; //PMeType(@TTurboSymbolEntry.MeType) 
     TypeKind: TMeTypeKind;
@@ -442,7 +455,7 @@ procedure TurboConvertAddrAbsoluteToRelated(Mem: PPreservedCodeMemory);
 implementation
 
 uses
-  uTurboScriptAccessor;
+  uTurboAccessor;
 
 {
 ****************************** TCustomTurboModule ******************************
@@ -477,14 +490,19 @@ end;
 
 procedure TCustomTurboModule.ClearMemory;
 begin
-  MemorySize := SizeOf(TPreservedCodeMemory); //+ cDefaultFreeMemSize;
-  UsedMemory := SizeOf(TPreservedCodeMemory);
+  ReallocMem(FMemory, SizeOf(TPreservedCodeMemory));
+  with PPreservedCodeMemory(FMemory)^ do
+  begin
+    MemorySize := SizeOf(TPreservedCodeMemory);
+    UsedMemory := SizeOf(TPreservedCodeMemory);
+  end;
+  //MemorySize := SizeOf(TPreservedCodeMemory); //+ cDefaultFreeMemSize;
 
   with PPreservedCodeMemory(FMemory)^ do
   begin
     LastWordEntry := nil;
     LastVariableEntry := nil;
-    LastSymbolEntry := nil;
+    LastTypeInfoEntry := nil;
     LastModuleEntry := nil;
     States := [];
   end;
@@ -507,7 +525,7 @@ begin
   Result := -1;
 end;
 
-function TCustomTurboModule.GetLastErrorCode: TTurboForthProcessorErrorCode;
+function TCustomTurboModule.GetLastErrorCode: TTurboProcessorErrorCode;
 begin
   Result := PPreservedCodeMemory(FMemory).LastErrorCode;
 end;
@@ -595,8 +613,6 @@ begin
 end;
 
 procedure TCustomTurboModule.NotifyModuleFree(Sender: TObject);
-var
-  I: Integer;
 begin
   RemoveUnloadNotification(TCustomTurboModule(Sender).NotifyModuleUnloaded);
 end;
@@ -651,7 +667,7 @@ begin
   vHeader.BuildDate := ModuleDate;
   aStream.WriteBuffer(vHeader, SizeOf(TTurboModuleStreamHeader));
   TurboConvertAddrAbsoluteToRelated(FMemory);
-  aStream.WriteBuffer(FMemory^, FUsedMemory);
+  aStream.WriteBuffer(FMemory^, UsedMemory);
   TurboConvertAddrRelatedToAbsolute(FMemory);
 end;
 
@@ -671,11 +687,16 @@ begin
 end;
 
 procedure TCustomTurboModule.SetMemorySize(Value: Integer);
+var
+  vOld: Pointer;
 begin
   if PPreservedCodeMemory(FMemory).MemorySize <> Value then
   begin
     PPreservedCodeMemory(FMemory).MemorySize := Value;
+    vOld := FMemory;
     ReallocMem(FMemory, Value);
+    if Integer(vOld) <> Integer(FMemory) then
+
   end;
 end;
 

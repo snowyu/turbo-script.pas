@@ -51,13 +51,13 @@ interface
 
 uses
   SysUtils, Classes
-  , uTurboScriptConsts
+  , uTurboConsts
   , uTurboExecutor
   ;
 
   
 type
-  TTurboX86Interpreter = class(TCustomTurboModule)
+  TTurboX86Interpreter = class(TCustomTurboExecutor)
   private
     FOldEBP: Integer;
     FOldEBX: Integer;
@@ -441,7 +441,7 @@ begin
   
   GTurboCoreWords[inAddInt] := iVMAddInt;
   GTurboCoreWords[inSubInt] := iVMSubInt;
-  GTurboCoreWords[inMULUnsignedInt] := iVMMulUnsignedInt;
+  GTurboCoreWords[inUMULInt] := iVMMulUnsignedInt;
 
   //Memory Operation Instruction with Param Stack
   GTurboCoreWords[inFetchInt] := vFetch;

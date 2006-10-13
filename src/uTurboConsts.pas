@@ -44,6 +44,15 @@ type
   TTurboCallStyle = (csForth, csRegister, csPascal, csCdecl, csStdCall, csFastCall);
   TTurboCodeFieldStyle = (cfsFunction, cfsVariable);
   TTurboCodeFieldStyles = set of TTurboCodeFieldStyle;
+  TTurboWordOptions = packed record //a DWORD
+      //优先级, highest means an IMMEDIATE word
+      //1=True; 0=False; Smudge bit. used to prevent FIND from finding this word
+      //this can be extent to private, protected, public, etc
+      Precedence: TTurboPriority; 
+      Visibility: TTurboVisibility; 
+      CallStyle: TTurboCallStyle;
+      CodeFieldStyle: TTurboCodeFieldStyles;
+  end;
 
   { Summary the FORTH Virtual Mache Codes}
   TTurboVMInstruction = (
@@ -165,15 +174,6 @@ type
   {: 核心虚拟指令表 }
   TTurboCoreWords = array [TTurboVMInstruction] of TProcedure;
 
-  TTurboWordOptions = packed record //a DWORD
-      //优先级, highest means an IMMEDIATE word
-      //1=True; 0=False; Smudge bit. used to prevent FIND from finding this word
-      //this can be extent to private, protected, public, etc
-      Precedence: TTurboPriority; 
-      Visibility: TTurboVisibility; 
-      CallStyle: TTurboCallStyle;
-      CodeFieldStyle: TTurboCodeFieldStyles;
-  end;
   {
   @param errHalt there are some data stil in return stack when Halt, the ESP should be point to
     the stack bottom! put the current ESP to TPreservedCodeMemory.ReturnStackBottom.   

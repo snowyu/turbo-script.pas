@@ -25,8 +25,9 @@ type
   TCustomTurboSymbol = class;
   TTurboVariableSymbol = class;
   TTurboTypeSymbol = class;
-  TCustomTurboWordSymbol = class;
+  TAbstractTurboWordSymbol = class;
   TTurboOpCodeSymbol = class;
+  TCustomTurboWordSymbol = class;
   TTurboWordSymbol = class;
   TCustomTurboWord = class(TCustomTurboModule)
   private
@@ -156,12 +157,15 @@ type
   TTurboTypeSymbol = class(TCustomTurboSymbol)
   end;
 
-  {: the turbo script virtual machine code symbol. }
-  TCustomTurboWordSymbol = class(TCustomTurboSymbol)
+  {: abstract word symbol. }
+  { Description
+  include OpCode, word, module symbol.
+  }
+  TAbstractTurboWordSymbol = class(TCustomTurboSymbol)
   end;
 
   {: the turbo script virtual machine code symbol. }
-  TTurboOpCodeSymbol = class(TCustomTurboWordSymbol)
+  TTurboOpCodeSymbol = class(TAbstractTurboWordSymbol)
   protected
     FOpCode: TTurboVMInstruction;
     FOperand1: Integer;
@@ -172,28 +176,36 @@ type
     property Operand2: Integer read FOperand2 write FOperand2;
   end;
 
+  {: the turbo script word(module) symbol. }
+  TCustomTurboWordSymbol = class(TAbstractTurboWordSymbol)
+  private
+    FCode: TCustomTurboModule;
+  public
+    constructor Create;
+    destructor Destroy; override;
+    property Code: TCustomTurboModule read FCode;
+  end;
+
   {: the turbo script virtual machine code symbol. }
   TTurboWordSymbol = class(TCustomTurboWordSymbol)
   private
     FBody: TTurboWordSymbolList;
-    FCode: TTurboWord;
   public
     constructor Create;
     destructor Destroy; override;
     property Body: TTurboWordSymbolList read FBody;
-    property Code: TTurboWord read FCode write FCode;
   end;
 
   {: keep the function body symbol. }
   TTurboWordSymbolList = class(TTurboSymbolList)
   private
-    function GetItems(Index: Integer): TCustomTurboWordSymbol;
-    function GetOwner: TTurboWordSymbol;
+    function GetItems(Index: Integer): TAbstractTurboWordSymbol;
+    function GetOwner: TCustomTurboWordSymbol;
   public
-    function Add(const aWord: TCustomTurboWordSymbol): Integer;
-    property Items[Index: Integer]: TCustomTurboWordSymbol read GetItems;
+    function Add(const aWord: TAbstractTurboWordSymbol): Integer;
+    property Items[Index: Integer]: TAbstractTurboWordSymbol read GetItems;
             default;
-    property Owner: TTurboWordSymbol read GetOwner;
+    property Owner: TCustomTurboWordSymbol read GetOwner;
   end;
 
 
@@ -232,8 +244,8 @@ begin
     begin
       FreeMem(FMemory);
       FMemory := Parent.FMemory;
-      FMemorySize := Parent.FMemorySize;
-      FUsedMemory := Parent.FUsedMemory;
+      //FMemorySize := Parent.FMemorySize;
+      //FUsedMemory := Parent.FUsedMemory;
     end
     else
     begin
@@ -252,6 +264,7 @@ end;
 
 procedure TCustomTurboWord.DoCompile;
 begin
+  //Process UsedModules
   //process TypeInfos
   //process Variables
   //Process words
@@ -393,12 +406,27 @@ begin
 end;
 
 {
+**************************** TCustomTurboWordSymbol ****************************
+}
+constructor TCustomTurboWordSymbol.Create;
+begin
+  inherited Create;
+  FCode := TCustomTurboModule.Create;
+end;
+
+destructor TCustomTurboWordSymbol.Destroy;
+begin
+  FreeAndNil(FCode);
+  inherited Destroy;
+end;
+
+{
 ******************************* TTurboWordSymbol *******************************
 }
 constructor TTurboWordSymbol.Create;
 begin
   inherited Create;
-  FBody := TTurboWordSymbol.Create(Self);
+  FBody := TCustomTurboWordSymbol.Create(Self);
 end;
 
 destructor TTurboWordSymbol.Destroy;
@@ -410,20 +438,22 @@ end;
 {
 ***************************** TTurboWordSymbolList *****************************
 }
-function TTurboWordSymbolList.Add(const aWord: TCustomTurboWordSymbol): Integer;
+function TTurboWordSymbolList.Add(const aWord: TAbstractTurboWordSymbol):
+        Integer;
 begin
-  aWord.Parent := TTurboWordSymbol(FOwner);
+  aWord.Parent := TCustomTurboWordSymbol(FOwner);
   Result :=  inherited Add(aWord);
 end;
 
-function TTurboWordSymbolList.GetItems(Index: Integer): TCustomTurboWordSymbol;
+function TTurboWordSymbolList.GetItems(Index: Integer):
+        TAbstractTurboWordSymbol;
 begin
-  Result := TCustomTurboWordSymbol(inherited Get(Index));
+  Result := TAbstractTurboWordSymbol(inherited Get(Index));
 end;
 
-function TTurboWordSymbolList.GetOwner: TTurboWordSymbol;
+function TTurboWordSymbolList.GetOwner: TCustomTurboWordSymbol;
 begin
-  Result := TTurboWordSymbol(FOwner);
+  Result := TCustomTurboWordSymbol(FOwner);
 end;
 
 
