@@ -1,0 +1,186 @@
+COMPILER TurboForthExpr
+
+DELPHI
+  USES (INTERFACE) uTurboConsts, uTurboExecutor 
+
+Const
+  cTurboFileExt = '.tfc';
+  cMaxMemorySize = 64 * 1024;
+  cLabelRedeclarationError = 300;
+
+Type
+  TTurboLabelDeclarationRec = packed record
+    Name: string;
+    Addr: Integer;
+  end;
+  
+PRIVATE
+  FModule: TCustomTurboModule;
+  FLabels: array of TTurboLabelDeclarationRec;
+  procedure Init;
+  procedure Final;
+  procedure WriteStr(S : string);
+  procedure WriteStrLn(S : string);
+  function AddLabel(const aName: string): Integer;
+  //if find retrun label index else -1
+  function FindLabel(const aName: string): Integer;
+  //if not find then add new label, return variable index.
+  function AddLabelEx(const aName: string): Integer;
+  function GetNumber(): Double; //convert the current string to float value
+PROTECTED
+
+PUBLIC
+  FileName: string;
+
+CREATE
+  FModule := TCustomTurboModule.Create;
+DESTROY
+  FreeAndNil(FModule);
+ERRORS
+    cLabelRedeclarationError : Result := 'Error: The Label name is redeclaration!.';
+
+PUBLISHED
+
+END_DELPHI
+
+function T-->Grammar<--.AddLabel(const aName: string): Integer;
+begin
+    Result := Length(FLabels);
+    SetLength(FLabels, Result+1);
+    with FLabels[Result] do
+    begin
+      Name := aName;
+      Addr := FModule.UsedMemory;
+    end;
+end;
+
+function T-->Grammar<--.AddLabelEx(const aName: string): Integer;
+begin
+  Result := FindLabel(aName);
+  if Result = -1 then
+  begin
+    Result := AddLabel(aName);
+  end
+  else 
+    SynError(cLabelRedeclarationError);
+
+end;
+
+function T-->Grammar<--.FindLabel(const aName: string): Integer;
+var
+  i: integer;
+begin
+  Result := -1;
+  for i := 0 to length(FLabels) -1 do
+  begin
+    if SameText(aName, FLabels[i].Name) then
+    begin
+      Result := i;
+      break;
+    end;
+  end;
+end;
+
+
+procedure T-->Grammar<--.Init;
+begin
+  with FModule do
+  begin
+    ClearMemory;
+    MemorySize := cMaxMemorySize;
+  end;
+  SetLength(FLabels, 0);
+end;
+
+procedure T-->Grammar<--.Final;
+var
+  vStream: TFileStream;
+begin
+  if ErrorList.Count = 0 then
+  begin
+    //WriteStrLn('The Result: '+FloatToStr(fResult));
+    if FileName <> '' then
+    begin
+      FModule.IsLoaded := True;
+      if LowerCase(ExtractFileExt(FileName)) <> cTurboFileExt then
+        FileName := ChangeFileExt(FileName, cTurboFileExt);
+      vStream := TFileStream.Create(FileName, fmCreate);
+      try
+        FModule.SaveToStream(vStream);
+      finally
+        vStream.Free;
+      end;
+    end;
+  end;
+  FModule.ClearMemory;
+  SetLength(FLabels, 0);
+end;
+
+procedure T-->Grammar<--.WriteStrLn(S : string);
+begin
+  WriteStr(s+#13#10); 
+end;
+
+procedure T-->Grammar<--.WriteStr(S : string);
+begin
+  ListStream.WriteBuffer(S[1],length(S));
+end;
+
+
+function T-->Grammar<--.GetNumber ():Double;
+(* Convert latest token to integer value Int *)
+VAR
+  Error : INTEGER;
+  S : STRING;
+BEGIN
+  S:= LexString;
+  //writeStrLn('Num is '+s);
+  //Result := 0.0;
+  Val(S, Result, Error);
+  if Error <> 0 then SynError(300);
+END;
+
+
+IGNORE CASE
+
+CHARACTERS
+ LETTER="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_".
+ DIGIT =  "0123456789".
+ CTRL=CHR(1)..CHR(31).
+ TAB=CHR(9).
+ EOL=CHR(13).
+ LF=CHR(10).
+ noQuote = ANY - "'" .
+ noDblQuote = ANY - '"' .               
+ HexDigit = "0123456789ABCDEF" .
+
+TOKENS
+ IntegerToken = ["+"|"-"] DIGIT {DIGIT}.
+ FloatToken = DIGIT {DIGIT}  ["." {DIGIT} ["E" ["+" |"-"] DIGIT {DIGIT}]].
+ Identifier = LETTER{LETTER|DIGIT}.
+
+NAMES
+
+
+IGNORE TAB+EOL+LF
+PRAGMAS
+
+
+PRODUCTIONS
+
+  (* TurboForthExpression = Statement {Statement}  . *)  
+  TurboForthExpression = (. Init ; .)  Statement {Statement}  (. Final ; .) .
+
+  Statement = 
+    [LabelDeclaration] 
+     PushIntStatement
+    |AddIntStatement
+  .
+
+  LabelDeclaration =
+    Identifier(. AddLabelEx(LexString); .) ":" .
+
+  PushIntStatement = ["PushInt"] IntegerToken (. FModule.AddIntToMem(Integer(inPushInt)); FModule.AddIntToMem(StrToInt(LexString));.) .
+  AddIntStatement  = "AddInt" (. FModule.AddIntToMem(Integer(inAddInt)); .) .
+
+END TurboForthExpr.
