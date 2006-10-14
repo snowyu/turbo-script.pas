@@ -500,6 +500,8 @@ begin
 
   with PPreservedCodeMemory(FMemory)^ do
   begin
+    InitializeProc := nil;
+    FinalizeProc := nil;
     LastWordEntry := nil;
     LastVariableEntry := nil;
     LastTypeInfoEntry := nil;
@@ -967,11 +969,11 @@ end;
 procedure TurboConvertAddrRelatedToAbsolute(Mem: PPreservedCodeMemory);
 {$IFDEF PUREPASCAL}
 begin
-  if Assigned(Mem.InitializeProc) then
+  {if Assigned(Mem.InitializeProc) then
     Inc(Integer(Mem.InitializeProc), Integer(Mem));
   if Assigned(Mem.FinalizeProc) then
     Inc(Integer(Mem.FinalizeProc), Integer(Mem));
-
+}
   //TODO: 
   TurboConvertEntryRelatedToAbsolute(Mem, Mem.LastTypeInfoEntry);  
   TurboConvertVarEntryRelatedToAbsolute(Mem, Mem.LastVariableEntry);  
@@ -980,7 +982,7 @@ begin
 end;
 {$ELSE PUREPASCAL}
 asm
-  MOV  EDX, [EAX].TPreservedCodeMemory.InitializeProc
+{  MOV  EDX, [EAX].TPreservedCodeMemory.InitializeProc
   CMP  EDX, 0
   JE   @@Skip
   ADD  EDX, EAX
@@ -993,6 +995,7 @@ asm
   MOV  [EAX].TPreservedCodeMemory.FinalizeProc, EDX
 
 @@Skip2:
+}
   LEA  EDX, [EAX].TPreservedCodeMemory.LastTypeInfoEntry
   CALL TurboConvertEntryRelatedToAbsolute 
 
