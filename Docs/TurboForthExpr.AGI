@@ -1,0 +1,58 @@
+[Frames]
+Ancestor=$(CocoR)\Frames\CocoBase.pas
+Parser=$(CocoR)\Frames\component.frm
+Test Project=$(CocoR)\Frames\test.dpr.frm
+Test Form=$(CocoR)\Frames\Test.pas.frm
+Test DFM=$(CocoR)\Frames\Test.dfm.frm
+Console=$(CocoR)\Frames\tfcc.dpr.frm
+
+[Output]
+Directory=$(CocoR)\..\Samples\
+
+[Registration]
+Palette=Coco/R
+
+[Messages]
+Show Warnings=1
+Show LL(1) Start Succ=1
+
+[Hash]
+Primary=TinyHash
+Secondary=HashSecondaryOne
+
+[Error Msg]
+Expected=%D% expected
+Invalid=invalid %D%
+Not Expected=this symbol not expected in %D%
+
+[Strings]
+Version Format='Version:' m.nn 'Release:' r 'Build:' b
+Last Build Format=dddddd tt
+
+[Options]
+C=1
+M=0
+R=0
+E=0
+Z=1
+V=1
+B=1
+O=1
+H=1
+Y=1
+D=0
+L=0
+A=0
+F=0
+G=0
+I=0
+S=0
+T=0
+X=0
+
+[Version Info]
+Version Number=0.1.1.22
+Last Build=10/15/2006 17:49:01
+Author=Riceball LEE
+Copyright=Copyright © 2006, Riceball LEE, All rights reserved.
+

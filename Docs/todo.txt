@@ -1,3 +1,28 @@
+2006-10-15
+  文件扩展名定义:
+    *.tf  Turbo Forth(ASM) Script Source
+
+tfcc.exe : Turbo Forth Command line Compiler.
+
+模块名称由文件名决定.
+
+!+ uTurboModuleFileAccessor
+
++ tsrun.dpr 初步完成:
+  能显示执行结果数据栈或返回栈的内容,如果有内容的话.
+
+!+ 增加过程的支持.
+:Word ;
+ 
+2006-10-14
+  文件扩展名定义:
+    *.tpc Turbo Script program Compiled
+    *.tcu Turbo Script unit Compiled 
+    *.ts  Turbo Script Source
+ tscc.exe : Turbo Script Command line Compiler
+ tsrun.exe <filename>: Turbo Script command line intercepter.
+* 修改了 coco/R delphi ,使得我能在框架文件中的自定义生成的文件名.使用开关 $M"ModuleName"
+
 2006-10-13
 ~ [COCO/R]
   如何获得当前的分析处的字符串!

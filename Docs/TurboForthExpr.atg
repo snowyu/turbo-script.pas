@@ -1,32 +1,37 @@
-COMPILER TurboForthExpr
+$C-  //Generate Delphi test project
+$E-  //Generate a component registration unit
+$Z+  //Generate console app
+
+COMPILER TurboForthProgram
 
 DELPHI
-  USES (INTERFACE) uTurboConsts, uTurboExecutor 
 
-Const
-  cTurboFileExt = '.tfc';
-  cMaxMemorySize = 64 * 1024;
-  cLabelRedeclarationError = 300;
+USES (INTERFACE) uStrUtils, uTurboConsts, uTurboExecutor 
 
-Type
+TYPE
   TTurboLabelDeclarationRec = packed record
     Name: string;
     Addr: Integer;
   end;
   
+
 PRIVATE
+  FInitProcCFA: Integer;
+  FLastWordEntry: PTurboWordEntry;
+  FLastWordCfa: Integer;
   FModule: TCustomTurboModule;
   FLabels: array of TTurboLabelDeclarationRec;
   procedure Init;
   procedure Final;
   procedure WriteStr(S : string);
   procedure WriteStrLn(S : string);
+  procedure DefineWordBegin(const aName: ShortString);
+  procedure DefineWordEnd;
   function AddLabel(const aName: string): Integer;
   //if find retrun label index else -1
   function FindLabel(const aName: string): Integer;
-  //if not find then add new label, return variable index.
+  //if not find then add new label, return label index else raise error.
   function AddLabelEx(const aName: string): Integer;
-  function GetNumber(): Double; //convert the current string to float value
 PROTECTED
 
 PUBLIC
@@ -37,11 +42,17 @@ CREATE
 DESTROY
   FreeAndNil(FModule);
 ERRORS
-    cLabelRedeclarationError : Result := 'Error: The Label name is redeclaration!.';
+    cLabelRedeclarationError : Result := rsLabelRedeclarationSyntaxError;
+    cWordNameIsNilDeclarationError: Result := rsWordNameIsNilDeclarationError;
 
 PUBLISHED
 
 END_DELPHI
+
+Const
+  cMaxMemorySize = 64 * 1024;
+  cLabelRedeclarationError = 300;
+  cWordNameIsNilDeclarationError = 301;
 
 function T-->Grammar<--.AddLabel(const aName: string): Integer;
 begin
@@ -64,6 +75,30 @@ begin
   else 
     SynError(cLabelRedeclarationError);
 
+end;
+
+procedure T-->Grammar<--.DefineWordBegin(const aName: ShortString);
+var
+  p: pointer;
+begin
+  if aName = '' then 
+    SynError(cWordNameIsNilDeclarationError)
+  else begin
+    Integer(FLastWordEntry) := Integer(FModule.Memory) + FModule.UsedMemory;
+    p := FModule.LastWordEntry;
+    FModule.AddIntToMem(Integer(p));
+    FModule.AllocSpace(SizeOf(TTurboWordOptions));
+    FModule.AllocSpace(SizeOf(LongWord)); //the ParamFieldLength
+    FModule.AddByteToMem(Length(aName));
+    FModule.AddBufferToMem(aName[1], Length(aName));
+    FLastWordCfa := FModule.UsedMemory;
+  end;
+end;
+
+procedure T-->Grammar<--.DefineWordEnd;
+begin
+  FModule.AddIntToMem(Integer(inExit));
+  FLastWordEntry.ParamFieldLength := FModule.UsedMemory - FLastWordCfa + 1;
 end;
 
 function T-->Grammar<--.FindLabel(const aName: string): Integer;
@@ -90,22 +125,33 @@ begin
     MemorySize := cMaxMemorySize;
   end;
   SetLength(FLabels, 0);
+  //writeln('SourceFileName=', SourceFileName);
+  FileName := ExtractFileBaseName(SourceFileName) + cTurboCompiledProgramFileExt;
+  //writeln('FileName=', FileName);
 end;
 
 procedure T-->Grammar<--.Final;
 var
   vStream: TFileStream;
 begin
+  //writeln('Final');
   if ErrorList.Count = 0 then
   begin
+   //writeln('No error');
     //WriteStrLn('The Result: '+FloatToStr(fResult));
     if FileName <> '' then
     begin
       FModule.IsLoaded := True;
-      if LowerCase(ExtractFileExt(FileName)) <> cTurboFileExt then
-        FileName := ChangeFileExt(FileName, cTurboFileExt);
+      //writeln('InitProcCFA=', FInitProcCFA+SizeOf(TTurboModuleStreamHeader));
+      with PPreservedCodeMemory(FModule.Memory)^ do
+      begin
+        Integer(InitializeProc) := FInitProcCFA;
+      end;
+      if LowerCase(ExtractFileExt(FileName)) <> cTurboCompiledProgramFileExt then
+        FileName := ChangeFileExt(FileName, cTurboCompiledProgramFileExt);
       vStream := TFileStream.Create(FileName, fmCreate);
       try
+        writeln('saving to ' + FileName);
         FModule.SaveToStream(vStream);
       finally
         vStream.Free;
@@ -127,19 +173,6 @@ begin
 end;
 
 
-function T-->Grammar<--.GetNumber ():Double;
-(* Convert latest token to integer value Int *)
-VAR
-  Error : INTEGER;
-  S : STRING;
-BEGIN
-  S:= LexString;
-  //writeStrLn('Num is '+s);
-  //Result := 0.0;
-  Val(S, Result, Error);
-  if Error <> 0 then SynError(300);
-END;
-
 
 IGNORE CASE
 
@@ -147,6 +180,7 @@ CHARACTERS
  LETTER="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_".
  DIGIT =  "0123456789".
  CTRL=CHR(1)..CHR(31).
+ SpecialChar = "*,()%:".
  TAB=CHR(9).
  EOL=CHR(13).
  LF=CHR(10).
@@ -155,32 +189,62 @@ CHARACTERS
  HexDigit = "0123456789ABCDEF" .
 
 TOKENS
- IntegerToken = ["+"|"-"] DIGIT {DIGIT}.
- FloatToken = DIGIT {DIGIT}  ["." {DIGIT} ["E" ["+" |"-"] DIGIT {DIGIT}]].
- Identifier = LETTER{LETTER|DIGIT}.
-
+ Identifier = LETTER {LETTER|DIGIT}.
+ IntegerToken = DIGIT {DIGIT} | DIGIT {DIGIT} CONTEXT ( ".." ).
+ HexNumberToken = "$" HexDigit {HexDigit}.
+ FloatToken = DIGIT {DIGIT} "." DIGIT {DIGIT} ["E" ["+" |"-"] DIGIT {DIGIT}].
+ 
 NAMES
 
 
 IGNORE TAB+EOL+LF
 PRAGMAS
 
+COMMENTS FROM "(" TO ")"
+COMMENTS FROM "//" TO EOL
+//COMMENTS FROM "{" TO "}"
+
+
 
 PRODUCTIONS
 
-  (* TurboForthExpression = Statement {Statement}  . *)  
-  TurboForthExpression = (. Init ; .)  Statement {Statement}  (. Final ; .) .
+  (* TurboForthProgram = Statement {Statement}  . *)  
+  TurboForthProgram 
+    =                                                  (. Init ; .)  
+    "PROGRAM" Identifier                               (. FModule.Name := LexString; .)
+    [DefineWord]
+    "BEGIN"                                            (. FInitProcCFA := FModule.UsedMemory; writeln('FInitProcCFA=',FInitProcCFA); .)
+    StatementBlock
+    "END."                                             (. FModule.AddIntToMem(Integer(inHalt)); .)
+    (. Final ; .) .
 
-  Statement = 
-    [LabelDeclaration] 
+  DefineWord
+    =
+    ":" Identifier                                     (. DefineWordBegin(LexString); .)
+    StatementBlock
+    ";"                                                (. DefineWordEnd; .)
+  .
+
+  StatementBlock 
+    = 
+    Statement {Statement}
+    .
+
+  Statement 
+    = 
+    [LabelDeclaration]
      PushIntStatement
-    |AddIntStatement
+    | AddIntStatement
+    | SubIntStatement
+    | WordStatement
   .
 
   LabelDeclaration =
-    Identifier(. AddLabelEx(LexString); .) ":" .
+    "Label" Identifier(. AddLabelEx(LexString); .)  .
 
-  PushIntStatement = ["PushInt"] IntegerToken (. FModule.AddIntToMem(Integer(inPushInt)); FModule.AddIntToMem(StrToInt(LexString));.) .
-  AddIntStatement  = "AddInt" (. FModule.AddIntToMem(Integer(inAddInt)); .) .
+  PushIntStatement = IntegerToken (. FModule.AddIntToMem(Integer(inPushInt)); FModule.AddIntToMem(StrToInt(LexString));.) .
+  AddIntStatement  = "+" (. FModule.AddIntToMem(Integer(inAddInt)); .) .
+  SubIntStatement  = "-" (. FModule.AddIntToMem(Integer(inSubInt)); .) .
 
-END TurboForthExpr.
+  WordStatement = Identifier (..).
+END TurboForthProgram.
