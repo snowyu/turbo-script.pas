@@ -15,6 +15,8 @@ const
   cDefaultParamStackSize = 127; 
   cDefaultFreeMemSize = 1024 * 8; //the Free Memory 8kb
   cMAXTIBCount = 1024;
+  cTurboCompiledProgramFileExt = '.tpc';
+  cTurboForthFileExt = '.tf';
   
 resourcestring
   rsMissFileHeaderError = 'Error: The file header is missed';
@@ -26,7 +28,9 @@ resourcestring
   rsParamStackUnderflowError = 'Parameter Stack underflow.';
   rsParamStackOverflowError = 'Parameter Stack overflow';
   rsBadOpCodeError = 'Error: Bad OpCode Found.';
-  
+  rsLabelRedeclarationSyntaxError = 'Error: The Label name is redeclaration!.';
+  rsWordNameIsNilDeclarationError = 'Error: the declaration word name is null!';   
+
 type
   ETurboScriptError = class(Exception);
   {: the Module Type }

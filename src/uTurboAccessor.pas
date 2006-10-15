@@ -41,11 +41,12 @@ type
 
   TTurboModuleAccessor = class(TTurboAccessor)
   public
+    {: if found then create the Stream and load the module to the Stream else
+            return nil. }
+    function GetModuleStream(const aModuleName: String): TStream; virtual;
+            abstract;
     {: Load the Module body into Module.Memory. }
     procedure LoadModule(const aModule: TCustomTurboModule);
-    {: load the module to the aStream }
-    function LoadModuleStream(const aModuleName: String; const aStream:
-            TStream): Boolean; virtual; abstract;
     {: if find then create and return the module Executor else return nil. }
     { Description
     @param IsLoaded whether load the module body to memory.
@@ -117,12 +118,10 @@ procedure TTurboModuleAccessor.LoadModule(const aModule: TCustomTurboModule);
 var
   vStream: TMemoryStream;
 begin
-  vStream := TMemoryStream.Create;
+  vStream := GetModuleStream(aModule.Name);
+  if Assigned(vStream) then
   try
-    if LoadModuleStream(aModule.Name, vStream) then
-    begin
       aModule.LoadFromStream(vStream);
-    end;
   finally
     vStream.Free;
   end;

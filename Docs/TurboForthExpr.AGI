@@ -4,7 +4,7 @@ Parser=$(CocoR)\Frames\component.frm
 Test Project=$(CocoR)\Frames\test.dpr.frm
 Test Form=$(CocoR)\Frames\Test.pas.frm
 Test DFM=$(CocoR)\Frames\Test.dfm.frm
-Console=$(CocoR)\Frames\tfcc.dpr.frm
+Console=$(CocoR)\..\docs\tfcc.dpr.frm
 
 [Output]
 Directory=$(CocoR)\..\Samples\

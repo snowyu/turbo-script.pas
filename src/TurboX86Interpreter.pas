@@ -399,12 +399,31 @@ asm
   {$ifdef TurboScript_FullSpeed}
   PUSH EDX
   {$endif}
-  MUL  EAX, [EBP] //EDX:EAX = EAX * [EDI]
+  MUL  [EBP] //EDX:EAX = EAX * [EBP]
   MOV  [EBP], EDX
   {$ifdef TurboScript_FullSpeed}
   POP  EDX
   {$endif}
   MOV  EBX, EAX
+  JMP  iVMNext
+end;
+
+// multiply
+//(n, n1) -- total
+//total = n* n1(int)
+procedure iVMMulInt;
+asm
+  MOV  EAX, EBX
+  {$ifdef TurboScript_FullSpeed}
+  //PUSH EDX
+  {$endif}
+  //IMUL  EAX, [EBP] //EDX:EAX = EAX * [EBP]
+  IMUL  EBX, [EBP] //EBX = EBX * [EBP]
+  //MOV  [EBP], EDX
+  {$ifdef TurboScript_FullSpeed}
+  //POP  EDX
+  {$endif}
+  //MOV  EBX, EAX
   JMP  iVMNext
 end;
 
@@ -442,6 +461,7 @@ begin
   GTurboCoreWords[inAddInt] := iVMAddInt;
   GTurboCoreWords[inSubInt] := iVMSubInt;
   GTurboCoreWords[inUMULInt] := iVMMulUnsignedInt;
+  GTurboCoreWords[inMULInt] := iVMMulInt;
 
   //Memory Operation Instruction with Param Stack
   GTurboCoreWords[inFetchInt] := vFetch;

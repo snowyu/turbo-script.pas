@@ -69,7 +69,9 @@ type
     FIsLoaded: Boolean;
     FParent: TCustomTurboModule;
     FVisibility: TTurboVisibility;
+    function GetInitializeProc: Integer;
     function GetLastErrorCode: TTurboProcessorErrorCode;
+    function GetLastWordEntry: PTurboWordEntry;
     function GetMemorySize: Integer;
     function GetModuleType: TTurboModuleType;
     function GetStatus: TTurboProcessorStates;
@@ -112,7 +114,7 @@ type
     FTIBIndex : Text[FTIBIndex]
     }
     FTextIndex: Integer;
-    procedure Grow;
+    procedure Grow(const aSize: Integer = 0);
     procedure SendUnloadNotification;
   public
     constructor Create; virtual;
@@ -121,7 +123,18 @@ type
     { Description
     Note: you must InitExecution first.
     }
-    procedure AddIntToMem(const aInt: Integer);
+    procedure AddBufferToMem(const aValue; aSize: Integer);
+    {: add a integer to the free memory, and add UsedMemory }
+    { Description
+    Note: you must InitExecution first.
+    }
+    procedure AddByteToMem(const aValue: Byte);
+    {: add a integer to the free memory, and add UsedMemory }
+    { Description
+    Note: you must InitExecution first.
+    }
+    procedure AddIntToMem(const aValue: Integer);
+    procedure AllocSpace(const aSize: Integer);
     {: reduce the memory size to initialization state }
     procedure ClearMemory;
     function FindUnloadNotification(aProc: TNotifyEvent): Integer;
@@ -131,6 +144,7 @@ type
     Note: accessor must be assigned first.
     }
     procedure Load;
+    procedure LoadFromFile(const aFileName: String);
     {: Load the VM Module from stream. }
     { Description
     @param Count 0 means all.
@@ -148,6 +162,7 @@ type
     function RequireModule(const aModuleName: ShortString): TCustomTurboModule;
     {: reset the stack pointers. }
     procedure Reset;
+    procedure SaveToFile(const aFileName: String);
     {: save FMemory to stream }
     procedure SaveToStream(const aStream: TStream);
     {: 是否被存放在Parent 中. }
@@ -159,12 +174,14 @@ type
     procedure UnloadNotification(aProc: TNotifyEvent);
     {: the TurboModuleAccessor }
     property Accessor: TObject read FAccessor write FAccessor;
+    property InitializeProc: Integer read GetInitializeProc;
     { Description
     if not loaded, then only the name and some options loaded but the body(
     Memory).
     }
     property IsLoaded: Boolean read FIsLoaded write FIsLoaded;
     property LastErrorCode: TTurboProcessorErrorCode read GetLastErrorCode;
+    property LastWordEntry: PTurboWordEntry read GetLastWordEntry;
     {: The Code Memory }
     property Memory: Pointer read FMemory write FMemory;
     {: : the Memory Size. }
@@ -431,7 +448,7 @@ type
     LastErrorCode: TTurboProcessorErrorCode;
     //如果ModuleType是模块，那么就是装载运行该模块前执行的初始化过程，入口地址
     //如果是函数，则是该函数的入口地址
-    InitializeProc: Pointer; 
+    InitializeProc: Pointer; //it is the offset address of the FMemory
     FinalizeProc: Pointer; //如果是模块的话
     //last Used(import) module entry.
     LastModuleEntry: PTurboModuleEntry;
@@ -477,15 +494,45 @@ begin
   inherited Destroy;
 end;
 
-procedure TCustomTurboModule.AddIntToMem(const aInt: Integer);
+procedure TCustomTurboModule.AddBufferToMem(const aValue; aSize: Integer);
+var
+  p: Pointer;
+begin
+  if PPreservedCodeMemory(FMemory).UsedMemory >= MemorySize then
+    Grow(aSize);
+  Integer(p) := Integer(FMemory) + PPreservedCodeMemory(FMemory).UsedMemory;
+  Move(aValue, p^, aSize);
+  Inc(PPreservedCodeMemory(FMemory).UsedMemory, aSize);
+end;
+
+procedure TCustomTurboModule.AddByteToMem(const aValue: Byte);
 var
   p: Pointer;
 begin
   if PPreservedCodeMemory(FMemory).UsedMemory >= MemorySize then
     Grow;
   Integer(p) := Integer(FMemory) + PPreservedCodeMemory(FMemory).UsedMemory;
-  PInteger(P)^ := aInt;
+  PByte(P)^ := aValue;
+  Inc(PPreservedCodeMemory(FMemory).UsedMemory, SizeOf(Byte));
+end;
+
+procedure TCustomTurboModule.AddIntToMem(const aValue: Integer);
+var
+  p: Pointer;
+begin
+  if PPreservedCodeMemory(FMemory).UsedMemory >= MemorySize then
+    Grow;
+  Integer(p) := Integer(FMemory) + PPreservedCodeMemory(FMemory).UsedMemory;
+  PInteger(P)^ := aValue;
   Inc(PPreservedCodeMemory(FMemory).UsedMemory, SizeOf(Integer));
+end;
+
+procedure TCustomTurboModule.AllocSpace(const aSize: Integer);
+begin
+  if (PPreservedCodeMemory(FMemory).UsedMemory+ aSize) >= MemorySize then
+    Grow(aSize);
+
+  Inc(PPreservedCodeMemory(FMemory).UsedMemory, aSize);
 end;
 
 procedure TCustomTurboModule.ClearMemory;
@@ -527,9 +574,19 @@ begin
   Result := -1;
 end;
 
+function TCustomTurboModule.GetInitializeProc: Integer;
+begin
+  Result := Integer(PPreservedCodeMemory(FMemory)^.InitializeProc);
+end;
+
 function TCustomTurboModule.GetLastErrorCode: TTurboProcessorErrorCode;
 begin
   Result := PPreservedCodeMemory(FMemory).LastErrorCode;
+end;
+
+function TCustomTurboModule.GetLastWordEntry: PTurboWordEntry;
+begin
+  Result := PPreservedCodeMemory(FMemory).LastWordEntry;
 end;
 
 function TCustomTurboModule.GetMemorySize: Integer;
@@ -571,9 +628,13 @@ begin
   Result := -1;
 end;
 
-procedure TCustomTurboModule.Grow;
+procedure TCustomTurboModule.Grow(const aSize: Integer = 0);
+var
+  I: Integer;
 begin
-  MemorySize := MemorySize + MemorySize div 4;
+  I := MemorySize div 4;
+  if I < aSize then I := aSize;
+  MemorySize := MemorySize + I;
 end;
 
 procedure TCustomTurboModule.Load;
@@ -581,6 +642,18 @@ begin
   if not IsLoaded and Assigned(FAccessor) then
   begin
     TTurboModuleAccessor(FAccessor).LoadModule(Self);
+  end;
+end;
+
+procedure TCustomTurboModule.LoadFromFile(const aFileName: String);
+var
+  vStream: TFileStream;
+begin
+  vStream := TFileStream.Create(aFileName, fmOpenRead and fmShareDenyNone);
+  try
+    LoadFromStream(vStream);
+  finally
+    vStream.Free;
   end;
 end;
 
@@ -602,16 +675,16 @@ begin
 
   if vHeader.Id <> cFORTHHeaderMagicId then
     raise ETurboScriptError.CreateRes(@rsInvalidTurboScriptStreamError);
-
   ModuleVersion := vHeader.Version;
   ModuleDate := vHeader.BuildDate;
 
-  MemorySize := Count;
-  aStream.ReadBuffer(FMemory^, Count);
+  MemorySize := Count-SizeOf(TTurboModuleStreamHeader);
+  aStream.ReadBuffer(FMemory^, MemorySize);
   Reset;
   TurboConvertAddrRelatedToAbsolute(FMemory);
 
   FIsLoaded := True;
+  WriteLn('loaded ok.');
 end;
 
 procedure TCustomTurboModule.NotifyModuleFree(Sender: TObject);
@@ -655,6 +728,18 @@ begin
   PPreservedCodeMemory(FMemory).Executor := Self;
 
   PPreservedCodeMemory(FMemory).States := [];
+end;
+
+procedure TCustomTurboModule.SaveToFile(const aFileName: String);
+var
+  vStream: TFileStream;
+begin
+  vStream := TFileStream.Create(aFileName, fmCreate);
+  try
+    SaveToStream(vStream);
+  finally
+    vStream.Free;
+  end;
 end;
 
 procedure TCustomTurboModule.SaveToStream(const aStream: TStream);
@@ -1117,10 +1202,12 @@ end;
 procedure TurboConvertAddrAbsoluteToRelated(Mem: PPreservedCodeMemory);
 {$IFDEF PUREPASCAL}
 begin
+{
   if Assigned(Mem.InitializeProc) then
     Dec(Integer(Mem.InitializeProc), Integer(Mem));
   if Assigned(Mem.FinalizeProc) then
     Dec(Integer(Mem.FinalizeProc), Integer(Mem));
+}
   TurboConvertEntryAbsoluteToRelated(Mem, Mem.LastWordEntry);  
   TurboConvertEntryAbsoluteToRelated(Mem, Mem.LastModuleEntry);  
   TurboConvertEntryAbsoluteToRelated(Mem, Mem.LastVariableEntry);  
@@ -1128,6 +1215,7 @@ begin
 end;
 {$ELSE PUREPASCAL}
 asm
+{
   MOV  EDX, [EAX].TPreservedCodeMemory.InitializeProc
   CMP  EDX, 0
   JE   @@Skip
@@ -1141,6 +1229,7 @@ asm
   MOV  [EAX].TPreservedCodeMemory.FinalizeProc, EDX
 
 @@Skip2:
+}
   LEA  EDX, [EAX].TPreservedCodeMemory.LastWordEntry
   CALL TurboConvertEntryAbsoluteToRelated 
 

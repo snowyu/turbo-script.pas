@@ -6,9 +6,9 @@ interface
 
 uses
   SysUtils, Classes
-  , uTurboScriptConsts
+  , uTurboConsts
   , uTurboExecutor 
-  , uTurboScriptAccessor
+  , uTurboAccessor
   ;
 
 type
@@ -18,6 +18,7 @@ type
     procedure SetIncludeDirs(const Value: string);
   protected
     FIncludeDirs: TStringList;
+    procedure GetModuleFileName(const aModuleName: String);
     function iRequire(const aModuleName: String; const IsLoaded: Boolean):
             TCustomTurboModule; override;
     {: trim invalid includes paths. }
@@ -25,8 +26,8 @@ type
   public
     constructor Create;
     destructor Destroy; override;
-    function LoadModuleStream(const aModuleName: String; const aStream:
-            TStream): Boolean; override;
+    function GetModuleStream(const aModuleName: String): TStream; override;
+    function SaveModule(const aModule: TCustomTurboModule): Boolean; override;
     property IncludeDirs: string read GetIncludeDirs write SetIncludeDirs;
   end;
 
@@ -58,13 +59,31 @@ begin
   Result := FIncludeDirs.DelimitedText;
 end;
 
+procedure TTurboModuleFileAccessor.GetModuleFileName(const aModuleName: String);
+begin
+end;
+
+function TTurboModuleFileAccessor.GetModuleStream(const aModuleName: String):
+        TStream;
+var
+  vFileName: string;
+begin
+  Result := nil;
+
+  vFileName := GetModuleFileName(aModuleName);
+  if vFileName <> '' then
+  begin
+    Result := TFileStream.Create(vFileName, fmOpenRead);
+  end;
+end;
+
 function TTurboModuleFileAccessor.iRequire(const aModuleName: String; const
         IsLoaded: Boolean): TCustomTurboModule;
 begin
 end;
 
-function TTurboModuleFileAccessor.LoadModuleStream(const aModuleName: String;
-        const aStream: TStream): Boolean;
+function TTurboModuleFileAccessor.SaveModule(const aModule:
+        TCustomTurboModule): Boolean;
 begin
 end;
 
