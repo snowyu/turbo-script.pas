@@ -10,6 +10,17 @@ uses
   , TurboInterpreter
   ;
 
+type
+  TMyInterpreter = Class(TTurboX86Interpreter)
+  protected
+    procedure DoPrintChar(aChar: Char); override;
+  end;
+
+procedure TMyInterpreter.DoPrintChar(aChar: Char);
+begin
+	 write(aChar);
+end;
+
 const
   Copyright = 'Turbo Script command line intercepter 1.0'#13#10'    Copyright(c) by Riceball<riceballl@hotmail.com>';
 
@@ -30,7 +41,7 @@ end;
 const
   cStackMaxSize = 1024 * 10;
 var
-  GTurboExecutor: TTurboX86Interpreter;
+  GTurboExecutor: TMyInterpreter;
   p: Pointer;
   CFA: Integer;
   tBegin, tEnd: Int64;
@@ -67,7 +78,7 @@ begin
   end;
 
   c := 0;
-    GTurboExecutor := TTurboX86Interpreter.Create;
+    GTurboExecutor := TMyInterpreter.Create;
     try
       GTurboExecutor.ParameterStackSize := cStackMaxSize;
       GetMem(p, cStackMaxSize);
@@ -141,6 +152,7 @@ begin
       FreeAndNil(GTurboExecutor);
     end;
 
+  WriteLn('');
   if lastErr <> errNone then
     writeln('lasterr=', Integer(lasterr));
   writeln('ScriptExecTime:',c/CountFreq*1000, ' (ms)');

@@ -116,7 +116,7 @@ var
 }
 procedure TTurboModuleAccessor.LoadModule(const aModule: TCustomTurboModule);
 var
-  vStream: TMemoryStream;
+  vStream: TStream;
 begin
   vStream := GetModuleStream(aModule.Name);
   if Assigned(vStream) then

@@ -27,6 +27,8 @@ PRIVATE
   procedure WriteStrLn(S : string);
   procedure DefineWordBegin(const aName: ShortString);
   procedure DefineWordEnd;
+  procedure AddWord(const aName: string);
+  procedure PushString();
   function AddLabel(const aName: string): Integer;
   //if find retrun label index else -1
   function FindLabel(const aName: string): Integer;
@@ -44,6 +46,7 @@ DESTROY
 ERRORS
     cLabelRedeclarationError : Result := rsLabelRedeclarationSyntaxError;
     cWordNameIsNilDeclarationError: Result := rsWordNameIsNilDeclarationError;
+    cUnknownWordError: Result := rsUnknownWordError;
 
 PUBLISHED
 
@@ -53,6 +56,7 @@ Const
   cMaxMemorySize = 64 * 1024;
   cLabelRedeclarationError = 300;
   cWordNameIsNilDeclarationError = 301;
+  cUnknownWordError = 302;
 
 function T-->Grammar<--.AddLabel(const aName: string): Integer;
 begin
@@ -77,6 +81,21 @@ begin
 
 end;
 
+procedure T-->Grammar<--.AddWord(const aName: string);
+var
+  vCFA: Integer;
+begin
+  writeln('AddW');
+  vCFA := FModule.GetWordCFA(aName);
+  if vCFA <> 0 then
+  begin
+    FModule.AddIntToMem(vCFA);
+  end
+  else 
+    SynError(cUnknownWordError);
+  writeln('AddE');
+end;
+
 procedure T-->Grammar<--.DefineWordBegin(const aName: ShortString);
 var
   p: pointer;
@@ -96,9 +115,15 @@ begin
 end;
 
 procedure T-->Grammar<--.DefineWordEnd;
+var
+  vPrior: PTurboWordEntry;
 begin
   FModule.AddIntToMem(Integer(inExit));
   FLastWordEntry.ParamFieldLength := FModule.UsedMemory - FLastWordCfa + 1;
+
+  vPrior := FModule.LastWordEntry;
+  FModule.LastWordEntry := FLastWordEntry;
+  FLastWordEntry.Prior := vPrior;
 end;
 
 function T-->Grammar<--.FindLabel(const aName: string): Integer;
@@ -162,6 +187,19 @@ begin
   SetLength(FLabels, 0);
 end;
 
+procedure T-->Grammar<--.PushString();
+var
+  s: string;
+  i: Integer;
+begin
+  s := AnsiDequotedStr(LexString, '''');
+  for i := length(s) downto 1 do
+  begin
+    FModule.AddIntToMem(Integer(inPushInt));
+    FModule.AddIntToMem(Ord(s[i])); 
+  end;
+end;
+
 procedure T-->Grammar<--.WriteStrLn(S : string);
 begin
   WriteStr(s+#13#10); 
@@ -193,7 +231,8 @@ TOKENS
  IntegerToken = DIGIT {DIGIT} | DIGIT {DIGIT} CONTEXT ( ".." ).
  HexNumberToken = "$" HexDigit {HexDigit}.
  FloatToken = DIGIT {DIGIT} "." DIGIT {DIGIT} ["E" ["+" |"-"] DIGIT {DIGIT}].
- 
+ StringToken   = "'" { noQuote | "'" "'" } "'" .
+
 NAMES
 
 
@@ -212,11 +251,17 @@ PRODUCTIONS
   TurboForthProgram 
     =                                                  (. Init ; .)  
     "PROGRAM" Identifier                               (. FModule.Name := LexString; .)
-    [DefineWord]
-    "BEGIN"                                            (. FInitProcCFA := FModule.UsedMemory; writeln('FInitProcCFA=',FInitProcCFA); .)
+    [DeclarationBlock]
+    "BEGIN"                                            (. FInitProcCFA := FModule.UsedMemory;  .)
     StatementBlock
     "END."                                             (. FModule.AddIntToMem(Integer(inHalt)); .)
     (. Final ; .) .
+
+  DeclarationBlock 
+    = 
+    Declaration {Declaration}.
+
+  Declaration = DefineWord .
 
   DefineWord
     =
@@ -234,8 +279,10 @@ PRODUCTIONS
     = 
     [LabelDeclaration]
      PushIntStatement
+    | PushStringStatement 
     | AddIntStatement
     | SubIntStatement
+    | EmitStatement
     | WordStatement
   .
 
@@ -245,6 +292,8 @@ PRODUCTIONS
   PushIntStatement = IntegerToken (. FModule.AddIntToMem(Integer(inPushInt)); FModule.AddIntToMem(StrToInt(LexString));.) .
   AddIntStatement  = "+" (. FModule.AddIntToMem(Integer(inAddInt)); .) .
   SubIntStatement  = "-" (. FModule.AddIntToMem(Integer(inSubInt)); .) .
+  EmitStatement = "EMIT" (. FModule.AddIntToMem(Integer(inEmit)); .) .
+  PushStringStatement = "#" StringToken (. PushString(); .) .
 
-  WordStatement = Identifier (..).
+  WordStatement = Identifier (. AddWord(LexString); .).
 END TurboForthProgram.

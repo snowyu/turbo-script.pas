@@ -421,7 +421,6 @@ type
         TInstruction)
     }
     procedure ExecuteInstruction(const aInstruction: TVMInstruction); overload;
-    function GetWordCFA(const aWord: string): Integer; override;
     {: create a Forth word header by internal }
     { Description
     only used in internal:
@@ -544,11 +543,6 @@ begin
   end
   else
     Result := '';
-end;
-
-function TTurboInterpreter.GetWordCFA(const aWord: string): Integer;
-begin
-  Result := -1;
 end;
 
 function TTurboInterpreter.iExecuteCFA(const aCFA: Integer): Integer;

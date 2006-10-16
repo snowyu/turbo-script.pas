@@ -27,9 +27,17 @@ uses
   ;
 
 type
+  PPreservedCodeMemory = ^ TPreservedCodeMemory;
+  PTurboVariableEntry = ^ TTurboVariableEntry;
+  PTurboModuleEntry = ^ TTurboModuleEntry;
+  PTurboWordEntry = ^ TTurboWordEntry;
+  PTurboTypeInfoEntry = ^ TTurboTypeInfoEntry;
+
   TCustomTurboPEFormat = class;
   TCustomTurboModule = class;
+  TCustomTurboExecutor = class;
   TTurboProgram = class;
+  TTurboPrintCharEvent = procedure(Sender: TCustomTurboExecutor; aChar: Char) of object;
   {: the abstract Portable Executable File Format. }
   { Description
   重定位地址:
@@ -77,6 +85,7 @@ type
     function GetStatus: TTurboProcessorStates;
     function GetTIB: string;
     function GetUsedMemory: Integer;
+    procedure SetLastWordEntry(const Value: PTurboWordEntry);
     procedure SetMemorySize(Value: Integer);
     procedure SetModuleType(Value: TTurboModuleType);
     procedure SetStatus(Value: TTurboProcessorStates);
@@ -138,7 +147,8 @@ type
     {: reduce the memory size to initialization state }
     procedure ClearMemory;
     function FindUnloadNotification(aProc: TNotifyEvent): Integer;
-    function GetWordCFA(const aWord: string): Integer; virtual;
+    {: 0 means not found. }
+    function GetWordCFA(const aWord: string): Integer;
     {: Load the body into the memory. }
     { Description
     Note: accessor must be assigned first.
@@ -181,7 +191,8 @@ type
     }
     property IsLoaded: Boolean read FIsLoaded write FIsLoaded;
     property LastErrorCode: TTurboProcessorErrorCode read GetLastErrorCode;
-    property LastWordEntry: PTurboWordEntry read GetLastWordEntry;
+    property LastWordEntry: PTurboWordEntry read GetLastWordEntry write
+            SetLastWordEntry;
     {: The Code Memory }
     property Memory: Pointer read FMemory write FMemory;
     {: : the Memory Size. }
@@ -292,6 +303,8 @@ type
   }
   TCustomTurboExecutor = class(TCustomTurboModule)
   protected
+    FOnPrintChar: TTurboPrintCharEvent;
+    procedure DoPrintChar(aChar: Char); virtual;
     {: Finalize after the execution. }
     procedure FinalizeExecution; virtual;
     {: : Run the CFA word. }
@@ -322,6 +335,8 @@ type
     }
     function ExecuteWord(const aWord: string): Integer;
     procedure Stop;
+    property OnPrintChar: TTurboPrintCharEvent read FOnPrintChar write
+            FOnPrintChar;
   end;
 
   TTurboProgram = class(TObject)
@@ -369,11 +384,6 @@ type
   end;
 
 
-  PPreservedCodeMemory = ^ TPreservedCodeMemory;
-  PTurboVariableEntry = ^ TTurboVariableEntry;
-  PTurboModuleEntry = ^ TTurboModuleEntry;
-  PTurboWordEntry = ^ TTurboWordEntry;
-  PTurboTypeInfoEntry = ^ TTurboTypeInfoEntry;
 
   TTurboExteralWordPFA = packed record
     ParamCount: Integer; 
@@ -424,7 +434,7 @@ type
     //## MeType: Pointer; //PMeType(@TTurboSymbolEntry.MeType) 
     TypeKind: TMeTypeKind;
     Name: ShortString; //packed ; maybe nil.
-    //other additional fields}
+    //Others Fields
   end;
 
   //the typecast for code memory area to get the parameters
@@ -625,7 +635,18 @@ end;
 
 function TCustomTurboModule.GetWordCFA(const aWord: string): Integer;
 begin
-  Result := -1;
+  Result := Integer(LastWordEntry);
+  while (Result <> 0) do
+  begin
+    if PTurboWordEntry(Result).Name = aWord then
+    begin
+      Result := Result + SizeOf(Pointer) + SizeOf(TTurboWordOptions) + SizeOf(LongWord) + 1
+        + Length(aWord) - Integer(FMemory);
+      exit;
+    end;
+    Result := Integer(PTurboWordEntry(Result).Prior);
+  end;
+  Result := 0;
 end;
 
 procedure TCustomTurboModule.Grow(const aSize: Integer = 0);
@@ -684,7 +705,7 @@ begin
   TurboConvertAddrRelatedToAbsolute(FMemory);
 
   FIsLoaded := True;
-  WriteLn('loaded ok.');
+  //WriteLn('loaded ok.');
 end;
 
 procedure TCustomTurboModule.NotifyModuleFree(Sender: TObject);
@@ -773,6 +794,11 @@ begin
   FModuleUnloadNotifies.Clear;
 end;
 
+procedure TCustomTurboModule.SetLastWordEntry(const Value: PTurboWordEntry);
+begin
+  PPreservedCodeMemory(FMemory).LastWordEntry := Value;
+end;
+
 procedure TCustomTurboModule.SetMemorySize(Value: Integer);
 var
   vOld: Pointer;
@@ -854,6 +880,12 @@ end;
 {
 ***************************** TCustomTurboExecutor *****************************
 }
+procedure TCustomTurboExecutor.DoPrintChar(aChar: Char);
+begin
+  if Assigned(FOnPrintChar) then
+    FOnPrintChar(Self, aChar);
+end;
+
 function TCustomTurboExecutor.ExecuteCFA(const aCFA: Integer): Integer;
 begin
   InitExecution;
@@ -991,8 +1023,7 @@ type
 procedure TurboConvertEntryRelatedToAbsolute(Mem: Pointer; aEntry: PTurboEntry);
 {$IFDEF PUREPASCAL}
 begin
-  if Assigned(aEntry) then
-    while aEntry.Prior <> nil do
+    while Assigned(aEntry) and (aEntry.Prior <> nil) do
     begin
       Integer(aEntry.Prior) := Integer(aEntry.Prior) + Integer(Mem);
       aEntry := aEntry.Prior;   
@@ -1009,7 +1040,7 @@ asm
 
   ADD  ECX, EAX
   MOV  [EDX].TTurboEntry.Prior, ECX
-  MOV  EDX, [ECX].TTurboEntry.Prior
+  MOV  EDX, ECX
   JMP  @@Loop
 @@exit:
 end;
@@ -1018,8 +1049,7 @@ end;
 procedure TurboConvertVarEntryRelatedToAbsolute(Mem: Pointer; aEntry: PTurboVariableEntry);
 {$IFDEF PUREPASCAL}
 begin
-  if Assigned(aEntry) then
-    while aEntry.Prior <> nil do
+    while Assigned(aEntry) and (aEntry.Prior <> nil) do
     begin
       Integer(aEntry.Prior) := Integer(aEntry.Prior) + Integer(Mem);
       if Assigned(aEntry.TypeInfo) then
@@ -1045,7 +1075,7 @@ asm
   MOV  [EDX].TTurboVariableEntry.TypeInfo, ECX
   MOV  ECX, [EDX].TTurboEntry.Prior
 @@skip:  
-  MOV  EDX, [ECX].TTurboEntry.Prior
+  MOV  EDX, ECX
   JMP  @@Loop
 @@exit:
 end;
@@ -1102,8 +1132,7 @@ procedure TurboConvertEntryAbsoluteToRelated(Mem: Pointer; aEntry: PTurboEntry);
 var
   P: PTurboEntry;
 begin
-  if Assigned(aEntry) then
-    while aEntry.Prior <> nil do
+    while Assigned(aEntry) and (aEntry.Prior <> nil) do
     begin
       p := aEntry.Prior;
       Integer(aEntry.Prior) := Integer(aEntry.Prior) - Integer(Mem);
@@ -1146,8 +1175,7 @@ procedure TurboConvertVarEntryAbsoluteToRelated(Mem: Pointer; aEntry: PTurboVari
 var
   P: PTurboVariableEntry;
 begin
-  if Assigned(aEntry) then
-    while aEntry.Prior <> nil do
+    while Assigned(aEntry) and (aEntry.Prior <> nil) do
     begin
       p := aEntry.Prior;
       Integer(aEntry.Prior) := Integer(aEntry.Prior) - Integer(Mem);

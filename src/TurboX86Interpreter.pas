@@ -443,6 +443,28 @@ procedure vCStore;
 begin
 end;
 
+//print a char
+procedure vEmit;
+asm
+  MOV  DL, BL  //DL <- TOS
+  XCHG ESP, EBP
+  POP  EBX
+  XCHG ESP, EBP
+  MOV  EAX, [EDI].TPreservedCodeMemory.Executor
+
+  PUSH EDI
+  PUSH EBX
+  PUSH ESI
+  PUSH EBP
+  MOV  ESI, [EAX]
+  CALL DWORD PTR [ESI + VMTOFFSET TTurboX86Interpreter.DoPrintChar]
+  POP  EBP
+  POP  ESI
+  POP  EBX
+  POP  EDI
+  JMP  iVMNext
+end;
+
 procedure InitTurboCoreWordList;
 begin
   {$ifdef TurboScript_FullSpeed}
@@ -471,6 +493,7 @@ begin
 
   GTurboCoreWords[inPushInt] := iVMPushInt;
   GTurboCoreWords[inPopInt] := iVMPopInt;
+  GTurboCoreWords[inEmit] := vEmit;
 
 end;
 

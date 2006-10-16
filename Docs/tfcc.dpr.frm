@@ -95,7 +95,7 @@ begin
 
       -->Grammar<--1.SourceFileName := aFileName;
       -->Grammar<--1.Execute;
-      -->Grammar<--1.ListStream.SaveToFile(ChangeFileExt(ParamStr(1),'.lst'));
+      -->Grammar<--1.ListStream.SaveToFile(ChangeFileExt(aFileName,'.lst'));
     finally
       DisplayObj.Free;
     end;

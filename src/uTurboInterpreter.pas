@@ -431,7 +431,7 @@ type
         TInstruction)
     }
     procedure ExecuteInstruction(const aInstruction: TVMInstruction); overload;
-    function GetWordCFA(const aWord: string): Integer; override;
+    function GetWordCFA(const aWord: string): Integer;
     {: create a Forth word header by internal }
     { Description
     only used in internal:

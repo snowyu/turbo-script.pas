@@ -1,3 +1,8 @@
+2006-10-16
++ define word feature done. test passed.
++ print char feature. TCustomTurboExecutor.OnPrintChar Event
+  EMIT(c --): send char out.
+
 2006-10-15
   文件扩展名定义:
     *.tf  Turbo Forth(ASM) Script Source

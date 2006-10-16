@@ -29,7 +29,8 @@ resourcestring
   rsParamStackOverflowError = 'Parameter Stack overflow';
   rsBadOpCodeError = 'Error: Bad OpCode Found.';
   rsLabelRedeclarationSyntaxError = 'Error: The Label name is redeclaration!.';
-  rsWordNameIsNilDeclarationError = 'Error: the declaration word name is null!';   
+  rsWordNameIsNilDeclarationError = 'Error: the declaration word name is null!';
+  rsUnknownWordError = 'Error: Unknown Word: no such word defined.';   
 
 type
   ETurboScriptError = class(Exception);
@@ -132,7 +133,8 @@ type
     inXORInt,
     inNEGATEInt, // Two's complement of top of stack (n -- -n)
     inNegateInt64, // Two's complement of top of stack (int64 -- -int64)
-    inABS, //(n -- |n|)
+    inABSInt, //(n -- |n|)
+    inABSInt64,
     
     {## Proc Operation Instruction: Flow Control }
     inJMP, //JUMP Absolute address(related to FMemory)
@@ -168,9 +170,10 @@ type
     inROTInt
 
     {## Return Stack Operation Instuction }
-    , RPushInt //>R: push to return stack  (int --) R(-- int)
-    , RPopInt  //R>: Pop from return stack (-- int) R(int --)
-    , RCopyInt //R@: Copy the TOS of return stack (-- int) R (int -- int)
+    , inRPushInt //>R: push to return stack  (int --) R(-- int)
+    , inRPopInt  //R>: Pop from return stack (-- int) R(int --)
+    , inRCopyInt //R@: Copy the TOS of return stack (-- int) R (int -- int)
+    , inEMIT  //(c --): send char out.
 
   ); 
 
