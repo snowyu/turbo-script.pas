@@ -22,11 +22,26 @@ interface
 
 uses
   SysUtils, Classes
-  , uMeTypes
+  //, uMeTypes
   , uTurboConsts
   ;
 
 type
+  {
+     @param ttSByte: Signed byte
+     @param ttUByte: Unsigned byte
+     @param ttSWord: Signed word
+     @param ttUWord: Unsigned word
+     @param ttSLong: Signed longword
+     @param ttULong: Unsigned longword
+  }
+  TTurboTypeKind = (ttUnknown, ttSByte, ttUByte, ttSWord, ttUWord, ttSLong, ttULong
+    , ttPointer, ttQWord, ttInt64, ttSet, ttEnumeration
+    , ttSingle, ttDouble, ttExtended, ttComp, ttCurrency
+    , ttVariant, ttRecord, ttArray, ttDynArray, ttClass
+    , ttString, ttShortString, ttWString, ttChar, ttWChar
+    , ttMethod, ttProcedure, ttInterface, ttParam
+  );
   PPreservedCodeMemory = ^ TPreservedCodeMemory;
   PTurboVariableEntry = ^ TTurboVariableEntry;
   PTurboModuleEntry = ^ TTurboModuleEntry;
@@ -79,17 +94,19 @@ type
     FVisibility: TTurboVisibility;
     function GetInitializeProc: Integer;
     function GetLastErrorCode: TTurboProcessorErrorCode;
+    function GetLastTypeInfoEntry: PTurboTypeInfoEntry;
+    function GetLastVariableEntry: PTurboVariableEntry;
     function GetLastWordEntry: PTurboWordEntry;
     function GetMemorySize: Integer;
     function GetModuleType: TTurboModuleType;
     function GetStatus: TTurboProcessorStates;
-    function GetTIB: string;
     function GetUsedMemory: Integer;
+    procedure SetLastTypeInfoEntry(const Value: PTurboTypeInfoEntry);
+    procedure SetLastVariableEntry(const Value: PTurboVariableEntry);
     procedure SetLastWordEntry(const Value: PTurboWordEntry);
     procedure SetMemorySize(Value: Integer);
     procedure SetModuleType(Value: TTurboModuleType);
     procedure SetStatus(Value: TTurboProcessorStates);
-    procedure SetTIB(Value: string);
     procedure SetUsedMemory(Value: Integer);
   protected
     {: The Code Memory }
@@ -146,7 +163,13 @@ type
     procedure AllocSpace(const aSize: Integer);
     {: reduce the memory size to initialization state }
     procedure ClearMemory;
+    {: nil means not found. }
+    function FindTypeInfoEntry(const aName: string): PTurboTypeInfoEntry;
     function FindUnloadNotification(aProc: TNotifyEvent): Integer;
+    {: nil means not found. }
+    function FindVariableEntry(const aName: string): PTurboVariableEntry;
+    {: nil means not found. }
+    function FindWordEntry(const aName: string): PTurboWordEntry;
     {: 0 means not found. }
     function GetWordCFA(const aWord: string): Integer;
     {: Load the body into the memory. }
@@ -191,6 +214,10 @@ type
     }
     property IsLoaded: Boolean read FIsLoaded write FIsLoaded;
     property LastErrorCode: TTurboProcessorErrorCode read GetLastErrorCode;
+    property LastTypeInfoEntry: PTurboTypeInfoEntry read GetLastTypeInfoEntry
+            write SetLastTypeInfoEntry;
+    property LastVariableEntry: PTurboVariableEntry read GetLastVariableEntry
+            write SetLastVariableEntry;
     property LastWordEntry: PTurboWordEntry read GetLastWordEntry write
             SetLastWordEntry;
     {: The Code Memory }
@@ -267,11 +294,6 @@ type
     property SP: Integer read FSP write FSP;
     {: the current status of the script. }
     property Status: TTurboProcessorStates read GetStatus write SetStatus;
-    {: the script source(TIB) }
-    { Description
-    TIB: text input Buffer
-    }
-    property TIB: string read GetTIB write SetTIB;
     {: 已经使用的内存 }
     { Description
     也就是指向最大的可用内存：
@@ -415,10 +437,11 @@ type
 
   TTurboVariableEntry = packed record
     Prior: PTurboVariableEntry; 
-    Addr: Pointer;
     Size: Integer;
+    Addr: Pointer; //offset address of the FMemory.
     TypeInfo: PTurboTypeInfoEntry; //TODO: relocate it.
     Name: ShortString;//packed
+    //Value: ....
   end;
   
   TTurboModuleEntry = packed record
@@ -432,7 +455,7 @@ type
     Prior: PTurboTypeInfoEntry; //nil means no more
     //## abondoned following fields are TypeInfo: PMeType
     //## MeType: Pointer; //PMeType(@TTurboSymbolEntry.MeType) 
-    TypeKind: TMeTypeKind;
+    TypeKind: TTurboTypeKind;
     Name: ShortString; //packed ; maybe nil.
     //Others Fields
   end;
@@ -452,9 +475,9 @@ type
     ReturnStackBottom: Pointer;
     UsedMemory: Integer;
     MemorySize: Integer; 
-    ToIn: Integer; //>IN the text buffer current index
-    TIBLength: Integer; //#TIB the text buffer length
-    TIB: array [0..cMAXTIBCount-1] of char; //'TIB
+    //ToIn: Integer; //>IN the text buffer current index
+    //TIBLength: Integer; //#TIB the text buffer length
+    //TIB: array [0..cMAXTIBCount-1] of char; //'TIB
     LastErrorCode: TTurboProcessorErrorCode;
     //如果ModuleType是模块，那么就是装载运行该模块前执行的初始化过程，入口地址
     //如果是函数，则是该函数的入口地址
@@ -468,6 +491,7 @@ type
     LastVariableEntry: PTurboVariableEntry;
     //RTTI TypeInfo 链表
     LastTypeInfoEntry: PTurboTypeInfoEntry;
+    //reserved: array [SizeOf() ] of byte; 
   end;
   
   TTurboModuleStreamHeader = packed record
@@ -478,6 +502,13 @@ type
   
 procedure TurboConvertAddrRelatedToAbsolute(Mem: PPreservedCodeMemory);
 procedure TurboConvertAddrAbsoluteToRelated(Mem: PPreservedCodeMemory);
+
+function GetTurboTypeSize(const aTypeKind: TTurboTypeKind): Integer;
+
+const
+  cByteTypes = [ttSByte, ttUByte, ttChar, ttSet];
+  cWordTypes = [ttSWord, ttUWord];
+  cLongWordTypes = [ttSLong, ttULong, ttPointer, ttProcedure];
 
 implementation
 
@@ -546,8 +577,13 @@ begin
 end;
 
 procedure TCustomTurboModule.ClearMemory;
+var
+  vPreserved: Integer;
 begin
-  ReallocMem(FMemory, SizeOf(TPreservedCodeMemory));
+  vPreserved := SizeOf(TPreservedCodeMemory);
+  if vPreserved < Integer(High(TTurboVMInstruction)) then
+      vPreserved := Integer(High(TTurboVMInstruction));
+  ReallocMem(FMemory, vPreserved);
   with PPreservedCodeMemory(FMemory)^ do
   begin
     MemorySize := SizeOf(TPreservedCodeMemory);
@@ -569,6 +605,22 @@ begin
   IsLoaded := False;
 end;
 
+function TCustomTurboModule.FindTypeInfoEntry(const aName: string):
+        PTurboTypeInfoEntry;
+begin
+  Result := LastTypeInfoEntry;
+  while (Result <> nil) do
+  begin
+    if Result.Name = aName then
+    begin
+      Exit;
+    end
+    else
+      Result := Result.Prior;
+  end;
+  Result := nil;
+end;
+
 function TCustomTurboModule.FindUnloadNotification(aProc: TNotifyEvent):
         Integer;
 var
@@ -584,6 +636,37 @@ begin
   Result := -1;
 end;
 
+function TCustomTurboModule.FindVariableEntry(const aName: string):
+        PTurboVariableEntry;
+begin
+  Result := LastVariableEntry;
+  while (Result <> nil) do
+  begin
+    if Result.Name = aName then
+    begin
+      Exit;
+    end
+    else
+      Result := Result.Prior;
+  end;
+  Result := nil;
+end;
+
+function TCustomTurboModule.FindWordEntry(const aName: string): PTurboWordEntry;
+begin
+  Result := LastWordEntry;
+  while (Result <> nil) do
+  begin
+    if Result.Name = aName then
+    begin
+      Exit;
+    end
+    else
+      Result := Result.Prior;
+  end;
+  Result := nil;
+end;
+
 function TCustomTurboModule.GetInitializeProc: Integer;
 begin
   Result := Integer(PPreservedCodeMemory(FMemory)^.InitializeProc);
@@ -592,6 +675,16 @@ end;
 function TCustomTurboModule.GetLastErrorCode: TTurboProcessorErrorCode;
 begin
   Result := PPreservedCodeMemory(FMemory).LastErrorCode;
+end;
+
+function TCustomTurboModule.GetLastTypeInfoEntry: PTurboTypeInfoEntry;
+begin
+  Result := PPreservedCodeMemory(FMemory).LastTypeInfoEntry;
+end;
+
+function TCustomTurboModule.GetLastVariableEntry: PTurboVariableEntry;
+begin
+  Result := PPreservedCodeMemory(FMemory).LastVariableEntry;
 end;
 
 function TCustomTurboModule.GetLastWordEntry: PTurboWordEntry;
@@ -614,20 +707,6 @@ begin
   Result := PPreservedCodeMemory(FMemory).States;
 end;
 
-function TCustomTurboModule.GetTIB: string;
-var
-  I: Integer;
-begin
-  i := PPreservedCodeMemory(FMemory).TIBLength;
-  if i > 0 then
-  begin
-    SetLength(Result, i);
-    Move(PPreservedCodeMemory(FMemory).TIB, PChar(Result)^, i);
-  end
-  else
-    Result := '';
-end;
-
 function TCustomTurboModule.GetUsedMemory: Integer;
 begin
   Result := PPreservedCodeMemory(FMemory).UsedMemory;
@@ -635,18 +714,10 @@ end;
 
 function TCustomTurboModule.GetWordCFA(const aWord: string): Integer;
 begin
-  Result := Integer(LastWordEntry);
-  while (Result <> 0) do
-  begin
-    if PTurboWordEntry(Result).Name = aWord then
-    begin
-      Result := Result + SizeOf(Pointer) + SizeOf(TTurboWordOptions) + SizeOf(LongWord) + 1
+  Result := Integer(FindWordEntry(aWord));
+  if Result <> 0 then
+    Result := Result + SizeOf(Pointer) + SizeOf(TTurboWordOptions) + SizeOf(LongWord) + 1
         + Length(aWord) - Integer(FMemory);
-      exit;
-    end;
-    Result := Integer(PTurboWordEntry(Result).Prior);
-  end;
-  Result := 0;
 end;
 
 procedure TCustomTurboModule.Grow(const aSize: Integer = 0);
@@ -794,6 +865,18 @@ begin
   FModuleUnloadNotifies.Clear;
 end;
 
+procedure TCustomTurboModule.SetLastTypeInfoEntry(const Value:
+        PTurboTypeInfoEntry);
+begin
+  PPreservedCodeMemory(FMemory).LastTypeInfoEntry := Value;
+end;
+
+procedure TCustomTurboModule.SetLastVariableEntry(const Value:
+        PTurboVariableEntry);
+begin
+  PPreservedCodeMemory(FMemory).LastVariableEntry := Value;
+end;
+
 procedure TCustomTurboModule.SetLastWordEntry(const Value: PTurboWordEntry);
 begin
   PPreservedCodeMemory(FMemory).LastWordEntry := Value;
@@ -821,29 +904,6 @@ end;
 procedure TCustomTurboModule.SetStatus(Value: TTurboProcessorStates);
 begin
   PPreservedCodeMemory(FMemory).States := Value;
-end;
-
-procedure TCustomTurboModule.SetTIB(Value: string);
-var
-  I: Integer;
-begin
-  if Value <> '' then
-  begin
-    i := Length(Value);
-    if i >= cMAXTIBCount then
-    begin
-      i := cMAXTIBCount-1;
-      SetLength(Value, i);
-      Value := Value + #0;
-    end;
-    Move(PChar(Value)^, PPreservedCodeMemory(FMemory).TIB, i+1);
-    PPreservedCodeMemory(FMemory).ToIN := 0;
-    PPreservedCodeMemory(FMemory).TIBLength := i;
-  end
-  else begin
-    PPreservedCodeMemory(FMemory).TIB[0] := #0;
-    PPreservedCodeMemory(FMemory).TIBLength := 0;
-  end;
 end;
 
 procedure TCustomTurboModule.SetUsedMemory(Value: Integer);
@@ -1019,6 +1079,17 @@ type
   TTurboEntry = packed record
     Prior: Pointer;
   end;
+
+function GetTurboTypeSize(const aTypeKind: TTurboTypeKind): Integer;
+begin
+  case aTypeKind of
+    ttSByte, ttUByte, ttChar, ttSet: Result := SizeOf(Byte);
+    ttSWord, ttUWord: Result := SizeOf(Word);
+    ttQWord, ttInt64: Result := SizeOf(Int64);
+  else
+    Result := SizeOf(Integer);
+  end;
+end;
 
 procedure TurboConvertEntryRelatedToAbsolute(Mem: Pointer; aEntry: PTurboEntry);
 {$IFDEF PUREPASCAL}

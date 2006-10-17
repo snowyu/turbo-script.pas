@@ -2,7 +2,7 @@ $C-  //Generate Delphi test project
 $E-  //Generate a component registration unit
 $Z+  //Generate console app
 
-COMPILER TurboForthProgram
+COMPILER TurboForthCompiler
 
 DELPHI
 
@@ -10,10 +10,15 @@ USES (INTERFACE) uStrUtils, uTurboConsts, uTurboExecutor
 
 TYPE
   TTurboLabelDeclarationRec = packed record
-    Name: string;
+    Name: String;
     Addr: Integer;
   end;
   
+  TTurboConstDeclarationRec = packed record
+    Name: String;
+    //TypeKind: TTurboTypeKind;
+    Value: String;
+  end;
 
 PRIVATE
   FInitProcCFA: Integer;
@@ -21,10 +26,11 @@ PRIVATE
   FLastWordCfa: Integer;
   FModule: TCustomTurboModule;
   FLabels: array of TTurboLabelDeclarationRec;
+  FConsts: array of TTurboConstDeclarationRec;
   procedure Init;
   procedure Final;
-  procedure WriteStr(S : string);
-  procedure WriteStrLn(S : string);
+  procedure WriteStr(S : String);
+  procedure WriteStrLn(S : String);
   procedure DefineWordBegin(const aName: ShortString);
   procedure DefineWordEnd;
   procedure AddWord(const aName: string);
@@ -34,6 +40,14 @@ PRIVATE
   function FindLabel(const aName: string): Integer;
   //if not find then add new label, return label index else raise error.
   function AddLabelEx(const aName: string): Integer;
+  function  AddConst(const aName, aValue: String): Integer;
+  //if not find then add new , return index else raise error.
+  function  AddConstEx(const aName, aValue: String): Integer;
+  function FindConst(const aName: String): Integer;
+  function GetConstValue(aName: string): String;
+
+  //if not find then add new , return index else raise error.
+  procedure AddVar(const aName: string; aType: TTurboTypeKind; const aValue: String = ''; aVisibility: TTurboVisibility = fvPublished);
 PROTECTED
 
 PUBLIC
@@ -47,6 +61,8 @@ ERRORS
     cLabelRedeclarationError : Result := rsLabelRedeclarationSyntaxError;
     cWordNameIsNilDeclarationError: Result := rsWordNameIsNilDeclarationError;
     cUnknownWordError: Result := rsUnknownWordError;
+    cConstRedeclarationError : Result := rsConstRedeclarationSyntaxError;
+    cVarRedeclarationError : Result := rsVarRedeclarationSyntaxError;
 
 PUBLISHED
 
@@ -57,6 +73,20 @@ Const
   cLabelRedeclarationError = 300;
   cWordNameIsNilDeclarationError = 301;
   cUnknownWordError = 302;
+  cVarRedeclarationError = 303;
+  cConstRedeclarationError = 304;
+
+function T-->Grammar<--.GetConstValue(aName: String): String;
+var
+  i: Integer;
+begin
+  for i := 0 to Length(FConsts) do
+    if aName = FConsts[i].Name then
+    begin
+      Result := FConsts[i].Value;
+    end;
+  SynError(cUnknownWordError);
+end;
 
 function T-->Grammar<--.AddLabel(const aName: string): Integer;
 begin
@@ -85,7 +115,6 @@ procedure T-->Grammar<--.AddWord(const aName: string);
 var
   vCFA: Integer;
 begin
-  writeln('AddW');
   vCFA := FModule.GetWordCFA(aName);
   if vCFA <> 0 then
   begin
@@ -93,7 +122,76 @@ begin
   end
   else 
     SynError(cUnknownWordError);
-  writeln('AddE');
+end;
+
+function T-->Grammar<--.AddConstEx(const aName, aValue: String): Integer;
+begin
+  Result := FindConst(aName);
+  if Result = -1 then
+  begin
+    Result := AddConst(aName, aValue);
+  end
+  else 
+    SynError(cConstRedeclarationError);
+end;
+
+function T-->Grammar<--.AddConst(const aName, aValue: String): Integer;
+begin
+  Result := Length(FConsts);
+  SetLength(FConsts, Result+1);
+  with FConsts[Result] do
+  begin
+    Name := aName;
+    Value := aValue;
+  end;
+end;
+
+function T-->Grammar<--.FindConst(const aName: String): Integer;
+begin
+  for Result := 0 to Length(FConsts)-1 do
+  begin
+    if aName = FConsts[Result].Name then exit;
+  end;
+  Result := -1;
+end;
+
+procedure T-->Grammar<--.AddVar(const aName: string; aType: TTurboTypeKind; const aValue: String; aVisibility: TTurboVisibility);
+var
+  vVaraibleEntry: PTurboVariableEntry;
+  vValue: Pointer;
+  vTypeSize: Integer;
+begin
+  Integer(vVaraibleEntry) := Integer(FModule.Memory) + FModule.UsedMemory;
+  vTypeSize := GetTurboTypeSize(aType);
+  FModule.AddIntToMem(Integer(FModule.LastVariableEntry));
+  FModule.AddIntToMem(vTypeSize);
+  FModule.AddIntToMem(0); //preserved.for addr.
+  if aVisibility >= fvPublished then
+  begin
+    FModule.AddByteToMem(Length(aName));
+    //Integer(P) := (FModule.Memory) + FModule.UsedMemory;
+    //FModule.AllocSpace(Length(aName));
+    FModule.AddBufferToMem(aName[1], Length(aName));
+    
+  end
+  else 
+  begin
+    FModule.AddByteToMem(0);
+  end;
+
+  Integer(vVaraibleEntry.Addr) := FModule.UsedMemory;
+  Integer(vValue) := Integer(FModule.Memory)  + FModule.UsedMemory;
+  FModule.AllocSpace(vTypeSize);
+  //CopyTurboTypeVar(aValue, vValue^, aType);
+  case aType of
+    ttSByte: PShortInt(vValue)^  := StrToInt(aValue);
+    ttUByte, ttChar, ttSet: PByte(vValue)^ := StrToInt(aValue);
+    ttSWord:PSmallInt(vValue)^ := StrToInt(aValue);
+    ttUWord: PWord(vValue)^ := StrToInt(aValue);
+    ttSLong: PInteger(vValue)^ := StrToInt(aValue);
+    ttULong: PLongWord(vValue)^ := StrToInt(aValue);
+    ttQWord, ttInt64: PInt64(vValue)^:= StrToInt(aValue);
+  end;
 end;
 
 procedure T-->Grammar<--.DefineWordBegin(const aName: ShortString);
@@ -127,18 +225,15 @@ begin
 end;
 
 function T-->Grammar<--.FindLabel(const aName: string): Integer;
-var
-  i: integer;
 begin
-  Result := -1;
-  for i := 0 to length(FLabels) -1 do
+  for Result := 0 to length(FLabels) -1 do
   begin
-    if SameText(aName, FLabels[i].Name) then
+    if SameText(aName, FLabels[Result].Name) then
     begin
-      Result := i;
-      break;
+      exit;
     end;
   end;
+  Result := -1;
 end;
 
 
@@ -150,6 +245,7 @@ begin
     MemorySize := cMaxMemorySize;
   end;
   SetLength(FLabels, 0);
+  SetLength(FConsts, 0);
   //writeln('SourceFileName=', SourceFileName);
   FileName := ExtractFileBaseName(SourceFileName) + cTurboCompiledProgramFileExt;
   //writeln('FileName=', FileName);
@@ -247,8 +343,8 @@ COMMENTS FROM "//" TO EOL
 
 PRODUCTIONS
 
-  (* TurboForthProgram = Statement {Statement}  . *)  
-  TurboForthProgram 
+  (* TurboForthCompiler = Statement {Statement}  . *)  
+  TurboForthCompiler 
     =                                                  (. Init ; .)  
     "PROGRAM" Identifier                               (. FModule.Name := LexString; .)
     [DeclarationBlock]
@@ -261,7 +357,54 @@ PRODUCTIONS
     = 
     Declaration {Declaration}.
 
-  Declaration = DefineWord .
+  Declaration = DefineConstPart| DefineVarPart | DefineWord .
+
+  DefineConstPart
+    =
+    "CONST" DefineConstant {DefineConstant} 
+  .
+
+  DefineConstant
+    (.Var vName, vValue: string; .) 
+    = 
+    Identifier (. vName := LexString; .) "=" Value<vValue> ";" 
+    (. AddConstEx(vName, vValue); .) .
+
+  DefineVarPart
+    = 
+    "VAR" DefineVariable {DefineVariable}
+  .
+
+  DefineVariable
+    (.Var vName: string; vType: TTurboTypeKind; vValue: string; .)
+    = 
+    Identifier (. vName := LexString; if FModule.FindVariableEntry(vName) <> nil then SynError(cVarRedeclarationError); .)
+    ":" TypeKind<vType> 
+    ["=" Value<vValue>]
+    ";" (. AddVar(vName, vType, vValue) .)
+  .
+
+  TypeKind<out aType: TTurboTypeKind> 
+    =
+    IntegerType <aType>
+  .
+  IntegerType<var aSubType: TTurboTypeKind>
+    =
+    "BYTE"                                            (. aSubType := ttUByte; .)
+    |"WORD"                                           (. aSubType := ttUWord; .)
+    |"DWORD"                                          (. aSubType := ttULong; .)
+    |"INTEGER"                                        (. aSubType := ttSLong; .)
+    |"QWORD"                                          (. aSubType := ttQWord; .)
+    |"INT64"                                          (. aSubType := ttInt64; .)
+  .
+
+  Value< out aValue: string >
+    =
+    StringToken                                       (. aValue := AnsiDequotedStr(LexString, ''''); .)
+    |IntegerToken                                     (. aValue := LexString; .)
+    |HexNumberToken                                   (. aValue := LexString; .)
+    |Identifier                                       (. aValue := GetConstValue(LexString); .)
+  .
 
   DefineWord
     =
@@ -296,4 +439,4 @@ PRODUCTIONS
   PushStringStatement = "#" StringToken (. PushString(); .) .
 
   WordStatement = Identifier (. AddWord(LexString); .).
-END TurboForthProgram.
+END TurboForthCompiler.

@@ -28,9 +28,11 @@ resourcestring
   rsParamStackUnderflowError = 'Parameter Stack underflow.';
   rsParamStackOverflowError = 'Parameter Stack overflow';
   rsBadOpCodeError = 'Error: Bad OpCode Found.';
-  rsLabelRedeclarationSyntaxError = 'Error: The Label name is redeclaration!.';
+  rsLabelRedeclarationSyntaxError = 'Error: The Label name is redeclareted!.';
   rsWordNameIsNilDeclarationError = 'Error: the declaration word name is null!';
   rsUnknownWordError = 'Error: Unknown Word: no such word defined.';   
+  rsVarRedeclarationSyntaxError = 'Error: The Variable name is redeclareted!.';
+  rsConstRedeclarationSyntaxError = 'Error: The Constant name is redeclareted!.';
 
 type
   ETurboScriptError = class(Exception);

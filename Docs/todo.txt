@@ -1,8 +1,19 @@
+2006-10-17
++ Varaible define: 全局变量定义.
++ const define
+
+变量分为: 
+  全局变量: 在代码空间内分配的,放在LastVariableEntry
+  局部变量: 在数据栈上分配的,退出的时候释放.
+  堆变量: 使用GetMem分配的,多用于字符串.
+
+- TCustomTurboModule.TIB
+
 2006-10-16
 + define word feature done. test passed.
 + print char feature. TCustomTurboExecutor.OnPrintChar Event
   EMIT(c --): send char out.
-+ #'123'(-- 33 32 31) push the reverse string to parameter stack.
++ #'123'(-- 43 42 41) push the reverse string to parameter stack.
 
 2006-10-15
   文件扩展名定义:
