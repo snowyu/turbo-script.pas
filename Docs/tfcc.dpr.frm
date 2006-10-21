@@ -94,7 +94,10 @@ begin
       -->Grammar<--1.OnFailure := DisplayObj.OnFailure;
 
       -->Grammar<--1.SourceFileName := aFileName;
-      -->Grammar<--1.Execute;
+      try
+        -->Grammar<--1.Execute;
+      except
+      End;
       -->Grammar<--1.ListStream.SaveToFile(ChangeFileExt(aFileName,'.lst'));
     finally
       DisplayObj.Free;

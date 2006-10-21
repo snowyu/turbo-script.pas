@@ -1,4 +1,8 @@
 {: Turbo Script command line intercepter}
+{ Description
+  开关：
+  -d: 显示调试信息（显示数据栈和返回栈数据）
+}
 program tsrun;
 
 {$APPTYPE CONSOLE}
@@ -14,11 +18,18 @@ type
   TMyInterpreter = Class(TTurboX86Interpreter)
   protected
     procedure DoPrintChar(aChar: Char); override;
+    procedure DoPrintString(const aStr: String); override;
   end;
 
 procedure TMyInterpreter.DoPrintChar(aChar: Char);
 begin
 	 write(aChar);
+end;
+
+procedure TMyInterpreter.DoPrintString(const aStr: String);
+begin
+	 //writeLN('DOSting:');
+	 write(aStr);
 end;
 
 const
@@ -52,6 +63,7 @@ var
   aFileName: string;
   s: string;
   CountFreq: Int64;
+  vShowDebugInfo: Boolean;
 begin
 	QueryPerformanceFrequency(CountFreq);
   Writeln(Copyright);
@@ -76,6 +88,7 @@ begin
   	Writeln(aFileName + ' is not exists.');
   	exit;
   end;
+  vShowDebugInfo := FindCmdLineSwitch('d');
 
   c := 0;
     GTurboExecutor := TMyInterpreter.Create;
@@ -91,7 +104,8 @@ begin
       begin
         //CFA := UsedMemory;
         //IsLoaded := True;
-        writeln(aFileName + ' loading...');
+        if vShowDebugInfo then writeln(aFileName + ' loading...');
+        writeln('');
         LoadFromFile(aFileName);
         Reset;
         CFA := InitializeProc;
@@ -103,7 +117,7 @@ begin
         lastErr := LastErrorCode;
 
         Integer(P) := SP;
-        if Integer(P) < (Integer(ParameterStack)+cStackMaxSize-SizeOf(Integer))  then
+        if vShowDebugInfo and (Integer(P) < (Integer(ParameterStack)+cStackMaxSize-SizeOf(Integer)))  then
         begin
         WriteLn('The ParameterStack Data :');
         i := 0;
@@ -124,7 +138,7 @@ begin
         end;
 
         Integer(P) := RP;
-        if Integer(P) < (Integer(ReturnStack)+cStackMaxSize) then
+        if vShowDebugInfo and (Integer(P) < (Integer(ReturnStack)+cStackMaxSize)) then
         begin
         WriteLn('The ReturnStack Data :');
         i := 0;
@@ -154,6 +168,13 @@ begin
 
   WriteLn('');
   if lastErr <> errNone then
+  begin
+    WriteLn('');
     writeln('lasterr=', Integer(lasterr));
-  writeln('ScriptExecTime:',c/CountFreq*1000, ' (ms)');
+  end;
+  if vShowDebugInfo then 
+  begin
+    WriteLn('');
+    writeln('ScriptExecTime:',c/CountFreq*1000, ' (ms)');
+  end;
 end.

@@ -16,14 +16,11 @@ uses
 type
   TCustomTurboWord = class;
   TTurboWord = class;
-  TTurboSymbolList = class;
   TTurboVariableList = class;
   TTurboWordList = class;
   TTurboModuleList = class;
   TTTurboModule = class;
   TCustomTurboCompiler = class;
-  TCustomTurboSymbol = class;
-  TTurboVariableSymbol = class;
   TTurboTypeSymbol = class;
   TAbstractTurboWordSymbol = class;
   TTurboOpCodeSymbol = class;
@@ -40,7 +37,8 @@ type
     procedure DoCompile; virtual;
     class procedure InitModuleType; virtual;
   public
-    constructor Create; override;
+    constructor Create(const aParent: TCustomTurboModule = nil; aVisibility:
+            TTurboVisibility = fvPublished); override;
     destructor Destroy; override;
     { Description
     根据编译开关将这些列表的类编译进入Memory.
@@ -63,14 +61,6 @@ type
   protected
     procedure DoCompile; override;
     class procedure InitModuleType; override;
-  end;
-
-  TTurboSymbolList = class(TList)
-  protected
-    FOwner: TObject;
-    procedure Notify(Ptr: Pointer; Action: TListNotification); override;
-  public
-    constructor Create(aOwner: TObject); reintroduce;
   end;
 
   TTurboVariableList = class(TTurboSymbolList)
@@ -117,41 +107,14 @@ type
     procedure DoCompile; override;
     class procedure InitModuleType; override;
   public
-    constructor Create; override;
+    constructor Create(const aParent: TCustomTurboModule = nil; aVisibility:
+            TTurboVisibility = fvPublished); override;
     destructor Destroy; override;
     {: 它的子模块列表:被 Parser 或Tree使用 }
     property Childs: TTurboModuleList read FChilds write FChilds;
   end;
 
   TCustomTurboCompiler = class(TCustomTurboObject)
-  end;
-
-  TCustomTurboSymbol = class(TObject)
-  private
-    FCaption: string;
-    FDescription: string;
-    FName: string;
-    FParent: TCustomTurboSymbol;
-    FRefs: LongInt;
-    FTypeInfo: PMeType;
-  public
-    property Caption: string read FCaption write FCaption;
-    property Description: string read FDescription write FDescription;
-    {: the symbol name }
-    property Name: string read FName write FName;
-    property Parent: TCustomTurboSymbol read FParent write FParent;
-    {: Indicates how many times this label is refered in the parsed code }
-    { Description
-    }
-    property Refs: LongInt read FRefs write FRefs;
-    property TypeInfo: PMeType read FTypeInfo write FTypeInfo;
-  end;
-
-  TTurboVariableSymbol = class(TCustomTurboSymbol)
-  private
-    FAddr: Integer;
-  public
-    property Addr: Integer read FAddr write FAddr;
   end;
 
   TTurboTypeSymbol = class(TCustomTurboSymbol)
@@ -214,9 +177,10 @@ implementation
 {
 ******************************* TCustomTurboWord *******************************
 }
-constructor TCustomTurboWord.Create;
+constructor TCustomTurboWord.Create(const aParent: TCustomTurboModule = nil;
+        aVisibility: TTurboVisibility = fvPublished);
 begin
-  inherited Create;
+  inherited Create(aParent, aVisibility);
   InitModuleType;
   FSymbols := TList.Create;
   FUsedModules := TList.Create;
@@ -287,24 +251,6 @@ end;
 class procedure TTurboWord.InitModuleType;
 begin
   FModuleType := mtFunction;
-end;
-
-{
-******************************* TTurboSymbolList *******************************
-}
-constructor TTurboSymbolList.Create(aOwner: TObject);
-begin
-  inherited Create;
-  FOwner := aOwner;
-end;
-
-procedure TTurboSymbolList.Notify(Ptr: Pointer; Action: TListNotification);
-begin
-  if (Action = lnDeleted) and (TObject(Ptr) is TObject) then
-  begin
-    TObject(Ptr).Free;
-    Ptr := nil;
-  end;
 end;
 
 {
@@ -382,9 +328,10 @@ end;
 {
 ******************************** TTTurboModule *********************************
 }
-constructor TTTurboModule.Create;
+constructor TTTurboModule.Create(const aParent: TCustomTurboModule = nil;
+        aVisibility: TTurboVisibility = fvPublished);
 begin
-  inherited Create;
+  inherited Create(aParent, aVisibility);
   FChilds := TTurboModuleList.Create(Self);
 end;
 

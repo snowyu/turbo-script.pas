@@ -374,6 +374,33 @@ asm
   JMP  iVMNext
 end;
 
+procedure iVMPushInt64;
+asm
+  //Decrement the data stack pointer.
+  //push the second data to the data stack.
+  XCHG ESP, EBP
+  PUSH EBX
+  LODSD
+  MOV  EBX, EAX
+  LODSD
+  PUSH EAX
+  XCHG ESP, EBP
+  JMP  iVMNext
+end;
+
+procedure iVMPopInt64;
+asm
+  XCHG ESP, EBP
+  POP  EBX
+  POP  EBX
+  XCHG ESP, EBP
+  {//move the top in stack to EAX 
+  MOV  EDX, [EBP] 
+  //Increment the data stack pointer.
+  ADD  EBP, Type(Integer)
+  }
+  JMP  iVMNext
+end;
 //(n, n1) -- (n = n + n1)
 procedure iVMAddInt;
 asm
@@ -427,16 +454,24 @@ asm
   JMP  iVMNext
 end;
 
-procedure vFetch;
-begin
+procedure vFetchInt;
+asm
+  //EBX is TOS
+  ADD EBX, EDI //TOS <- TOS + FMem
+  MOV EBX, [EBX]
+  JMP  iVMNext
 end;
 
 procedure vStore;
 begin
 end;
 
-procedure vCFetch;
-begin
+procedure vCFetchInt;
+asm
+  //EBX is TOS
+  ADD EBX, EDI //TOS <- TOS + FMem
+  MOV BL, [EBX]
+  JMP  iVMNext
 end;
 
 procedure vCStore;
@@ -444,7 +479,7 @@ begin
 end;
 
 //print a char
-procedure vEmit;
+procedure vEmitChar;
 asm
   MOV  DL, BL  //DL <- TOS
   XCHG ESP, EBP
@@ -458,6 +493,52 @@ asm
   PUSH EBP
   MOV  ESI, [EAX]
   CALL DWORD PTR [ESI + VMTOFFSET TTurboX86Interpreter.DoPrintChar]
+  POP  EBP
+  POP  ESI
+  POP  EBX
+  POP  EDI
+  JMP  iVMNext
+end;
+
+//print ShortString
+procedure vEmitString;
+asm
+  MOV  EDX, EBX  //EDX <- TOS
+  XCHG ESP, EBP
+  POP  EBX
+  XCHG ESP, EBP
+  MOV  EAX, [EDI].TPreservedCodeMemory.Executor
+
+  PUSH EDI
+  PUSH EBX
+  PUSH ESI
+  PUSH EBP
+  ADD  EDX, EDI
+  //MOV  ESI, [EAX]
+  CALL TTurboX86Interpreter.DoPrintShortString
+  POP  EBP
+  POP  ESI
+  POP  EBX
+  POP  EDI
+  JMP  iVMNext
+end;
+
+//print AnsiString
+procedure vEmitLString;
+asm
+  MOV  EDX, EBX  //EDX <- TOS
+  XCHG ESP, EBP
+  POP  EBX
+  XCHG ESP, EBP
+  MOV  EAX, [EDI].TPreservedCodeMemory.Executor
+
+  PUSH EDI
+  PUSH EBX
+  PUSH ESI
+  PUSH EBP
+  ADD  EDX, EDI
+  MOV  ESI, [EAX]
+  CALL DWORD PTR [ESI + VMTOFFSET TTurboX86Interpreter.DoPrintString]
   POP  EBP
   POP  ESI
   POP  EBX
@@ -486,14 +567,18 @@ begin
   GTurboCoreWords[inMULInt] := iVMMulInt;
 
   //Memory Operation Instruction with Param Stack
-  GTurboCoreWords[inFetchInt] := vFetch;
+  GTurboCoreWords[inFetchInt] := vFetchInt;
   GTurboCoreWords[inStoreInt] := vStore;
-  GTurboCoreWords[inFetchByte] := vCFetch;
+  GTurboCoreWords[inFetchByte] := vCFetchInt;
   GTurboCoreWords[inStoreByte] := vCStore;
 
   GTurboCoreWords[inPushInt] := iVMPushInt;
   GTurboCoreWords[inPopInt] := iVMPopInt;
-  GTurboCoreWords[inEmit] := vEmit;
+  GTurboCoreWords[inPushQWord] := iVMPushInt64;
+  GTurboCoreWords[inPopQWord] := iVMPopInt64;
+  GTurboCoreWords[inEmit] := vEmitChar;
+  GTurboCoreWords[inEmitString] := vEmitString;
+  GTurboCoreWords[inEmitLString] := vEmitLString;
 
 end;
 

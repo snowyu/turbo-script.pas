@@ -11,7 +11,7 @@ const
   cFORTHHeaderMagicId = 'TURBO4TH';
   cFORTHHeaderMagicIdLen = 8; 
   //cFORTHMagicWordSize = SizeOf(cFORTHHeaderMagicWord);
-  cDefaultStackSize = 127;
+  cDefaultReturnStackSize = 127;
   cDefaultParamStackSize = 127; 
   cDefaultFreeMemSize = 1024 * 8; //the Free Memory 8kb
   cMAXTIBCount = 1024;
@@ -33,6 +33,7 @@ resourcestring
   rsUnknownWordError = 'Error: Unknown Word: no such word defined.';   
   rsVarRedeclarationSyntaxError = 'Error: The Variable name is redeclareted!.';
   rsConstRedeclarationSyntaxError = 'Error: The Constant name is redeclareted!.';
+  rsRedeclarationSyntaxError  = 'Error: The Identifier is redeclareted!.';
 
 type
   ETurboScriptError = class(Exception);
@@ -119,6 +120,8 @@ type
     inMinInt, //Return the smaller of top two n1<n2 (n1,n2 -- n1)
     inMaxInt, //Return the bigger of top two n1<n2 (n1,n2 -- n2)
     inWithinUnsignedInt, //( u ul uh -- t )          Return true if ul <= u < uh …^égƒÈ
+    inAddStr, //(pShortString1 pShortString2 ---- pResult)
+    inAddLStr, //(pAnsiString1 pAnsiString2 ---- pAnsiResult)
 
     {## Logical instructions }
     {## for Integer}
@@ -176,6 +179,8 @@ type
     , inRPopInt  //R>: Pop from return stack (-- int) R(int --)
     , inRCopyInt //R@: Copy the TOS of return stack (-- int) R (int -- int)
     , inEMIT  //(c --): send char out.
+    , inEmitString // (ShortStringAddr -- )
+    , inEmitLString // (AnsiStringAddr -- )
 
   ); 
 

@@ -1,3 +1,65 @@
+2006-10-20
++ [ASM] 定义常量，变量
+  编译通过
+  不过未能实现常量表达式的合并。
+  常量测试完毕
+  变量测试完毕
+  暂时不实现 PushByte, pushWord 指令，全部以PushInt指令的形式实现。
++ 内部过程指令(也许在最终版本中删去)：
+  等俺调用外部函数的通用指令搞好后，这些就用不着了。
+  + .S(aStr: pShortString); (aStr -- ) 注意该地址是相对地址＝ Addr + Integer(FMemory)
+  + .LS(aStr: pAnsiString); (aStr -- )
+
+!* 当编译时候增加内存，有可能会发生FMemory的移动，这个时候，我用的是绝对地址，就会出错！！
+  我应该根据编译状态，在编译的时候全部使用相对地址！！
+  
+!+ [ASM] Imports XXX,XXX2; 导入指令，可以讲其它源程序单元导入到直接，相当于 Include.
+!+ [ASM] Uses XXX. XXX; 单元链接指令，相当于列举要使用的DLL表！！
+
+
+* [Bug]  f发现在动态数组的 Object 中使用 长字符串 Name 记录出现错误，莫名奇妙的乱指！！
+  改成ShortString,后正常。
+  TTurboSimpleConst = object
+  public
+    Name: ShortString;
+
+  TTurboSimpleVar = object(TTurboSimpleConst)
+  FVars: array of TTurboSimpleVar;
+  如果name 是 string 那么就出怪事情了：
+  var
+    ss: string = '';
+  : Add + ;
+  这个时候报告 Add 是重复的，发现是FVars中最后一个的Name域乱套的原因。
+  明白了，我是直接整个记录 赋值，这样就不能让Name的字符串引用增加，看看是不是这个原因。
+  tmd,不行还是同样的错误！！
+  
+
+~ [Coco/R] SynError 并不引起异常退出，而是将当前错误记入List，继续编译！！
+
+
+2006-10-19
+~ 需要知道Delphi是怎么处理将常量字符串赋值给变量的。
+  首先将常量字符串放入内存区域（在程序的最后面）。然后指明字符串所在地址，调用一个函数将其复制到变量中！！
+  在俺的一次汇编中无法实现这样的东东！！只能是嵌入。换句话说，如果是常量定义就立即在内存开辟空间。
+
+  Delphi的全局变量放在程序的后面
+  
+AnsiString: 常量 
+'0123456789'
+$FFFF(引用计数) $000A(字符Count)  '0123456789' $00 (它的所有常量在内存中都是Aligned),空白处用00填充。
+
+2006-10-18
+~  EMIT, #'' 指令为临时测试用!!
+* 修改了 TTurboProgram 从CustomExecutor派生了.
+  然后 增加了 ExecutorClass 使用前必须赋值!
+  将Executor 的Visibility 作为私有, 这样使用Program 的内存
+* TCustomTurboModule  : 当 StoredInParent 的时候不要释放内存. 
+  不过是否要ClearMemory起作用??
+  不要,当StoredInParent 时候,不能清除内存!!因为内存是父亲的! 
+  还有对于StoredInParent 的,Unload 不会起作用,因为已经装入到父亲了,除非是父亲卸载..
++ uTurboSymbols
+  准备使用
+
 2006-10-17
 + Varaible define: 全局变量定义.
 + const define
