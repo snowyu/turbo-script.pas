@@ -13,6 +13,5 @@
 {$Define TurboScript_DataStack_Overflow_Inspect} 
 {$Define TurboScript_ReturnStack_Overflow_Inspect}
 {$Define TurboScript_Memory_Overflow_Inspect}
-{.$Define TurboScript_FullSpeed}
 
 {$ENDIF ~TurboScript_INC}

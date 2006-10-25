@@ -80,8 +80,6 @@ implementation
 procedure iVMInit;forward;
 procedure iVMNext;forward;
 procedure iVMHalt;forward;
-procedure iVMNextFullSpeed;forward;
-procedure iVMHaltFullSpeed;forward;
 procedure iVMEnter;forward;
 
 {
@@ -175,17 +173,12 @@ asm
   JMP  iVMNext
 end;
 
+//the interpreter core here:
 procedure iVMNext;
 asm
-  {$ifndef TurboScript_FullSpeed}
   MOV  DL, [EDI].TPreservedCodeMemory.States
-  {$endif}
-  JMP  iVMNextFullSpeed 
-end;
 
-//the interpreter core here:
-procedure iVMNextFullSpeed;
-asm
+  //TODO: BT is a 486 directive.
   BT EDX, psRunning //cTurboScriptIsRunningBit
   JNC @@Exit
 
@@ -235,13 +228,6 @@ asm
   JMP iVMNext
 end;
 
-procedure iVMHaltFullSpeed;
-asm
-  BTR EDX, psRunning //cTurboScriptIsRunningBit  //clear the cIsRunningBit to 0.
-  //MOV [EDI].TPreservedCodeMemory.States, DL
-  JMP iVMNext
-end;
-
 procedure iVMExit;
 asm
   POP  ESI
@@ -286,9 +272,6 @@ asm
 @@RequireModuleExecutor: //find and load the module into the memory.
   PUSH EBX
   PUSH ESI
-  {$ifdef TurboScript_FullSpeed}
-  PUSH EDX
-  {$endif}
   PUSH EBP
   
   MOV  EDX, EAX
@@ -297,9 +280,6 @@ asm
   //function TCustomTruboExecutor.GetModuleMemoryAddr(aModuleIndex: Integer): Pointer;
   CALL TCustomTurboExecutor.RequireModule
   POP EBP
-  {$ifdef TurboScript_FullSpeed}
-  POP EDX
-  {$endif}
   POP ESI
   POP EBX
 
@@ -423,14 +403,8 @@ end;
 procedure iVMMulUnsignedInt;
 asm
   MOV  EAX, EBX
-  {$ifdef TurboScript_FullSpeed}
-  PUSH EDX
-  {$endif}
   MUL  [EBP] //EDX:EAX = EAX * [EBP]
   MOV  [EBP], EDX
-  {$ifdef TurboScript_FullSpeed}
-  POP  EDX
-  {$endif}
   MOV  EBX, EAX
   JMP  iVMNext
 end;
@@ -441,15 +415,9 @@ end;
 procedure iVMMulInt;
 asm
   MOV  EAX, EBX
-  {$ifdef TurboScript_FullSpeed}
-  //PUSH EDX
-  {$endif}
   //IMUL  EAX, [EBP] //EDX:EAX = EAX * [EBP]
   IMUL  EBX, [EBP] //EBX = EBX * [EBP]
   //MOV  [EBP], EDX
-  {$ifdef TurboScript_FullSpeed}
-  //POP  EDX
-  {$endif}
   //MOV  EBX, EAX
   JMP  iVMNext
 end;
@@ -548,13 +516,9 @@ end;
 
 procedure InitTurboCoreWordList;
 begin
-  {$ifdef TurboScript_FullSpeed}
-  GTurboCoreWords[inNext] := iVMNextFullSpeed;
-  GTurboCoreWords[inHalt] := iVMHaltFullSpeed;
-  {$else}
   GTurboCoreWords[inNext] := iVMNext;
   GTurboCoreWords[inHalt] := iVMHalt;
-  {$endif}
+
   GTurboCoreWords[inEnter] := iVMEnter;
   GTurboCoreWords[inExit] := iVMExit;
 

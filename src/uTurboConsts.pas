@@ -40,17 +40,23 @@ type
   {: the Module Type }
   {
     @param mtFunction         the script function(word).
+    @param mtHost             the module is in the host application
+    @param mtDLL              the DLL module
   }
-  TTurboModuleType = (mtUnknown, mtProgram, mtLib, mtObject, mtFunction);
+  TTurboModuleType = (mtUnknown, mtProgram, mtLib, mtObject, mtFunction, mtHost, mtDLL);
 
   TTurboScriptOption = (soOptimize, soLoadOnDemand, soBindingRuntime, soBindingCompileTime);
   TTurboScriptOptions = set of TTurboScriptOption;
 
+  {
+    fvHide, fvPrivate: only can view in the module
+    fvProtected-fvPublished: 采用远调用方式，其它模块可见。
+  }
   TTurboVisibility = (fvHide, fvPrivate, fvProtected, fvPublic, fvPublished);
   //the Forth Execution priority fpHighest means cfsImmediately
   TTurboPriority = (fpLowest, fpLower, fpLow, fpNormal, fpHigh, pfHigher, fpHighest);
   TTurboCallStyle = (csForth, csRegister, csPascal, csCdecl, csStdCall, csFastCall);
-  TTurboCodeFieldStyle = (cfsFunction, cfsVariable);
+  TTurboCodeFieldStyle = (cfsFunction, cfsHostFunction, cfsDLLFunction);
   TTurboCodeFieldStyles = set of TTurboCodeFieldStyle;
   TTurboWordOptions = packed record //a DWORD
       //优先级, highest means an IMMEDIATE word
@@ -62,6 +68,7 @@ type
       CodeFieldStyle: TTurboCodeFieldStyles;
   end;
 
+  PTurboVMInstruction = ^TTurboVMInstruction;
   { Summary the FORTH Virtual Mache Codes}
   TTurboVMInstruction = (
     inNone,
@@ -204,6 +211,11 @@ type
   );
 
   
+  TStaticMemoryStream = class(TCustomMemoryStream)
+  public
+    constructor Create(const Ptr: Pointer; const Size: LongInt); reintroduce;
+  end;
+
   {: FreeNotify }
   TCustomTurboObject = class(TObject)
   private
@@ -229,6 +241,15 @@ const
   cMaxTurboVMInstructionCount = SizeOf(TTurboCoreWords) div SizeOf(TProcedure); //the max turbo VM code directive count
   
 implementation
+
+{
+***************************** TStaticMemoryStream ******************************
+}
+constructor TStaticMemoryStream.Create(const Ptr: Pointer; const Size: LongInt);
+begin
+  inherited Create;
+  SetPointer(Ptr, Size);
+end;
 
 {
 ****************************** TCustomTurboObject ******************************

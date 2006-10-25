@@ -22,11 +22,12 @@ interface
 
 uses
   SysUtils, Classes
-  //, uMeTypes
+  , uMeTypes
   , uTurboConsts
   ;
 
 type
+  {: the basic simple turbo types. }
   {
      @param ttSByte: Signed byte
      @param ttUByte: Unsigned byte
@@ -42,12 +43,14 @@ type
   TTurboTypeKind = (
     ttkUnknown, ttkSByte, ttkUByte, ttkSWord, ttkUWord
     , ttkSLong, ttkULong
-    , ttkPointer, ttkQWord, ttkInt64, ttkSet, ttkEnumeration
+    , ttkPointer, ttkQWord, ttkInt64
     , ttkSingle, ttkDouble, ttkExtended, ttkComp, ttkCurr
-    , ttkVariant, ttkRecord, ttkArray, ttkDynArray, ttkClass
+    , ttkVariant, 
     , ttkString, ttkLString, ttkWString, ttkChar, ttkWChar
-    , ttkMethod, ttkProcedure, ttkInterface, ttkParam
+    , ttkMethod, ttkInterface
   );
+  TTurboSimpleTypes = array [TTurboTypeKind] of PMeType;
+
   PPreservedCodeMemory = ^ TPreservedCodeMemory;
   PTurboVariableEntry = ^ TTurboVariableEntry;
   PTurboModuleEntry = ^ TTurboModuleEntry;
@@ -171,6 +174,11 @@ type
     Note: you must InitExecution first.
     }
     procedure AddIntToMem(const aValue: Integer);
+    {: add a OpCode to the free memory, and add UsedMemory }
+    { Description
+    Note: you must InitExecution first.
+    }
+    procedure AddOpToMem(const aOpCode: TTurboVMInstruction);
     {: fill 0 to align the memory. }
     procedure AlignMem;
     procedure AllocSpace(const aSize: Integer);
@@ -426,10 +434,6 @@ type
 
 
 
-  TTurboExteralWordPFA = packed record
-    ParamCount: Integer; 
-    TypeInfo: PTurboTypeInfoEntry;  //nil means no RTTI info. the address is related.
-  end;
   //For type-cast the Mem
   TTurboWordEntry = packed record
     Prior: PTurboWordEntry; //前一个单词 0 means 为最前面。
@@ -453,6 +457,14 @@ type
     //CFA: LongWord;
     //ParameterFields: array of Integer; //大多数情况下是PForthWord，但是少数情况下是数据或VM Codes
   end;
+  //cfsHostFunction, cfsDLLFunction
+  TTurboExteralWordPFA = packed record
+    ProcAddr: Pointer;
+    ModuleEntry: Pointer;
+    ProcTypeEntry: Pointer; //offset addr.
+    Index: Integer; //-1 means non-index visits.
+    Name: ShortString; //packed the function name in the DLL/Host.
+  end;
 
   TTurboVariableEntry = packed record
     Prior: PTurboVariableEntry; 
@@ -463,11 +475,18 @@ type
     //Value: ....
   end;
   
+  //the import module for uses.
   TTurboModuleEntry = packed record
     Prior: PTurboModuleEntry; //nil means no more
-    //ModuleIndex: integer;
-    Module: TCustomTurboModule; //nil means not assigned(or loaded).
-    Name: ShortString; //packed string, the full module name with path.
+    ModuleType: TTurboModuleType;
+    {
+      DLL Module(mtDLL): it's the DLL handle.
+      Host Module(mtHost):
+      ForthLib module(mtLib): loaded the instance of TCustomTurboModule.
+      nil means not assigned(or loaded).
+    }
+    Module: Pointer; 
+    ModuleName: ShortString; //packed string, the full module name with path.
   end;
 
   TTurboTypeInfoEntry = packed record
@@ -522,10 +541,8 @@ type
 procedure TurboConvertAddrRelatedToAbsolute(Mem: PPreservedCodeMemory);
 procedure TurboConvertAddrAbsoluteToRelated(Mem: PPreservedCodeMemory);
 
-const
-  cByteTypes = [ttkSByte, ttkUByte, ttkChar, ttkSet];
-  cWordTypes = [ttkSWord, ttkUWord, ttkWChar];
-  cLongWordTypes = [ttkSLong, ttkULong, ttkPointer, ttkProcedure];
+var 
+  SimpleTurboTypes: TTurboSimpleTypes;
 
 implementation
 
@@ -587,6 +604,17 @@ begin
     Grow;
   Integer(p) := Integer(FMemory) + PPreservedCodeMemory(FMemory).UsedMemory;
   PInteger(P)^ := aValue;
+  Inc(PPreservedCodeMemory(FMemory).UsedMemory, SizeOf(Integer));
+end;
+
+procedure TCustomTurboModule.AddOpToMem(const aOpCode: TTurboVMInstruction);
+var
+  p: Pointer;
+begin
+  if PPreservedCodeMemory(FMemory).UsedMemory >= MemorySize then
+    Grow;
+  Integer(p) := Integer(FMemory) + PPreservedCodeMemory(FMemory).UsedMemory;
+  PInteger(P)^ := Integer(aOpCode);
   Inc(PPreservedCodeMemory(FMemory).UsedMemory, SizeOf(Integer));
 end;
 
@@ -985,6 +1013,7 @@ begin
   if FIsLoaded and not StoredInParent then
   begin
     SendUnloadNotification;
+    if Name <> '' then RemoveModuleTypes(Name);
     ClearMemory;
   end;
 end;
@@ -1175,6 +1204,24 @@ type
   TTurboEntry = packed record
     Prior: Pointer;
   end;
+
+//remove registered types of this module
+procedure RemoveModuleTypes(const aModuleName: string);
+var
+  i,j: integer;
+  s: string;
+begin
+  with GRegisteredTypes^ do
+    for i := Count - 1 downto 0 do
+    begin
+      s := PMeType(Lists^[i]).Name;
+      j := Pos('.', s) - 1;
+      if (j = Length(aModuleName) and CompareMem(@aModuleName[1], s[1], j) then
+      begin
+        Delete(i);
+      end;
+    end;
+end;
 
 procedure TurboConvertEntryRelatedToAbsolute(Mem: Pointer; aEntry: PTurboEntry);
 {$IFDEF PUREPASCAL}
@@ -1428,4 +1475,34 @@ asm
 end;
 {$ENDIF PUREPASCAL}
 
+procedure SetupSimpleTypes;
+begin
+    ttkUnknown, ttkSByte, ttkUByte, ttkSWord, ttkUWord
+    , ttkSLong, ttkULong
+    , ttkPointer, ttkQWord, ttkInt64
+    , ttkSingle, ttkDouble, ttkExtended, ttkComp, ttkCurr
+    , ttkVariant, 
+    , ttkString, ttkLString, ttkWString, ttkChar, ttkWChar
+    , ttkMethod, ttkInterface
+  SimpleTurboTypes[ttkSByte] := GetRegisteredTypeByTypeInfo(Typeinfo(Shorint));
+  SimpleTurboTypes[ttkUByte] := GetRegisteredTypeByTypeInfo(Typeinfo(Byte));
+  SimpleTurboTypes[ttkSWord] := GetRegisteredTypeByTypeInfo(Typeinfo(Smallint));
+  SimpleTurboTypes[ttkUWord] := GetRegisteredTypeByTypeInfo(Typeinfo(Word));
+  SimpleTurboTypes[ttkSLong] := GetRegisteredTypeByTypeInfo(Typeinfo(Longint));
+  SimpleTurboTypes[ttkULong] := GetRegisteredTypeByTypeInfo(Typeinfo(LongWord));
+  SimpleTurboTypes[ttkInt64] := GetRegisteredTypeByTypeInfo(Typeinfo(Int64));
+  SimpleTurboTypes[ttkSingle] := GetRegisteredTypeByTypeInfo(Typeinfo(Single));
+  SimpleTurboTypes[ttkDouble] := GetRegisteredTypeByTypeInfo(Typeinfo(Double));
+  SimpleTurboTypes[ttkExtended] := GetRegisteredTypeByTypeInfo(Typeinfo(Extended));
+  SimpleTurboTypes[ttkComp] := GetRegisteredTypeByTypeInfo(Typeinfo(Comp));
+  SimpleTurboTypes[ttkCurr] := GetRegisteredTypeByTypeInfo(Typeinfo(Currency));
+  SimpleTurboTypes[ttkString] := GetRegisteredTypeByTypeInfo(Typeinfo(Shortstring));
+  SimpleTurboTypes[ttkLString] := GetRegisteredTypeByTypeInfo(Typeinfo(AnsiString));
+  SimpleTurboTypes[ttkWString] := GetRegisteredTypeByTypeInfo(Typeinfo(WideString));
+  SimpleTurboTypes[ttkChar] := GetRegisteredTypeByTypeInfo(Typeinfo(Char));
+  SimpleTurboTypes[ttkWChar] := GetRegisteredTypeByTypeInfo(Typeinfo(WideChar));
+end;
+
+initialization
+finalization
 end.

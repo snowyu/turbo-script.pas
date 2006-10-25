@@ -1,3 +1,141 @@
+2006-10-24
++ Function RemoveModuleTypes(aModuleName: string)
+  //remove registered types of this module
+* call RemoveModuleTypes function when module is unloaded.
+2. 是否缓存ProcType，也就是放到注册类型列表中，先不缓存：
+  vProcType :=  getProcType(const Buffer):PMeProcType;
+  New(vProc, Create);
+  vProc.InitFrom(vProcType);
+  vProc.AssignFromStack(ParamStack);
+  Inc(ParamStackPointer, vProc.StackSize);
+
+!+ MeString: 
+  Length(Word) String #0(Byte)
+  this string length can be 0-$FFFF
+  MeString = packed record
+    Len: Word;
+    Str: array [1..Len] of char;default;
+    EndOfString: char; //#0 always. EndOfString
+  end;
+
+  ShortString = packed record
+    Len: Byte;
+    Str: array [1..Len] of char;default;
+  end;
+
+  AnsiString ＝ ^ TAnsiString.Str;
+  TAnsiString = packed record
+    RefCount: Integer;
+    Len: LongWord;
+    Str: array [1..Len] of char; default;
+    EndOfString: char; //#0 always. EndOfString
+  end;
+
+2006-10-23
+~  开始弄 TypeInfo,
+* TCustomModule
+  + RegisteredTypes: TMeTypes;
++ [uTurboConsts] TStaticMemoryStream
+基本类型：基本类型是内置的不需要放入流中。如何区分基本类型和自定义类型在流中。
+在流中可以通过 数字的大小来区分，如： >=0 是基本类型，>0 的则是指向自定义类型的偏移地址。
+过程类型不是基本类型
+
+基本类型: TTurboType
+
+定义流格式: 嘿嘿，我可以按照Delphi RTTI 的内存格式进行啊（TypInfoEx.pas）
+TuroType: integer; //>=0 是基本类型，>0 的则是指向自定义类型的偏移地址。
+
+ProcType Stream:
+  Kind: TMethodKind
+  Name: packed ShortSting
+  ParamCount: Byte
+  ParamList: array[1,,ParamCount] of record
+      Flags: TParamFlags;
+      ParamType: Integer;
+      ParamName: Packed ShortString;
+  end;
+  [ResultType: integer] //如果是函数
+
+1. 需要函数来装入BufferToMeType
+2. 是否缓存ProcType
+3. 只建立一个RegisteredTypes 管理所有的类型？然后通过
+  类型名称为： ModuleName.TypeName 来区分
+  既然只用一个那么就可以使用MeType的全局GRegisteredTypes变量！！
+
+自定义类型的生存周期：就是模块的生存周期。
+后期绑定的类型不存在生存周期问题。
+
+~ 考虑如何将类型纳入我的知识数据库
+模块和类型放入知识库中：
+  模块和类型的关系： krCollection
+
+粒度：
+  模块里面的类型过程等全部内容被放入一个字段（相当于文件存放在了数据库中）。
+  模块里面的内容被拆散，每一个类型，过程被分别存放在不同的字段中(这时候，这些东西全部是后期绑定的)。
+
+2006-10-21
+~ 发现一种新的语言 Seed: 它的特点是可以自定义新的语法结构(for 语句，while语句等)，它的自身就是这样弄出来来的。
+  http://seed7.sourceforge.net
+~ 在网上看了看关于 ECMA standard common intermediate language CIL（也就是Dot.net 的CLR Microsoft Intermediate Language (MSIL)） 的实现，
+  其思路和俺的差不多，都是面向堆栈，支持后期绑定（它称之为反射refelection）,metadata（运行时刻类型信息，还不知道是否是所有的都有，还是自己定义，不过如果想做到safecode，那么就必须知道meta信息，这样才能防止传入非法数据，我想managed code 一定有metainfo,最多名称没有）。
+  我感兴趣的是，它是怎么实现不同大小的push指令的（它叫load）。
+  所有的东西都是类，其实俺的实现也可以这么理解，模块＝类，至于说必须要传递自己这个参数，那不就是FMemory基址指针(我放在EDI中的)，就差一个VMT表了。
+  不过有点乱的是对象实例和类如何区分？我这定义的应该是对象的类！而不是对象实例。
+!+ 定义外部函数的 TTurboWordEntry CFA域的内容：
+  外部的定义： 模块外部的Forth函数（可从调用约定看出）；在宿主(MainApp)中的函数；在DLL中的函数。
+   PModuleEntry:
+   PFunctionIndex:
+   FunctionName: PTPackedString
+   //参数个数
+   //参数描述列表: Size InRegister(如果为0表示要压入堆栈，该域供Register and FastCall使用)
+   
+   返回值类型＝无，在EAX中；在EAX:EDX中；在浮点小数栈中；
+   必须获知每一个参数类型，才能决定压入堆栈的参数是那些，尤其是register调用。
+!* [CustomModule] 当在编译状态的时候，不作地址变换。
+!+ 虚拟 CPU 识别的基本类型:
+   Address
+   Integer(int1, int2, int4(32位), int8(64位), nativeInt)
+   Float
+   String
+- [FullSpeedFeature] From TTurboX86Interpreter
+!* TTurboCodeFieldStyle = (cfsFunction, cfsHostFunction, cfsDLLFunction);
+  cfsFunction: 
+    published-protectd Function 就统一采用外部调用Foth函数的形式： ModuleAddr FunctionAddr
+    而privated 的则是私有函数，只能在模块内使用。
+  cfsHostFunction, cfsDLLFunction: 
+    PModuleEntry: Pointer;
+    Index: Integer; -1 means non-index visits.
+    Name: PChar; //the function name in the DLL/Host.
+* TTurboModuleEntry: 对其扩充
+  + ModuleType: mtLib, mtHost, mtDLL
+  * Module: Pointer:
+      DLL Module(mtDLL): it's the DLL handle.
+      ForthLib module(mtLib): loaded the instance of TCustomTurboModule.
+      Host Module(mtHost): 如果不把host里的函数按模块组织就不用，否则就该设计一个新类来处理。
+      nil means not assigned(or loaded).
+外部DLL/Host函数执行流程如下：
+根据 TTurboWordEntry的 TTurboExteralWordPFA.PModuleEntry获得 ModuleHandle,如果 ModuleHandle ＝ nil 那么装载该DLL,
+还是用伪代码写：
+if TTurboExteralWordPFA.ProcAddr = nil then
+begin
+  with TTurboExteralWordPFA.PModuleEntry do
+  begin
+    if ModuleHandle = nil then ModuleHandle := LoadLib(ModuleName);
+    if TTurboExteralWordPFA.Index <> -1 then ProcAddr := GetProcAddrByIndex() 
+    else ProcAddr := GetProcAddrByName();
+    if ProcAddr = nil then raise Error!!
+  end;
+end;
+DLLExecutor.Params := ParamStack()
+DLLExecutor.ParamTypes
+DLLExecutor.Run(ProcAddr);
+换句话说，该过程的参数类型也必须注册！！
+我必须使用静态对象，否则手工逐个填充VMT指针太累。
+或者这么说需要伪meTypes添加类型的保存，装载流机制。
+如果我在模块内那不是要重复，如果多个模块调用同一个外部函数？？
+不过这是没有办法的事情，只能这样，你必须把模块想成DLL。
+
+
 2006-10-20
 + [ASM] 定义常量，变量
   编译通过
