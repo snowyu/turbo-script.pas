@@ -18,7 +18,7 @@ TYPE
   TTurboValueRec = packed record
     case Integer of
       0: (
-        case TTurboTypeKind of
+        case TTurboSimpleTypeKind of
           //ttkUByte: (VByte: Byte);
           ttkSByte: (VShortInt: ShortInt);
           //ttkUWord: (VWord: Word);
@@ -58,14 +58,14 @@ TYPE
   TTurboSimpleConst = object
   public
     Name: ShortString;
-    TypeKind: TTurboTypeKind;
+    TypeKind: TTurboSimpleTypeKind;
     Value: TTurboValueRec;
     ValueStr: String;
     Size: Integer;
   public
     function AssignValueTo(const Source: Pointer): Boolean;
     //根据aValue 如果aTypeKind is ttkUnknown 那么会自动判断其类型
-    function AssignValue(const aValue: string; const aTypeKind: TTurboTypeKind = ttkUnknown): Boolean;
+    function AssignValue(const aValue: string; const aTypeKind: TTurboSimpleTypeKind = ttkUnknown): Boolean;
     procedure SaveString(const aModule: TCustomTurboModule);
   end;
 
@@ -107,7 +107,7 @@ PRIVATE
   //if not find then add new , return index else raise error.
   function  DefineConstEx(const aValue: TTurboSimpleConst): Integer;
   function FindConst(const aName: String): Integer;
-  function GetConstValue(const aTypeKind: TTurboTypeKind; const aName: string): TTurboValueRec;
+  function GetConstValue(const aTypeKind: TTurboSimpleTypeKind; const aName: string): TTurboValueRec;
 
   //if not find then add new , return index else raise error.
   function DefineVar(const aValue: TTurboSimpleVar; aVisibility: TTurboVisibility = fvPublished): Integer;
@@ -145,7 +145,7 @@ Const
   cConstRedeclarationError = 304;
   cRedeclarationError = 305;
 
-function GetSimpleTurboTypeSize(const aTypeKind: TTurboTypeKind): Integer;
+function GetSimpleTurboTypeSize(const aTypeKind: TTurboSimpleTypeKind): Integer;
 begin
   case aTypeKind of
     ttkSByte, ttkUByte, ttkChar, ttkSet: Result := SizeOf(Byte);
@@ -163,7 +163,7 @@ begin
   end;
 end;
 
-function TTurboSimpleConst.AssignValue(const aValue: string; const aTypeKind: TTurboTypeKind): Boolean;
+function TTurboSimpleConst.AssignValue(const aValue: string; const aTypeKind: TTurboSimpleTypeKind): Boolean;
 begin
   Result := True;
   //writeln('AssignValue:', Integer(aTypeKind));
@@ -269,6 +269,7 @@ begin
   Result := AddWordCFA(aName);
   if Result then exit;
 
+  writeln('cUnknownWordError:',aName);
   SynError(cUnknownWordError);
 end;
 
@@ -316,7 +317,7 @@ end;
 
 function T-->Grammar<--.IsUniqueIdentifier(const aName: String): Boolean;
 begin
-  writeln('IsUniqueIdentifier:', aName);
+  //writeln('IsUniqueIdentifier:', aName);
   Result := FindConst(aName) < 0;
   //writeln('C:',Result);
   if Result then
@@ -332,7 +333,7 @@ begin
   end;
 end;
 
-function T-->Grammar<--.GetConstValue(const aTypeKind: TTurboTypeKind; const aName: String): TTurboValueRec;
+function T-->Grammar<--.GetConstValue(const aTypeKind: TTurboSimpleTypeKind; const aName: String): TTurboValueRec;
 var
   i: Integer;
 begin
@@ -425,7 +426,7 @@ begin
   for Result := 0 to Length(FVars)-1 do
   begin
     //if aName = 'Add' then 
-    ///WriteLn(Result, ':FV:',FVars[Result].Name);
+    //WriteLn(Result, ':FV:',FVars[Result].Name);
     if aName = FVars[Result].Name then exit;
   end;
   Result := -1;
@@ -445,7 +446,7 @@ begin
   begin
     //WriteLn(Result, ':DefineVar:',Name);
     //Name := aValue.Name; //保证让其ref增加
-    FModule.AlignMem;
+    //FModule.AlignMem;
     Integer(vVaraibleEntry) := Integer(FModule.Memory) + FModule.UsedMemory;
     vTypeSize := GetSimpleTurboTypeSize(aValue.TypeKind);
     Size := vTypeSize;
@@ -453,6 +454,7 @@ begin
     FModule.AddIntToMem(Integer(FModule.LastVariableEntry));
     FModule.AddIntToMem(vTypeSize);
     FModule.AddIntToMem(0); //preserved.for addr.
+    FModule.AddIntToMem(0); //preserved.for TypeInfo.
     if aVisibility >= fvPublished then
     begin
       //fill the variable name 
@@ -472,6 +474,7 @@ begin
     SaveString(FModule); //if this is string 
     AssignValueTo(vValue);
   end;
+  FModule.LastVariableEntry := Pointer(Integer(vVaraibleEntry) - Integer(FModule.Memory));
   //SetLength(FVars, Length(FVars) + 1);
   //FindVar('');
 end;
@@ -480,7 +483,7 @@ function T-->Grammar<--.DefineWordBegin(const aName: ShortString): Boolean;
 //var
   //p: pointer;
 begin
-  WriteLn('DefineWordBegin:',aName);
+  //WriteLn('DefineWordBegin:',aName);
   FindVar('');
   Result := IsUniqueIdentifier(aName);
   if Result then
@@ -490,9 +493,11 @@ begin
     FModule.AddIntToMem(Integer(FModule.LastWordEntry));
     FModule.AllocSpace(SizeOf(TTurboWordOptions));
     FModule.AllocSpace(SizeOf(LongWord)); //the ParamFieldLength
+    FModule.AllocSpace(SizeOf(Integer)); //the CFA
     FModule.AddByteToMem(Length(aName));
     FModule.AddBufferToMem(aName[1], Length(aName));
     FLastWordCfa := FModule.UsedMemory;
+    FLastWordEntry.CFA := FLastWordCfa;
   end
   //else FLastWordCfa := 0;
 end;
@@ -505,7 +510,7 @@ begin
   FLastWordEntry.ParamFieldLength := FModule.UsedMemory - FLastWordCfa + 1;
 
   vPrior := FModule.LastWordEntry;
-  FModule.LastWordEntry := FLastWordEntry;
+  FModule.LastWordEntry := Pointer(Integer(FLastWordEntry) - Integer(FModule.Memory));
   FLastWordEntry.Prior := vPrior;
 end;
 
@@ -528,6 +533,7 @@ begin
   begin
     ClearMemory;
     MemorySize := cMaxMemorySize;
+    Status := [psCompiling];
   end;
   SetLength(FLabels, 0);
   SetLength(FConsts, 0);
@@ -674,13 +680,13 @@ PRODUCTIONS
     ";" (. if IsUniqueIdentifier(vValue.Name) then DefineVar(vValue); .)
   .
 
-  TypeKind<var aType: TTurboTypeKind> 
+  TypeKind<var aType: TTurboSimpleTypeKind> 
     =
     IntegerType <aType>
     |StringType <aType>
   .
 
-  IntegerType<var aSubType: TTurboTypeKind>
+  IntegerType<var aSubType: TTurboSimpleTypeKind>
     =
     "BYTE"                                            (. aSubType := ttkUByte; .)
     |"WORD"                                           (. aSubType := ttkUWord; .)
@@ -689,7 +695,7 @@ PRODUCTIONS
     |"QWORD"                                          (. aSubType := ttkQWord; .)
     |"INT64"                                          (. aSubType := ttkInt64; .)
   .
-  StringType<var aSubType: TTurboTypeKind>
+  StringType<var aSubType: TTurboSimpleTypeKind>
     =
     "STRING"                                          (. aSubType := ttkLString; .)
     |"SHORTSTRING"                                    (. aSubType := ttkString; .)
@@ -720,6 +726,7 @@ PRODUCTIONS
     | PushStringStatement 
     | AddIntStatement
     | SubIntStatement
+    | MulIntStatement
     | "@" (. FModule.AddIntToMem(Integer(inFetchInt)); .)
     | EmitStatement
     | WordStatement
@@ -729,8 +736,9 @@ PRODUCTIONS
     "Label" Identifier(. DefineLabelEx(LexString); .)  .
 
   PushIntStatement = IntegerToken (. FModule.AddIntToMem(Integer(inPushInt)); FModule.AddIntToMem(StrToInt(LexString));.) .
-  AddIntStatement  = "+" (. FModule.AddIntToMem(Integer(inAddInt)); .) .
+  AddIntStatement  = "+" (. FModule.AddOpToMem(inAddInt); .) .
   SubIntStatement  = "-" (. FModule.AddIntToMem(Integer(inSubInt)); .) .
+  MulIntStatement  = "*" (. FModule.AddopToMem(inMulInt); .) .
   EmitStatement 
     = 
     "EMIT" (. FModule.AddIntToMem(Integer(inEmit)); .) 

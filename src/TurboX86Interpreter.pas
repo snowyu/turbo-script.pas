@@ -223,6 +223,7 @@ end;
 
 procedure iVMHalt;
 asm
+  MOV DL, [EDI].TPreservedCodeMemory.States
   BTR EDX, psRunning //cTurboScriptIsRunningBit  //clear the cIsRunningBit to 0.
   MOV [EDI].TPreservedCodeMemory.States, DL
   JMP iVMNext
@@ -236,6 +237,9 @@ end;
 
 procedure iVMExitFar;
 asm
+  MOV DL, [EDI].TPreservedCodeMemory.States
+  BTR EDX, psRunning //cTurboScriptIsRunningBit  //clear the cIsRunningBit to 0.
+  MOV [EDI].TPreservedCodeMemory.States, DL
   POP  ESI
   POP  EDI
   JMP  iVMNext
@@ -275,7 +279,7 @@ asm
   PUSH EBP
   
   MOV  EDX, EAX
-  ADD  EDX, Offset TTurboModuleEntry.Name
+  ADD  EDX, Offset TTurboModuleEntry.ModuleName
   MOV  EAX, [EDI].TPreservedCodeMemory.Executor
   //function TCustomTruboExecutor.GetModuleMemoryAddr(aModuleIndex: Integer): Pointer;
   CALL TCustomTurboExecutor.RequireModule
@@ -286,7 +290,11 @@ asm
   CMP  EAX, 0
   JZ   @@NotFoundError
 
+  //Copy CPU States to the New Module Memory.
+  MOV EDI, [ESP] //restore the old Module MemoryBase in TOS
+  MOV  CL, [EDI].TPreservedCodeMemory.States
   MOV  EDI, [EAX].TTurboExecutorAccess.FMemory
+  MOV  [EDI].TPreservedCodeMemory.States, CL
   JMP @@Exit
 
 @@NotFoundError:
@@ -419,6 +427,7 @@ asm
   IMUL  EBX, [EBP] //EBX = EBX * [EBP]
   //MOV  [EBP], EDX
   //MOV  EBX, EAX
+  ADD  EBP, TYPE(Integer)
   JMP  iVMNext
 end;
 

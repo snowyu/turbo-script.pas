@@ -1,3 +1,26 @@
+2006-10-26
+!+ 单元初始化(Init)and Final 过程要改变成链表形式，从第一个执行，加是到最后一个。
+  目的：对于那些没有自己的内存的模块，但是有自己的初始化过程的，也要执行啊。
+  PTurboWordLink = ^TTurboWordLink;
+  TTurboWordLink = packed record
+    Next: PTurboWordLink;
+    Word: PTurboWordEntry;
+  end;
+
+!* 现在放在wordEntry上的全部都是近调用，应该是远调用才对。近调用的只有私有word,或在WordEntry上的visibility in [<=fsPrivate]。
+
+2006-10-25
+在内存中RTTI信息的链接方式，决定采用和VM机器指令同样的方式，当数值小于保留区为简单类型常量(TTurboSimpleType)，否则为相对偏移地址。
+使用 Delphi单元 TypInfo 的 TTypeData。只不过里面的所有 PPTypeInfo 类型的字段变成了上述说明的。
+
++ uTurboTypes.pas
+  专门处理 读入内存，创建装载MeTypes.
+  //Create PMeProcType and load 
+  LoadMeProcTypeFrom(aProcTypeData: PTurboProcTypeData): PMeProcType;
+  既然只有一个过程，那么还是暂时放在TurboExecutor一起。
+
+
+
 2006-10-24
 + Function RemoveModuleTypes(aModuleName: string)
   //remove registered types of this module
@@ -47,7 +70,7 @@ TuroType: integer; //>=0 是基本类型，>0 的则是指向自定义类型的偏移地址。
 
 ProcType Stream:
   Kind: TMethodKind
-  Name: packed ShortSting
+  //Name: packed ShortSting
   ParamCount: Byte
   ParamList: array[1,,ParamCount] of record
       Flags: TParamFlags;
@@ -510,7 +533,7 @@ iVMExitFar:
  这个类叫什么好呢？ TTurboProgram:
    TTurboProgram: Execute
 
-记住这里的X86堆栈： 压入则是地址减少，弹出则是地址增加
+记住这里的X86堆栈： 压入则是地址减少，弹出则是地址增加，ESP总是指向栈顶。
 When an item is pushed onto the stack, the processor decrements the ESP
 register, then writes the item at the new top of stack. When an item is popped off the stack, the
 processor reads the item from the top of stack, then increments the ESP register

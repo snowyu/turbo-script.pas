@@ -107,7 +107,7 @@ begin
         if vShowDebugInfo then writeln(aFileName + ' loading...');
         writeln('');
         LoadFromFile(aFileName);
-        Reset;
+        //Reset;
         CFA := InitializeProc;
         //AddIntToMem(Integer(inMULUnsignedInt));
         QueryPerformanceCounter(tBegin);
@@ -175,6 +175,6 @@ begin
   if vShowDebugInfo then 
   begin
     WriteLn('');
-    writeln('ScriptExecTime:',c/CountFreq*1000, ' (ms)');
+    writeln('ScriptExecTime(',c,'):',c/CountFreq*1000, ' (ms)');
   end;
 end.
