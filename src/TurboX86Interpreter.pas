@@ -54,7 +54,6 @@ uses
   , uTurboConsts
   , uTurboExecutor
   ;
-
   
 type
   TTurboX86Interpreter = class(TCustomTurboExecutor)
@@ -242,14 +241,18 @@ asm
   MOV [EDI].TPreservedCodeMemory.States, DL
   POP  ESI
   POP  EDI
+  MOV [EDI].TPreservedCodeMemory.States, DL
   JMP  iVMNext
 end;
 
+//save the old MemoryBase, pass the CPUStates to the new MemoryBase.
 procedure iVMEnterFar;
 asm
+  MOV DL, [EDI].TPreservedCodeMemory.States
   PUSH EDI //save the current MemoryBase.
   LODSD
   MOV  EDI, EAX //load the new MemoryBase
+  MOV [EDI].TPreservedCodeMemory.States, DL
   LODSD
   ADD EAX, EDI
   JMP iVMEnter
