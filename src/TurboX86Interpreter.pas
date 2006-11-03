@@ -50,6 +50,7 @@ interface
 {$I TurboScript.inc}
 
 uses
+  Windows, //QueryPerformanceCounter
   SysUtils, Classes
   , uTurboConsts
   , uTurboExecutor
@@ -130,7 +131,9 @@ begin
     //PUSH @@ReturnAdr
     CALL  iVMInit
   @@ReturnAdr:
-    CMP  EBP, [EDI].TPreservedCodeMemory.ParamStackBottom
+    MOV  EAX, [EDI].TPreservedCodeMemory.GlobalOptions
+    CMP  EBP, [EAX].TTurboGlobalOptions.ParamStackBottom
+  //  CMP  EBP, [EDI].TPreservedCodeMemory.ParamStackBottom
     JE   @@skipStoreTOS
     //数据总是指向栈顶
     //数据栈中，栈底的数据是无意义的。
@@ -167,8 +170,12 @@ type
   
 procedure iVMInit;
 asm
-  MOV  [EDI].TPreservedCodeMemory.ReturnStackBottom, ESP
-  MOV  [EDI].TPreservedCodeMemory.ParamStackBottom, EBP
+  MOV  EAX, [EDI].TPreservedCodeMemory.GlobalOptions
+ 
+  MOV  [EAX].TTurboGlobalOptions.ReturnStackBottom, ESP
+  MOV  [EAX].TTurboGlobalOptions.ParamStackBottom, EBP
+  //LEA  ECX, GTurboCoreWords
+  //MOV  DL, [EDI].TPreservedCodeMemory.States
   JMP  iVMNext
 end;
 
@@ -181,34 +188,43 @@ asm
   BT EDX, psRunning //cTurboScriptIsRunningBit
   JNC @@Exit
 
+@@DoEnter:
   //MOV EAX, [ESI]  //the current instruction in W register
   //ADD ESI, Type(Pointer) //4 = INC PC INC PC INC PC INC PC
   LODSD
   
 @@ExecInstruction:
   CMP  EAX, cMaxTurboVMInstructionCount
-  LEA  ECX, GTurboCoreWords
   JAE   @@IsUserWord
 @@IsVMCode:
+  LEA  ECX, GTurboCoreWords
   MOV  EAX, [ECX+EAX*4]
   CMP  EAX, 0
   JZ   @@BadOpError
   JMP  EAX
 @@BadOpError:
-  MOV  [EDI].TPreservedCodeMemory.LastErrorCode, errBadInstruction
+  MOV  EAX, [EDI].TPreservedCodeMemory.GlobalOptions
+ 
+  MOV  [EAX].TTurboGlobalOptions.LastErrorCode, errBadInstruction
   JMP  iVMHalt
   //Bad OpCode: no procedure assigned to the OpCode.
 @@IsUserWord:
   ADD  EAX, EDI //指向用户定义的word入口
-  JMP  iVMEnter
+  
+  //JMP  iVMEnter
+  PUSH ESI        //push the current IP.
+  MOV  ESI, EAX   //set the new IP
+  JMP  @@DoEnter
 @@Exit:
-  CMP  ESP, [EDI].TPreservedCodeMemory.ReturnStackBottom
+  MOV  EAX, [EDI].TPreservedCodeMemory.GlobalOptions
+  CMP  ESP, [EAX].TTurboGlobalOptions.ReturnStackBottom
   JZ   @@byebye  //ok
 @@HaltErr:
   BTS  EDX, errHalt
-  MOV  EAX, ESP
-  MOV  ESP, [EDI].TPreservedCodeMemory.ReturnStackBottom
-  MOV  [EDI].TPreservedCodeMemory.ReturnStackBottom, EAX
+  MOV  [EDI].TPreservedCodeMemory.States, DL
+  MOV  ECX, ESP
+  MOV  ESP, [EAX].TTurboGlobalOptions.ReturnStackBottom
+  MOV  [EAX].TTurboGlobalOptions.ReturnStackBottom, ECX
 @@byebye:
 
 end;
@@ -236,12 +252,17 @@ end;
 
 procedure iVMExitFar;
 asm
-  MOV DL, [EDI].TPreservedCodeMemory.States
+  //不能这样！这样的话如果是自己调用这个函数，退出的时候就会停止
+  //另外，如果我正好这个时候发布停止，但是这里却重置了状态～～
+{  MOV DL, [EDI].TPreservedCodeMemory.States
   BTR EDX, psRunning //cTurboScriptIsRunningBit  //clear the cIsRunningBit to 0.
   MOV [EDI].TPreservedCodeMemory.States, DL
+  //Add this:
+  BTS EDX, psRunning //cTurboScriptIsRunningBit  //set the cIsRunningBit to 1.
+} 
   POP  ESI
   POP  EDI
-  MOV [EDI].TPreservedCodeMemory.States, DL
+  //MOV [EDI].TPreservedCodeMemory.States, DL
   JMP  iVMNext
 end;
 
@@ -302,7 +323,8 @@ asm
 
 @@NotFoundError:
   POP  EDI
-  MOV  [EDI].TPreservedCodeMemory.LastErrorCode, errModuleNotFound
+  MOV  EAX, [EDI].TPreservedCodeMemory.GlobalOptions
+  MOV  [EAX].TTurboGlobalOptions.LastErrorCode, errModuleNotFound
   JMP  iVMHalt
 
 @@DoLocalEnterFar:
@@ -339,13 +361,13 @@ asm
   XCHG ESP, EBP
   PUSH EBX
   XCHG ESP, EBP
-  {SUB  EBP, Type(Pointer)
+  {SUB  EBP, Type(tsPointer)
   MOV  [EBP], EDX
   }
  
   {
   MOV  EDX, [ESI]
-  ADD  ESI, Type(Integer)
+  ADD  ESI, Type(tsInt)
   }
   LODSD
   MOV  EBX, EAX
@@ -360,7 +382,7 @@ asm
   {//move the top in stack to EAX 
   MOV  EDX, [EBP] 
   //Increment the data stack pointer.
-  ADD  EBP, Type(Integer)
+  ADD  EBP, Type(tsInt)
   }
   JMP  iVMNext
 end;
@@ -396,15 +418,38 @@ end;
 procedure iVMAddInt;
 asm
   ADD EBX, [EBP]
-  ADD EBP, Type(Integer)
+  ADD EBP, Type(tsInt)
   JMP  iVMNext
 end;
 
-//(n, n1) -- (n = n - n1)
+//(int64, int64-1) -- (int64 = int64 + int64-1)
+procedure iVMAddInt64;
+asm
+  ADD EBX, [EBP+Type(tsInt)]
+  MOV EAX, [EBP]
+  ADC EAX, [EBP+(Type(tsInt)*2)]
+  ADD EBP, Type(tsInt)*2
+  MOV [EBP], EAX
+  JMP  iVMNext
+end;
+
+
+//(n, n1) -- (n = n1 - n)
 procedure iVMSubInt;
 asm
   SUB EBX, [EBP]
-  ADD EBP, Type(Integer)
+  ADD EBP, Type(tsInt)
+  JMP  iVMNext
+end;
+
+//(int64a, int64b) -- (int64 = int64b - int64a)
+procedure iVMSubInt64;
+asm
+  SUB EBX, [EBP+Type(tsInt)]
+  MOV EAX, [EBP]
+  SBB EAX, [EBP+(Type(tsInt)*2)]
+  ADD EBP, Type(tsInt)*2
+  MOV [EBP], EAX
   JMP  iVMNext
 end;
 
@@ -430,7 +475,7 @@ asm
   IMUL  EBX, [EBP] //EBX = EBX * [EBP]
   //MOV  [EBP], EDX
   //MOV  EBX, EAX
-  ADD  EBP, TYPE(Integer)
+  ADD  EBP, TYPE(tsInt)
   JMP  iVMNext
 end;
 
@@ -526,6 +571,22 @@ asm
   JMP  iVMNext
 end;
 
+//(-- int64)
+procedure vGetTickCount;
+asm
+  XCHG ESP, EBP
+  PUSH EBX
+  PUSH 0
+  PUSH 0
+  XCHG ESP, EBP
+  PUSH EBP
+  CALL QueryPerformanceCounter
+  XCHG ESP, EBP
+  POP  EBX
+  XCHG ESP, EBP
+  JMP  iVMNext
+end;
+
 procedure InitTurboCoreWordList;
 begin
   GTurboCoreWords[inNext] := iVMNext;
@@ -541,6 +602,8 @@ begin
   GTurboCoreWords[inSubInt] := iVMSubInt;
   GTurboCoreWords[inUMULInt] := iVMMulUnsignedInt;
   GTurboCoreWords[inMULInt] := iVMMulInt;
+  GTurboCoreWords[inAddInt64] := iVMAddInt64;
+  GTurboCoreWords[inSubInt64] := iVMSubInt64;
 
   //Memory Operation Instruction with Param Stack
   GTurboCoreWords[inFetchInt] := vFetchInt;
@@ -555,7 +618,7 @@ begin
   GTurboCoreWords[inEmit] := vEmitChar;
   GTurboCoreWords[inEmitString] := vEmitString;
   GTurboCoreWords[inEmitLString] := vEmitLString;
-
+  GTurboCoreWords[inGetTickCount] := vGetTickCount;
 end;
 
 initialization
