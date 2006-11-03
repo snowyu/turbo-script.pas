@@ -152,6 +152,7 @@ Const
   cConstRedeclarationError = 304;
   cRedeclarationError = 305;
 
+
 function GetSimpleTurboTypeSize(const aTypeKind: TTurboSimpleTypeKind): Integer;
 begin
   case aTypeKind of
@@ -494,6 +495,7 @@ begin
       end;
     end;
   
+    if Size >= SizeOf(tsInt) then FModule.AlignMem;
     Addr := FModule.UsedMemory;
     if Visibility >= fvProtected then
     begin

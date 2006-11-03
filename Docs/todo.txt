@@ -1,5 +1,6 @@
 2006-11-3
 * [BUG] [ForthCompiler] 因为我在Object使用了string，但是却没有初始化object内存，在对赋值该string赋值的出现严重错误！！改为Shortstring即可。
+* [BUG] [ForthCompiler] Int64, Integer 这类的变量必须AlignMem.
 * [VM] reanme TTurboWordEntry packed record to TTurboWordBlock object!
 + [VM] !TICK:: store tickcount to variable address directly. (int64Addr -- )
 + [VM] StoreInt(!), StoreInt64(!i8), StoreByte(!i1), StoreWord(!i2)
