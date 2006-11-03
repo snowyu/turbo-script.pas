@@ -36,6 +36,8 @@ resourcestring
   rsRedeclarationSyntaxError  = 'Error: The Identifier is redeclareted!.';
 
 type
+  tsInt = LongInt;
+  //tsPointer = LongInt;
   ETurboScriptError = class(Exception);
   {: the Module Type }
   {
@@ -109,7 +111,9 @@ type
     {## Arithmatic instructions }
     {## for Integer}
     inAddInt, //Add
+    inAddInt64, //Add int64
     inSubInt, //subtract
+    inSubInt64, //subtract int64 (int64a, int64b) -- (int64 = int64b - int64a)
     inIncInt, //add 1
     inDecInt, //subtract 1
     inUMULInt, //UM* Unsigned multiply(un1, un2 -- u-int64 ) 
@@ -188,6 +192,7 @@ type
     , inEMIT  //(c --): send char out.
     , inEmitString // (ShortStringAddr -- )
     , inEmitLString // (AnsiStringAddr -- )
+    , inGetTickCount //(-- int64)
 
   ); 
 
