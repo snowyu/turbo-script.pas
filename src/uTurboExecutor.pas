@@ -102,6 +102,9 @@ type
   Load the script into memory
   }
   TCustomTurboModule = class(TCustomTurboObject)
+  private
+    function GetGlobalOptions: Pointer;
+    procedure SetGlobalOptions(Value: Pointer);
   protected
     FAccessor: TObject;
     FIsLoaded: Boolean;
@@ -224,6 +227,8 @@ type
     procedure UnloadNotification(aProc: TNotifyEvent);
     {: the TurboModuleAccessor }
     property Accessor: TObject read FAccessor write FAccessor;
+    property GlobalOptions: Pointer read GetGlobalOptions write
+            SetGlobalOptions;
     property InitializeProc: Integer read GetInitializeProc;
     { Description
     if not loaded, then only the name and some options loaded but the body(
@@ -460,7 +465,7 @@ type
     //the Param Field Length
     //该函数主体的长度 
     ParamFieldLength: LongWord;
-    CFA: Integer;//the offset address of the memory.
+    CFA: tsInt;//the offset address of the memory.
     Name: ShortString; //packed
     {if CallStyle <> csForth then //external procedure
       //PFA: TTurboExteralWordPFA
@@ -481,13 +486,13 @@ type
     ProcAddr: Pointer; //if it csForth then it is the CFA.
     ModuleEntry: PTurboModuleEntry;
     ProcTypeEntry: Pointer; //if it csForth then it is Module instance else it is ProcTypeInfo offset addr.
-    Index: Integer; //-1 means non-index visits.
+    Index: tsInt; //-1 means non-index visits.
     Name: ShortString; //packed the function name in the DLL/Host.
   end;
 
   TTurboVariableEntry = packed record
     Prior: PTurboVariableEntry; 
-    Size: Integer;
+    Size: tsInt;
     Addr: Pointer; //offset address of the FMemory.
     TypeInfo: PTurboTypeInfoEntry; //TODO: relocate it.
     Name: ShortString;//packed
@@ -534,31 +539,44 @@ type
   PTurboParamTypeData = ^TTurboParamTypeData;
   TTurboParamTypeData = packed record
     Flags: TParamFlags;
-    TypeInfo: Integer;//TTurboSimpleTypeKind or PTurboTypeInfoEntry
+    TypeInfo: tsInt;//TTurboSimpleTypeKind or PTurboTypeInfoEntry
     ParamName: ShortString;
   end;
 
 
-
-  //the typecast for code memory area to get the parameters
-  TPreservedCodeMemory = packed record
-    States: TTurboProcessorStates;
-    Executor: TCustomTurboModule;
-    //##abondoned:this Module unique Index in this program, allocated by compiler.
-    //##ModuleIndex: Integer;
-    ModuleType: TTurboModuleType;
+  PTurboGlobalOptions = ^TTurboGlobalOptions;
+  TTurboGlobalOptions = record  //do not use the packed.
+    //States: TTurboProcessorStates; //如果放在这里，速度会下降
+    LastErrorCode: TTurboProcessorErrorCode;
     ParamStackBase: Pointer;
     ParamStackSize: Integer; //bytes
     ParamStackBottom: Pointer;
     ReturnStackBase: Pointer;
     ReturnStackSize: Integer; //bytes
     ReturnStackBottom: Pointer;
-    UsedMemory: Integer;
-    MemorySize: Integer; 
+  end;
+
+  //the typecast for code memory area to get the parameters
+  TPreservedCodeMemory = packed record
+    States: TTurboProcessorStates;
+    GlobalOptions: PTurboGlobalOptions;
+    Executor: TCustomTurboModule;
+    //##abondoned:this Module unique Index in this program, allocated by compiler.
+    //##ModuleIndex: Integer;
+    ModuleType: TTurboModuleType;
+    {ParamStackBase: Pointer;
+    ParamStackSize: Integer; //bytes
+    ParamStackBottom: Pointer;
+    ReturnStackBase: Pointer;
+    ReturnStackSize: Integer; //bytes
+    ReturnStackBottom: Pointer;
+    }
+    UsedMemory: tsInt;
+    MemorySize: tsInt; 
     //ToIn: Integer; //>IN the text buffer current index
     //TIBLength: Integer; //#TIB the text buffer length
     //TIB: array [0..cMAXTIBCount-1] of char; //'TIB
-    LastErrorCode: TTurboProcessorErrorCode;
+    //LastErrorCode: TTurboProcessorErrorCode;
     //如果ModuleType是模块，那么就是装载运行该模块前执行的初始化过程，入口地址
     //如果是函数，则是该函数的入口地址
     InitializeProc: Pointer; //it is the offset address of the FMemory
@@ -783,6 +801,11 @@ begin
   Result := nil;
 end;
 
+function TCustomTurboModule.GetGlobalOptions: Pointer;
+begin
+  Result := PPreservedCodeMemory(FMemory).GlobalOptions;
+end;
+
 function TCustomTurboModule.GetInitializeProc: Integer;
 begin
   Result := Integer(PPreservedCodeMemory(FMemory)^.InitializeProc);
@@ -790,7 +813,13 @@ end;
 
 function TCustomTurboModule.GetLastErrorCode: TTurboProcessorErrorCode;
 begin
-  Result := PPreservedCodeMemory(FMemory).LastErrorCode;
+  with PPreservedCodeMemory(FMemory)^ do
+  begin
+    if Assigned(GlobalOptions) then
+      Result := GlobalOptions.LastErrorCode
+    else
+      Result := errNone;
+  end;
 end;
 
 function TCustomTurboModule.GetLastTypeInfoEntry: PTurboTypeInfoEntry;
@@ -820,22 +849,38 @@ end;
 
 function TCustomTurboModule.GetParameterStack: Pointer;
 begin
-  Result := PPreservedCodeMemory(FMemory).ParamStackBase;
+  with PPreservedCodeMemory(FMemory)^ do
+    if Assigned(GlobalOptions) then
+      Result := GlobalOptions.ParamStackBase
+    else
+      Result := nil;
 end;
 
 function TCustomTurboModule.GetParameterStackSize: Integer;
 begin
-  Result := PPreservedCodeMemory(FMemory).ParamStackSize;
+  with PPreservedCodeMemory(FMemory)^ do
+    if Assigned(GlobalOptions) then
+      Result := GlobalOptions.ParamStackSize
+    else
+      Result := 0;
 end;
 
 function TCustomTurboModule.GetReturnStack: Pointer;
 begin
-  Result := PPreservedCodeMemory(FMemory).ReturnStackBase;
+  with PPreservedCodeMemory(FMemory)^ do
+    if Assigned(GlobalOptions) then
+      Result := GlobalOptions.ReturnStackBase
+    else
+      Result := nil;
 end;
 
 function TCustomTurboModule.GetReturnStackSize: Integer;
 begin
-  Result := PPreservedCodeMemory(FMemory).ReturnStackSize;
+  with PPreservedCodeMemory(FMemory)^ do
+    if Assigned(GlobalOptions) then
+      Result := GlobalOptions.ReturnStackSize
+    else
+      Result := 0;
 end;
 
 function TCustomTurboModule.GetRoot: TCustomTurboModule;
@@ -901,10 +946,7 @@ procedure TCustomTurboModule.LoadFromStream(const aStream: TStream; Count:
         Integer = 0);
 var
   vHeader: TTurboModuleStreamHeader;
-  vParameterStack: Pointer;
-  vReturnStack: Pointer;
-  vParameterStackSize: Integer;
-  vReturnStackSize: Integer;
+  vOptions: Pointer;
 begin
   if Count <= 0 then
   begin
@@ -925,10 +967,11 @@ begin
   with PPreservedCodeMemory(FMemory)^ do
   begin
     //backup the data in the Memory
-    vParameterStack := ParameterStack;
+    vOptions := GlobalOptions;
+    {vParameterStack := ParameterStack;
     vReturnStack := ReturnStack;
     vReturnStackSize := ReturnStackSize;
-    vParameterStackSize := ParameterStackSize;
+    vParameterStackSize := ParameterStackSize;}
   end;
 
   MemorySize := Count-SizeOf(TTurboModuleStreamHeader);
@@ -937,10 +980,11 @@ begin
   with PPreservedCodeMemory(FMemory)^ do
   begin
     //now restore the data
-    ParameterStack := vParameterStack;
+    GlobalOptions := vOptions;
+    {ParameterStack := vParameterStack;
     ReturnStack := vReturnStack;
     ReturnStackSize := vReturnStackSize;
-    ParameterStackSize := vParameterStackSize;
+    ParameterStackSize := vParameterStackSize; //}
   end;
 
   Reset;
@@ -991,9 +1035,9 @@ begin
 
   with PPreservedCodeMemory(FMemory)^ do
   begin
-    SP := Integer(ParameterStack) + ParamStackSize;
-    RP := Integer(ReturnStack) + ReturnStackSize;
-    LastErrorCode := errNone;
+    SP := Integer(GlobalOptions.ParamStackBase) + GlobalOptions.ParamStackSize;
+    RP := Integer(GlobalOptions.ReturnStackBase) + GlobalOptions.ReturnStackSize;
+    GlobalOptions.LastErrorCode := errNone;
     Executor := Self;
     States := [];
   end;
@@ -1014,10 +1058,7 @@ end;
 procedure TCustomTurboModule.SaveToStream(const aStream: TStream);
 var
   vHeader: TTurboModuleStreamHeader;
-  vParameterStack: Pointer;
-  vReturnStack: Pointer;
-  vParameterStackSize: Integer;
-  vReturnStackSize: Integer;
+  vOptions: Pointer;
 begin
   if not FIsLoaded then
     raise ETurboScriptError.CreateRes(@rsTurboScriptNotLoadedError);
@@ -1031,24 +1072,28 @@ begin
   with PPreservedCodeMemory(FMemory)^ do
   begin
     //backup the data in the Memory
-    vParameterStack := ParameterStack;
+    vOptions := GlobalOptions;
+    GlobalOptions := nil;
+    {vParameterStack := ParameterStack;
     vReturnStack := ReturnStack;
     vReturnStackSize := ReturnStackSize;
     vParameterStackSize := ParameterStackSize;
     ParameterStack := 0;
     ReturnStack := 0;
     ReturnStackSize := 0;
-    ParameterStackSize := 0;
+    ParameterStackSize := 0;}
   end;
 
   aStream.WriteBuffer(FMemory^, UsedMemory);
 
   with PPreservedCodeMemory(FMemory)^ do
   begin
-    ParameterStack := vParameterStack;
+    GlobalOptions := vOptions;
+  {  ParameterStack := vParameterStack;
     ReturnStack := vReturnStack;
     ReturnStackSize := vReturnStackSize;
     ParameterStackSize := vParameterStackSize;
+  }
   end;
 
   if not (psCompiling in Status) then TurboConvertAddrRelatedToAbsolute(FMemory);
@@ -1067,6 +1112,11 @@ begin
     Proc(Self);
   end;
   FModuleUnloadNotifies.Clear;
+end;
+
+procedure TCustomTurboModule.SetGlobalOptions(Value: Pointer);
+begin
+  PPreservedCodeMemory(FMemory).GlobalOptions := Value;
 end;
 
 procedure TCustomTurboModule.SetLastTypeInfoEntry(const Value:
@@ -1107,12 +1157,12 @@ end;
 
 procedure TCustomTurboModule.SetParameterStack(Value: Pointer);
 begin
-  PPreservedCodeMemory(FMemory).ParamStackBase := Value;
+  PPreservedCodeMemory(FMemory).GlobalOptions.ParamStackBase := Value;
 end;
 
 procedure TCustomTurboModule.SetParameterStackSize(Value: Integer);
 begin
-  PPreservedCodeMemory(FMemory).ParamStackSize := Value;
+  PPreservedCodeMemory(FMemory).GlobalOptions.ParamStackSize := Value;
 end;
 
 procedure TCustomTurboModule.SetParent(const Value: TCustomTurboModule);
@@ -1129,12 +1179,12 @@ end;
 
 procedure TCustomTurboModule.SetReturnStack(Value: Pointer);
 begin
-  PPreservedCodeMemory(FMemory).ReturnStackBase := Value;
+  PPreservedCodeMemory(FMemory).GlobalOptions.ReturnStackBase := Value;
 end;
 
 procedure TCustomTurboModule.SetReturnStackSize(Value: Integer);
 begin
-  PPreservedCodeMemory(FMemory).ReturnStackSize := Value;
+  PPreservedCodeMemory(FMemory).GlobalOptions.ReturnStackSize := Value;
 end;
 
 procedure TCustomTurboModule.SetStatus(Value: TTurboProcessorStates);
@@ -1382,7 +1432,7 @@ begin
   if not (psRunning in Status) and (ParameterStackSize <> Value) then
   begin
     ParameterStackSize := Value;
-    ReallocMem(PPreservedCodeMemory(FMemory).ParamStackBase, (Value+1)*SizeOf(Pointer));
+    ReallocMem(PPreservedCodeMemory(FMemory).GlobalOptions.ParamStackBase, (Value+1)*SizeOf(Pointer));
     //if FSP > FParameterStackSize then FSP := FParameterStackSize;
   end;
 end;
@@ -1393,7 +1443,7 @@ begin
   begin
     ReturnStackSize := Value;
     //p := ReturnStack;
-    ReallocMem(PPreservedCodeMemory(FMemory).ReturnStackBase, (Value+1)*SizeOf(Pointer));
+    ReallocMem(PPreservedCodeMemory(FMemory).GlobalOptions.ReturnStackBase, (Value+1)*SizeOf(Pointer));
     //ReturnStack := p;
     //if FSP > FParameterStackSize then FSP := FParameterStackSize;
   end;
