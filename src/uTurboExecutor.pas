@@ -1,7 +1,8 @@
 {: The abstract super script executor module. }
 { Description
 
-记住这里的堆栈(采用X86的堆栈规则)： 压入则是地址减少，弹出则是地址增加
+记住这里的堆栈(采用X86的堆栈规则)： 压入则是地址减少，弹出则是地址增加,
+堆栈是悬在顶部，往下增长的。
 When an item is pushed onto the stack, the processor decrements the ESP
 register, then writes the item at the new top of stack. When an item is popped
 off the stack, the
@@ -56,7 +57,7 @@ type
   PPreservedCodeMemory = ^ TPreservedCodeMemory;
   PTurboVariableEntry = ^ TTurboVariableEntry;
   PTurboModuleEntry = ^ TTurboModuleEntry;
-  PTurboWordEntry = ^ TTurboWordEntry;
+  PTurboWordEntry = ^ TTurboWordBlock;
   PTurboTypeInfoEntry = ^ TTurboTypeInfoEntry;
   PTurboExteralWordCFA = ^TTurboExteralWordCFA;
 
@@ -104,7 +105,9 @@ type
   TCustomTurboModule = class(TCustomTurboObject)
   private
     function GetGlobalOptions: Pointer;
+    function GetLastModuleEntry: PTurboModuleEntry;
     procedure SetGlobalOptions(Value: Pointer);
+    procedure SetLastModuleEntry(Value: PTurboModuleEntry);
   protected
     FAccessor: TObject;
     FIsLoaded: Boolean;
@@ -183,6 +186,11 @@ type
     procedure AllocSpace(const aSize: Integer);
     {: reduce the memory size to initialization state }
     procedure ClearMemory;
+    {: find used module name entry. }
+    { Description
+    nil means not found.
+    }
+    function FindModuleEntry(const aName: string): PTurboModuleEntry;
     {: nil means not found. }
     function FindTypeInfoEntry(const aName: string): PTurboTypeInfoEntry;
     function FindUnloadNotification(aProc: TNotifyEvent): Integer;
@@ -236,6 +244,8 @@ type
     }
     property IsLoaded: Boolean read FIsLoaded write FIsLoaded;
     property LastErrorCode: TTurboProcessorErrorCode read GetLastErrorCode;
+    property LastModuleEntry: PTurboModuleEntry read GetLastModuleEntry write
+            SetLastModuleEntry;
     property LastTypeInfoEntry: PTurboTypeInfoEntry read GetLastTypeInfoEntry
             write SetLastTypeInfoEntry;
     property LastVariableEntry: PTurboVariableEntry read GetLastVariableEntry
@@ -458,7 +468,7 @@ type
 
 
   //For type-cast the Mem
-  TTurboWordEntry = packed record
+  TTurboWordBlock = object
     Prior: PTurboWordEntry; //前一个单词 0 means 为最前面。
 
     Options: TTurboWordOptions;
@@ -676,9 +686,14 @@ var
 begin
   if PPreservedCodeMemory(FMemory).UsedMemory >= MemorySize then
     Grow;
+
   Integer(p) := Integer(FMemory) + PPreservedCodeMemory(FMemory).UsedMemory;
+  {
   PInteger(P)^ := Integer(aOpCode);
   Inc(PPreservedCodeMemory(FMemory).UsedMemory, SizeOf(Integer));
+  }
+  PTurboVMInstruction(P)^ := aOpCode;
+  Inc(PPreservedCodeMemory(FMemory).UsedMemory, SizeOf(TTurboVMInstruction));
 end;
 
 procedure TCustomTurboModule.AlignMem;
@@ -727,6 +742,24 @@ begin
 
     IsLoaded := False;
   end;
+end;
+
+function TCustomTurboModule.FindModuleEntry(const aName: string):
+        PTurboModuleEntry;
+begin
+  Result := LastModuleEntry;
+  while (Result <> nil) do
+  begin
+    if psCompiling in Status then
+      Integer(Result) := Integer(FMemory) + Integer(Result);
+    if Result.ModuleName = aName then
+    begin
+      Exit;
+    end
+    else
+      Result := Result.Prior;
+  end;
+  Result := nil;
 end;
 
 function TCustomTurboModule.FindTypeInfoEntry(const aName: string):
@@ -820,6 +853,11 @@ begin
     else
       Result := errNone;
   end;
+end;
+
+function TCustomTurboModule.GetLastModuleEntry: PTurboModuleEntry;
+begin
+  Result := PPreservedCodeMemory(FMemory).LastModuleEntry;
 end;
 
 function TCustomTurboModule.GetLastTypeInfoEntry: PTurboTypeInfoEntry;
@@ -1117,6 +1155,11 @@ end;
 procedure TCustomTurboModule.SetGlobalOptions(Value: Pointer);
 begin
   PPreservedCodeMemory(FMemory).GlobalOptions := Value;
+end;
+
+procedure TCustomTurboModule.SetLastModuleEntry(Value: PTurboModuleEntry);
+begin
+  PPreservedCodeMemory(FMemory).LastModuleEntry := Value;
 end;
 
 procedure TCustomTurboModule.SetLastTypeInfoEntry(const Value:

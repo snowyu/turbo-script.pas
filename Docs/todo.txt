@@ -1,4 +1,14 @@
 2006-11-3
+* [BUG] [ForthCompiler] 因为我在Object使用了string，但是却没有初始化object内存，在对赋值该string赋值的出现严重错误！！改为Shortstring即可。
+* [VM] reanme TTurboWordEntry packed record to TTurboWordBlock object!
++ [VM] !TICK:: store tickcount to variable address directly. (int64Addr -- )
++ [VM] StoreInt(!), StoreInt64(!i8), StoreByte(!i1), StoreWord(!i2)
++ [VM] FetchInt(@), FetchInt64(@i8), FetchByte(@i1), FetchWord(@i2)
+* [VM] 修改指令长度为 Byte 而不是 Int32，这样保留内存区只有256个字节，最大基本指令只有255个，现目前使用了大概100多个，需要根据 CLR
+  做最后修订。
+
+~ packed record
+  只有对里面的 Pointer, Integer, Int64, string 才会对齐。shortstring类型不会产生对齐。
 !* change the TTurboWordEntry record to TTurboWordBlock object
   这样我就能在上面加上地址重定位到其它模块等的过程。
   ?!* Name to PPackedShortString;

@@ -191,13 +191,15 @@ asm
 @@DoEnter:
   //MOV EAX, [ESI]  //the current instruction in W register
   //ADD ESI, Type(Pointer) //4 = INC PC INC PC INC PC INC PC
-  LODSD
+  XOR EAX, EAX
+  LODSB
+  //MOVZX EAX, AL //the XOR EAX,EAX is faster! 
   
 @@ExecInstruction:
-  CMP  EAX, cMaxTurboVMInstructionCount
-  JAE   @@IsUserWord
+  //CMP  EAX, cMaxTurboVMInstructionCount
+  //JAE   @@IsUserWord
 @@IsVMCode:
-  LEA  ECX, GTurboCoreWords
+  MOV  ECX, OFFSET GTurboCoreWords
   MOV  EAX, [ECX+EAX*4]
   CMP  EAX, 0
   JZ   @@BadOpError
@@ -232,6 +234,15 @@ end;
 procedure iVMEnter;
 asm
   PUSH ESI        //push the current IP.
+  MOV  ESI, EAX   //set the new IP
+  JMP iVMNext
+end;
+
+procedure iVMCall;
+asm
+  LODSD
+  PUSH ESI        //push the current IP.
+  ADD  EAX, EDI
   MOV  ESI, EAX   //set the new IP
   JMP iVMNext
 end;
@@ -374,7 +385,51 @@ asm
   JMP  iVMNext
 end;
 
-procedure iVMPopInt;
+//this is a Push Byte(立即操作数) directive
+procedure iVMPushByte;
+asm
+  //Decrement the data stack pointer.
+  //push the second data to the data stack.
+  XCHG ESP, EBP
+  PUSH EBX
+  XCHG ESP, EBP
+  {SUB  EBP, Type(tsPointer)
+  MOV  [EBP], EDX
+  }
+ 
+  {
+  MOV  EDX, [ESI]
+  ADD  ESI, Type(tsInt)
+  }
+  XOR EAX, EAX
+  LODSB
+  MOV  EBX, EAX
+  JMP  iVMNext
+end;
+
+//this is a Push Word(立即操作数) directive
+procedure iVMPushWord;
+asm
+  //Decrement the data stack pointer.
+  //push the second data to the data stack.
+  XCHG ESP, EBP
+  PUSH EBX
+  XCHG ESP, EBP
+  {SUB  EBP, Type(tsPointer)
+  MOV  [EBP], EDX
+  }
+ 
+  {
+  MOV  EDX, [ESI]
+  ADD  ESI, Type(tsInt)
+  }
+  XOR EAX, EAX
+  LODSW
+  MOV  EBX, EAX
+  JMP  iVMNext
+end;
+
+procedure iVMDropInt;
 asm
   XCHG ESP, EBP
   POP  EBX
@@ -401,7 +456,7 @@ asm
   JMP  iVMNext
 end;
 
-procedure iVMPopInt64;
+procedure iVMDropInt64;
 asm
   XCHG ESP, EBP
   POP  EBX
@@ -487,20 +542,136 @@ asm
   JMP  iVMNext
 end;
 
-procedure vStore;
-begin
-end;
-
-procedure vCFetchInt;
+procedure vFetchByte;
 asm
   //EBX is TOS
-  ADD EBX, EDI //TOS <- TOS + FMem
-  MOV BL, [EBX]
+  MOV EBX, EAX
+  XOR EBX, EBX
+  ADD EAX, EDI //EAX <- TOS + FMem
+  MOV BL, [EAX]
   JMP  iVMNext
 end;
 
-procedure vCStore;
-begin
+procedure vFetchWord;
+asm
+  //EBX is TOS
+  MOV EBX, EAX
+  XOR EBX, EBX
+  ADD EAX, EDI //EAX <- TOS + FMem
+  MOV BX, [EAX]
+  JMP  iVMNext
+end;
+
+procedure vFetchInt64;
+asm
+  //EBX is TOS
+  ADD EBX, EDI //TOS <- TOS + FMem
+  MOV EAX, [EBX+4]
+  MOV EBX, [EBX]
+
+{ //push EAX the high 32bit of the int64
+  SUB EBP, Type(tsInt)
+  MOV [EBP], EAX
+}
+  XCHG ESP, EBP
+  PUSH EAX
+  XCHG ESP, EBP
+  JMP  iVMNext
+end;
+
+procedure vStoreInt;
+asm
+  ADD EBX, EDI 
+  MOV EAX, [EBP]
+  MOV [EBX], EAX
+  INC EBP 
+  INC EBP 
+  INC EBP 
+  INC EBP
+  MOV EBX, [EBP]
+  //check whether is stackbottom
+  MOV EAX, [EDI].TPreservedCodeMemory.GlobalOptions
+  CMP EBP, [EAX].TTurboGlobalOptions.ParamStackBase
+  JLE @@exit //already is bottom then exit.
+  INC EBP 
+  INC EBP 
+  INC EBP 
+  INC EBP
+@@exit:  
+  JMP  iVMNext
+end;
+
+procedure vStoreInt64;
+asm
+  ADD EBX, EDI 
+  MOV EAX, [EBP]
+  MOV [EBX], EAX
+  MOV EAX, [EBP+4]
+  MOV [EBX+4], EAX
+  INC EBP 
+  INC EBP 
+  INC EBP 
+  INC EBP
+
+  INC EBP 
+  INC EBP 
+  INC EBP 
+  INC EBP
+  MOV EBX, [EBP]
+  //check whether is stackbottom
+  MOV EAX, [EDI].TPreservedCodeMemory.GlobalOptions
+  CMP EBP, [EAX].TTurboGlobalOptions.ParamStackBase
+  JLE @@exit //already is bottom then exit.
+  INC EBP 
+  INC EBP 
+  INC EBP 
+  INC EBP
+@@exit:  
+  JMP  iVMNext
+end;
+
+procedure vStoreWord;
+asm
+  ADD EBX, EDI 
+  MOV EAX, [EBP]
+  MOV [EBX], AX
+  INC EBP 
+  INC EBP 
+  INC EBP 
+  INC EBP
+  MOV EBX, [EBP]
+  //check whether is stackbottom
+  MOV EAX, [EDI].TPreservedCodeMemory.GlobalOptions
+  CMP EBP, [EAX].TTurboGlobalOptions.ParamStackBase
+  JLE @@exit //already is bottom then exit.
+  INC EBP 
+  INC EBP 
+  INC EBP 
+  INC EBP
+@@exit:  
+  JMP  iVMNext
+end;
+
+procedure vStoreByte;
+asm
+  ADD EBX, EDI 
+  MOV EAX, [EBP]
+  MOV [EBX], AL
+  INC EBP 
+  INC EBP 
+  INC EBP 
+  INC EBP
+  MOV EBX, [EBP]
+  //check whether is stackbottom
+  MOV EAX, [EDI].TPreservedCodeMemory.GlobalOptions
+  CMP EBP, [EAX].TTurboGlobalOptions.ParamStackBase
+  JLE @@exit //already is bottom then exit.
+  INC EBP 
+  INC EBP 
+  INC EBP 
+  INC EBP
+@@exit:  
+  JMP  iVMNext
 end;
 
 //print a char
@@ -587,6 +758,18 @@ asm
   JMP  iVMNext
 end;
 
+//(int64Addr --)
+procedure vStoreTickCount;
+asm
+  ADD  EBX, EDI
+  PUSH EBX
+  CALL QueryPerformanceCounter
+  XCHG ESP, EBP
+  POP  EBX
+  XCHG ESP, EBP
+  JMP  iVMNext
+end;
+
 procedure InitTurboCoreWordList;
 begin
   GTurboCoreWords[inNext] := iVMNext;
@@ -594,6 +777,7 @@ begin
 
   GTurboCoreWords[inEnter] := iVMEnter;
   GTurboCoreWords[inExit] := iVMExit;
+  GTurboCoreWords[inCall] := iVMCall;
 
   GTurboCoreWords[inEnterFar] := iVMEnterFar;
   GTurboCoreWords[inExitFar] := iVMExitFar;
@@ -607,18 +791,26 @@ begin
 
   //Memory Operation Instruction with Param Stack
   GTurboCoreWords[inFetchInt] := vFetchInt;
-  GTurboCoreWords[inStoreInt] := vStore;
-  GTurboCoreWords[inFetchByte] := vCFetchInt;
-  GTurboCoreWords[inStoreByte] := vCStore;
+  GTurboCoreWords[inStoreInt] := vStoreInt;
+  GTurboCoreWords[inFetchInt64] := vFetchInt64;
+  GTurboCoreWords[inStoreInt64] := vStoreInt64;
+  GTurboCoreWords[inFetchWord] := vFetchWord;
+  GTurboCoreWords[inStoreWord] := vStoreWord;
+  GTurboCoreWords[inFetchByte] := vFetchByte;
+  GTurboCoreWords[inStoreByte] := vStoreByte;
 
   GTurboCoreWords[inPushInt] := iVMPushInt;
-  GTurboCoreWords[inPopInt] := iVMPopInt;
-  GTurboCoreWords[inPushQWord] := iVMPushInt64;
-  GTurboCoreWords[inPopQWord] := iVMPopInt64;
+  GTurboCoreWords[inPushByte] := iVMPushByte;
+  GTurboCoreWords[inPushWord] := iVMPushWord;
+  GTurboCoreWords[inDropInt] := iVMDropInt;
+  GTurboCoreWords[inPushInt64] := iVMPushInt64;
+  GTurboCoreWords[inDropInt64] := iVMDropInt64;
   GTurboCoreWords[inEmit] := vEmitChar;
   GTurboCoreWords[inEmitString] := vEmitString;
   GTurboCoreWords[inEmitLString] := vEmitLString;
   GTurboCoreWords[inGetTickCount] := vGetTickCount;
+  GTurboCoreWords[inStoreTickCount] := vStoreTickCount;
+
 end;
 
 initialization

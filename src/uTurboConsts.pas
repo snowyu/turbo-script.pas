@@ -83,26 +83,27 @@ type
     //ForthDLL的模块链接方式调用
     inEnterFar, //inEnterFar ModuleMemBase-addr Addr
     inExitFar,  //对于远调用的返回指令必须是该指令! R: (MemoryBase PC -- )
+    inCall, //near call inCall Addr
     
     inPushByte, //in fact it will be expand to int, then inPush Byte (-- n)
     inPushWord,
     inPushInt,  // inPushInt Int (-- n)
-    inPushQWord, //two integer(int64).
-    inPopByte, //inPopByte ByteVar-Addr (n --)
-    inPopWord, //inPopWord WordVar-Addr (n --)
-    inPopInt, //inPopInt IntVar-Addr (n --)
-    inPopQWord, //inPopQWord QWordVar-Addr (n --)
+    inPushInt64, //two integer(int64). (-- int64)
+    inPopByte, //inPopByte ByteVar-Addr  (n --)
+    inPopWord, //inPopWord WordVar-Addr  (n --)
+    inPopInt, //inPopInt   IntVar-Addr  (n --)
+    inPopInt64, //inPopInt64 QWordVar-Addr (n --)
 
     {## Memory Operation Instruction }
-    inStoreInt,  //! Store a Integer,pop data to memory (aInt addr --)
+    inStoreInt,  //! Store a Integer,pop data to memory (aInt offsetAddr --)
     inStoreByte, //C! CStore
     inStoreWord, //inStoreWord  (aWord aWord-addr --)
-    inStoreQWord, //int64, inStoreQWord (aQWord aQWord-addr --)
-    inStoreRP, //RP! Set return stack pointer (addr -- )
-    inFetchInt,  //Fetch, push a integer from memory. (addr -- aInt)
+    inStoreInt64, //int64, inStoreQWord (aQWord aQWord-addr --)
+    inStoreRP, //RP! Set return stack pointer (offsetAddr -- )
+    inFetchInt,  //Fetch, push a integer from memory. (offsetAddr -- aInt)
     inFetchByte, //CFetch
     inFetchWord, //inFetchWord (aWord-addr -- aWord) 
-    inFetchQWord,
+    inFetchInt64,
     inFetchRP, //RP@ Push current RP(returnStacck Poiinter) as data (-- RP)
     //Copies bytes from a source to a destination.
     inMove, //Move(src-addr, dest-addr, count --)
@@ -179,11 +180,15 @@ type
 
     {## data Stack Operation Instuction }
     inDropInt,  //Discard top of stack (int --) 
-    inDropQWord,  //Discard top of stack (int64 --) 
+    inDropInt64,  //Discard top of stack (int64 --) 
     inDUPInt,  //Duplicate the TOS (int -- int int)
+    inDUPInt64,  //Duplicate the TOS (int64 -- int64 int64)
     inSWAPInt, //Exchange top two of stack (int1 int2 -- int2 int1)
+    inSWAPInt64, //Exchange top two of stack (int641 int642 -- int642 int641)
     inOVERInt,  //Duplicate second of stack (i1 i2 -- i1 i2 i1)
-    inROTInt
+    inOVERInt64,  //Duplicate second of stack (i641 i642 -- i641 i642 i641)
+    inROTInt,
+    inROTInt64
 
     {## Return Stack Operation Instuction }
     , inRPushInt //>R: push to return stack  (int --) R(-- int)
@@ -193,6 +198,7 @@ type
     , inEmitString // (ShortStringAddr -- )
     , inEmitLString // (AnsiStringAddr -- )
     , inGetTickCount //(-- int64)
+    , inStoreTickCount //(int64Addr -- ) (int64Addr)^ = tickcount
 
   ); 
 

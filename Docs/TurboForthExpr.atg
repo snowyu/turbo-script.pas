@@ -60,9 +60,10 @@ TYPE
     Name: ShortString;
     TypeKind: TTurboSimpleTypeKind;
     Value: TTurboValueRec;
-    ValueStr: String;
+    ValueStr: ShortString;
     Size: Integer;
   public
+    procedure SetTypeKind(aValue: TTurboSimpleTypeKind);
     function AssignValueTo(const Source: Pointer): Boolean;
     //根据aValue 如果aTypeKind is ttkUnknown 那么会自动判断其类型
     function AssignValue(const aValue: string; const aTypeKind: TTurboSimpleTypeKind = ttkUnknown): Boolean;
@@ -71,6 +72,7 @@ TYPE
 
   TTurboSimpleVar = object(TTurboSimpleConst)
   public
+    Visibility: TTurboVisibility;
     Addr: Integer;
   end;
 
@@ -80,9 +82,12 @@ PRIVATE
   FLastWordEntry: PTurboWordEntry;
   FLastWordCfa: Integer;
   FModule: TCustomTurboModule;
+
   FLabels: array of TTurboLabelDeclarationRec;
   FConsts: array of TTurboSimpleConst;
   FVars: array of TTurboSimpleVar;
+  FWords: array of PTurboWordEntry;
+  FUsedModules: array of PTurboModuleEntry;
   procedure Init;
   procedure Final;
   procedure WriteStr(S : String);
@@ -111,7 +116,7 @@ PRIVATE
   function GetConstValue(const aTypeKind: TTurboSimpleTypeKind; const aName: string): TTurboValueRec;
 
   //if not find then add new , return index else raise error.
-  function DefineVar(const aValue: TTurboSimpleVar; aVisibility: TTurboVisibility = fvPublished): Integer;
+  function DefineVar(const aValue: TTurboSimpleVar): Integer;
   function FindVar(const aName: String): Integer;
 
   //make sure the indentifier is unique else it will raise the error..
@@ -188,7 +193,7 @@ begin
   else
     try
       ValueStr := aValue;
-      Value.VInt64 := StrToInt(aValue);
+      Value.VInt64 := StrToInt64(aValue);
       //writeln(Name,'=',Value.VByte);
       if aTypeKind = ttkUnknown then
       begin
@@ -222,8 +227,10 @@ end;
 function TTurboSimpleConst.AssignValueTo(const Source: Pointer): Boolean;
 begin
   Result := True;
-  //writeln('AssignValueTo:', Value.VInteger);
-  case TypeKind of
+  //writeln('AssignValueTo:', ValueStr);
+  move(Value, Source^, Size);
+  //writeln(InttoHex(Value.VInteger, 4));
+  {case TypeKind of
     ttkSLong, ttkInterface, ttkProcedure, ttkPointer, ttkString, ttkLString: PInteger(Source)^ := Value.VInteger;
     ttkSByte: PShortInt(Source)^  := Value.VShortInt;
     ttkUByte, ttkChar, ttkSet: PByte(Source)^ := Value.VByte;
@@ -233,7 +240,7 @@ begin
     ttkQWord, ttkInt64: PInt64(Source)^:= Value.VInt64;
     else 
       Result := False;
-  end;
+  end;//}
   //writeln('TypeKind=', Integer(TypeKind));
   //writeln('PSource=', PInteger(Source)^);
 end;
@@ -256,6 +263,12 @@ begin
         aModule.AddByteToMem(0);
       end;
     end;//case
+end;
+
+procedure TTurboSimpleConst.SetTypeKind(aValue: TTurboSimpleTypeKind);
+begin
+  TypeKind := aValue;
+  Size := GetSimpleTurboTypeSize(TypeKind);
 end;
 
 { T-->Grammar<-- }
@@ -287,16 +300,22 @@ begin
     begin
       if Size <= SizeOf(Integer) then
       begin
-        FModule.AddOpToMem(inPushInt);
-        Size := SizeOf(Integer);
+        //FModule.AddOpToMem(inPushInt);
+        //Size := SizeOf(Integer);
+        Case Size of
+          SizeOf(Byte): FModule.AddOpToMem(inPushByte);
+          SizeOf(Word): FModule.AddOpToMem(inPushWord);
+          //SizeOf(tsInt): FModule.AddOpToMem(inPushInt);
+          //SizeOf(Int64): FModule.AddOpToMem(inPushInt64);
+          else 
+          begin
+            FModule.AddOpToMem(inPushInt);
+            Size := SizeOf(Integer);
+          end;
+        end;//case
       end
       else
-        FModule.AddOpToMem(inPushQWord);
-      {Case Size of
-        SizeOf(Byte): FModule.AddOpToMem(inPushByte);
-        SizeOf(Word): FModule.AddOpToMem(inPushWord);
-        SizeOf(Integer): FModule.AddOpToMem(inPushInt);
-      end;//}
+        FModule.AddOpToMem(inPushInt64);
       Integer(p) := Integer(FModule.Memory) + FModule.UsedMemory;
       FModule.AllocSpace(Size);
       AssignValueTo(p);
@@ -315,6 +334,23 @@ begin
       FModule.AddOpToMem(inPushInt);
       FModule.AddIntToMem(Addr);
     end
+end;
+
+function T-->Grammar<--.AddWordCFA(const aName: string): Boolean;
+var
+  vCFA: Integer;
+begin
+  vCFA := FModule.GetWordCFA(aName);
+  if vCFA <> 0 then
+  begin
+    FModule.AddOpToMem(inCall);
+    FModule.AddIntToMem(vCFA);
+    Result := True;
+  end
+  else begin
+    Result := False;
+    //SynError(cUnknownWordError);
+  end;
 end;
 
 function T-->Grammar<--.IsUniqueIdentifier(const aName: String): Boolean;
@@ -373,22 +409,6 @@ begin
 
 end;
 
-function T-->Grammar<--.AddWordCFA(const aName: string): Boolean;
-var
-  vCFA: Integer;
-begin
-  vCFA := FModule.GetWordCFA(aName);
-  if vCFA <> 0 then
-  begin
-    FModule.AddIntToMem(vCFA);
-    Result := True;
-  end
-  else begin
-    Result := False;
-    //SynError(cUnknownWordError);
-  end;
-end;
-
 function T-->Grammar<--.DefineConstEx(const aValue: TTurboSimpleConst): Integer;
 begin
   //WriteLn('ConstDefine:', aValue.Name);
@@ -434,11 +454,11 @@ begin
   Result := -1;
 end;
 
-function T-->Grammar<--.DefineVar(const aValue: TTurboSimpleVar; aVisibility: TTurboVisibility): Integer;
+function T-->Grammar<--.DefineVar(const aValue: TTurboSimpleVar): Integer;
 var
   vVaraibleEntry: PTurboVariableEntry;
   vValue: Pointer;
-  vTypeSize: Integer;
+  //vTypeSize: Integer;
 begin
   //在前面已经判断了是不是名称重复：
   Result := Length(FVars);
@@ -449,34 +469,45 @@ begin
     //WriteLn(Result, ':DefineVar:',Name);
     //Name := aValue.Name; //保证让其ref增加
     //FModule.AlignMem;
-    Integer(vVaraibleEntry) := Integer(FModule.Memory) + FModule.UsedMemory;
-    vTypeSize := GetSimpleTurboTypeSize(aValue.TypeKind);
-    Size := vTypeSize;
+    //vTypeSize := GetSimpleTurboTypeSize(aValue.TypeKind);
+    //Size := vTypeSize;
+    //WriteLn(Name,'.Visibility=', Integer(Visibility));
+    //WriteLn(Name,'.Size=', Size);
 
-    FModule.AddIntToMem(Integer(FModule.LastVariableEntry));
-    FModule.AddIntToMem(vTypeSize);
-    FModule.AddIntToMem(0); //preserved.for addr.
-    FModule.AddIntToMem(0); //preserved.for TypeInfo.
-    if aVisibility >= fvPublished then
+    if Visibility >= fvProtected then
     begin
-      //fill the variable name 
-      FModule.AddByteToMem(Length(Name));
-      FModule.AddBufferToMem(Name[1], Length(Name));
-    end
-    else 
-    begin
-      //no name
-      FModule.AddByteToMem(0);
+      Integer(vVaraibleEntry) := Integer(FModule.Memory) + FModule.UsedMemory;
+      FModule.AddIntToMem(Integer(FModule.LastVariableEntry));
+      FModule.AddIntToMem(Size);
+      FModule.AddIntToMem(0); //preserved.for addr.
+      FModule.AddIntToMem(0); //preserved.for TypeInfo.
+      if Visibility >= fvPublished then
+      begin
+        //fill the variable name 
+        FModule.AddByteToMem(Length(Name));
+        FModule.AddBufferToMem(Name[1], Length(Name));
+      end
+      else 
+      begin
+        //no name
+        FModule.AddByteToMem(0);
+      end;
     end;
   
     Addr := FModule.UsedMemory;
-    Integer(vVaraibleEntry.Addr) := Addr;
-    Integer(vValue) := Integer(FModule.Memory)  + FModule.UsedMemory;
-    FModule.AllocSpace(vTypeSize);
-    SaveString(FModule); //if this is string 
-    AssignValueTo(vValue);
+    if Visibility >= fvProtected then
+    begin
+      Integer(vVaraibleEntry.Addr) := Addr;
+      FModule.LastVariableEntry := Pointer(Integer(vVaraibleEntry) - Integer(FModule.Memory));
+    end;
+    Integer(vValue) := Integer(FModule.Memory)  + Addr;
+    FModule.AllocSpace(Size);
+    if ValueStr <> '' then
+    begin
+      SaveString(FModule); //if this is string 
+      AssignValueTo(vValue);
+    end;
   end;
-  FModule.LastVariableEntry := Pointer(Integer(vVaraibleEntry) - Integer(FModule.Memory));
   //SetLength(FVars, Length(FVars) + 1);
   //FindVar('');
 end;
@@ -492,8 +523,9 @@ begin
   begin
     Integer(FLastWordEntry) := Integer(FModule.Memory) + FModule.UsedMemory;
     //p := FModule.LastWordEntry;
-    FModule.AddIntToMem(Integer(FModule.LastWordEntry));
+    FModule.AddIntToMem(tsInt(FModule.LastWordEntry));
     FModule.AllocSpace(SizeOf(TTurboWordOptions));
+    //FModule.AlignMem;
     FModule.AllocSpace(SizeOf(LongWord)); //the ParamFieldLength
     FModule.AllocSpace(SizeOf(Integer)); //the CFA
     FModule.AddByteToMem(Length(aName));
@@ -540,6 +572,8 @@ begin
   SetLength(FLabels, 0);
   SetLength(FConsts, 0);
   SetLength(FVars, 0);
+  SetLength(FWords, 0);
+  SetLength(FUsedModules, 0);
   //writeln('SourceFileName=', SourceFileName);
   FileName := ExtractFileBaseName(SourceFileName) + cTurboCompiledProgramFileExt;
   //writeln('FileName=', FileName);
@@ -577,6 +611,8 @@ begin
   SetLength(FLabels, 0);
   SetLength(FConsts, 0);
   SetLength(FVars, 0);
+  SetLength(FWords, 0);
+  SetLength(FUsedModules, 0);
 end;
 
 procedure T-->Grammar<--.PushString();
@@ -675,9 +711,9 @@ PRODUCTIONS
 
   DefineVariable
     (.Var vValue: TTurboSimpleVar; .)
-    =  //(. vValue.VInt64s[0] := 0; vValue.VInt64s[1] := 0 .)
-    Identifier (. vValue.Name := LexString; .)
-    ":" TypeKind<vValue.TypeKind> 
+    =  (. vValue.Visibility := fvPrivate;vValue.ValueStr := ''; .)
+    [WordVsibility<vValue.Visibility>] Identifier (. vValue.Name := LexString; .)
+    ":" TypeKind<vValue.TypeKind> (.vValue.SetTypeKind(vValue.TypeKind); .)
     ["=" Value<vValue>]
     ";" (. if IsUniqueIdentifier(vValue.Name) then DefineVar(vValue); .)
   .
@@ -752,10 +788,18 @@ PRODUCTIONS
     | SubIntAsmStatement
     | "i8-" (.FModule.AddOpToMem(inSubInt64); .)
     | MulIntAsmStatement
+    | "!" (. FModule.AddOpToMem(inStoreInt); .)
+    | "!i8" (. FModule.AddOpToMem(inStoreInt64); .)
+    | "!i2" (. FModule.AddOpToMem(inStoreWord); .)
+    | "!i1" (. FModule.AddOpToMem(inStoreByte); .)
     | "@" (. FModule.AddOpToMem(inFetchInt); .)
-    | "." (. FModule.AddOpToMem(inPopInt); .)
+    | "@i8" (. FModule.AddOpToMem(inFetchInt64); .)
+    | "@i2" (. FModule.AddOpToMem(inFetchWord); .)
+    | "@i1" (. FModule.AddOpToMem(inFetchByte); .)
+    | "DROP" (. FModule.AddOpToMem(inPopInt); .)
     | EmitAsmStatement
     | "@TICK" (. FModule.AddOpToMem(inGetTickCount); .)
+    | "!TICK" (. FModule.AddOpToMem(inStoreTickCount); .)
     | WordAsmStatement
   .
 
