@@ -15,10 +15,15 @@
 使用层: TurboForthCompiler.pas, TurboPascalCompiler.pas, TurboBasicCompiler.pas, TurboCCompiler.pas, etc
 扩展层: 
 
+连接器模块：根据需要将编译好的VM单元静态引入主脚本程序模块，需要处理地址重定位，优化（如：其它unit的初始化过程是对某个单元变量赋值，但是该变量并没有被主程序使用，那么该初始化过程就不会被连接进入或执行）
+抽象与使用层: uTurboLinker.pas
+
 执行器模块
 抽象层: uTurboExecutor.pas(include abstract PEFormat, executor , debugger and TurboProgram classes)
 使用层: TurboX86Executor.pas; TurboZ80Executor.pas, TurboJavaVMExecutor.pas
 扩展层: 如, TurboInterpreter.pas; TurboDebugger.pas;  
+
+JIT Translator 即时翻译模块：由执行器调用，将VM及时翻译成本族语言直接执行。
 
 执行器中只包括Codes, ImportModules(自己提供给脚本使用的以及通过LoadLibrary装入的), Resource, 其它信息(ImportTable)只在PEFormat中存在。
 
@@ -93,18 +98,36 @@ type //in TurboScriptConsts
   PPreservedCodeMemory = ^ TPreservedCodeMemory;
   //the typecast for code memory area to get the parameters
   TPreservedCodeMemory = packed record
-    Executor: TCustomTurboExecutor;
-    ModuleIndex: Integer; //this Module unique Index in this program, allocated by compiler.
+    States: TTurboProcessorStates;
+    Executor: TCustomTurboModule;
+    //##abondoned:this Module unique Index in this program, allocated by compiler.
+    //##ModuleIndex: Integer;
+    ModuleType: TTurboModuleType;
     ParamStackBase: Pointer;
     ParamStackSize: Integer; //bytes
+    ParamStackBottom: Pointer;
     ReturnStackBase: Pointer;
     ReturnStackSize: Integer; //bytes
-    TIBLength: Integer; //the text buffer length
-    ToIn: Integer; //the text buffer current index
-    TIB: array [0..1023] of char;
-    LastWordEntry: Pointer; //有名字的函数链表，指向最后一个函数入口。
-    LastVarEntry: Pointer; //有名字的变量链表
-    LastSymbolEntry: Pointer; //RTTI 符号表 链表
+    ReturnStackBottom: Pointer;
+    UsedMemory: Integer;
+    MemorySize: Integer; 
+    //ToIn: Integer; //>IN the text buffer current index
+    //TIBLength: Integer; //#TIB the text buffer length
+    //TIB: array [0..cMAXTIBCount-1] of char; //'TIB
+    LastErrorCode: TTurboProcessorErrorCode;
+    //如果ModuleType是模块，那么就是装载运行该模块前执行的初始化过程，入口地址
+    //如果是函数，则是该函数的入口地址
+    InitializeProc: Pointer; //it is the offset address of the FMemory
+    FinalizeProc: Pointer; //如果是模块的话
+    //last Used(import) module entry.
+    LastModuleEntry: PTurboModuleEntry;
+    //有名字的函数链表，指向最后一个函数入口。
+    LastWordEntry: PTurboWordEntry;
+    //有名字的变量链表
+    LastVariableEntry: PTurboVariableEntry;
+    //RTTI TypeInfo 链表
+    LastTypeInfoEntry: PTurboTypeInfoEntry;
+    //reserved: array [SizeOf() ] of byte; 
   end;
 
 测试VM代码：

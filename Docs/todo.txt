@@ -1,3 +1,113 @@
+2006-11-3
+!* change the TTurboWordEntry record to TTurboWordBlock object
+  这样我就能在上面加上地址重定位到其它模块等的过程。
+  ?!* Name to PPackedShortString;
+~ 在64位的机器上同样可以使用32位指针！！而且并不存在64位的指针，指针最多到48位！
+
+2006-11-2
+* [ForthCompiler]
+  + @Tick : push the QueryPerformanceCounter: int64 to stack. [临时指令]
+  + i8+: add int64
+  + i8-: sub int64  (i1 i2 -- int64= i2`-i1)
+
+2006-11-1
+~ TASK
+  + [ForthCompiler] 完成 Word 结构:
+    + FWords: array of PTurboWordEntry;
+    + FUsedModules: array of PTurboModuleEntry;
+    + extend Define Word 
+      WordDefine : [WordVisibility] WordName ("external" FORTHCALL|STDCALL|PASCAL|REGISTER|FASTCALL) |CodeParts ;
+        注意，默认为 ForthCall,其它的调用则是外部DLL调用！对于>Protected的ForthCall的过程，全部使用远调用。
+      : [WordVisibility] WordName 
+        ExternalWord
+        |WordPart
+      ";".
+      ExternalWord = "EXTENAL" 
+        StdCall
+        |PascalCall
+        |RegisterCall
+        |FastCall
+        |DefaultCall //the default forth call.
+      
+      StdCall ＝"STDCALL" ExternalWordPart.
+      ExternalWordPart = Identity 
+        "Name" Identity
+        |"Index" Integer
+      .
+
+    + 测试远调用
+    + 完成VM指令：调用 CallEntry WordEntry
+    + 完成DLL调用
+
+~ 关于地址，在代码区的地址为相对偏移地址，而使用内存分配的地址为绝对地址（如局部变量的字符串）。
+
+CLR 的即使编译器优化得很好，至少在这个加法运算上:
+    CFA := 300;
+    QueryPerformanceCounter(tBegin);
+    CFA:= CFA+300;
+    CFA:= CFA+300;
+    ....
+    CFA:= CFA+300;
+  他使用JIT编译后的：
+  MOV ESI, 300  BE2C010000
+  ADD ESI, 300  81C62C010000
+  ...
+  ADD ESI, 300
+  Delphi 编译的：
+  MOV EBX, 300  BB2C010000
+  ADD EBX, 300  81C32C010000
+
+  和Delphi编译的一样，只是使用的寄存器不一样，但是为啥时间差别这么大？？.net = 15; delphi=60;
+  我在内存种强制将EBX改成ESI发现是和EBX一样的时间。这只能说明CLR在即时编译的时候做的优化 ＝ 300*XXX;不然不可能这么快。
+
+EUPHORIA 脚本引擎才是最快的，多用于游戏开发中。它采用的是和我类似的脚本执行机构!但是在它的运行器中似乎没有中断的办法，而TurboScript则每执行一个指令前都要检查是否需要停止，除非是编译的时候插入调试指令。【它的核心代码写得简直不是人看的】
+因此它比我的快，我的TurboScript要比它慢0.25倍(虚拟指令执行)。【1/74 = 0.01351(EUPHORIA)  1/98 = 0.01020(TurboScript), 1351:1020】
+再测试下它的调用子过程的效率：1/522 = 0.0019157; TurboScript: 1/157 =  0.006369. 19157/63690 嘿嘿，俺的调用子程序的效率简直比它高到哪里去了！～！我调用子过程的速度比它快70%倍.
+EUPHORIA 脚本:
+function iAdd(integer a, integer b)
+  return a+b
+end function
+--计时开始
+count = 300
+iAdd(count, 300)
+...
+iAdd(count, 300)
+--计时结束
+
+TurboScript脚本
+: Add +;
+--计时开始
+300
+300 Add
+...
+300 Add
+--计时结束
+
+2006-10-31
+* [Bug] 将远调用作为对另一程序的调用，不要互相影响。
+  也就是说，另一程序的状态和错误是完全独立的！
+  当然这样的唯一遗憾就是：调用后无法得知其真实运行态。
+  他们之间只有参数栈和返回栈是共享的。还有全局参数区。
+!+ 全局参数区，将状态，和参数栈大小等参数纳入，这样才能减少远调用的复制操作。而且也能解决停止状态。
+  TTurboGlobalOptions = record  //do not use the packed.
+    //States: TTurboProcessorStates; //如果放在这里，速度会下降
+    LastErrorCode: TTurboProcessorErrorCode;
+    ParamStackBase: Pointer;
+    ParamStackSize: Integer; //bytes
+    ParamStackBottom: Pointer;
+    ReturnStackBase: Pointer;
+    ReturnStackSize: Integer; //bytes
+    ReturnStackBottom: Pointer;
+  end;
+  
+~ 近调用过程的性能损耗：
+  以加法为例： 
+  定义过程 : Add +; 与直接调用 "+" 虚拟指令比较：
+  "+" 指令的速度＝ 1 (1/100)
+  Add 过程调用的速度 ＝  0.568 (1/176)
+  速度下降了43.2％[100-56.8].
+  俺稍微优化了下，Add 过程调用的速度 ＝ 0.613(1/163)， 速度现在是虚拟指令速度的61.3%,下降了38.7％ 和没有优化前比，速度提升了4.5%.
+
 2006-10-26
 !+ 单元初始化(Init)and Final 过程要改变成链表形式，从第一个执行，加是到最后一个。
   目的：对于那些没有自己的内存的模块，但是有自己的初始化过程的，也要执行啊。
@@ -1094,3 +1204,198 @@ Flowchart:
     inSWAP,
     inOVER,
     inROT
+
+
+
+
+_______________________________
+
+世上最快的脚本引擎与TurboScript
+原来以为Luna 是最快的，我还在为比Luna快若干倍沾沾自喜，现在知道错了，大大的错了，世界上最快的脚本引擎应该是 EUPHORIA 。
+它主要被用于游戏中的脚本引擎，最近开放源码了。
+ 
+它的解释器采用的是和我的TurboScript类似的脚本执行机构!但是在它的解释器中似乎没有提供中断、暂停的渠道，除非是编译的时候插入调试指令，而TurboScript则在每执行一个指令前都要检查是否需要停止。我想这是它比TurboScript快的原因吧，不过它的核心代码实在是太难读了，根本不是人读的，注释又少。直接虚拟指令运行效率比较，TurboScript比它慢0.25倍。不过值得高兴的是它的调用子过程的效率比 TurboScript 慢太多了，调用子过程的效率TurboScript比它高70%倍。下面是我的测试方法：
+ 
+全部采用 QueryPerformanceCounter 高精度计数。
+ 
+x86汇编:
+  ;计时开始
+  MOV EBX, 300  BB2C010000
+  ADD EBX, 300  81C32C010000
+  ..... --- 总计 2017 次
+  ADD EBX, 300  81C32C010000
+  ;计时结束
+ 
+结果运行时间：60
+ 
+EUPHORIA 加法指令顺序执行效率测试脚本：
+  --计时开始
+    count = 300
+    count +=300
+    ..... --- 总计 2017 次
+    count +=300
+  --计时结束
+ 
+结果运行时间：74 【难以置信，只比汇编慢18.9%倍】
+ 
+TurboScript ASM 脚本：
+  (计时开始)
+  300
+  300 +
+    ..... （总计 2017 次）
+  300 +
+  (计时结束)
+ 
+结果运行时间：98 【比汇编慢38.8%倍】
+ 
+子过程调用效率测试
+x86 汇编 子过程调用效率测试脚本:
+function add(a,b: integer): integer;
+asm
+  mov EAX, a
+  add EAX, b
+end;
+--计时开始
+  asm
+    mOV EAX, 300
+    MOV EDX, 300    CALL ADD
+    ..... （总计 2017 次）
+    MOV EDX, 300    CALL ADD
+--计时结束
+结果运行时间：126
+ 
+EUPHORIA 子过程调用效率测试脚本:
+function iAdd(integer a, integer b)
+  return a+b
+end function
+--计时开始
+count = 300
+iAdd(count, 300)
+..... --- 总计 2017 次
+iAdd(count, 300)
+--计时结束
+ 
+结果运行时间：522 【比汇编慢了近75.9%倍，比TurboScript 近调用慢近70%倍】
+ 
+TurboScript 子过程调用效率测试
+: Add +;
+--计时开始
+300
+300 Add
+..... （总计 2017 次）
+300 Add
+--计时结束
+结果运行时间：157【只比汇编慢19.7％倍】
+
+
+
+_______________________________
+EUPHORIA 完整脚本
+		   ---------------------------
+		   -- Prime Sieve Benchmark --
+		   -- "Shootout" Version    --
+		   ---------------------------
+
+without type_check
+include dll.e
+include machine.e
+
+
+constant
+         k32=open_dll("kernel32.dll"),
+         qpf=define_c_func(k32,"QueryPerformanceFrequency",{C_UINT},C_INT),
+         qpc=define_c_proc(k32,"QueryPerformanceCounter",{C_UINT})
+--the latter is a function actually, but we don't care about the boolean
+--status code it returns
+
+if k32=-1 then --you're in trouble, or under Linux, or...
+elsif qpf=-1 or qpc=-1 then --your Windows version doesn't support this
+end if
+
+constant p232=power(2,32)
+
+--helper function to retrieve results
+function int64ptr_to_atom(atom ptr)
+  sequence s
+  s=peek4s({ptr,2})
+  return p232*s[2]+s[1]
+end function
+ 
+constant timeFactorPtr=allocate(8),
+         timeRC=c_func(qpf,{timeFactorPtr}),
+         timeFactor=int64ptr_to_atom(timeFactorPtr)
+--counts are given in ticks, and there are timeFactor ticks per second
+
+--now some variables
+constant maxSections=6  --whatever positive integer suits you
+sequence perfptr,total,times,started
+perfptr=repeat(0,maxSections)
+total=perfptr  --total execution time
+times=total    --number of runs
+started=times  --flags
+for i=1 to maxSections do perfptr[i]=allocate(16) end for
+--each structure will store two pairs of integers, for a total of 4*4=16 bytes
+
+--ok, now the two procedures that start/end a timed section
+
+procedure start(integer section)
+  c_proc(qpc,{perfptr[section]})
+  started[section]=1
+end procedure
+
+procedure stop(integer section)
+  c_proc(qpc,{perfptr[section]+8})
+  if not started[section] then return end if  --start time not valid
+  started[section]=0
+  times[section]+=1
+  total[section] = (int64ptr_to_atom(perfptr[section]+8)-int64ptr_to_atom(perfptr[section]))
+end procedure
+
+
+--not sure you gain any real precision (in theory, you do) by keeping
+--total[section] as a number of counts rather than an actual time.
+--And you'd have to implement addition for int64s using the 31-bit Eu integer type,
+--- not the best idea I'd think of.
+--however: 1/ atoms don't lose arithmetic accuracy whileless than power(2,53);
+--you can implement addition for int64s:
+
+constant p229=power(2,29)  --largest Eu-integer power of 2
+type int32(atom x)
+  return integer(remainder(x,p229))
+end type
+
+type int64(object x)
+  return integer(x) or
+  (sequence(x) and length(x)=2 and int32(x[1]) and int32(x[2]))
+end type
+
+
+function iAdd(integer a, integer b)
+  return a+b
+end function
+
+procedure main()
+    integer count
+start(1)
+    count = 300
+    count = iAdd(count, 300)
+    .....
+    count = iAdd(count, 300)
+stop(1)
+    printf(1, "Count: %d\n", count)  -- 1028
+end procedure
+
+puts(1, "Prime Sieve Benchmark\n")
+
+atom t
+t = time()  -- start timer
+main()
+t = time() - t -- end timer
+
+printf(1, "time: %.2f\n", t)
+printf(1, "time: %.2f\n", total[1])
+
+if getc(0) then  -- wait for key press
+end if
+
+    

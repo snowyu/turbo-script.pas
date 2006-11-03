@@ -75,6 +75,7 @@ TYPE
   end;
 
 PRIVATE
+  FTurboGlobalOptions: TTurboGlobalOptions;
   FInitProcCFA: Integer;
   FLastWordEntry: PTurboWordEntry;
   FLastWordCfa: Integer;
@@ -86,7 +87,7 @@ PRIVATE
   procedure Final;
   procedure WriteStr(S : String);
   procedure WriteStrLn(S : String);
-  function  DefineWordBegin(const aName: ShortString): Boolean;
+  function  DefineWordBegin(const aName: ShortString; const aOptions: TTurboWordOptions): Boolean;
   procedure DefineWordEnd;
   procedure PushString();
   // Add Identifier CFA address into the memory. 
@@ -122,6 +123,7 @@ PUBLIC
 
 CREATE
   FModule := TCustomTurboModule.Create;
+  FModule.GlobalOptions := @FTurboGlobalOptions;
 DESTROY
   FreeAndNil(FModule);
 ERRORS
@@ -285,15 +287,15 @@ begin
     begin
       if Size <= SizeOf(Integer) then
       begin
-        FModule.AddIntToMem(Integer(inPushInt));
+        FModule.AddOpToMem(inPushInt);
         Size := SizeOf(Integer);
       end
       else
-        FModule.AddIntToMem(Integer(inPushQWord));
+        FModule.AddOpToMem(inPushQWord);
       {Case Size of
-        SizeOf(Byte): FModule.AddIntToMem(Integer(inPushByte));
-        SizeOf(Word): FModule.AddIntToMem(Integer(inPushWord));
-        SizeOf(Integer): FModule.AddIntToMem(Integer(inPushInt));
+        SizeOf(Byte): FModule.AddOpToMem(inPushByte);
+        SizeOf(Word): FModule.AddOpToMem(inPushWord);
+        SizeOf(Integer): FModule.AddOpToMem(inPushInt);
       end;//}
       Integer(p) := Integer(FModule.Memory) + FModule.UsedMemory;
       FModule.AllocSpace(Size);
@@ -310,7 +312,7 @@ begin
   if Result then
     with FVars[i] do
     begin
-      FModule.AddIntToMem(Integer(inPushInt));
+      FModule.AddOpToMem(inPushInt);
       FModule.AddIntToMem(Addr);
     end
 end;
@@ -479,12 +481,12 @@ begin
   //FindVar('');
 end;
 
-function T-->Grammar<--.DefineWordBegin(const aName: ShortString): Boolean;
+function T-->Grammar<--.DefineWordBegin(const aName: ShortString; const aOptions: TTurboWordOptions): Boolean;
 //var
   //p: pointer;
 begin
   //WriteLn('DefineWordBegin:',aName);
-  FindVar('');
+  //FindVar('');
   Result := IsUniqueIdentifier(aName);
   if Result then
   begin
@@ -506,7 +508,7 @@ procedure T-->Grammar<--.DefineWordEnd;
 var
   vPrior: PTurboWordEntry;
 begin
-  FModule.AddIntToMem(Integer(inExit));
+  FModule.AddOpToMem(inExit);
   FLastWordEntry.ParamFieldLength := FModule.UsedMemory - FLastWordCfa + 1;
 
   vPrior := FModule.LastWordEntry;
@@ -585,7 +587,7 @@ begin
   s := AnsiDequotedStr(LexString, '''');
   for i := length(s) downto 1 do
   begin
-    FModule.AddIntToMem(Integer(inPushInt));
+    FModule.AddOpToMem(inPushInt);
     FModule.AddIntToMem(Ord(s[i])); 
   end;
 end;
@@ -643,8 +645,8 @@ PRODUCTIONS
     "PROGRAM" Identifier                               (. FModule.Name := LexString; .)
     [DeclarationBlock]
     "BEGIN"                                            (. FInitProcCFA := FModule.UsedMemory;  .)
-    StatementBlock
-    "END."                                             (. FModule.AddIntToMem(Integer(inHalt)); .)
+    ASMStatementBlock
+    "END."                                             (. FModule.AddOpToMem(inHalt); .)
     (. Final ; .) .
 
   DeclarationBlock 
@@ -707,46 +709,72 @@ PRODUCTIONS
 //    |Identifier                                       (. aValue.Value := GetConstValue(aValue.TypeKind, LexString); .)
   .
 
-  DefineWord (. Var vSucc: Boolean; .)
+  DefineWord (. Var vSucc: Boolean; vName: string; vOptions: TTurboWordOptions; .)
+    = (. vOptions.Visibility := fvPublished; .)
+    ":" [WordVsibility<vOptions.Visibility>] Identifier     (. vName := LexString; .)
+    [ExternalWordOption<vOptions>]
+    
+                                                            (. vSucc := DefineWordBegin(vName, vOptions); .)
+    ASMStatementBlock
+    ";"                                                     (. if vSucc then DefineWordEnd; .)
+  .
+  ExternalWordOption< var aOptions: TTurboWordOptions >
+    = "EXTENAL" [StringToken]  //the default is the lastModuleEntry if no the module name.
+    "STDCALL" ExternalWordOptionPart
+    |"REGISTER" ExternalWordOptionPart
+  .
+  ExternalWordOptionPart 
     =
-    ":" Identifier                                     (. vSucc := DefineWordBegin(LexString); .)
-    StatementBlock
-    ";"                                                (. if vSucc then DefineWordEnd; .)
+   ["Name" Identifier]
+   ["Index" IntegerToken]
+  .
+  WordVsibility< var aVisibility: TTurboVisibility > 
+    = 
+    "HIDDEN"                                           (. aVisibility := fvHide; .)
+    |"PRIVATE"                                         (. aVisibility := fvPrivate; .)
+    |"PROTECTED"                                       (. aVisibility := fvProtected; .)
+    |"PUBLIC"                                          (. aVisibility := fvPublic; .)
+    |"PUBLISHED"                                       (. aVisibility := fvPublished; .)
   .
 
-  StatementBlock 
+  ASMStatementBlock 
     = 
-    Statement {Statement}
+    ASMStatement {ASMStatement}
     .
 
-  Statement 
+  ASMStatement 
     = 
     [LabelDeclaration]
-     PushIntStatement
-    | PushStringStatement 
-    | AddIntStatement
-    | SubIntStatement
-    | MulIntStatement
-    | "@" (. FModule.AddIntToMem(Integer(inFetchInt)); .)
-    | EmitStatement
-    | WordStatement
+     PushIntAsmStatement
+    | PushStringAsmStatement 
+    | AddIntAsmStatement
+    | "i8+" (.FModule.AddOpToMem(inAddInt64); .)
+    | SubIntAsmStatement
+    | "i8-" (.FModule.AddOpToMem(inSubInt64); .)
+    | MulIntAsmStatement
+    | "@" (. FModule.AddOpToMem(inFetchInt); .)
+    | "." (. FModule.AddOpToMem(inPopInt); .)
+    | EmitAsmStatement
+    | "@TICK" (. FModule.AddOpToMem(inGetTickCount); .)
+    | WordAsmStatement
   .
 
   LabelDeclaration =
-    "Label" Identifier(. DefineLabelEx(LexString); .)  .
+    "Label" Identifier   (. DefineLabelEx(LexString); .)  .
 
-  PushIntStatement = IntegerToken (. FModule.AddIntToMem(Integer(inPushInt)); FModule.AddIntToMem(StrToInt(LexString));.) .
-  AddIntStatement  = "+" (. FModule.AddOpToMem(inAddInt); .) .
-  SubIntStatement  = "-" (. FModule.AddIntToMem(Integer(inSubInt)); .) .
-  MulIntStatement  = "*" (. FModule.AddopToMem(inMulInt); .) .
-  EmitStatement 
+  PushIntAsmStatement = 
+    ( IntegerToken|HexNumberToken ) (. FModule.AddOpToMem(inPushInt); FModule.AddIntToMem(StrToInt(LexString));.) .
+  AddIntAsmStatement  = "+" (. FModule.AddOpToMem(inAddInt); .) .
+  SubIntAsmStatement  = "-" (. FModule.AddOpToMem(inSubInt); .) .
+  MulIntAsmStatement  = "*" (. FModule.AddopToMem(inMulInt); .) .
+  EmitAsmStatement 
     = 
-    "EMIT" (. FModule.AddIntToMem(Integer(inEmit)); .) 
-    | ".S" (. FModule.AddIntToMem(Integer(inEmitString)); .) 
-    | ".LS" (. FModule.AddIntToMem(Integer(inEmitLString)); .) 
+    "EMIT" (. FModule.AddOpToMem(inEmit); .) 
+    | ".S" (. FModule.AddOpToMem(inEmitString); .) 
+    | ".LS" (. FModule.AddOpToMem(inEmitLString); .) 
   .
 
-  PushStringStatement = "#" StringToken (. PushString(); .) .
+  PushStringAsmStatement = "#" StringToken (. PushString(); .) .
 
-  WordStatement = Identifier (. AddIdentifierCFA(LexString); .).
+  WordAsmStatement = Identifier (. AddIdentifierCFA(LexString); .).
 END TurboForthCompiler.

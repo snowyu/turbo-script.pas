@@ -52,6 +52,7 @@ end;
 const
   cStackMaxSize = 1024 * 10;
 var
+  GGlobalOptions: TTurboGlobalOptions;
   GTurboExecutor: TMyInterpreter;
   p: Pointer;
   CFA: Integer;
@@ -93,12 +94,20 @@ begin
   c := 0;
     GTurboExecutor := TMyInterpreter.Create;
     try
-      GTurboExecutor.ParameterStackSize := cStackMaxSize;
-      GetMem(p, cStackMaxSize);
-      GTurboExecutor.ParameterStack := p;
-      GTurboExecutor.ReturnStackSize := cStackMaxSize;
-      GetMem(p, cStackMaxSize);
-      GTurboExecutor.ReturnStack := p;
+      GTurboExecutor.GlobalOptions := @GGlobalOptions;
+      with GGlobalOptions do
+      begin
+        ParamStackSize := cStackMaxSize;
+      //GTurboExecutor.ParameterStackSize := cStackMaxSize;
+        GetMem(p, cStackMaxSize);
+        ParamStackBase := p;
+      //GTurboExecutor.ParameterStack := p;
+      //GTurboExecutor.ReturnStackSize := cStackMaxSize;
+        GetMem(p, cStackMaxSize);
+      //GTurboExecutor.ReturnStack := p;
+        ReturnStackBase := p;
+        ReturnStackSize := cStackMaxSize;
+      end;
       //GTurboExecutor.InitExecution;
       with GTurboExecutor do
       begin
