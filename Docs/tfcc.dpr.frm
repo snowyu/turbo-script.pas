@@ -6,11 +6,12 @@ program -->MODULENAME<--;
 uses
   SysUtils,
   uTurboConsts,
+  Cocobase,
   -->Grammar<--;
 
 const
-  ResultStr = 'Results can be found in ';
-  cProgCopyright = '-->MODULENAME<-- 1.0 Writen by Riceball<riceballl@hotmail.com>';
+  sErrorDetail = 'Error Detail can be found in ';
+  cProgCopyright = '-->MODULENAME<-- 1.0 Copyright(c) 2006 Riceball LEE<riceballl@hotmail.com>';
   cProgTitle     = 'Turbo Forth Command Line Complier';
 
 type
@@ -19,35 +20,63 @@ type
     function CustomErrorEvent(Sender : TObject; const ErrorCode : integer; 
       const Data : string) : string;
     procedure OnSuccess(Sender : TObject);
+    procedure OnError(Sender : TObject; Error : TCocoError);
     procedure OnFailure(Sender : TObject; NumErrors : integer);
   end; // DisplayObj
+  TCocoRScannerAccess = class(TCocoRScanner);
 
 var
   -->Grammar<--1 : T-->Grammar<--;
   DisplayObj : TDisplayObj;
+  GFileName: String;
+  ReqMakeErrListFile: Boolean;
 
 { TDisplayObj }
 
 function TDisplayObj.CustomErrorEvent(Sender: TObject;
   const ErrorCode: integer; const Data : string): string;
 begin
-  Result := 'Error: ' + IntToStr(ErrorCode);
+  Result := 'Error(' + IntToStr(ErrorCode) + ') ';
+  If Data <> '' then Result := Result + ':'+ Data;
 end;
 
 procedure TDisplayObj.OnSuccess(Sender : TObject);
 begin
   Writeln('Compile sucessful');
-  Writeln(ResultStr + ChangeFileExt(ParamStr(1),'.lst'));
+  //Writeln(sErrorDetail + ChangeFileExt(GFileName,'.lst'));
 end;
+
+procedure TDisplayObj.OnError(Sender : TObject; Error : TCocoError);
+Var
+  s: String;
+  errStr: String;
+begin
+  With Error Do
+  Begin
+    s := T-->Grammar<--(Sender).ErrorStr(ErrorCode, Data);
+    errStr := Format('at line %d, position %d: %s',  [Line, Col - 1, S]);
+    s := GFileName + '(' + IntToStr(Line) + ')';
+    Case ErrorType of
+      etSyntax: s := s + ' Syntax ';
+      etSymantic:s := s + ' Symantic ';
+    End;
+    s := s + 'Error(E'+ IntToStr(ErrorCode) + ') ' + errStr;
+  End;
+  Writeln(s);
+End;
 
 procedure TDisplayObj.OnFailure(Sender : TObject; NumErrors : integer);
 begin
-  Write('Compile completed with ' + IntToStr(NumErrors) + ' error');
+  Write(GFileName+'(', TCocoRScannerAccess(T-->Grammar<--(Sender).Scanner).CurrLine, ') Fatal Error: Compile fatal with ' + IntToStr(NumErrors) + ' error');
   if NumErrors <> 1 then
     Writeln('s')
   else
     Writeln;
-  Writeln(ResultStr + ChangeFileExt(ParamStr(1),'.lst'));
+  If ReqMakeErrListFile Then
+  Begin
+    Writeln(sErrorDetail + ChangeFileExt(GFileName,'.lst'));
+    T-->Grammar<--(Sender).ListStream.SaveToFile(ChangeFileExt(GFileName,'.lst'));
+  End;
 end;
 
 procedure ShowVersion;
@@ -64,12 +93,12 @@ begin
   //Writeln(cProgTitle);
   //Writeln(cProgCopyright);
   //Writeln('');
-  Writeln('Usage: -->MODULENAME<-- [filename]');
+  Writeln('Usage: -->MODULENAME<-- filename[.tf] [-ge]');
+  Writeln('Options:');
+  Writeln('-ge generate error detail list file if nay.');
   Writeln('Example: -->MODULENAME<-- Test.tf');
 end;
 
-Var
-  aFilename: String;
 begin
   ShowVersion;
   if ParamCount = 0 then
@@ -77,28 +106,30 @@ begin
     ShowHelp;
     Exit;
   end;
+  GFileName := ParamStr(1);
+  If ParamCount >= 2 Then
+  	ReqMakeErrListFile := AnsiSameText(ParamStr(2), '-ge');
   -->Grammar<--1 := T-->Grammar<--.Create(nil);
   try
     DisplayObj := TDisplayObj.Create;
     try
-      aFilename := ParamStr(1);
-      if ExtractFileExt(aFileName) = '' then 
-        aFileName := aFileName + cTurboForthFileExt;
-      if NOT FileExists(aFilename) then
+      if ExtractFileExt(GFileName) = '' then 
+        GFileName := GFileName + cTurboForthFileExt;
+      if NOT FileExists(GFileName) then
       begin
-        Writeln('File: ' + aFileName + ' not found.');
+        Writeln('File: ' + GFileName + ' not found.');
         Exit;
       end;
       -->Grammar<--1.OnCustomError := DisplayObj.CustomErrorEvent;
       -->Grammar<--1.OnSuccess := DisplayObj.OnSuccess;
       -->Grammar<--1.OnFailure := DisplayObj.OnFailure;
+      -->Grammar<--1.OnError   := DisplayObj.OnError;
 
-      -->Grammar<--1.SourceFileName := aFileName;
+      -->Grammar<--1.SourceFileName := GFileName;
       try
         -->Grammar<--1.Execute;
       except
       End;
-      -->Grammar<--1.ListStream.SaveToFile(ChangeFileExt(aFileName,'.lst'));
     finally
       DisplayObj.Free;
     end;
