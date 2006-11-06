@@ -224,7 +224,7 @@ type
     procedure Expect(n : integer);
     procedure GenerateListing;
     procedure Get; virtual; abstract;
-    procedure PrintErr(line : string; ErrorCode, col : integer;
+    procedure PrintErr(line : string; ErrorCode, lnr, col : integer;
       Data : string);
     procedure StoreError(const nr : integer; const Symbol : TSymbolPosition;
       const Data : string; const ErrorType : integer);
@@ -607,6 +607,7 @@ begin
       if TCocoError(ErrorList[i]).Line = lnr then
       begin
         PrintErr(line, TCocoError(ErrorList[i]).ErrorCode,
+          TCocoError(ErrorList[i]).Line,
           TCocoError(ErrorList[i]).Col,
           TCocoError(ErrorList[i]).Data);
         inc(errC);
@@ -621,6 +622,7 @@ begin
     if TCocoError(ErrorList[i]).Line = lnr then
     begin
       PrintErr(line, TCocoError(ErrorList[i]).ErrorCode,
+        TCocoError(ErrorList[i]).Line,
         TCocoError(ErrorList[i]).Col,
         TCocoError(ErrorList[i]).Data);
       inc(errC);
@@ -711,7 +713,7 @@ begin
   Result := Scanner.GetString(Scanner.NextSymbol)
 end; {LookAheadString}
 
-procedure TCocoRGrammar.PrintErr(line : string; ErrorCode : integer; col : integer; Data : string);
+procedure TCocoRGrammar.PrintErr(line : string; ErrorCode : integer; lnr, col : integer; Data : string);
   { Print an error message }
 
   procedure DrawErrorPointer;
@@ -731,9 +733,16 @@ procedure TCocoRGrammar.PrintErr(line : string; ErrorCode : integer; col : integ
     StreamToListFile('^ ', FALSE)
   end; {DrawErrorPointer}
 
+var
+  S                           : string;
 begin {PrintErr}
   DrawErrorPointer;
-  StreamToListFile(ErrorStr(ErrorCode, Data), FALSE);
+  StreamToListFile(Copy(Line, 1, Col - 2) + '--------------------------', FALSE);
+  //StreamToListFile(ErrorStr(ErrorCode, Data), FALSE);
+  //StreamToListFile('', TRUE)
+  S := ErrorStr(ErrorCode, Data);
+  StreamToListFile(Format('Syntax error at line %d, position %d: %s',
+    [lnr, Col - 1, S]), TRUE);
   StreamToListFile('', TRUE)
 end; {PrintErr}
 
