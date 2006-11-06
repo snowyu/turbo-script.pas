@@ -129,7 +129,7 @@ function CharIsUpper(const C: Char): Boolean; {$IFDEF CLR} inline; {$ENDIF}
 function CharIsLower(const C: Char): Boolean; {$IFDEF CLR} inline; {$ENDIF}
 
 Var
-  AppPath: String;
+  gAppPath: String;
 
 implementation
 
@@ -1107,7 +1107,7 @@ begin
 end;
 
 initialization
-  AppPath := ExtractFilePath(ParamStr(0));
+  gAppPath := ExtractFilePath(ParamStr(0));
   LoadCharTypes;
   LoadCaseMap;
 end.
