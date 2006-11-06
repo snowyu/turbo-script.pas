@@ -2,11 +2,12 @@ $C-  //Generate Delphi test project
 $E-  //Generate a component registration unit
 $Z+  //Generate console app
 
+//{$IFDEF MSWINDOWS}Windows,{$ENDIF}
 COMPILER TurboForthCompiler
 
 DELPHI
 
-USES (INTERFACE) uStrUtils, uTurboConsts, uTurboExecutor 
+USES (INTERFACE) uStrUtils, uTurboConsts, uTurboExecutor, uTurboAccessor, uTurboModuleFileAccessor
 
 TYPE
   TTurboLabelDeclarationRec = packed record
@@ -76,29 +77,51 @@ TYPE
     Addr: Integer;
   end;
 
+  TTurboSimpleWord = object
+    Options: TTurboWordOptions;
+    //the Param Field Length
+    //该函数主体的长度 
+    ParamFieldLength: LongWord;
+    CFA: tsInt;//the offset address of the memory.
+    Name: ShortString; 
+    ModuleName: ShortString;  //for external word
+    ModuleType: TTurboModuleType;  //for external word
+    ModuleIndex: Integer; //for external word
+    Module: TCustomTurboModule; //for external forth word
+    ExternalOptions: TTurboExteralWordCFA; //Exteral Word Options
+  end;
+
+  TTurboSimpleModule = object
+    Entry: PTurboModuleEntry; //offset address
+    ModuleType: TTurboModuleType;
+    Name: ShortString;
+    Module: TCustomTurboModule;
+  end;
+
 PRIVATE
   FTurboGlobalOptions: TTurboGlobalOptions;
   FInitProcCFA: Integer;
-  FLastWordEntry: PTurboWordEntry;
+  //正在定义的Word,如果存在 
+  FDefinedWordEntry: PTurboWordEntry;
   FLastWordCfa: Integer;
   FModule: TCustomTurboModule;
 
   FLabels: array of TTurboLabelDeclarationRec;
   FConsts: array of TTurboSimpleConst;
   FVars: array of TTurboSimpleVar;
-  FWords: array of PTurboWordEntry;
-  FUsedModules: array of PTurboModuleEntry;
+  FWords: array of TTurboSimpleWord;
+  FUsedModules: array of TTurboSimpleModule;
   procedure Init;
   procedure Final;
   procedure WriteStr(S : String);
   procedure WriteStrLn(S : String);
-  function  DefineWordBegin(const aName: ShortString; const aOptions: TTurboWordOptions): Boolean;
-  procedure DefineWordEnd;
+  function  DefineWordBegin(var aWord: TTurboSimpleWord): Boolean;
+  procedure DefineWordEnd();
   procedure PushString();
   // Add Identifier CFA address into the memory. 
   function AddIdentifierCFA(const aName: String): Boolean;
   // AddWordCFA address into the memory. 
-  function AddWordCFA(const aName: String): Boolean;
+  function AddWordCFA(aName: String): Boolean;
   // Add Const address into the memory. 
   function AddConstCFA(const aName: String): Boolean;
   // Add Var address into the memory. 
@@ -119,6 +142,12 @@ PRIVATE
   function DefineVar(const aValue: TTurboSimpleVar): Integer;
   function FindVar(const aName: String): Integer;
 
+  //try find module if not then Generate.
+  procedure GenerateModuleEntryForWord(var aWord: TTurboSimpleWord);
+  function FindModule(const aName: String; aModuleType: TTurboModuleType): Integer;
+  function  AddUsedModule(const aName: String; aModuleType: TTurboModuleType): Integer;
+  function FindWord(const aName: String): Integer;
+  
   //make sure the indentifier is unique else it will raise the error..
   function IsUniqueIdentifier(const aName: String): Boolean;
 PROTECTED
@@ -138,6 +167,9 @@ ERRORS
     cConstRedeclarationError : Result := rsConstRedeclarationSyntaxError;
     cVarRedeclarationError : Result := rsVarRedeclarationSyntaxError;
     cRedeclarationError : Result := rsRedeclarationSyntaxError;
+    cDLLModuleMissError: Result := rsDLLModuleMissSyntaxError;
+    cFileNotFoundError:  Result := rsFileNotFoundError;
+    cWordNotFoundError:  Result := rsWordNotFoundError;
 
 PUBLISHED
 
@@ -151,6 +183,9 @@ Const
   cVarRedeclarationError = 303;
   cConstRedeclarationError = 304;
   cRedeclarationError = 305;
+  cDLLModuleMissError = 306;
+  cFileNotFoundError  = 307;
+  cWordNotFoundError  = 308;
 
 
 function GetSimpleTurboTypeSize(const aTypeKind: TTurboSimpleTypeKind): Integer;
@@ -180,13 +215,14 @@ begin
     ValueStr := AnsiDequotedStr(aValue, '''');
     if aTypeKind = ttkUnknown then
     begin
-      if Length(ValueStr) < 256 then
+       TypeKind := ttkString;
+      {if Length(ValueStr) < 256 then
       begin
         TypeKind := ttkString;
       end
       else begin
         TypeKind := ttkLString;
-      end;
+      end;}
     end 
     else if aTypeKind = ttkChar then
       Value.VByte := Ord(ValueStr[1]);
@@ -285,8 +321,8 @@ begin
   Result := AddWordCFA(aName);
   if Result then exit;
 
-  writeln('cUnknownWordError:',aName);
-  SynError(cUnknownWordError);
+  //writeln('cUnknownWordError:',aName);
+  SynError(cUnknownWordError, aName);
 end;
 
 function T-->Grammar<--.AddConstCFA(const aName: String): Boolean;
@@ -337,20 +373,48 @@ begin
     end
 end;
 
-function T-->Grammar<--.AddWordCFA(const aName: string): Boolean;
+function T-->Grammar<--.AddWordCFA(aName: string): Boolean;
 var
-  vCFA: Integer;
+  i: Integer;
 begin
-  vCFA := FModule.GetWordCFA(aName);
-  if vCFA <> 0 then
+  Result := False;
+  i := FindWord(aName);
+  if i >= 0 then with FWords[i] do
   begin
-    FModule.AddOpToMem(inCall);
-    FModule.AddIntToMem(vCFA);
-    Result := True;
-  end
-  else begin
-    Result := False;
-    //SynError(cUnknownWordError);
+    case Options.CodeFieldStyle of
+      cfsFunction:
+      begin
+        FModule.AddOpToMem(inCall);
+        FModule.AddIntToMem(CFA);
+        Result := True;
+      end;
+      cfsExternalFunction:
+      begin
+        case Options.CallStyle of
+          csForth:
+          begin
+            if Assigned(Module) then
+            begin
+              if ExternalOptions.Name <> '' then aName := ExternalOptions.Name;
+              i := Module.GetWordCFA(aName);
+              if i <> 0 then
+              begin
+                FModule.AddOpToMem(inCallFar);
+                writeln(aName, '.ModEntry:',Integer(FUsedModules[ModuleIndex].Entry));
+                FModule.AddIntToMem(Integer(FUsedModules[ModuleIndex].Entry));
+                FModule.AddIntToMem(i);
+                writeln(aName, '.CFA:',i);
+                Result := True;
+              end
+              else
+                SynError(cWordNotFoundError, '"'+ aName + '" CFA not in ' + FUsedModules[ModuleIndex].Name);
+            end
+            else
+              SynError(cWordNotFoundError, '"'+ aName + '" not in ' + FUsedModules[ModuleIndex].Name);
+          end;
+        end; //case
+      end;
+    end;//case
   end;
 end;
 
@@ -363,7 +427,7 @@ begin
     Result := FindVar(aName)< 0;
   //writeln('V:',Result);
   if Result then
-    Result := FModule.FindWordEntry(aName) = nil;
+    Result := FindWord(aName) < 0;
   //writeln('W:',Result);
   if not Result then
   begin
@@ -383,7 +447,7 @@ begin
       Result := Value;
       exit;
     end;
-  SynError(cUnknownWordError);
+  SynError(cUnknownWordError, aName);
 end;
 
 function T-->Grammar<--.DefineLabel(const aName: string; const aWordName: string): Integer;
@@ -514,40 +578,124 @@ begin
   //FindVar('');
 end;
 
-function T-->Grammar<--.DefineWordBegin(const aName: ShortString; const aOptions: TTurboWordOptions): Boolean;
-//var
-  //p: pointer;
+function T-->Grammar<--.DefineWordBegin(var aWord: TTurboSimpleWord): Boolean;
+var
+  i: Integer;
 begin
   //WriteLn('DefineWordBegin:',aName);
   //FindVar('');
-  Result := IsUniqueIdentifier(aName);
+  Result := IsUniqueIdentifier(aWord.Name);
   if Result then
   begin
-    Integer(FLastWordEntry) := Integer(FModule.Memory) + FModule.UsedMemory;
+    Integer(FDefinedWordEntry) := Integer(FModule.Memory) + FModule.UsedMemory;
     //p := FModule.LastWordEntry;
     FModule.AddIntToMem(tsInt(FModule.LastWordEntry));
     FModule.AllocSpace(SizeOf(TTurboWordOptions));
     //FModule.AlignMem;
     FModule.AllocSpace(SizeOf(LongWord)); //the ParamFieldLength
     FModule.AllocSpace(SizeOf(Integer)); //the CFA
-    FModule.AddByteToMem(Length(aName));
-    FModule.AddBufferToMem(aName[1], Length(aName));
+    if aWord.Options.Visibility >= fvProtected then
+    begin
+      FModule.AddByteToMem(Length(aWord.Name));
+      FModule.AddBufferToMem(aWord.Name[1], Length(aWord.Name));
+    end
+    else
+      FModule.AddByteToMem(0);
     FLastWordCfa := FModule.UsedMemory;
-    FLastWordEntry.CFA := FLastWordCfa;
+    FDefinedWordEntry.CFA := FLastWordCfa;
+    aWord.CFA := FLastWordCfa;
+    FDefinedWordEntry.Options := aWord.Options;
+
+    i := Length(FWords);
+    SetLength(FWords, i+1);
+    FWords[i] := aWord;
   end
   //else FLastWordCfa := 0;
 end;
 
-procedure T-->Grammar<--.DefineWordEnd;
+procedure T-->Grammar<--.DefineWordEnd();
 var
   vPrior: PTurboWordEntry;
 begin
-  FModule.AddOpToMem(inExit);
-  FLastWordEntry.ParamFieldLength := FModule.UsedMemory - FLastWordCfa + 1;
+  if FDefinedWordEntry.Options.Visibility >= fvPublished then
+    FModule.AddOpToMem(inExitFar)
+  else
+    FModule.AddOpToMem(inExit);
+  FDefinedWordEntry.ParamFieldLength := FModule.UsedMemory - FLastWordCfa + 1;
+  FWords[Length(FWords)-1].ParamFieldLength := FDefinedWordEntry.ParamFieldLength;
 
   vPrior := FModule.LastWordEntry;
-  FModule.LastWordEntry := Pointer(Integer(FLastWordEntry) - Integer(FModule.Memory));
-  FLastWordEntry.Prior := vPrior;
+  FModule.LastWordEntry := Pointer(Integer(FDefinedWordEntry) - Integer(FModule.Memory));
+  FDefinedWordEntry.Prior := vPrior;
+end;
+
+function T-->Grammar<--.FindWord(const aName: String): Integer;
+begin
+  for Result := 0 to Length(FWords)-1 do
+  begin
+    if AnsiSameText(aName, FWords[Result].Name) then exit;
+  end;
+  Result := -1;
+end;
+
+procedure T-->Grammar<--.GenerateModuleEntryForWord(var aWord: TTurboSimpleWord);
+var
+  i: Integer;
+begin
+  if aWord.ModuleName <> '' then
+  begin
+    i := FindModule(aWord.ModuleName, aWord.ModuleType);
+    //WriteLn('GenerateModuleEntryForWord:', aWord.ModuleName);
+    if i < 0 then i := AddUsedModule(aWord.ModuleName, aWord.ModuleType);
+    if i >= 0 then
+    begin
+      aWord.ExternalOptions.ModuleEntry := FUsedModules[i].Entry;
+      aWord.ModuleIndex := i;
+      aWord.Module := FUsedModules[i].Module;
+    end;
+  end
+  else with aWord.ExternalOptions do 
+  begin
+    ModuleEntry := FModule.LastModuleEntry;
+    if ModuleEntry = nil then SynError(cDLLModuleMissError, aWord.Name);
+  end;
+end;
+
+function  T-->Grammar<--.AddUsedModule(const aName: String; aModuleType: TTurboModuleType): Integer;
+var
+  vModule: TCustomTurboModule;
+begin
+  //WriteLn('AddUsedModule:', aName);
+  Result := -1;
+  if aModuleType = mtLib then
+  begin
+    vModule := FModule.RequireModule(aName);
+    if vModule = nil then
+    begin
+      SynError(cFileNotFoundError, aName);
+      exit;
+    end;
+  end;
+  Result := Length(FUsedModules);
+  SetLength(FUsedModules, Result+1);
+  with FUsedModules[Result] do
+  begin
+    Name := aName;
+    ModuleType := aModuleType;
+    if aModuleType = mtLib then Module := vModule else Module := nil;
+    with FModule do 
+    begin
+      Integer(Entry) := UsedMemory; //the offset address.
+      AddIntToMem(tsInt(LastModuleEntry));
+      AddByteToMem(Byte(aModuleType));
+      AddIntToMem(0); //preserved for Module: Pointer
+      AllocSpace(SizeOf(LongWord)); //Revision
+      AllocSpace(SizeOf(TTimeStamp)); //BuildDate
+      AddByteToMem(Length(aName));
+      if Length(aName) > 0 then
+        AddBufferToMem(aName[1], Length(aName));
+    end;
+  end;
 end;
 
 function T-->Grammar<--.FindLabel(const aName: string; const aWordName: string): Integer;
@@ -562,6 +710,14 @@ begin
   Result := -1;
 end;
 
+function T-->Grammar<--.FindModule(const aName: String; aModuleType: TTurboModuleType): Integer;
+begin
+  for Result := 0 to Length(FUsedModules)-1 do
+  begin
+    if AnsiSameText(aName, FUsedModules[Result].Name) and (aModuleType = FUsedModules[Result].ModuleType) then exit;
+  end;
+  Result := -1;
+end;
 
 procedure T-->Grammar<--.Init;
 begin
@@ -680,14 +836,17 @@ PRODUCTIONS
   (* TurboForthCompiler = Statement {Statement}  . *)  
   TurboForthCompiler 
     =                                                  (. Init ; .)  
-    "PROGRAM" Identifier                               (. FModule.Name := LexString; .)
-    [DeclarationBlock]
+    ( "PROGRAM"                                        (. FModule.ModuleType := mtProgram; .)
+      |"UNIT"                                          (. FModule.ModuleType := mtLib; .) 
+    )
+    Identifier                                         (. FModule.Name := LexString; .)
+    [DeclarationBlock]  
     "BEGIN"                                            (. FInitProcCFA := FModule.UsedMemory;  .)
     ASMStatementBlock
     "END."                                             (. FModule.AddOpToMem(inHalt); .)
     (. Final ; .) .
 
-  DeclarationBlock 
+   DeclarationBlock 
     = 
     Declaration {Declaration}.
 
@@ -747,24 +906,51 @@ PRODUCTIONS
 //    |Identifier                                       (. aValue.Value := GetConstValue(aValue.TypeKind, LexString); .)
   .
 
-  DefineWord (. Var vSucc: Boolean; vName: string; vOptions: TTurboWordOptions; .)
-    = (. vOptions.Visibility := fvPublished; .)
-    ":" [WordVsibility<vOptions.Visibility>] Identifier     (. vName := LexString; .)
-    [ExternalWordOption<vOptions>]
+  DefineWord (. Var vSucc: Boolean; vWord: TTurboSimpleWord; .)
+    = 
+                                                                 (. vWord.Options.Visibility := fvPrivate; 
+                                                                    vWord.Options.CallStyle := csForth;
+                                                                    vWord.Options.CodeFieldStyle := cfsFunction;
+                                                                 .)
+    ":" [WordVsibility<vWord.Options.Visibility>] Identifier     (. vWord.Name := LexString; .)
     
-                                                            (. vSucc := DefineWordBegin(vName, vOptions); .)
-    ASMStatementBlock
-    ";"                                                     (. if vSucc then DefineWordEnd; .)
+    [
+    ExternalWordOption<vWord>                                    (. GenerateModuleEntryForWord(vWord); .)
+    ]
+                                                                 (.vSucc := DefineWordBegin(vWord);  .)
+    [ASMStatementBlock]
+    ";"                                                          (. if vSucc and (vWord.Options.CodeFieldStyle = cfsFunction) then DefineWordEnd(); .)
   .
-  ExternalWordOption< var aOptions: TTurboWordOptions >
-    = "EXTENAL" [StringToken]  //the default is the lastModuleEntry if no the module name.
-    "STDCALL" ExternalWordOptionPart
-    |"REGISTER" ExternalWordOptionPart
+  ExternalWordOption< var aWord: TTurboSimpleWord >
+    = 
+    //the default is the lastModuleEntry if no the module name.
+                                                            (. aWord.ModuleName := ''; 
+                                                               aWord.ExternalOptions.Name := '';
+                                                            .)
+    "EXTERNAL"                                              (. aWord.Options.CodeFieldStyle := cfsExternalFunction; .)
+    [
+      StringToken                                           (.aWord.ModuleName := AnsiDequotedStr(LexString, '''');
+                                                              aWord.ModuleType := mtLib; .)  //the default module Type is mtLib
+      [ModuleType<aWord.ModuleType>]
+    ]
+    [
+      "STDCALL"                (. aWord.Options.CallStyle := csStdCall; .)
+       |"REGISTER"             (. aWord.Options.CallStyle := csRegister; .)
+       |"PASCAL"               (. aWord.Options.CallStyle := csPascal; .)
+       |"FORTH"                (. aWord.Options.CallStyle := csForth; .)
+       ExternalWordOptionPart<aWord.ExternalOptions>
+    ]
   .
-  ExternalWordOptionPart 
+  ModuleType< var aType: TTurboModuleType >
     =
-   ["Name" Identifier]
-   ["Index" IntegerToken]
+    "LIB"                                                  (. aType := mtLib;  .)
+    |"DLL"                                                 (. aType := mtDLL;  .)
+    |"HOST"                                                (. aType := mtHost; .)
+  .
+  ExternalWordOptionPart < var aOptions: TTurboExteralWordCFA >
+    =
+   ["Name" StringToken (. aOptions.Name := AnsiDequotedStr(LexString, ''''); .) ]
+   ["Index" IntegerToken (. aOptions.Index := StrToInt(LexString); .)]
   .
   WordVsibility< var aVisibility: TTurboVisibility > 
     = 

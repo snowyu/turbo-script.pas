@@ -1,3 +1,60 @@
+2006-11-6
+!* [Bug] !Tick 出现问题，值没有能保存进去！
+* [VM] Forth DLL 调用初步测试通过！
+* [Bug] 使用Unit的时候 全局参数 忘记 需要设置！！
+* [Bug] ForthCompiler 对于Published 的定义的单词应该是用ExitFar!
+  为了设置该参数，还是只有让Executor创建对象！！
+~ ModuleFileAccessor
+  如果要考虑支持树型Module名称： Module1.SubModule1.SubModule2，那么必须要有
+    BasePath: 用于指明项目的库的基本Root目录，同时需要增加编译开关: "-Base:"，用来在编译单元的时候指明该单元的Base目录。
+    SysPath: 用于指明TurboScript系统的Root目录
+  搜索顺序为先找BasePath,再找SysPath. 这样BasePath就可以重载SysPath中的内容。
+  为了测试，先不管这些，只实现flat Modules.
+~ 注意ModuleEntry中的单元全部都是真实的需要引用的单元，对于那些直接嵌入的单元在运行时刻中是并不存在的。
+  而对于真实的单元（类似于DLL），Module.Parant属性是没有用处的（它的目的是为直接嵌入的提供到底嵌入到哪里）。
+  既然如此那就无所谓了，还是让Accessor 负责创建Module。
+~ [奇思妙想] 将FastPrint控件包改造成能够编辑录入的界面设计系统。
+
+2006-11-5
+* ModuleAccessor 需要得知是用哪一种Executor Class,要不我把这个责任扔回去？
+  * RequireModule 增加一个参数:
+   + aModuleClass: TTurboModuleClass
+   这样似乎不行啊，还是只能让上面一级（TurboModule负责创建，否则Create的参数无法设置！！）
+* [ForthCompiler]
+  + display error infomations on the console.
+  + the switch options: -ge : generate the deatil error list file (*.lst)
+
+2006-11-4 
+~ 关于后期绑定，内部实现的初步设想是返回一个aBindingHandle，然后操作该handle.  FindVarBinding('aVarName'， aBindingHandle， pValue); 
+   SetVarBinding(aBindingHandle) //变量被修改。
+   不过，建议还可以参考CLR的实现，如果能找到的话。
+~ 异常：采用表的形式，而不是嵌套堆栈的形式来存放异常处理过程，这样做的好处是：执行的时候不用在堆栈中压入处理过程，加快执行速度，缺点是错误发生的时候，查表速度慢。
+  + 全局参数中加上 ExceptionProcessor: 指向该模块的异常处理中心的地址【该地址为"System"单元的过程偏移地址,也许该地址为绝对地址由主程序单元在初始化的时候设置更为妥当？】。
+  + TurboWrodEntry中加上 ExceptionProcessBlock 字段指明当错误发生的时候该跳转到哪里去进行该处的异常处理？但是嵌套异常如何办？？嵌套异常全部写入该块中，并注明拦截的终止地址即可。
+    try.finally 和 try..except的异同：都是捕获异常。
+    try.finally 执行完成finally 的语句照样触发异常,跳过finally后面的语句退出过程；
+    try..except 执行完成except 的语句后，如果没有raise不会触发异常，后面的语句照样执行；
+  【注意：如果该单词不在WordEntry上那么就无法进行异常处理】
+~ 关于远调用，先只实现  Forth, stdcall, pascal 三种，stdcall, pascal由于参数全部在堆栈所以根本无需要知道参数的个数，只需要知道有无返回值以及返回值的大小。
+~ 关于可视性，将其排序，按照 published, public, ... 的顺序排列这样 published 能被最先找到！
+~ 发现如果将过程从模块中分离存放在数据库中，似乎过于零散，这样不便于我异常处理的实现。我觉得可以将模块设想成原子动作表（如：某对象的所有动作，某模块的所有动作，某动作的所有原子动作），集中存放。
+  还是必须分开存放，原因如下：
+  1、便于运行时刻对该过程动态添加过程（动作）的参数，和修改。
+~ 是否需要象CLR一样，将数据区独立出来？在代码区只有临时数据区，通过 Ldc.1 ..ldc.5 等指令直接访问。
+  的确有必要，理由：代码区全是代码之后，便于地址重定位。将地址全部变成绝对地址后，性能绝对是提高，而不是降低。当然在启动性能上受到了损失。
+  不过我这里的模块都是小模块，所以也谈不上损失多少的问题。
+~ 在定义外部word的时候如何区分该word的module类型？？
+  : Public Word external ["moduleName" [Lib|DLL|Host]] [stdcall|pascal|forth] [name "procname"] [index 1];
+!* ModuleEntry.
+  + Revision:
+  + BuildDate TitmeStamp
+  由于我在编译的时候将使用单元的过程的偏移量直接编入了代码中，所以必须判断单元的版本和日期，这样该单元被改变后会自动重新编译，取得最新的偏移量。
+!+ [ForthCompiler] 需要加上使用 RequireModule(),然后取得过程的偏移量。
+  + 需要完成 TurboFileAccessor.
+~ 关于外部调用的实现，我有两个方案
+  1、建立 CallExternal PTurboWordEntry 指令 这样具体外部函数的类型在该指令中解析
+  1、在编译时刻分别解析不同的外部函数类型，然后产生对应调用指令。
+
 2006-11-3
 * [BUG] [ForthCompiler] 因为我在Object使用了string，但是却没有初始化object内存，在对赋值该string赋值的出现严重错误！！改为Shortstring即可。
 * [BUG] [ForthCompiler] Int64, Integer 这类的变量必须AlignMem.

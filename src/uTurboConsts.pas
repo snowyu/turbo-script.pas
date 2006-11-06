@@ -16,6 +16,7 @@ const
   cDefaultFreeMemSize = 1024 * 8; //the Free Memory 8kb
   cMAXTIBCount = 1024;
   cTurboCompiledProgramFileExt = '.tpc';
+  cTurboCompiledUnitFileExt = '.tpc';
   cTurboForthFileExt = '.tf';
   
 resourcestring
@@ -34,6 +35,9 @@ resourcestring
   rsVarRedeclarationSyntaxError = 'Error: The Variable name is redeclareted!.';
   rsConstRedeclarationSyntaxError = 'Error: The Constant name is redeclareted!.';
   rsRedeclarationSyntaxError  = 'Error: The Identifier is redeclareted!.';
+  rsDLLModuleMissSyntaxError = 'Error: No DLL Module assigned!';
+  rsFileNotFoundError = 'Fatal: File not found:';
+  rsWordNotFoundError = 'Fatal: Word not found:';
 
 type
   tsInt = LongInt;
@@ -58,8 +62,8 @@ type
   //the Forth Execution priority fpHighest means cfsImmediately
   TTurboPriority = (fpLowest, fpLower, fpLow, fpNormal, fpHigh, pfHigher, fpHighest);
   TTurboCallStyle = (csForth, csRegister, csPascal, csCdecl, csStdCall, csFastCall);
-  TTurboCodeFieldStyle = (cfsFunction, cfsHostFunction, cfsDLLFunction);
-  TTurboCodeFieldStyles = set of TTurboCodeFieldStyle;
+  //cfsExternalFunction is external function. see Also ExternalOptions.ModuleType
+  TTurboCodeFieldStyle = (cfsFunction, cfsExternalFunction);
   TTurboWordOptions = packed record //a DWORD
       //”≈œ»º∂, highest means an IMMEDIATE word
       //1=True; 0=False; Smudge bit. used to prevent FIND from finding this word
@@ -67,7 +71,7 @@ type
       Precedence: TTurboPriority; 
       Visibility: TTurboVisibility; 
       CallStyle: TTurboCallStyle;
-      CodeFieldStyle: TTurboCodeFieldStyles;
+      CodeFieldStyle: TTurboCodeFieldStyle;
   end;
 
   PTurboVMInstruction = ^TTurboVMInstruction;

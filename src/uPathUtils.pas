@@ -113,6 +113,11 @@ function RemovePathServer(Path: TPath):TPath;
 function PathConcat(Path1, Path2: TPath): TPath;
 
 function ToSystemPath(const Path: TPath; const BasePath: TPath = ''):TSystemPath;
+{: add the SystemPathDelimiter for the absoluted path if the first char is not the SystemPathDelimiter. }
+{
+  if the SystemPath is the related path then the BasePath will be added.
+  也就是是说它定义了自己的一套path规范，首先你要将其转换成符合它规范的字符串
+}
 function ToPath(SystemPath: TSystemPath;  const BasePath: TPath = ''):TPath;
 
 function ToSystemPaths(const Paths: TPaths; const BasePath: TPath = ''): TSystemPaths; overload;
@@ -125,6 +130,10 @@ function StringsToPaths(S: TStrings):TPaths;
 function SplitPath(Path: TPath): TPaths;
 function JoinPaths(Paths: TPaths): TPath;
 
+{: translate the Path from FromBase to ToBase }
+{
+  Note if the FromBase is nil and Path is absolute path then MovePath := Path.
+}
 function  MovePath(Path, FromBase: TPath; ToBase: TPath = ''): TPath;
 function  MovePaths(const Paths: TPaths; const FromBase: TPath; const ToBase: TPath = ''): TPaths;
 

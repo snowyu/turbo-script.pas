@@ -57,9 +57,10 @@ type
   PPreservedCodeMemory = ^ TPreservedCodeMemory;
   PTurboVariableEntry = ^ TTurboVariableEntry;
   PTurboModuleEntry = ^ TTurboModuleEntry;
-  PTurboWordEntry = ^ TTurboWordBlock;
+  PTurboWordEntry = ^ TTurboWordEntry;
   PTurboTypeInfoEntry = ^ TTurboTypeInfoEntry;
   PTurboExteralWordCFA = ^TTurboExteralWordCFA;
+  PTurboGlobalOptions = ^TTurboGlobalOptions;
 
   TCustomTurboPEFormat = class;
   TCustomTurboModule = class;
@@ -104,9 +105,9 @@ type
   }
   TCustomTurboModule = class(TCustomTurboObject)
   private
-    function GetGlobalOptions: Pointer;
+    function GetGlobalOptions: PTurboGlobalOptions;
     function GetLastModuleEntry: PTurboModuleEntry;
-    procedure SetGlobalOptions(Value: Pointer);
+    procedure SetGlobalOptions(Value: PTurboGlobalOptions);
     procedure SetLastModuleEntry(Value: PTurboModuleEntry);
   protected
     FAccessor: TObject;
@@ -197,8 +198,12 @@ type
     {: nil means not found. }
     function FindVariableEntry(const aName: string): PTurboVariableEntry;
     {: nil means not found. }
-    function FindWordEntry(const aName: string): PTurboWordEntry;
-    {: 0 means not found. }
+    function FindWordEntry(const aName: string; const aCallStyle:
+            TTurboCallStyle = csForth): PTurboWordEntry;
+    {: Get the Local forth word entry. }
+    { Description
+    Note: 0 means not found.
+    }
     function GetWordCFA(const aWord: string): Integer;
     {: Load the body into the memory. }
     { Description
@@ -235,7 +240,7 @@ type
     procedure UnloadNotification(aProc: TNotifyEvent);
     {: the TurboModuleAccessor }
     property Accessor: TObject read FAccessor write FAccessor;
-    property GlobalOptions: Pointer read GetGlobalOptions write
+    property GlobalOptions: PTurboGlobalOptions read GetGlobalOptions write
             SetGlobalOptions;
     property InitializeProc: Integer read GetInitializeProc;
     { Description
@@ -468,7 +473,7 @@ type
 
 
   //For type-cast the Mem
-  TTurboWordBlock = object
+  TTurboWordEntry = object
     Prior: PTurboWordEntry; //前一个单词 0 means 为最前面。
 
     Options: TTurboWordOptions;
@@ -496,7 +501,8 @@ type
     ProcAddr: Pointer; //if it csForth then it is the CFA.
     ModuleEntry: PTurboModuleEntry;
     ProcTypeEntry: Pointer; //if it csForth then it is Module instance else it is ProcTypeInfo offset addr.
-    Index: tsInt; //-1 means non-index visits.
+    //-1 means non-index visits.
+    Index: tsInt;  
     Name: ShortString; //packed the function name in the DLL/Host.
   end;
 
@@ -520,6 +526,8 @@ type
       nil means not assigned(or loaded).
     }
     Module: Pointer; 
+    Revision: LongWord; //the file version
+    BuildDate: TTimeStamp;
     ModuleName: ShortString; //packed string, the full module name with path.
   end;
 
@@ -554,7 +562,6 @@ type
   end;
 
 
-  PTurboGlobalOptions = ^TTurboGlobalOptions;
   TTurboGlobalOptions = record  //do not use the packed.
     //States: TTurboProcessorStates; //如果放在这里，速度会下降
     LastErrorCode: TTurboProcessorErrorCode;
@@ -604,7 +611,8 @@ type
   
   TTurboModuleStreamHeader = packed record
     Id: array [0..cFORTHHeaderMagicIdLen-1] of char;
-    Version: LongWord;
+    Version: LongWord; //the file format version
+    Revision: LongWord; //the file version
     BuildDate: TTimeStamp;
   end;
   
@@ -622,6 +630,9 @@ implementation
 uses
   uTurboAccessor;
 
+const
+  cCurrentModuleFileForamtVersionNo = 1; 
+  
 {
 ****************************** TCustomTurboModule ******************************
 }
@@ -813,7 +824,8 @@ begin
   Result := nil;
 end;
 
-function TCustomTurboModule.FindWordEntry(const aName: string): PTurboWordEntry;
+function TCustomTurboModule.FindWordEntry(const aName: string; const
+        aCallStyle: TTurboCallStyle = csForth): PTurboWordEntry;
 begin
   Result := LastWordEntry;
   while (Result <> nil) do
@@ -823,8 +835,13 @@ begin
       //writeln('psCompiling,', Integer(Result));
       Integer(Result) := Integer(FMemory) + Integer(Result);
     end;
-    //writeln('FindWordEntry:', Result.Name);
-    if Result.Name = aName then
+    {if Result.Name <> '' then
+    begin
+      writeln('FindWordEntry:', Result.Name);
+      writeln('FindWordEntry:', Integer(Result.Options.CallStyle));
+      writeln('aCallStyle:', Integer(aCallStyle));
+    end;//}
+    if (Result.Options.CallStyle = aCallStyle) and AnsiSameText(Result.Name, aName) then
     begin
       Exit;
     end
@@ -834,7 +851,7 @@ begin
   Result := nil;
 end;
 
-function TCustomTurboModule.GetGlobalOptions: Pointer;
+function TCustomTurboModule.GetGlobalOptions: PTurboGlobalOptions;
 begin
   Result := PPreservedCodeMemory(FMemory).GlobalOptions;
 end;
@@ -999,7 +1016,7 @@ begin
 
   if vHeader.Id <> cFORTHHeaderMagicId then
     raise ETurboScriptError.CreateRes(@rsInvalidTurboScriptStreamError);
-  ModuleVersion := vHeader.Version;
+  ModuleVersion := vHeader.Revision;
   ModuleDate := vHeader.BuildDate;
 
   with PPreservedCodeMemory(FMemory)^ do
@@ -1058,12 +1075,13 @@ end;
 function TCustomTurboModule.RequireModule(const aModuleName: ShortString):
         TCustomTurboModule;
 begin
-  Result := GTurboModuleManager.Require(aModuleName, True);
+  Result := GTurboModuleManager.Require(aModuleName, TTurboModuleClass(ClassType), GlobalOptions, True);
+
   if Assigned(Result) then
   begin
     Result.UnloadNotification(NotifyModuleUnloaded);
     FreeNotification(Result.NotifyModuleFree);
-  end;
+  end
 end;
 
 procedure TCustomTurboModule.Reset;
@@ -1102,7 +1120,8 @@ begin
     raise ETurboScriptError.CreateRes(@rsTurboScriptNotLoadedError);
 
   vHeader.Id := cFORTHHeaderMagicId;
-  vHeader.Version := ModuleVersion;
+  vHeader.Revision := ModuleVersion;
+  vHeader.Version  := cCurrentModuleFileForamtVersionNo;
   vHeader.BuildDate := ModuleDate;
   aStream.WriteBuffer(vHeader, SizeOf(TTurboModuleStreamHeader));
   if not (psCompiling in Status) then TurboConvertAddrAbsoluteToRelated(FMemory);
@@ -1152,7 +1171,7 @@ begin
   FModuleUnloadNotifies.Clear;
 end;
 
-procedure TCustomTurboModule.SetGlobalOptions(Value: Pointer);
+procedure TCustomTurboModule.SetGlobalOptions(Value: PTurboGlobalOptions);
 begin
   PPreservedCodeMemory(FMemory).GlobalOptions := Value;
 end;

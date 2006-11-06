@@ -11,6 +11,7 @@ uses
   Windows,  SysUtils
   , uTurboConsts
   , uTurboExecutor
+  , uTurboModuleFileAccessor
   , TurboInterpreter
   ;
 

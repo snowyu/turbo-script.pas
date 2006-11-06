@@ -53,7 +53,7 @@ Var
 begin
   With Error Do
   Begin
-    s := T-->Grammar<--(Sender).ErrorStr(ErrorCode, Data);
+    s := T-->Grammar<--(Sender).ErrorStr(ErrorCode, Data) + ' --- '+ Data;
     errStr := Format('at line %d, position %d: %s',  [Line, Col - 1, S]);
     s := GFileName + '(' + IntToStr(Line) + ')';
     Case ErrorType of

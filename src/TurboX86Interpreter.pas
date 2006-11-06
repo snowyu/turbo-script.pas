@@ -210,13 +210,14 @@ asm
   MOV  [EAX].TTurboGlobalOptions.LastErrorCode, errBadInstruction
   JMP  iVMHalt
   //Bad OpCode: no procedure assigned to the OpCode.
-@@IsUserWord:
+{@@IsUserWord:
   ADD  EAX, EDI //指向用户定义的word入口
   
   //JMP  iVMEnter
   PUSH ESI        //push the current IP.
   MOV  ESI, EAX   //set the new IP
   JMP  @@DoEnter
+}
 @@Exit:
   MOV  EAX, [EDI].TPreservedCodeMemory.GlobalOptions
   CMP  ESP, [EAX].TTurboGlobalOptions.ReturnStackBottom
@@ -343,7 +344,10 @@ asm
 @@Exit:
   LODSD
   ADD EAX, EDI
-  JMP iVMEnter
+  //JMP iVMEnter
+  PUSH ESI        //push the current IP.
+  MOV  ESI, EAX   //set the new IP
+  JMP iVMNext
 end;
 
 
@@ -778,6 +782,7 @@ begin
   GTurboCoreWords[inEnter] := iVMEnter;
   GTurboCoreWords[inExit] := iVMExit;
   GTurboCoreWords[inCall] := iVMCall;
+  GTurboCoreWords[inCallFar] := iVMCallFar;
 
   GTurboCoreWords[inEnterFar] := iVMEnterFar;
   GTurboCoreWords[inExitFar] := iVMExitFar;
