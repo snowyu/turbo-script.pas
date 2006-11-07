@@ -182,7 +182,8 @@ end;
 //the interpreter core here:
 procedure iVMNext;
 asm
-  MOV  DL, [EDI].TPreservedCodeMemory.States
+  MOV  EAX, [EDI].TPreservedCodeMemory.GlobalOptions
+  MOV  DL, [EAX].TTurboGlobalOptions.States
 
   //TODO: BT is a 486 directive.
   BT EDX, psRunning //cTurboScriptIsRunningBit
@@ -190,7 +191,7 @@ asm
 
 @@DoEnter:
   //MOV EAX, [ESI]  //the current instruction in W register
-  //ADD ESI, Type(Pointer) //4 = INC PC INC PC INC PC INC PC
+  //ADD ESI, Type(tsInt) //4 = INC PC INC PC INC PC INC PC
   XOR EAX, EAX
   LODSB
   //MOVZX EAX, AL //the XOR EAX,EAX is faster! 
@@ -200,8 +201,9 @@ asm
   //JAE   @@IsUserWord
 @@IsVMCode:
   MOV  ECX, OFFSET GTurboCoreWords
-  MOV  EAX, [ECX+EAX*4]
-  CMP  EAX, 0
+  MOV  EAX, [ECX+EAX*Type(tsInt)]
+  TEST EAX, EAX
+  //CMP  EAX, 0
   JZ   @@BadOpError
   JMP  EAX
 @@BadOpError:
@@ -218,7 +220,9 @@ asm
   MOV  ESI, EAX   //set the new IP
   JMP  @@DoEnter
 }
+
 @@Exit:
+{ //move to iVMHalt
   MOV  EAX, [EDI].TPreservedCodeMemory.GlobalOptions
   CMP  ESP, [EAX].TTurboGlobalOptions.ReturnStackBottom
   JZ   @@byebye  //ok
@@ -229,31 +233,38 @@ asm
   MOV  ESP, [EAX].TTurboGlobalOptions.ReturnStackBottom
   MOV  [EAX].TTurboGlobalOptions.ReturnStackBottom, ECX
 @@byebye:
-
+//}
 end;
 
 procedure iVMEnter;
 asm
-  PUSH ESI        //push the current IP.
-  MOV  ESI, EAX   //set the new IP
-  JMP iVMNext
-end;
-
-procedure iVMCall;
-asm
   LODSD
-  PUSH ESI        //push the current IP.
   ADD  EAX, EDI
+  PUSH ESI        //push the current IP.
   MOV  ESI, EAX   //set the new IP
   JMP iVMNext
 end;
 
 procedure iVMHalt;
 asm
-  MOV DL, [EDI].TPreservedCodeMemory.States
+{  MOV DL, [EDI].TPreservedCodeMemory.States
   BTR EDX, psRunning //cTurboScriptIsRunningBit  //clear the cIsRunningBit to 0.
   MOV [EDI].TPreservedCodeMemory.States, DL
   JMP iVMNext
+}
+  MOV  EAX, [EDI].TPreservedCodeMemory.GlobalOptions
+  CMP  ESP, [EAX].TTurboGlobalOptions.ReturnStackBottom
+  MOV  DL, [EAX].TTurboGlobalOptions.States
+  BTR  EDX, psRunning //cTurboScriptIsRunningBit  //clear the cIsRunningBit to 0.
+  BTS  EDX, psHalt
+  MOV  [EAX].TTurboGlobalOptions.States, DL
+  JZ   @@byebye  //ok
+@@HaltErr:
+  MOV  [EAX].TTurboGlobalOptions.LastErrorCode, errHalt
+  MOV  ECX, ESP
+  MOV  ESP, [EAX].TTurboGlobalOptions.ReturnStackBottom
+  MOV  [EAX].TTurboGlobalOptions.ReturnStackBottom, ECX
+@@byebye:
 end;
 
 procedure iVMExit;
@@ -281,14 +292,21 @@ end;
 //save the old MemoryBase, pass the CPUStates to the new MemoryBase.
 procedure iVMEnterFar;
 asm
-  MOV DL, [EDI].TPreservedCodeMemory.States
   PUSH EDI //save the current MemoryBase.
   LODSD
+  TEST EAX, EAX //CMP EAX, 0
+  JZ @@LocalEnter 
+  //MOV DL, [EDI].TPreservedCodeMemory.States
   MOV  EDI, EAX //load the new MemoryBase
-  MOV [EDI].TPreservedCodeMemory.States, DL
+  //MOV [EDI].TPreservedCodeMemory.States, DL
+
+@@LocalEnter:
+  //JMP iVMEnter
   LODSD
   ADD EAX, EDI
-  JMP iVMEnter
+  PUSH ESI        //push the current IP.
+  MOV  ESI, EAX   //set the new IP
+  JMP iVMNext
 end;
 
 //CALLFAR PTurboModuleEntry cfa-addr
@@ -300,16 +318,17 @@ procedure iVMCallFar;
 asm
   PUSH EDI //save the current MemoryBase.
   LODSD    //EAX= PTurboModuleEntry
-  CMP  EAX, 0
+  TEST EAX, EAX //CMP EAX, 0
   JZ  @@DoLocalEnterFar
   ADD  EAX, EDI //PTurboModuleEntry real addr
   MOV  ECX, [EAX].TTurboModuleEntry.Module
-  CMP  ECX, 0
+  TEST ECX, ECX //CMP ECX, 0
   JZ   @@RequireModuleExecutor
   MOV  EDI, [ECX].TTurboExecutorAccess.FMemory
   JMP  @@exit
 
 @@RequireModuleExecutor: //find and load the module into the memory.
+  PUSH EAX  //keep the PTurboModuleEntry 
   PUSH EBX
   PUSH ESI
   PUSH EBP
@@ -322,15 +341,17 @@ asm
   POP EBP
   POP ESI
   POP EBX
+  POP ECX  //restore the PTurboModuleEntry
 
-  CMP  EAX, 0
+  TEST  EAX, EAX
   JZ   @@NotFoundError
 
+  MOV [ECX].TTurboModuleEntry.Module, EAX
   //Copy CPU States to the New Module Memory.
-  MOV EDI, [ESP] //restore the old Module MemoryBase in TOS
-  MOV  CL, [EDI].TPreservedCodeMemory.States
+  //MOV EDI, [ESP] //restore the old Module MemoryBase in TOS
+  //MOV  CL, [EDI].TPreservedCodeMemory.States
   MOV  EDI, [EAX].TTurboExecutorAccess.FMemory
-  MOV  [EDI].TPreservedCodeMemory.States, CL
+  //MOV  [EDI].TPreservedCodeMemory.States, CL
   JMP @@Exit
 
 @@NotFoundError:
@@ -342,9 +363,9 @@ asm
 @@DoLocalEnterFar:
 
 @@Exit:
+  //JMP iVMEnter
   LODSD
   ADD EAX, EDI
-  //JMP iVMEnter
   PUSH ESI        //push the current IP.
   MOV  ESI, EAX   //set the new IP
   JMP iVMNext
@@ -361,9 +382,11 @@ asm
   ADD  EBX, EDI //EBX: TOS
   MOV  ESI, EBX   
 
-  XCHG ESP, EBP
+  {XCHG ESP, EBP
   POP  EBX
-  XCHG ESP, EBP
+  XCHG ESP, EBP}
+  MOV EBX, [EBP]
+  ADD EBP, Type(tsInt)
 
   JMP  iVMNext
 end;
@@ -373,17 +396,11 @@ procedure iVMPushInt;
 asm
   //Decrement the data stack pointer.
   //push the second data to the data stack.
-  XCHG ESP, EBP
+  {XCHG ESP, EBP
   PUSH EBX
-  XCHG ESP, EBP
-  {SUB  EBP, Type(tsPointer)
-  MOV  [EBP], EDX
-  }
- 
-  {
-  MOV  EDX, [ESI]
-  ADD  ESI, Type(tsInt)
-  }
+  XCHG ESP, EBP //}
+  SUB  EBP, Type(tsInt)
+  MOV  [EBP], EBX
   LODSD
   MOV  EBX, EAX
   JMP  iVMNext
@@ -394,17 +411,12 @@ procedure iVMPushByte;
 asm
   //Decrement the data stack pointer.
   //push the second data to the data stack.
-  XCHG ESP, EBP
+  {XCHG ESP, EBP
   PUSH EBX
-  XCHG ESP, EBP
-  {SUB  EBP, Type(tsPointer)
-  MOV  [EBP], EDX
-  }
+  XCHG ESP, EBP //}
+  SUB  EBP, Type(tsInt)
+  MOV  [EBP], EBX
  
-  {
-  MOV  EDX, [ESI]
-  ADD  ESI, Type(tsInt)
-  }
   XOR EAX, EAX
   LODSB
   MOV  EBX, EAX
@@ -416,17 +428,12 @@ procedure iVMPushWord;
 asm
   //Decrement the data stack pointer.
   //push the second data to the data stack.
-  XCHG ESP, EBP
+  {XCHG ESP, EBP
   PUSH EBX
-  XCHG ESP, EBP
-  {SUB  EBP, Type(tsPointer)
-  MOV  [EBP], EDX
-  }
- 
-  {
-  MOV  EDX, [ESI]
-  ADD  ESI, Type(tsInt)
-  }
+  XCHG ESP, EBP //}
+  SUB  EBP, Type(tsInt)
+  MOV  [EBP], EBX
+
   XOR EAX, EAX
   LODSW
   MOV  EBX, EAX
@@ -435,14 +442,14 @@ end;
 
 procedure iVMDropInt;
 asm
-  XCHG ESP, EBP
+  {XCHG ESP, EBP
   POP  EBX
-  XCHG ESP, EBP
-  {//move the top in stack to EAX 
-  MOV  EDX, [EBP] 
+  XCHG ESP, EBP //}
+  //move the top in stack to EAX 
+  MOV  EBX, [EBP] 
   //Increment the data stack pointer.
   ADD  EBP, Type(tsInt)
-  }
+
   JMP  iVMNext
 end;
 
@@ -781,7 +788,6 @@ begin
 
   GTurboCoreWords[inEnter] := iVMEnter;
   GTurboCoreWords[inExit] := iVMExit;
-  GTurboCoreWords[inCall] := iVMCall;
   GTurboCoreWords[inCallFar] := iVMCallFar;
 
   GTurboCoreWords[inEnterFar] := iVMEnterFar;

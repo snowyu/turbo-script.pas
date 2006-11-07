@@ -145,6 +145,7 @@ type
     function GetStatus: TTurboProcessorStates;
     function GetUsedMemory: Integer;
     procedure Grow(const aSize: Integer = 0);
+    procedure LoadUsedModules;
     procedure SendUnloadNotification;
     procedure SetLastTypeInfoEntry(const Value: PTurboTypeInfoEntry);
     procedure SetLastVariableEntry(const Value: PTurboVariableEntry);
@@ -563,7 +564,7 @@ type
 
 
   TTurboGlobalOptions = record  //do not use the packed.
-    //States: TTurboProcessorStates; //如果放在这里，速度会下降
+    States: TTurboProcessorStates; //如果放在这里，速度会下降
     LastErrorCode: TTurboProcessorErrorCode;
     ParamStackBase: Pointer;
     ParamStackSize: Integer; //bytes
@@ -575,7 +576,6 @@ type
 
   //the typecast for code memory area to get the parameters
   TPreservedCodeMemory = packed record
-    States: TTurboProcessorStates;
     GlobalOptions: PTurboGlobalOptions;
     Executor: TCustomTurboModule;
     //##abondoned:this Module unique Index in this program, allocated by compiler.
@@ -643,6 +643,7 @@ begin
   FModuleUnloadNotifies := TList.Create;
   FParent := aParent;
   FVisibility := aVisibility;
+  //FOptions := [soLoadOnDemand];
   ClearMemory;
 end;
 
@@ -711,8 +712,9 @@ procedure TCustomTurboModule.AlignMem;
 var
   I: Integer;
 begin
-  I := UsedMemory mod SizeOf(Integer);
-  if I <> 0 then AllocSpace(I);
+  I := (UsedMemory + 3) and $FFFFFFFC;
+  I := I - UsedMemory;
+  if I > 0 then AllocSpace(I);
 end;
 
 procedure TCustomTurboModule.AllocSpace(const aSize: Integer);
@@ -748,7 +750,7 @@ begin
       LastVariableEntry := nil;
       LastTypeInfoEntry := nil;
       LastModuleEntry := nil;
-      States := [];
+      //States := [];
     end;
 
     IsLoaded := False;
@@ -951,7 +953,13 @@ end;
 
 function TCustomTurboModule.GetStatus: TTurboProcessorStates;
 begin
-  Result := PPreservedCodeMemory(FMemory).States;
+  with PPreservedCodeMemory(FMemory)^ do
+  begin
+    if Assigned(GlobalOptions) then
+      Result := GlobalOptions.States
+    else
+      Result := [];
+  end;
 end;
 
 function TCustomTurboModule.GetUsedMemory: Integer;
@@ -1045,8 +1053,33 @@ begin
   Reset;
   if not (psCompiling in Status) then TurboConvertAddrRelatedToAbsolute(FMemory);
 
+  if not (soLoadOnDemand in Options) then
+  begin
+    LoadUsedModules;
+  end;
+
   FIsLoaded := True;
   //WriteLn('loaded ok.');
+end;
+
+procedure TCustomTurboModule.LoadUsedModules;
+var
+  vModuleEntry: PTurboModuleEntry;
+  vModule: TCustomTurboModule;
+begin
+  vModuleEntry := LastModuleEntry;
+  while (vModuleEntry <> nil) do
+  begin
+    if psCompiling in Status then
+      Integer(vModuleEntry) := Integer(FMemory) + Integer(vModuleEntry);
+    vModule := nil;
+    case vModuleEntry.ModuleType of
+      mtLib: vModule := RequireModule(vModuleEntry.ModuleName);
+    end; //case
+    if Assigned(vModule) then
+      vModuleEntry.Module := vModule;
+    vModuleEntry := vModuleEntry.Prior;
+  end;
 end;
 
 procedure TCustomTurboModule.NotifyModuleFree(Sender: TObject);
@@ -1055,11 +1088,26 @@ begin
 end;
 
 procedure TCustomTurboModule.NotifyModuleUnloaded(Sender: TObject);
+var
+  vModule: PTurboModuleEntry;
 begin
-  //TODO: apply the TTurboModuleEntry Executor to nil!!
   if (Sender = FParent) and StoredInParent then
   begin
     FIsLoaded := False;
+  end;
+
+  vModule := LastModuleEntry;
+  while (vModule <> nil) do
+  begin
+    if psCompiling in Status then
+      Integer(vModule) := Integer(FMemory) + Integer(vModule);
+    if vModule.Module = Sender then
+    begin
+      vModule.Module := nil;
+      Exit;
+    end
+    else
+      vModule := vModule.Prior;
   end;
 end;
 
@@ -1095,7 +1143,7 @@ begin
     RP := Integer(GlobalOptions.ReturnStackBase) + GlobalOptions.ReturnStackSize;
     GlobalOptions.LastErrorCode := errNone;
     Executor := Self;
-    States := [];
+    //GlobalOptions.States := []; //不是你的东西就别动！！
   end;
 end;
 
@@ -1253,18 +1301,20 @@ procedure TCustomTurboModule.SetStatus(Value: TTurboProcessorStates);
 var
   vChanged: Boolean;
 begin
-  if Value <> PPreservedCodeMemory(FMemory).States then
+  with PPreservedCodeMemory(FMemory)^ do
   begin
-    vChanged := psCompiling in (Value * PPreservedCodeMemory(FMemory).States);
-    PPreservedCodeMemory(FMemory).States := Value;
-    if vChanged then
+    if Assigned(GlobalOptions) and (Value <> GlobalOptions.States) then
     begin
-      if psCompiling in Value then
-        TurboConvertAddrAbsoluteToRelated(FMemory)
-      else
-        TurboConvertAddrRelatedToAbsolute(FMemory);
+      vChanged := psCompiling in (Value * GlobalOptions.States);
+      GlobalOptions.States := Value;
+      if vChanged then
+      begin
+        if psCompiling in Value then
+          TurboConvertAddrAbsoluteToRelated(FMemory)
+        else
+          TurboConvertAddrRelatedToAbsolute(FMemory);
+      end;
     end;
-
   end;
 end;
 
@@ -1422,12 +1472,15 @@ begin
     RP := Integer(FReturnStack) + FReturnStackSize;
   //}
 
-  Include(PPreservedCodeMemory(FMemory).States, psRunning);
+  Include(PPreservedCodeMemory(FMemory).GlobalOptions.States, psRunning);
 end;
 
 procedure TCustomTurboExecutor.Stop;
 begin
-  Exclude(PPreservedCodeMemory(FMemory).States, psRunning);
+  with PPreservedCodeMemory(FMemory)^ do
+  begin
+    if Assigned(GlobalOptions) then Exclude(GlobalOptions.States, psRunning);
+  end;
 end;
 
 {

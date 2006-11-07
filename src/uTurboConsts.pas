@@ -41,7 +41,7 @@ resourcestring
 
 type
   tsInt = LongInt;
-  //tsPointer = LongInt;
+  tsPointer = Pointer;
   ETurboScriptError = class(Exception);
   {: the Module Type }
   {
@@ -80,14 +80,13 @@ type
     inNone,
     {## The FORTH CORE instructions }
     inHalt,
-    inEnter,
+    inEnter, //inEnter Addr
     inExit,
     inNext,
     //Far Call, 对于公开的供其他模块调用的函数全部使用该方式
     //ForthDLL的模块链接方式调用
     inEnterFar, //inEnterFar ModuleMemBase-addr Addr
     inExitFar,  //对于远调用的返回指令必须是该指令! R: (MemoryBase PC -- )
-    inCall, //near call inCall Addr
     
     inPushByte, //in fact it will be expand to int, then inPush Byte (-- n)
     inPushWord,
@@ -207,7 +206,7 @@ type
   ); 
 
   //the Core procedure List, maybe procedure or method.
-  {: 核心虚拟指令表 }
+  {: 核心虚拟指令表 } 
   TTurboCoreWords = array [TTurboVMInstruction] of TProcedure;
 
   {
@@ -216,11 +215,11 @@ type
 
   Note: the state Must be a Byte for speed!!!
   }
-  TTurboProcessorState = (psRunning, psStepping, psCompiling
-    , errHalt
+  TTurboProcessorState = (psHalt, psRunning, psStepping, psCompiling
+    //, errHalt
   );
   TTurboProcessorStates = set of TTurboProcessorState;
-  TTurboProcessorErrorCode = (errNone, errBadInstruction, errDizZero
+  TTurboProcessorErrorCode = (errNone, errBadInstruction, errHalt, errDizZero
     , errModuleNotFound
     , errOutOfMem, errOutOfDataStack, errOutOfReturnStack 
   );
