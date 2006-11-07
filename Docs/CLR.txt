@@ -1,0 +1,4 @@
+CIR(Common Intermediate Language (CIL))分析
+
+数据栈：
+它称之为 evaluation stack， 数据栈存放数据的最小单位是4字节的32位整数。
