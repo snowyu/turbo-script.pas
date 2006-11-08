@@ -129,19 +129,21 @@ begin
         Integer(P) := SP;
         if vShowDebugInfo and (Integer(P) < (Integer(ParameterStack)+cStackMaxSize-SizeOf(Integer)))  then
         begin
+        WriteLn('');
+        WriteLn('______________________________');
         WriteLn('The ParameterStack Data :');
         i := 0;
-        Write('  ');
+        //Write('':2);
         while Integer(P) < (Integer(ParameterStack)+cStackMaxSize-SizeOf(Integer)) do
         begin
           r := PInteger(P)^;
           Inc(Integer(P), SizeOf(Integer));
           Write(r:8,'($', IntToHex(r,4), ') ');
           inc(i);
-          if i mod 4 = 0 then 
+          if i mod 3 = 0 then 
           begin
             writeln('');
-            Write('  ');
+            //Write('':2);
           end;
         end;
         WriteLn('');
@@ -150,19 +152,20 @@ begin
         Integer(P) := RP;
         if vShowDebugInfo and (Integer(P) < (Integer(ReturnStack)+cStackMaxSize)) then
         begin
+        WriteLn('______________________________');
         WriteLn('The ReturnStack Data :');
         i := 0;
-        Write('  ');
+        //Write('  ');
         while Integer(P) < (Integer(ReturnStack)+cStackMaxSize) do
         begin
           r := PInteger(P)^;
           Inc(Integer(P), SizeOf(Integer));
           Write(r:8,'($', IntToHex(r,4), ') ');
           inc(i);
-          if i mod 4 = 0 then 
+          if i mod 3 = 0 then 
           begin
             writeln('');
-            Write('  ');
+            //Write('  ');
           end;
         end;
         WriteLn('');

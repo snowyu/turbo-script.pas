@@ -105,6 +105,7 @@ type
   }
   TCustomTurboModule = class(TCustomTurboObject)
   private
+    FDataMemory: Pointer;
     function GetGlobalOptions: PTurboGlobalOptions;
     function GetLastModuleEntry: PTurboModuleEntry;
     procedure SetGlobalOptions(Value: PTurboGlobalOptions);
@@ -130,6 +131,7 @@ type
     }
     FTextIndex: Integer;
     FVisibility: TTurboVisibility;
+    function GetDataMemorySize: Integer;
     function GetInitializeProc: Integer;
     function GetLastErrorCode: TTurboProcessorErrorCode;
     function GetLastTypeInfoEntry: PTurboTypeInfoEntry;
@@ -143,10 +145,13 @@ type
     function GetReturnStackSize: Integer;
     function GetRoot: TCustomTurboModule;
     function GetStatus: TTurboProcessorStates;
+    function GetUsedDataSize: Integer;
     function GetUsedMemory: Integer;
     procedure Grow(const aSize: Integer = 0);
+    procedure GrowData(const aSize: Integer = 0);
     procedure LoadUsedModules;
     procedure SendUnloadNotification;
+    procedure SetDataMemorySize(Value: Integer);
     procedure SetLastTypeInfoEntry(const Value: PTurboTypeInfoEntry);
     procedure SetLastVariableEntry(const Value: PTurboVariableEntry);
     procedure SetLastWordEntry(const Value: PTurboWordEntry);
@@ -158,6 +163,7 @@ type
     procedure SetReturnStack(Value: Pointer);
     procedure SetReturnStackSize(Value: Integer);
     procedure SetStatus(Value: TTurboProcessorStates);
+    procedure SetUsedDataSize(Value: Integer);
     procedure SetUsedMemory(Value: Integer);
   public
     constructor Create(const aParent: TCustomTurboModule = nil; aVisibility:
@@ -167,12 +173,27 @@ type
     { Description
     Note: you must InitExecution first.
     }
+    procedure AddBufferToData(const aValue; aSize: Integer);
+    {: add a integer to the free memory, and add UsedMemory }
+    { Description
+    Note: you must InitExecution first.
+    }
     procedure AddBufferToMem(const aValue; aSize: Integer);
     {: add a integer to the free memory, and add UsedMemory }
     { Description
     Note: you must InitExecution first.
     }
+    procedure AddByteToData(const aValue: Byte);
+    {: add a integer to the free memory, and add UsedMemory }
+    { Description
+    Note: you must InitExecution first.
+    }
     procedure AddByteToMem(const aValue: Byte);
+    {: add a integer to the free memory, and add UsedMemory }
+    { Description
+    Note: you must InitExecution first.
+    }
+    procedure AddIntToData(const aValue: Integer);
     {: add a integer to the free memory, and add UsedMemory }
     { Description
     Note: you must InitExecution first.
@@ -184,7 +205,10 @@ type
     }
     procedure AddOpToMem(const aOpCode: TTurboVMInstruction);
     {: fill 0 to align the memory. }
+    procedure AlignData;
+    {: fill 0 to align the memory. }
     procedure AlignMem;
+    procedure AllocDataSpace(const aSize: Integer);
     procedure AllocSpace(const aSize: Integer);
     {: reduce the memory size to initialization state }
     procedure ClearMemory;
@@ -241,6 +265,13 @@ type
     procedure UnloadNotification(aProc: TNotifyEvent);
     {: the TurboModuleAccessor }
     property Accessor: TObject read FAccessor write FAccessor;
+    property DataMemory: Pointer read FDataMemory write FDataMemory;
+    {: : the Memory Size. }
+    { Description
+    warining: if in the running status, you may be get trouble!!
+    }
+    property DataMemorySize: Integer read GetDataMemorySize write
+            SetDataMemorySize;
     property GlobalOptions: PTurboGlobalOptions read GetGlobalOptions write
             SetGlobalOptions;
     property InitializeProc: Integer read GetInitializeProc;
@@ -337,6 +368,12 @@ type
     until the status is not in the psConpiling.
     }
     property Status: TTurboProcessorStates read GetStatus write SetStatus;
+    {: 已经使用的内存 }
+    { Description
+    也就是指向最大的可用内存：
+    从该地址起的内存未用：FMemory[UsedMemory] 
+    }
+    property UsedDataSize: Integer read GetUsedDataSize write SetUsedDataSize;
     {: 已经使用的内存 }
     { Description
     也就是指向最大的可用内存：
@@ -576,6 +613,7 @@ type
 
   //the typecast for code memory area to get the parameters
   TPreservedCodeMemory = packed record
+    Data: Pointer; //point to the data memory. Or its the offset of the data in File .
     GlobalOptions: PTurboGlobalOptions;
     Executor: TCustomTurboModule;
     //##abondoned:this Module unique Index in this program, allocated by compiler.
@@ -589,7 +627,9 @@ type
     ReturnStackBottom: Pointer;
     }
     UsedMemory: tsInt;
-    MemorySize: tsInt; 
+    MemorySize: tsInt;
+    UsedDataSize: tsInt;
+    DataSize: tsInt; 
     //ToIn: Integer; //>IN the text buffer current index
     //TIBLength: Integer; //#TIB the text buffer length
     //TIB: array [0..cMAXTIBCount-1] of char; //'TIB
@@ -616,8 +656,8 @@ type
     BuildDate: TTimeStamp;
   end;
   
-procedure TurboConvertAddrRelatedToAbsolute(Mem: PPreservedCodeMemory);
-procedure TurboConvertAddrAbsoluteToRelated(Mem: PPreservedCodeMemory);
+procedure TurboConvertAddrRelatedToAbsolute(Mem: PPreservedCodeMemory; Data: Pointer);
+procedure TurboConvertAddrAbsoluteToRelated(Mem: PPreservedCodeMemory; Data: Pointer);
 //remove registered types of this module
 procedure RemoveModuleTypes(const aModuleName: string);
 
@@ -655,19 +695,46 @@ begin
   begin
     FreeMem(FMemory);
     FMemory := nil;
+    FreeMem(FDataMemory);
+    FDataMemory := nil;
   end;
   inherited Destroy;
+end;
+
+procedure TCustomTurboModule.AddBufferToData(const aValue; aSize: Integer);
+var
+  p: Pointer;
+begin
+  if (PPreservedCodeMemory(FMemory).UsedDataSize+aSize) > DataMemorySize then
+    GrowData(aSize);
+  Integer(p) := Integer(FDataMemory) + PPreservedCodeMemory(FMemory).UsedDataSize;
+  Move(aValue, p^, aSize);
+  Inc(PPreservedCodeMemory(FMemory).UsedDataSize, aSize);
 end;
 
 procedure TCustomTurboModule.AddBufferToMem(const aValue; aSize: Integer);
 var
   p: Pointer;
 begin
-  if PPreservedCodeMemory(FMemory).UsedMemory >= MemorySize then
+  if (PPreservedCodeMemory(FMemory).UsedMemory+aSize) > MemorySize then
     Grow(aSize);
   Integer(p) := Integer(FMemory) + PPreservedCodeMemory(FMemory).UsedMemory;
   Move(aValue, p^, aSize);
   Inc(PPreservedCodeMemory(FMemory).UsedMemory, aSize);
+end;
+
+procedure TCustomTurboModule.AddByteToData(const aValue: Byte);
+var
+  p: Pointer;
+begin
+  with PPreservedCodeMemory(FMemory)^ do
+  begin
+    if UsedDataSize >= DataSize then
+      GrowData;
+    Integer(p) := Integer(FDataMemory) + UsedDataSize;
+    PByte(P)^ := aValue;
+    Inc(UsedDataSize, SizeOf(Byte));
+  end;
 end;
 
 procedure TCustomTurboModule.AddByteToMem(const aValue: Byte);
@@ -679,6 +746,20 @@ begin
   Integer(p) := Integer(FMemory) + PPreservedCodeMemory(FMemory).UsedMemory;
   PByte(P)^ := aValue;
   Inc(PPreservedCodeMemory(FMemory).UsedMemory, SizeOf(Byte));
+end;
+
+procedure TCustomTurboModule.AddIntToData(const aValue: Integer);
+var
+  p: Pointer;
+begin
+  with PPreservedCodeMemory(FMemory)^ do
+  begin
+    if UsedDataSize >= DataSize then
+      GrowData;
+    Integer(p) := Integer(FDataMemory) + UsedDataSize;
+    PInteger(P)^ := aValue;
+    Inc(UsedDataSize, SizeOf(Integer));
+  end;
 end;
 
 procedure TCustomTurboModule.AddIntToMem(const aValue: Integer);
@@ -708,6 +789,15 @@ begin
   Inc(PPreservedCodeMemory(FMemory).UsedMemory, SizeOf(TTurboVMInstruction));
 end;
 
+procedure TCustomTurboModule.AlignData;
+var
+  I: Integer;
+begin
+  I := (UsedDataSize + 3) and $FFFFFFFC;
+  I := I - UsedDataSize;
+  if I > 0 then AllocDataSpace(I);
+end;
+
 procedure TCustomTurboModule.AlignMem;
 var
   I: Integer;
@@ -715,6 +805,14 @@ begin
   I := (UsedMemory + 3) and $FFFFFFFC;
   I := I - UsedMemory;
   if I > 0 then AllocSpace(I);
+end;
+
+procedure TCustomTurboModule.AllocDataSpace(const aSize: Integer);
+begin
+  if (PPreservedCodeMemory(FMemory).UsedDataSize + aSize) >= DataMemorySize then
+    GrowData(aSize);
+
+  Inc(PPreservedCodeMemory(FMemory).UsedDataSize, aSize);
 end;
 
 procedure TCustomTurboModule.AllocSpace(const aSize: Integer);
@@ -735,10 +833,14 @@ begin
     if vPreserved < Integer(High(TTurboVMInstruction)) then
         vPreserved := Integer(High(TTurboVMInstruction));
     ReallocMem(FMemory, vPreserved);
+    ReallocMem(FDataMemory, cDefaultDataMemSize);
     with PPreservedCodeMemory(FMemory)^ do
     begin
       MemorySize := vPreserved;
       UsedMemory := vPreserved;
+      Data := FDataMemory;
+      DataSize := cDefaultDataMemSize;
+      UsedDataSize := SizeOf(tsInt); //preserved the first integer
     end;
     //MemorySize := SizeOf(TPreservedCodeMemory); //+ cDefaultFreeMemSize;
 
@@ -764,7 +866,7 @@ begin
   while (Result <> nil) do
   begin
     if psCompiling in Status then
-      Integer(Result) := Integer(FMemory) + Integer(Result);
+      Integer(Result) := Integer(FDataMemory) + Integer(Result);
     if Result.ModuleName = aName then
     begin
       Exit;
@@ -782,7 +884,7 @@ begin
   while (Result <> nil) do
   begin
     if psCompiling in Status then
-      Integer(Result) := Integer(FMemory) + Integer(Result);
+      Integer(Result) := Integer(FDataMemory) + Integer(Result);
     if Result.Name = aName then
     begin
       Exit;
@@ -815,7 +917,7 @@ begin
   while (Result <> nil) do
   begin
     if psCompiling in Status then
-      Integer(Result) := Integer(FMemory) + Integer(Result);
+      Integer(Result) := Integer(FDataMemory) + Integer(Result);
     if Result.Name = aName then
     begin
       Exit;
@@ -835,7 +937,8 @@ begin
     if psCompiling in Status then
     begin
       //writeln('psCompiling,', Integer(Result));
-      Integer(Result) := Integer(FMemory) + Integer(Result);
+      Integer(Result) := Integer(FDataMemory) + Integer(Result);
+      //break;
     end;
     {if Result.Name <> '' then
     begin
@@ -851,6 +954,11 @@ begin
       Result := Result.Prior;
   end;
   Result := nil;
+end;
+
+function TCustomTurboModule.GetDataMemorySize: Integer;
+begin
+  Result := PPreservedCodeMemory(FMemory).DataSize;
 end;
 
 function TCustomTurboModule.GetGlobalOptions: PTurboGlobalOptions;
@@ -962,6 +1070,11 @@ begin
   end;
 end;
 
+function TCustomTurboModule.GetUsedDataSize: Integer;
+begin
+  Result := PPreservedCodeMemory(FMemory).UsedDataSize;
+end;
+
 function TCustomTurboModule.GetUsedMemory: Integer;
 begin
   Result := PPreservedCodeMemory(FMemory).UsedMemory;
@@ -983,6 +1096,15 @@ begin
   I := MemorySize div 4;
   if I < aSize then I := aSize;
   MemorySize := MemorySize + I;
+end;
+
+procedure TCustomTurboModule.GrowData(const aSize: Integer = 0);
+var
+  I: Integer;
+begin
+  I := DataMemorySize div 4;
+  if I < aSize then I := aSize;
+  DataMemorySize := DataMemorySize + I;
 end;
 
 procedure TCustomTurboModule.Load;
@@ -1010,6 +1132,7 @@ procedure TCustomTurboModule.LoadFromStream(const aStream: TStream; Count:
 var
   vHeader: TTurboModuleStreamHeader;
   vOptions: Pointer;
+  p: Pointer;
 begin
   if Count <= 0 then
   begin
@@ -1037,8 +1160,17 @@ begin
     vParameterStackSize := ParameterStackSize;}
   end;
 
-  MemorySize := Count-SizeOf(TTurboModuleStreamHeader);
-  aStream.ReadBuffer(FMemory^, MemorySize);
+  UsedMemory := SizeOf(TPreservedCodeMemory);
+  aStream.ReadBuffer(FMemory^, SizeOf(TPreservedCodeMemory));
+  ReallocMem(FMemory, MemorySize);
+  Integer(p) := Integer(FMemory) + SizeOf(TPreservedCodeMemory);
+  aStream.ReadBuffer(p^, UsedMemory-SizeOf(TPreservedCodeMemory));
+
+  ReallocMem(FDataMemory, DataMemorySize);
+  //writeln('Load.UsedDataOff=',aStream.Position);
+  aStream.ReadBuffer(FDataMemory^, UsedDataSize);
+  //MemorySize := Count-SizeOf(TTurboModuleStreamHeader);
+  //aStream.ReadBuffer(FMemory^, MemorySize);
 
   with PPreservedCodeMemory(FMemory)^ do
   begin
@@ -1051,7 +1183,7 @@ begin
   end;
 
   Reset;
-  if not (psCompiling in Status) then TurboConvertAddrRelatedToAbsolute(FMemory);
+  if not (psCompiling in Status) then TurboConvertAddrRelatedToAbsolute(FMemory, FDataMemory);
 
   if not (soLoadOnDemand in Options) then
   begin
@@ -1071,7 +1203,7 @@ begin
   while (vModuleEntry <> nil) do
   begin
     if psCompiling in Status then
-      Integer(vModuleEntry) := Integer(FMemory) + Integer(vModuleEntry);
+      Integer(vModuleEntry) := Integer(FDataMemory) + Integer(vModuleEntry);
     vModule := nil;
     case vModuleEntry.ModuleType of
       mtLib: vModule := RequireModule(vModuleEntry.ModuleName);
@@ -1142,6 +1274,7 @@ begin
     SP := Integer(GlobalOptions.ParamStackBase) + GlobalOptions.ParamStackSize;
     RP := Integer(GlobalOptions.ReturnStackBase) + GlobalOptions.ReturnStackSize;
     GlobalOptions.LastErrorCode := errNone;
+    Data := FDataMemory;
     Executor := Self;
     //GlobalOptions.States := []; //不是你的东西就别动！！
   end;
@@ -1172,13 +1305,14 @@ begin
   vHeader.Version  := cCurrentModuleFileForamtVersionNo;
   vHeader.BuildDate := ModuleDate;
   aStream.WriteBuffer(vHeader, SizeOf(TTurboModuleStreamHeader));
-  if not (psCompiling in Status) then TurboConvertAddrAbsoluteToRelated(FMemory);
+  if not (psCompiling in Status) then TurboConvertAddrAbsoluteToRelated(FMemory, FDataMemory);
 
   with PPreservedCodeMemory(FMemory)^ do
   begin
     //backup the data in the Memory
     vOptions := GlobalOptions;
     GlobalOptions := nil;
+    Data := nil;
     {vParameterStack := ParameterStack;
     vReturnStack := ReturnStack;
     vReturnStackSize := ReturnStackSize;
@@ -1190,10 +1324,13 @@ begin
   end;
 
   aStream.WriteBuffer(FMemory^, UsedMemory);
-
+  //writeln('Save.UsedDataOff=',aStream.Position);
+  if UsedDataSize > 0 then
+    aStream.WriteBuffer(FDataMemory^, UsedDataSize);
   with PPreservedCodeMemory(FMemory)^ do
   begin
     GlobalOptions := vOptions;
+    Data := FDataMemory;
   {  ParameterStack := vParameterStack;
     ReturnStack := vReturnStack;
     ReturnStackSize := vReturnStackSize;
@@ -1201,7 +1338,7 @@ begin
   }
   end;
 
-  if not (psCompiling in Status) then TurboConvertAddrRelatedToAbsolute(FMemory);
+  if not (psCompiling in Status) then TurboConvertAddrRelatedToAbsolute(FMemory, FDataMemory);
 end;
 
 procedure TCustomTurboModule.SendUnloadNotification;
@@ -1217,6 +1354,20 @@ begin
     Proc(Self);
   end;
   FModuleUnloadNotifies.Clear;
+end;
+
+procedure TCustomTurboModule.SetDataMemorySize(Value: Integer);
+var
+  vOld: Pointer;
+begin
+  if PPreservedCodeMemory(FMemory).DataSize <> Value then
+  begin
+    PPreservedCodeMemory(FMemory).DataSize := Value;
+    vOld := FDataMemory;
+    ReallocMem(FDataMemory, Value);
+    if Integer(vOld) <> Integer(FDataMemory) then
+      PPreservedCodeMemory(FMemory).Data := FDataMemory;
+  end;
 end;
 
 procedure TCustomTurboModule.SetGlobalOptions(Value: PTurboGlobalOptions);
@@ -1310,18 +1461,31 @@ begin
       if vChanged then
       begin
         if psCompiling in Value then
-          TurboConvertAddrAbsoluteToRelated(FMemory)
+          TurboConvertAddrAbsoluteToRelated(FMemory, FDataMemory)
         else
-          TurboConvertAddrRelatedToAbsolute(FMemory);
+          TurboConvertAddrRelatedToAbsolute(FMemory, FDataMemory);
       end;
     end;
   end;
+end;
+
+procedure TCustomTurboModule.SetUsedDataSize(Value: Integer);
+begin
+  if Value < SizeOf(TPreservedCodeMemory) then
+    Value  := SizeOf(TPreservedCodeMemory);
+  if Value > DataMemorySize then
+    GrowData(Value - DataMemorySize);
+  PPreservedCodeMemory(FMemory).UsedDataSize := Value;
 end;
 
 procedure TCustomTurboModule.SetUsedMemory(Value: Integer);
 begin
   if Value < SizeOf(TPreservedCodeMemory) then
     Value  := SizeOf(TPreservedCodeMemory);
+
+  if Value > MemorySize then
+    GrowData(Value - MemorySize);
+
   PPreservedCodeMemory(FMemory).UsedMemory := Value;
 end;
 
@@ -1566,8 +1730,9 @@ end;
 
 
 type
-  PTurboEntry = ^ TTurboEntry;
-  TTurboEntry = packed record
+  PPTurboEntry = ^ PTurboEntry;
+  PTurboEntry  = ^ TTurboEntry;
+  TTurboEntry  = packed record
     Prior: Pointer;
   end;
 
@@ -1589,35 +1754,24 @@ begin
     end;
 end;
 
-procedure TurboConvertEntryRelatedToAbsolute(Mem: Pointer; aEntry: PTurboEntry);
-{$IFDEF PUREPASCAL}
+procedure TurboConvertEntryRelatedToAbsolute(Mem: Pointer; var aEntry: PTurboEntry);
 begin
+  if Assigned(aEntry) then
+  begin
+    Integer(aEntry) := Integer(aEntry) + Integer(Mem);
     while Assigned(aEntry) and (aEntry.Prior <> nil) do
     begin
       Integer(aEntry.Prior) := Integer(aEntry.Prior) + Integer(Mem);
       aEntry := aEntry.Prior;   
     end;
+  end;
 end;
-{$ELSE PUREPASCAL}
-asm
-  CMP  EDX, 0
-  JE   @@exit
-@@Loop:
-  MOV  ECX, [EDX].TTurboEntry.Prior
-  CMP  ECX, 0
-  JE   @@exit
 
-  ADD  ECX, EAX
-  MOV  [EDX].TTurboEntry.Prior, ECX
-  MOV  EDX, ECX
-  JMP  @@Loop
-@@exit:
-end;
-{$ENDIF PUREPASCAL}
-
-procedure TurboConvertVarEntryRelatedToAbsolute(Mem: Pointer; aEntry: PTurboVariableEntry);
-{$IFDEF PUREPASCAL}
+procedure TurboConvertVarEntryRelatedToAbsolute(Mem: Pointer; var aEntry: PTurboVariableEntry);
 begin
+  if Assigned(aEntry) then
+  begin
+    Integer(aEntry) := Integer(aEntry) + Integer(Mem);
     while Assigned(aEntry) and (aEntry.Prior <> nil) do
     begin
       Integer(aEntry.Prior) := Integer(aEntry.Prior) + Integer(Mem);
@@ -1625,33 +1779,10 @@ begin
         Integer(aEntry.TypeInfo) := Integer(aEntry.TypeInfo) + Integer(Mem);  
       aEntry := aEntry.Prior;   
     end;
+  end;
 end;
-{$ELSE PUREPASCAL}
-asm
-  CMP  EDX, 0
-  JE   @@exit
-@@Loop:
-  MOV  ECX, [EDX].TTurboEntry.Prior
-  CMP  ECX, 0
-  JE   @@exit
 
-  ADD  ECX, EAX
-  MOV  [EDX].TTurboEntry.Prior, ECX
-  CMP  [EDX].TTurboVariableEntry.TypeInfo, 0
-  JE   @@skip
-  MOV  ECX, [EDX].TTurboVariableEntry.TypeInfo
-  ADD  ECX, EAX
-  MOV  [EDX].TTurboVariableEntry.TypeInfo, ECX
-  MOV  ECX, [EDX].TTurboEntry.Prior
-@@skip:  
-  MOV  EDX, ECX
-  JMP  @@Loop
-@@exit:
-end;
-{$ENDIF PUREPASCAL}
-
-procedure TurboConvertAddrRelatedToAbsolute(Mem: PPreservedCodeMemory);
-{$IFDEF PUREPASCAL}
+procedure TurboConvertAddrRelatedToAbsolute(Mem: PPreservedCodeMemory; Data: Pointer);
 begin
   {if Assigned(Mem.InitializeProc) then
     Inc(Integer(Mem.InitializeProc), Integer(Mem));
@@ -1659,45 +1790,13 @@ begin
     Inc(Integer(Mem.FinalizeProc), Integer(Mem));
 }
   //TODO: 
-  TurboConvertEntryRelatedToAbsolute(Mem, Mem.LastTypeInfoEntry);  
-  TurboConvertVarEntryRelatedToAbsolute(Mem, Mem.LastVariableEntry);  
-  TurboConvertEntryRelatedToAbsolute(Mem, Mem.LastWordEntry);  
-  TurboConvertEntryRelatedToAbsolute(Mem, Mem.LastModuleEntry);  
+  TurboConvertEntryRelatedToAbsolute(Data, PTurboEntry(Mem.LastTypeInfoEntry));  
+  TurboConvertVarEntryRelatedToAbsolute(Data, Mem.LastVariableEntry);  
+  TurboConvertEntryRelatedToAbsolute(Data, PTurboEntry(Mem.LastWordEntry));  
+  TurboConvertEntryRelatedToAbsolute(Data, PTurboEntry(Mem.LastModuleEntry));  
 end;
-{$ELSE PUREPASCAL}
-asm
-{  MOV  EDX, [EAX].TPreservedCodeMemory.InitializeProc
-  CMP  EDX, 0
-  JE   @@Skip
-  ADD  EDX, EAX
-  MOV  [EAX].TPreservedCodeMemory.InitializeProc, EDX
-@@Skip:
-  MOV  EDX, [EAX].TPreservedCodeMemory.FinalizeProc
-  CMP  EDX, 0
-  JE   @@Skip2
-  ADD  EDX, EAX
-  MOV  [EAX].TPreservedCodeMemory.FinalizeProc, EDX
 
-@@Skip2:
-}
-  LEA  EDX, [EAX].TPreservedCodeMemory.LastTypeInfoEntry
-  CALL TurboConvertEntryRelatedToAbsolute 
-
-  LEA  EDX, [EAX].TPreservedCodeMemory.LastVariableEntry
-  CALL TurboConvertVarEntryRelatedToAbsolute 
-
-  LEA  EDX, [EAX].TPreservedCodeMemory.LastWordEntry
-  CALL TurboConvertEntryRelatedToAbsolute 
-
-  LEA  EDX, [EAX].TPreservedCodeMemory.LastModuleEntry
-  CALL TurboConvertEntryRelatedToAbsolute 
-
-
-end;
-{$ENDIF PUREPASCAL}
-
-procedure TurboConvertEntryAbsoluteToRelated(Mem: Pointer; aEntry: PTurboEntry);
-{$IFDEF PUREPASCAL}
+procedure TurboConvertEntryAbsoluteToRelated(Mem: Pointer; var aEntry: PTurboEntry);
 var
   P: PTurboEntry;
 begin
@@ -1709,38 +1808,8 @@ begin
       aEntry := P.Prior;   
     end;
 end;
-{$ELSE PUREPASCAL}
-asm
-  CMP  EDX, 0
-  JE   @@exit1
 
-  PUSH EBX
-  MOV  ECX, [EDX].TTurboEntry.Prior
-
-  CMP  ECX, 0
-  JE   @@exit
-
-  MOV  EBX, ECX
-  SUB  EBX, EAX
-  MOV  [EDX].TTurboEntry.Prior, EBX
-
-@@Loop:
-  MOV  EDX, [ECX].TTurboEntry.Prior
-  CMP  EDX, 0
-  JE   @@exit
-  MOV  EBX, EDX
-  SUB  EDX, EAX
-  MOV  [ECX].TTurboEntry.Prior, EDX
-  MOV  ECX, EBX
-  JMP  @@Loop
-@@exit:
-  POP  EBX
-@@exit1:
-end;
-{$ENDIF PUREPASCAL}
-
-procedure TurboConvertVarEntryAbsoluteToRelated(Mem: Pointer; aEntry: PTurboVariableEntry);
-{$IFDEF PUREPASCAL}
+procedure TurboConvertVarEntryAbsoluteToRelated(Mem: Pointer; var aEntry: PTurboVariableEntry);
 var
   P: PTurboVariableEntry;
 begin
@@ -1748,56 +1817,14 @@ begin
     begin
       p := aEntry.Prior;
       Integer(aEntry.Prior) := Integer(aEntry.Prior) - Integer(Mem);
-      if Assign(aEntry.TypeInfo) then
+      if Assigned(aEntry.TypeInfo) then
         Integer(aEntry.TypeInfo) := Integer(aEntry.TypeInfo) - Integer(Mem);
       //aEntry.Prior := t;
       aEntry := P.Prior;   
     end;
 end;
-{$ELSE PUREPASCAL}
-asm
-  CMP  ECX, 0
-  JE   @@exit1
 
-  PUSH EBX
-  MOV  ECX, [EDX].TTurboEntry.Prior
-
-  CMP  ECX, 0
-  JE   @@exit
-
-  MOV  EBX, [EDX].TTurboVariableEntry.TypeInfo 
-  CMP  EBX, 0
-  JE   @@skip1
-  SUB  EBX, EAX
-  MOV  [EDX].TTurboVariableEntry.TypeInfo, EBX 
-@@skip1:
-  MOV  EBX, ECX
-  SUB  EBX, EAX
-  MOV  [EDX].TTurboEntry.Prior, EBX
-
-@@Loop:
-  MOV  EDX, [ECX].TTurboEntry.Prior
-  CMP  EDX, 0
-  JE   @@exit
-  MOV  EBX, [ECX].TTurboVariableEntry.TypeInfo 
-  CMP  EBX, 0
-  JE   @@skip
-  SUB  EBX, EAX
-  MOV  [ECX].TTurboVariableEntry.TypeInfo, EBX 
-@@skip:
-  MOV  EBX, EDX
-  SUB  EDX, EAX
-  MOV  [ECX].TTurboEntry.Prior, EDX
-  MOV  ECX, EBX
-  JMP  @@Loop
-@@exit:
-  POP  EBX
-@@exit1:
-end;
-{$ENDIF PUREPASCAL}
-
-procedure TurboConvertAddrAbsoluteToRelated(Mem: PPreservedCodeMemory);
-{$IFDEF PUREPASCAL}
+procedure TurboConvertAddrAbsoluteToRelated(Mem: PPreservedCodeMemory; Data: Pointer);
 begin
 {
   if Assigned(Mem.InitializeProc) then
@@ -1805,41 +1832,11 @@ begin
   if Assigned(Mem.FinalizeProc) then
     Dec(Integer(Mem.FinalizeProc), Integer(Mem));
 }
-  TurboConvertEntryAbsoluteToRelated(Mem, Mem.LastWordEntry);  
-  TurboConvertEntryAbsoluteToRelated(Mem, Mem.LastModuleEntry);  
-  TurboConvertEntryAbsoluteToRelated(Mem, Mem.LastVariableEntry);  
-  TurboConvertEntryAbsoluteToRelated(Mem, Mem.LastTypeInfoEntry);  
+  TurboConvertEntryAbsoluteToRelated(Data, PTurboEntry(Mem.LastWordEntry));  
+  TurboConvertEntryAbsoluteToRelated(Data, PTurboEntry(Mem.LastModuleEntry));  
+  TurboConvertVarEntryAbsoluteToRelated(Data, Mem.LastVariableEntry);  
+  TurboConvertEntryAbsoluteToRelated(Data, PTurboEntry(Mem.LastTypeInfoEntry));  
 end;
-{$ELSE PUREPASCAL}
-asm
-{
-  MOV  EDX, [EAX].TPreservedCodeMemory.InitializeProc
-  CMP  EDX, 0
-  JE   @@Skip
-  SUB  EDX, EAX
-  MOV  [EAX].TPreservedCodeMemory.InitializeProc, EDX
-@@Skip:
-  MOV  EDX, [EAX].TPreservedCodeMemory.FinalizeProc
-  CMP  EDX, 0
-  JE   @@Skip2
-  SUB  EDX, EAX
-  MOV  [EAX].TPreservedCodeMemory.FinalizeProc, EDX
-
-@@Skip2:
-}
-  LEA  EDX, [EAX].TPreservedCodeMemory.LastWordEntry
-  CALL TurboConvertEntryAbsoluteToRelated 
-
-  LEA  EDX, [EAX].TPreservedCodeMemory.LastModuleEntry
-  CALL TurboConvertEntryAbsoluteToRelated 
-
-  LEA  EDX, [EAX].TPreservedCodeMemory.LastVariableEntry
-  CALL TurboConvertEntryAbsoluteToRelated 
-
-  LEA  EDX, [EAX].TPreservedCodeMemory.LastTypeInfoEntry
-  CALL TurboConvertEntryAbsoluteToRelated 
-end;
-{$ENDIF PUREPASCAL}
 
 procedure SetupSimpleTypes;
 begin

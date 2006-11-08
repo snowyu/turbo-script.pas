@@ -320,7 +320,7 @@ asm
   LODSD    //EAX= PTurboModuleEntry
   TEST EAX, EAX //CMP EAX, 0
   JZ  @@DoLocalEnterFar
-  ADD  EAX, EDI //PTurboModuleEntry real addr
+  ADD  EAX, [EDI].TPreservedCodeMemory.Data //PTurboModuleEntry real addr
   MOV  ECX, [EAX].TTurboModuleEntry.Module
   TEST ECX, ECX //CMP ECX, 0
   JZ   @@RequireModuleExecutor
@@ -548,35 +548,36 @@ end;
 procedure vFetchInt;
 asm
   //EBX is TOS
-  ADD EBX, EDI //TOS <- TOS + FMem
-  MOV EBX, [EBX]
+  MOV EAX, [EDI].TPreservedCodeMemory.Data
+  MOV EBX, [EAX+EBX] //[TOS + FDataMemory]
   JMP  iVMNext
 end;
 
 procedure vFetchByte;
 asm
   //EBX is TOS
-  MOV EBX, EAX
+  MOV EAX, EBX
   XOR EBX, EBX
-  ADD EAX, EDI //EAX <- TOS + FMem
-  MOV BL, [EAX]
+  MOV ECX, [EDI].TPreservedCodeMemory.Data
+  MOV BL, [ECX+EAX]
   JMP  iVMNext
 end;
 
 procedure vFetchWord;
 asm
   //EBX is TOS
-  MOV EBX, EAX
+  MOV EAX, EBX
   XOR EBX, EBX
-  ADD EAX, EDI //EAX <- TOS + FMem
-  MOV BX, [EAX]
+  MOV ECX, [EDI].TPreservedCodeMemory.Data
+  MOV BX, [ECX+EAX]
   JMP  iVMNext
 end;
 
 procedure vFetchInt64;
 asm
   //EBX is TOS
-  ADD EBX, EDI //TOS <- TOS + FMem
+  //MOV EAX, [EDI].TPreservedCodeMemory.Data
+  ADD EBX, [EDI].TPreservedCodeMemory.Data //TOS <- TOS + FDataMem
   MOV EAX, [EBX+4]
   MOV EBX, [EBX]
 
@@ -590,9 +591,10 @@ asm
   JMP  iVMNext
 end;
 
+//(int addr -- )
 procedure vStoreInt;
 asm
-  ADD EBX, EDI 
+  ADD EBX, [EDI].TPreservedCodeMemory.Data 
   MOV EAX, [EBP]
   MOV [EBX], EAX
   INC EBP 
@@ -614,7 +616,7 @@ end;
 
 procedure vStoreInt64;
 asm
-  ADD EBX, EDI 
+  ADD EBX, [EDI].TPreservedCodeMemory.Data 
   MOV EAX, [EBP]
   MOV [EBX], EAX
   MOV EAX, [EBP+4]
@@ -643,7 +645,7 @@ end;
 
 procedure vStoreWord;
 asm
-  ADD EBX, EDI 
+  ADD EBX, [EDI].TPreservedCodeMemory.Data 
   MOV EAX, [EBP]
   MOV [EBX], AX
   INC EBP 
@@ -665,7 +667,7 @@ end;
 
 procedure vStoreByte;
 asm
-  ADD EBX, EDI 
+  ADD EBX, [EDI].TPreservedCodeMemory.Data 
   MOV EAX, [EBP]
   MOV [EBX], AL
   INC EBP 
@@ -686,6 +688,7 @@ asm
 end;
 
 //print a char
+//{c -- }
 procedure vEmitChar;
 asm
   MOV  DL, BL  //DL <- TOS
@@ -711,6 +714,7 @@ end;
 procedure vEmitString;
 asm
   MOV  EDX, EBX  //EDX <- TOS
+  ADD  EDX, [EDI].TPreservedCodeMemory.Data 
   XCHG ESP, EBP
   POP  EBX
   XCHG ESP, EBP
@@ -720,7 +724,6 @@ asm
   PUSH EBX
   PUSH ESI
   PUSH EBP
-  ADD  EDX, EDI
   //MOV  ESI, [EAX]
   CALL TTurboX86Interpreter.DoPrintShortString
   POP  EBP
@@ -734,6 +737,7 @@ end;
 procedure vEmitLString;
 asm
   MOV  EDX, EBX  //EDX <- TOS
+  ADD  EDX, [EDI].TPreservedCodeMemory.Data 
   XCHG ESP, EBP
   POP  EBX
   XCHG ESP, EBP
@@ -743,8 +747,7 @@ asm
   PUSH EBX
   PUSH ESI
   PUSH EBP
-  ADD  EDX, EDI
-  MOV  ESI, [EAX]
+  MOV  ESI, [EAX]  //ESI <--- VMT For VMT Lookup.
   CALL DWORD PTR [ESI + VMTOFFSET TTurboX86Interpreter.DoPrintString]
   POP  EBP
   POP  ESI
@@ -772,7 +775,7 @@ end;
 //(int64Addr --)
 procedure vStoreTickCount;
 asm
-  ADD  EBX, EDI
+  ADD  EBX, [EDI].TPreservedCodeMemory.Data
   PUSH EBX
   CALL QueryPerformanceCounter
   XCHG ESP, EBP

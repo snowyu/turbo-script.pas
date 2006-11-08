@@ -14,6 +14,7 @@ const
   cDefaultReturnStackSize = 127;
   cDefaultParamStackSize = 127; 
   cDefaultFreeMemSize = 1024 * 8; //the Free Memory 8kb
+  cDefaultDataMemSize = 1024;
   cMAXTIBCount = 1024;
   cTurboCompiledProgramFileExt = '.tpc';
   cTurboCompiledUnitFileExt = '.tpc';

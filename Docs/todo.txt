@@ -1,3 +1,25 @@
+2006-11-8
+* 分离代码区数据区
+  * 重新调整文件结构
+    将数据区放在代码区后面，数据区的偏移量 ＝ SizeOf(StreamHeader) + UsedMemory + 1。
+  + TCustomTurboModule.DataMemory
+  + TPreservedCodeMemory.Data
+  * TCustomTurboModule
+    * FindXXXEntry
+    * LoadFromStream, SaveToStream, Reset
+    + DataMemorySize
+    * LoadUsedModules
+    + UsedDataSize
+    + AllocDataSpace, GrowData, AddXXXToData
+  * TX86Interpreter
+    CallFar, EmitString, EmitLString, FetchXXX, StoreXXX
+!* 重新整理VM指令集
+!+ 运行时刻将指令中的变量相对地址变为绝对地址
+   + GetTurboInstructionLength(aOp: TTurboInstruction): Byte;
+   + TTurboAddressRelocator
+     + TranslateYoRelated
+     + TranslateYoAbsoluted
+
 2006-11-7
 ~ 【x86ASM】TEST :  AND imm8 with AL; set SF, ZF, PF according to result
 * [Bug] ForthCompiler: 对于定义为>= Protected 的单词，需要使用远调用！
@@ -12,14 +34,20 @@
   要不在模块上也加入这个参数呢？？
 ~ TODO:
   * 分离代码区数据区
+  * 增加地址重定位器，当处于非编译状态时，地址为绝对地址（包括代码数据中的所有指针）。而当切换到编译状态的时候地址为相对地址。
+    * 修改 X86Interpreter, 适应新的绝对地址，这样速度又将提升。
   * TypeInfo: 抽象基本类型，类型定义
   * 变量后期绑定，Word后期绑定
+  * 改写汇编编译器，采用语法树生成代码，而不是现在的直接生成。
+    * 制定Word参数类型（这样能实现对过程参数的语法检查）
   * DLL 远调用， Host 远调用
   * 制定类的底层规范
+  * 制定异常处理机制
   * 制定高级语言规范
   小任务：
     * 完善单元初始和终止过程链
-    * 增加编译开关
+    * 增加编译开关：(Max)MemSize; (Max)ParamStackSize, (Max)ReturnStackSize, (Max)DataSize
+      有个问题如果在文件里也有定义，到底是以命令行为准，还是以文件，我想是以文件！
 
 2006-11-6
 !* [Bug] !Tick 出现问题，值没有能保存进去！
