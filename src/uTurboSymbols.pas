@@ -11,12 +11,16 @@ uses
   ;
 
 type
-  TCustomTurboSymbol = class;
+  TTurboSymbol = class;
+  TTurboTypeSymbol = class;
   TTurboSymbolList = class;
   TTurboConstSymbol = class;
   TTurboVariableSymbol = class;
-  TTurboConstSymbolList = class;
-  TCustomTurboSymbol = class(TObject)
+  TTurboConstList = class;
+  TTurboWordSymbol = class;
+  TTurboVariableList = class;
+  {: the abstract metadata class for symbol. }
+  TTurboSymbol = class(TObject)
   private
     FCaption: string;
     FDescription: string;
@@ -24,42 +28,55 @@ type
     FParent: TObject;
     FRefs: LongInt;
   public
-    {: :add the index symbol to memory. }
-    procedure ReferenceToMem(const aModule: TCustomTurboModule; Index: Integer);
+    {: :add the index symbol content to memory. }
+    { Description
+    for compile, maybe i should rename to CompileTo?
+    }
+    procedure CompileTo(const aModule: TCustomTurboModule; Index: Integer = -1);
             virtual;
+    {: the short comment(one line) for the symbol. }
     property Caption: string read FCaption write FCaption;
+    {: the long comment(multi-line) for the symbol. }
     property Description: string read FDescription write FDescription;
     {: the symbol name }
     property Name: string read FName write FName;
     property Parent: TObject read FParent write FParent;
-    {: Indicates how many times this label is refered in the parsed code }
+    {: Indicates how many times this symbol is refered in the parsed code for
+            compiling only. }
     { Description
     }
     property Refs: LongInt read FRefs write FRefs;
   end;
 
+  TTurboTypeSymbol = class(TTurboSymbol)
+  private
+    FTypeKind: TTurboTypeKind;
+  public
+    property TypeKind: TTurboTypeKind read FTypeKind write FTypeKind;
+  end;
+
   TTurboSymbolList = class(TList)
   private
-    function GetItems(Index: Integer): TCustomTurboSymbol;
+    function GetItems(Index: Integer): TTurboSymbol;
   protected
     FOwner: TCustomTurboModule;
     procedure Notify(Ptr: Pointer; Action: TListNotification); override;
   public
     constructor Create(aOwner: TObject); reintroduce;
     function Find(const aName: String): Integer;
-    property Items[Index: Integer]: TCustomTurboSymbol read GetItems; default;
+    property Items[Index: Integer]: TTurboSymbol read GetItems; default;
     property Owner: TCustomTurboModule read FOwner write FOwner;
   end;
 
-  TTurboConstSymbol = class(TCustomTurboSymbol)
+  TTurboConstSymbol = class(TTurboSymbol)
   private
-    FTypeKind: TTurboTypeKind;
+    FTypeKind: TTurboTypeSymbol;
     FValue: string;
     procedure SetValue(const aValue: string);
   public
-    procedure ReferenceToMem(const aModule: TCustomTurboModule; Index: Integer);
+    procedure CompileTo(const aModule: TCustomTurboModule; Index: Integer = -1);
             override;
-    property TypeKind: TTurboTypeKind read FTypeKind write FTypeKind;
+    property TypeKind: TTurboTypeSymbol read FTypeKind write FTypeKind;
     property Value: string read FValue write SetValue;
   end;
 
@@ -70,7 +87,7 @@ type
     property Addr: Integer read FAddr write FAddr;
   end;
 
-  TTurboConstSymbolList = class(TTurboSymbolList)
+  TTurboConstList = class(TTurboSymbolList)
   private
     function GetItems(Index: Integer): TTurboConstSymbol;
   public
@@ -82,16 +99,36 @@ type
     property Items[Index: Integer]: TTurboConstSymbol read GetItems; default;
   end;
 
+  {: the turbo script virtual machine code symbol. }
+  TTurboWordSymbol = class(TCustomTurboWordSymbol)
+  private
+    FBody: TTurboWordSymbolList;
+  public
+    constructor Create;
+    destructor Destroy; override;
+    property Body: TTurboWordSymbolList read FBody;
+  end;
+
+  TTurboVariableList = class(TTurboSymbolList)
+  private
+    function GetItems(Index: Integer): TTurboVariableSymbol;
+    function GetOwner: TCustomTurboWord;
+  public
+    function Add: TTurboVariableSymbol;
+    property Items[Index: Integer]: TTurboVariableSymbol read GetItems; default;
+    property Owner: TCustomTurboWord read GetOwner;
+  end;
+
 
 implementation
 
 {
-****************************** TCustomTurboSymbol ******************************
+********************************* TTurboSymbol *********************************
 }
-procedure TCustomTurboSymbol.ReferenceToMem(const aModule: TCustomTurboModule;
-        Index: Integer);
+procedure TTurboSymbol.CompileTo(const aModule: TCustomTurboModule; Index:
+        Integer = -1);
 begin
-  Inc(Refs);
+  Inc(FRefs);
 end;
 
 {
@@ -113,9 +150,9 @@ begin
   Result := -1;
 end;
 
-function TTurboSymbolList.GetItems(Index: Integer): TCustomTurboSymbol;
+function TTurboSymbolList.GetItems(Index: Integer): TTurboSymbol;
 begin
-  Result := TCustomTurboSymbol(Get(Index));
+  Result := TTurboSymbol(Get(Index));
 end;
 
 procedure TTurboSymbolList.Notify(Ptr: Pointer; Action: TListNotification);
@@ -130,8 +167,8 @@ end;
 {
 ****************************** TTurboConstSymbol *******************************
 }
-procedure TTurboConstSymbol.ReferenceToMem(const aModule: TCustomTurboModule;
-        Index: Integer);
+procedure TTurboConstSymbol.CompileTo(const aModule: TCustomTurboModule; Index:
+        Integer = -1);
 var
   vTypeSize: Integer;
   vValue: Pointer;
@@ -158,7 +195,7 @@ begin
       ttULong: PLongWord(vValue)^ := StrToInt(Value);
       ttQWord, ttInt64: PInt64(vValue)^:= StrToInt(Value);
   end;
-  inherited ReferenceToMem(aModule, Index);
+  inherited CompileTo(aModule, Index);
 end;
 
 procedure TTurboConstSymbol.SetValue(const aValue: string);
@@ -194,9 +231,9 @@ begin
 end;
 
 {
-**************************** TTurboConstSymbolList *****************************
+******************************* TTurboConstList ********************************
 }
-function TTurboConstSymbolList.Add(const aName, aValue: String): Integer;
+function TTurboConstList.Add(const aName, aValue: String): Integer;
 begin
   Result := Find(aName);
   if Result = -1 then
@@ -207,12 +244,12 @@ begin
     Result := -1;
 end;
 
-procedure TTurboConstSymbolList.AddToMem(Index: Integer);
+procedure TTurboConstList.AddToMem(Index: Integer);
 begin
   inherited AddToMem(Index);
 end;
 
-function TTurboConstSymbolList.CreateConst(const aName, aValue: String):
+function TTurboConstList.CreateConst(const aName, aValue: String):
         TTurboConstSymbol;
 begin
   Result := TTurboConstSymbol.Create;
@@ -221,9 +258,48 @@ begin
   Result.Value := aValue;
 end;
 
-function TTurboConstSymbolList.GetItems(Index: Integer): TTurboConstSymbol;
+function TTurboConstList.GetItems(Index: Integer): TTurboConstSymbol;
 begin
-  Result := TCustomTurboSymbol(Get(Index));
+  Result := TTurboSymbol(Get(Index));
+end;
+
+{
+******************************* TTurboWordSymbol *******************************
+}
+constructor TTurboWordSymbol.Create;
+begin
+  inherited Create;
+  FBody := TCustomTurboWordSymbol.Create(Self);
+end;
+
+destructor TTurboWordSymbol.Destroy;
+begin
+  FreeAndNil(FBody);
+  inherited Destroy;
+end;
+
+{
+****************************** TTurboVariableList ******************************
+}
+function TTurboVariableList.Add: TTurboVariableSymbol;
+begin
+  Result := TTurboModule.Create;
+  try
+    Result.Parent := TCustomTurboWord(FOwner);
+    inherited Add(Result);
+  except
+    FreeAndNil(Result);
+  end;
+end;
+
+function TTurboVariableList.GetItems(Index: Integer): TTurboVariableSymbol;
+begin
+  Result := TTurboModule(inherited Get(Index));
+end;
+
+function TTurboVariableList.GetOwner: TCustomTurboWord;
+begin
+  Result := TCustomTurboWord(FOwner);
 end;
 
 

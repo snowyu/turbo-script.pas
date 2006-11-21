@@ -626,8 +626,8 @@ type
     ReturnStackSize: Integer; //bytes
     ReturnStackBottom: Pointer;
     }
-    UsedMemory: tsInt;
-    MemorySize: tsInt;
+    UsedMemory: tsInt;//实际使用的大小
+    MemorySize: tsInt;//分配代码区的大小
     UsedDataSize: tsInt;
     DataSize: tsInt; 
     //ToIn: Integer; //>IN the text buffer current index

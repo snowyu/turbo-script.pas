@@ -16,16 +16,13 @@ uses
 type
   TCustomTurboWord = class;
   TTurboWord = class;
-  TTurboVariableList = class;
   TTurboWordList = class;
   TTurboModuleList = class;
   TTTurboModule = class;
   TCustomTurboCompiler = class;
-  TTurboTypeSymbol = class;
   TAbstractTurboWordSymbol = class;
   TTurboOpCodeSymbol = class;
   TCustomTurboWordSymbol = class;
-  TTurboWordSymbol = class;
   TCustomTurboWord = class(TCustomTurboModule)
   private
     FSymbols: TList;
@@ -61,16 +58,6 @@ type
   protected
     procedure DoCompile; override;
     class procedure InitModuleType; override;
-  end;
-
-  TTurboVariableList = class(TTurboSymbolList)
-  private
-    function GetItems(Index: Integer): TTurboVariableSymbol;
-    function GetOwner: TCustomTurboWord;
-  public
-    function Add: TTurboVariableSymbol;
-    property Items[Index: Integer]: TTurboVariableSymbol read GetItems; default;
-    property Owner: TCustomTurboWord read GetOwner;
   end;
 
   TTurboWordList = class(TTurboSymbolList)
@@ -117,14 +104,11 @@ type
   TCustomTurboCompiler = class(TCustomTurboObject)
   end;
 
-  TTurboTypeSymbol = class(TCustomTurboSymbol)
-  end;
-
   {: abstract word symbol. }
   { Description
   include OpCode, word, module symbol.
   }
-  TAbstractTurboWordSymbol = class(TCustomTurboSymbol)
+  TAbstractTurboWordSymbol = class(TTurboSymbol)
   end;
 
   {: the turbo script virtual machine code symbol. }
@@ -147,16 +131,6 @@ type
     constructor Create;
     destructor Destroy; override;
     property Code: TCustomTurboModule read FCode;
-  end;
-
-  {: the turbo script virtual machine code symbol. }
-  TTurboWordSymbol = class(TCustomTurboWordSymbol)
-  private
-    FBody: TTurboWordSymbolList;
-  public
-    constructor Create;
-    destructor Destroy; override;
-    property Body: TTurboWordSymbolList read FBody;
   end;
 
   {: keep the function body symbol. }
@@ -254,30 +228,6 @@ begin
 end;
 
 {
-****************************** TTurboVariableList ******************************
-}
-function TTurboVariableList.Add: TTurboVariableSymbol;
-begin
-  Result := TTurboModule.Create;
-  try
-    Result.Parent := TCustomTurboWord(FOwner);
-    inherited Add(Result);
-  except
-    FreeAndNil(Result);
-  end;
-end;
-
-function TTurboVariableList.GetItems(Index: Integer): TTurboVariableSymbol;
-begin
-  Result := TTurboModule(inherited Get(Index));
-end;
-
-function TTurboVariableList.GetOwner: TCustomTurboWord;
-begin
-  Result := TCustomTurboWord(FOwner);
-end;
-
-{
 ******************************** TTurboWordList ********************************
 }
 function TTurboWordList.Add: TCustomTurboWord;
@@ -364,21 +314,6 @@ end;
 destructor TCustomTurboWordSymbol.Destroy;
 begin
   FreeAndNil(FCode);
-  inherited Destroy;
-end;
-
-{
-******************************* TTurboWordSymbol *******************************
-}
-constructor TTurboWordSymbol.Create;
-begin
-  inherited Create;
-  FBody := TCustomTurboWordSymbol.Create(Self);
-end;
-
-destructor TTurboWordSymbol.Destroy;
-begin
-  FreeAndNil(FBody);
   inherited Destroy;
 end;
 
