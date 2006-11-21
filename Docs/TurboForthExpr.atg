@@ -337,22 +337,22 @@ begin
     begin
       if Size <= SizeOf(Integer) then
       begin
-        //FModule.AddOpToMem(inPushInt);
+        //FModule.AddOpToMem(opPushInt);
         //Size := SizeOf(Integer);
         Case Size of
-          SizeOf(Byte): FModule.AddOpToMem(inPushByte);
-          SizeOf(Word): FModule.AddOpToMem(inPushWord);
-          //SizeOf(tsInt): FModule.AddOpToMem(inPushInt);
-          //SizeOf(Int64): FModule.AddOpToMem(inPushInt64);
+          SizeOf(Byte): FModule.AddOpToMem(opPushByte);
+          SizeOf(Word): FModule.AddOpToMem(opPushWord);
+          //SizeOf(tsInt): FModule.AddOpToMem(opPushInt);
+          //SizeOf(Int64): FModule.AddOpToMem(opPushInt64);
           else 
           begin
-            FModule.AddOpToMem(inPushInt);
+            FModule.AddOpToMem(opPushInt);
             Size := SizeOf(Integer);
           end;
         end;//case
       end
       else
-        FModule.AddOpToMem(inPushInt64);
+        FModule.AddOpToMem(opPushInt64);
       Integer(p) := Integer(FModule.Memory) + FModule.UsedMemory;
       FModule.AllocSpace(Size);
       AssignValueTo(p);
@@ -368,7 +368,7 @@ begin
   if Result then
     with FVars[i] do
     begin
-      FModule.AddOpToMem(inPushInt);
+      FModule.AddOpToMem(opPushInt);
       FModule.AddIntToMem(Addr);
     end
 end;
@@ -386,12 +386,12 @@ begin
       begin
         if Options.Visibility < fvProtected then
         begin
-          FModule.AddOpToMem(inEnter);
+          FModule.AddOpToMem(opEnter);
           FModule.AddIntToMem(CFA);
         end
         else
         begin
-          FModule.AddOpToMem(inEnterFar);
+          FModule.AddOpToMem(opEnterFar);
           FModule.AddIntToMem(0);
           FModule.AddIntToMem(CFA);
         end;
@@ -408,7 +408,7 @@ begin
               i := Module.GetWordCFA(aName);
               if i <> 0 then
               begin
-                FModule.AddOpToMem(inCallFar);
+                FModule.AddOpToMem(opCallFar);
                 //writeln(aName, '.ModEntry:',Integer(FUsedModules[ModuleIndex].Entry));
                 FModule.AddIntToMem(Integer(FUsedModules[ModuleIndex].Entry));
                 FModule.AddIntToMem(i);
@@ -630,9 +630,9 @@ var
   vPrior: PTurboWordEntry;
 begin
   if FDefinedWordEntry.Options.Visibility >= fvProtected then
-    FModule.AddOpToMem(inExitFar)
+    FModule.AddOpToMem(opExitFar)
   else
-    FModule.AddOpToMem(inExit);
+    FModule.AddOpToMem(opExit);
   FDefinedWordEntry.ParamFieldLength := FModule.UsedMemory - FLastWordCfa + 1;
   FWords[Length(FWords)-1].ParamFieldLength := FDefinedWordEntry.ParamFieldLength;
 
@@ -795,7 +795,7 @@ begin
   s := AnsiDequotedStr(LexString, '''');
   for i := length(s) downto 1 do
   begin
-    FModule.AddOpToMem(inPushInt);
+    FModule.AddOpToMem(opPushInt);
     FModule.AddIntToMem(Ord(s[i])); 
   end;
 end;
@@ -857,7 +857,7 @@ PRODUCTIONS
     [DeclarationBlock]  
     "BEGIN"                                            (. FInitProcCFA := FModule.UsedMemory;  .)
     ASMStatementBlock
-    "END."                                             (. FModule.AddOpToMem(inHalt); .)
+    "END."                                             (. FModule.AddOpToMem(opHalt); .)
     (. Final ; .) .
 
    DeclarationBlock 
@@ -986,22 +986,22 @@ PRODUCTIONS
      PushIntAsmStatement
     | PushStringAsmStatement 
     | AddIntAsmStatement
-    | "i8+" (.FModule.AddOpToMem(inAddInt64); .)
+    | "i8+" (.FModule.AddOpToMem(opAddInt64); .)
     | SubIntAsmStatement
-    | "i8-" (.FModule.AddOpToMem(inSubInt64); .)
+    | "i8-" (.FModule.AddOpToMem(opSubInt64); .)
     | MulIntAsmStatement
-    | "!" (. FModule.AddOpToMem(inStoreInt); .)
-    | "!i8" (. FModule.AddOpToMem(inStoreInt64); .)
-    | "!i2" (. FModule.AddOpToMem(inStoreWord); .)
-    | "!i1" (. FModule.AddOpToMem(inStoreByte); .)
-    | "@" (. FModule.AddOpToMem(inFetchInt); .)
-    | "@i8" (. FModule.AddOpToMem(inFetchInt64); .)
-    | "@i2" (. FModule.AddOpToMem(inFetchWord); .)
-    | "@i1" (. FModule.AddOpToMem(inFetchByte); .)
-    | "DROP" (. FModule.AddOpToMem(inPopInt); .)
+    | "!" (. FModule.AddOpToMem(opStoreInt); .)
+    | "!i8" (. FModule.AddOpToMem(opStoreInt64); .)
+    | "!i2" (. FModule.AddOpToMem(opStoreWord); .)
+    | "!i1" (. FModule.AddOpToMem(opStoreByte); .)
+    | "@" (. FModule.AddOpToMem(opFetchInt); .)
+    | "@i8" (. FModule.AddOpToMem(opFetchInt64); .)
+    | "@i2" (. FModule.AddOpToMem(opFetchWord); .)
+    | "@i1" (. FModule.AddOpToMem(opFetchByte); .)
+    | "DROP" (. FModule.AddOpToMem(opPopInt); .)
     | EmitAsmStatement
-    | "@TICK" (. FModule.AddOpToMem(inGetTickCount); .)
-    | "!TICK" (. FModule.AddOpToMem(inStoreTickCount); .)
+    | "@TICK" (. FModule.AddOpToMem(opGetTickCount); .)
+    | "!TICK" (. FModule.AddOpToMem(opStoreTickCount); .)
     | WordAsmStatement
   .
 
@@ -1009,15 +1009,15 @@ PRODUCTIONS
     "Label" Identifier   (. DefineLabelEx(LexString); .)  .
 
   PushIntAsmStatement = 
-    ( IntegerToken|HexNumberToken ) (. FModule.AddOpToMem(inPushInt); FModule.AddIntToMem(StrToInt(LexString));.) .
-  AddIntAsmStatement  = "+" (. FModule.AddOpToMem(inAddInt); .) .
-  SubIntAsmStatement  = "-" (. FModule.AddOpToMem(inSubInt); .) .
-  MulIntAsmStatement  = "*" (. FModule.AddopToMem(inMulInt); .) .
+    ( IntegerToken|HexNumberToken ) (. FModule.AddOpToMem(opPushInt); FModule.AddIntToMem(StrToInt(LexString));.) .
+  AddIntAsmStatement  = "+" (. FModule.AddOpToMem(opAddInt); .) .
+  SubIntAsmStatement  = "-" (. FModule.AddOpToMem(opSubInt); .) .
+  MulIntAsmStatement  = "*" (. FModule.AddOpToMem(opMulInt); .) .
   EmitAsmStatement 
     = 
-    "EMIT" (. FModule.AddOpToMem(inEmit); .) 
-    | ".S" (. FModule.AddOpToMem(inEmitString); .) 
-    | ".LS" (. FModule.AddOpToMem(inEmitLString); .) 
+    "EMIT" (. FModule.AddOpToMem(opEmit); .) 
+    | ".S" (. FModule.AddOpToMem(opEmitString); .) 
+    | ".LS" (. FModule.AddOpToMem(opEmitLString); .) 
   .
 
   PushStringAsmStatement = "#" StringToken (. PushString(); .) .

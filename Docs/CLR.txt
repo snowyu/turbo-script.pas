@@ -2,3 +2,298 @@ CIR(Common Intermediate Language (CIL))分析
 
 数据栈：
 它称之为 evaluation stack， 数据栈存放数据的最小单位是4字节的32位整数。
+
+它的加法指令只有一种形式，这说明它的加法指令的数据类型是后期约束的，不过这样一来，构成加法的指令的数据必须要有数据类型了！
+CLR 比我多了一个参数表用于传递过程的参数。
+
+== Metadata ==
+谈谈Metadata在PE中的组织结构。CLR的头信息里面专门有一个字段指向Metadata数据块，实际上这个数据块只是Metadata的一个头结构，
+保存有Metadata的全局信息，而Metadata的实际数据，是通过若干不同的Heap或者说Stream保存的。这里我统一使用Stream流作为他
+的名字，但很多文档中以Heap堆作为其称呼，我们可以理解他是一个二进制流，其中数据以堆的结构进行组织。在文件中是流，装入内存
+后是堆。实际上就是俺的数据区。不过它分得更加细致。
+
+Metadata里最常见的有五种流，#String, #Blob, #Guid,#US(User String)和#~流("#"是流名字的前缀)。每种类型流最多只能出现一次，
+#US和#Blob流可省略。
+
+#String流就是一个字符串堆，Metadata内部用到的所有字符串如类或方法的名字等等都以UTF8编码保存在此堆内。
+而用户的字符串如字符串常量，则以Unicode编码保存在#US(User String)堆内。
+值得注意的是，US流和String流在二进制结构组织上不同，我们后面将分析时会详细提及。
+
+Guid流是保存程序中使用到的Guid的数组，如Assembly中Module的MVID。
+
+Blob流是一个通用存储空间，除了Guid和字符串以外基本上所有剩下的东西都以二进制数据形式放在里面，如PublicKey，常量的值等等。
+等效于我的数据区中分配的变量区。
+
+最重要的是#~流，这是Metadata核心信息存放的地方。#~流物理上以若干张表(Table)的形式组织，每张表存储某一方面的Metadata信息，
+如MethodDef表存储所有方法的信息。每张表又由若干的行(Row)组成每行有n个列(Column)，每列代表一种信息，如MethodDef表中每一行
+都有一个方法的RVA,类型标志,名字,Signature等等信息。在其中通过各种索引来相互关联，整个组织结构和关系数据库很相似。
+
+比较特殊的是，这里所有的表通过一个64bit的有效位图来表示表存在与否每种类型的表有一个编号，如MethodDef表的编号是6，则第(1<<(6-1))位置1
+因而每个表的每一行，可以使用一个唯一的Token表示。此Token是一个32bit无符号整型数，最高一个字节表示表的序号，低三个字节表示表中的索引号。
+如0x06000003表示0x06表（MethodDef）中第3行（如MyApp::Add）这个Token概念在CLR中频繁使用，如IL代码调用函数、使用变量都是使用Token。
+与之类似的还有Coded Index，等会讲二进制实现时再说。
+   
+CIL Instructions
+_________________________________________________
+Format                Assembly Format   Description
+0x00                  nop
+0x01                  break             断点设置，我这里用作halt.
+0x02                  ldarg.0           load argument onto the stack
+0x03                  ldarg.1
+0x04                  ldarg.2
+0x05                  ldarg.3
+0x06                  ldloc.0           load local variable onto the stack
+0x07                  ldloc.1
+0x08                  ldloc.2
+0x09                  ldloc.3
+0x0A                  stloc.0
+0x0B                  stloc.1
+0x0C                  stloc.2
+0x0D                  stloc.3
+0x0E                  ldarg.s num       Load argument numbered num onto the stack, short form.
+0x0F                  ldarga.s argNum   Fetch the address of argument argNum, short form.
+0x10                  starg.s num       Store value to the argument numbered num, short form.
+0x11<unsigned int8>   ldloc.s indx      Load local variable of index indx onto stack, short form.
+0x12<unsigned int8>   ldloca.s indx     Load address of local variable with index indx, short form.
+0x13<unsigned int8>   stloc.s indx      Pop a value from stack into local variable indx, short form.
+0x14                  ldnull            Push a null reference on the stack.
+                                        [It might be thought that ldnull is redundant: why not use ldc.i4.0 or ldc.i8.0 instead? The answer is
+                                        that ldnull provides a size-agnostic null – analogous to an ldc.i instruction, which does not exist. However,
+                                        even if CIL were to include an ldc.i instruction it would still benefit verification algorithms to retain the ldnull
+                                        instruction because it makes type tracking easier. ]
+                                          ldc.<type>: load numeric constant
+0x15                  ldc.i4.m1           Push -1 onto the stack as int32.
+0x15                  ldc.i4.M1           Push -1 of type int32 onto the stack as int32 (alias for ldc.i4.m1).
+0x16                  ldc.i4.0            Push 0 onto the stack as int32.
+0x17                  ldc.i4.1
+0x18                  ldc.i4.2
+0x19                  ldc.i4.3
+0x1A                  ldc.i4.4
+0x1B                  ldc.i4.5
+0x1C                  ldc.i4.6
+0x1D                  ldc.i4.7
+0x1E                  ldc.i4.8
+0x1F<int8>            ldc.i4.s num        Push num onto the stack as int32, short form.
+0x20<int32>           ldc.i4 num          Push num of type int32 onto the stack as int32.
+0x21<int64>           ldc.i8 num          Push num of type int64 onto the stack as int64.
+0x22<float32>         ldc.r4 num          Push num of type float32 onto the stack as F.
+0x23<float64>         ldc.r8 num          Push num of type float64 onto the stack as F.
+0x25                  Dup                 Duplicate the value on the top of the stack.
+0x26                  pop                 remove the top element of the stack
+0x27<T>               jmp method          Exit current method and jump to the specified method.
+0x28<T>               call method         Call method described by method.
+0x29<T>               calli callsitedescr Call method indicated on the stack with arguments described by callsitedescr.
+0x2A                  Ret                 Return from method, possibly with a value.
+0x2B<int8>            br.s target         Branch to target, short form. <unconditional branch>
+0x2C<int8>            brfalse.s target    Branch to target if value is zero (false), short form.
+0x2D<int8>            brtrue.s target     Branch to target if value is non-zero (true), short form.
+0x2E<int8>            beq.s target        Branch to target if equal, short form.
+0x2F<int8>            bge.s target        Branch to target if greater than or equal to, short form.
+0x30<int8>            bgt.s target        Branch to target if greater than, short form.
+0x31<int8>            ble.s target        Branch to target if less than or equal to, short form.
+0x32<int8>            blt.s target        Branch to target if less than, short form.
+0x33<int8>            bne.un.s target     Branch to target if unequal or unordered, short form.
+                                          The bne.un instruction transfers control to target if value1 is not equal to value2, when compared unsigned
+                                          (for integer values) or unordered (for floating-point values).
+                                          The effect is identical to performing a ceq instruction followed by a brfalse target.
+0x34<int8> bge.un.s
+0x35<int8> bgt.un.s
+0x36<int8> ble.un.s
+0x37<int8> blt.un.s
+0x38<int32>           br target           Branch to target.<unconditional branch>
+0x39 brfalse
+0x3A brtrue
+0x3B beq
+0x3C bge
+0x3D bgt
+0x3E ble
+0x3F blt
+0x40 bne.un
+0x41 bge.un
+0x42 bgt.un
+0x43 ble.un
+0x44 blt.un
+0x45<unsigned int32>  switch(t1, t2 … tN) table switch based on value. Jump to one of n values. Stack:(Value -- )
+   <int32>… <int32>                       The switch instruction implements a jump table. The format of the instruction is 
+                                           an unsigned int32 representing the number of targets N, followed by N int32 values 
+                                           specifying jump targets: these targets are represented as offsets (positive or negative) 
+                                           from the beginning of the instruction following this switch instruction.
+0x46                  ldind.i1             Indirect load value of type int8 as int32 on the stack. Stack:(addr -- Value)
+0x47                  ldind.u1
+0x48                  ldind.i2
+0x49                  ldind.u2
+0x4A                  ldind.i4
+0x4B                  ldind.u4
+0x4C                  ldind.i8
+0x4D                  ldind.i
+0x4E                  ldind.r4
+0x4F                  ldind.r8
+0x50                  ldind.ref
+0x51                  stind.ref
+0x52                  stind.i1
+0x53                  stind.i2
+0x54                  stind.i4
+0x55                  stind.i8
+0x56                  stind.r4
+0x57                  stind.r8
+0x58                  add                 Add two values, returning a new value. (value1, value2 -- Result). <Only For Type-Safe value.>
+0x59                  sub                 <Only For Type-Safe value.>
+0x5A                  mul                 <Only For Type-Safe value.>
+0x5B                  div                 <Only For Type-Safe value.>
+0x5C                  div.un              <Only For Type-Safe value.>
+0x5D                  rem                 <Only For Type-Safe value.>
+0x5E                  rem.un              <Only For Type-Safe value.>
+0x5F                  and                 <Only For Type-Safe value.>
+0x60                  or                  <Only For Type-Safe value.>
+0x61                  xor                 <Only For Type-Safe value.>
+0x62                  shl                 <Only For Type-Safe value.>
+0x63                  shr                 <Only For Type-Safe value.>
+0x64                  shr.un              <Only For Type-Safe value.>
+0x65                  neg                 <Only For Type-Safe value.>
+0x66                  not                 <Only For Type-Safe value.>
+0x67                 conv.i1               conv.<to type> – data conversion. Convert to int8, pushing int32 on stack. (Value -- Result)
+0x68                 conv.i2
+0x69                 conv.i4
+0x6A                 conv.i8
+0x6B                 conv.r4
+0x6C                 conv.r8
+0x6D                 conv.u4
+0x6E                 conv.u8
+0x6F                 callvirt
+0x70                 cpobj
+0x71                 ldobj
+0x72                 ldstr
+0x73                 newobj
+0x74                 castclass
+0x75                 isinst
+0x76                 conv.r.un
+0x79                 unbox
+0x7A                 throw
+0x7B                 ldfld
+0x7C                 ldflda
+0x7D                 stfld
+0x7E                 ldsfld
+0x7F                 ldsflda
+0x80                 stsfld
+0x81<T>              stobj typeTok           Store a value of type typeTok at an address. (dest, src --) 
+                                             If typeTok is a value type, the stobj instruction copies the value src to the address dest. 
+                                             If typeTok is a reference type, the stobj instruction has the same effect as stind.ref.
+0x82                 conv.ovf.i1.un
+0x83                 conv.ovf.i2.un
+0x84                 conv.ovf.i4.un
+0x85                 conv.ovf.i8.un
+0x86                 conv.ovf.u1.un
+0x87                 conv.ovf.u2.un
+0x88                 conv.ovf.u4.un
+0x89                 conv.ovf.u8.un
+0x8A                 conv.ovf.i.un
+0x8B                 conv.ovf.u.un
+0x8C<T>              box typeTok             Convert a boxable value to its boxed form. (val -- obj)
+                                             If typeTok is a value type, the box instruction converts val to its boxed form. 
+                                             When typeTok is a non-nullable type (§1.8.2.4), this is done by creating a new 
+                                             object and copying the data from val into the newly allocated object. If it is 
+                                             a nullable type, this is done by inspecting val’s HasValue property; if it is 
+                                             false, a null reference is pushed onto the stack; otherwise, the result of boxing 
+                                             val’s Value property is pushed onto the stack. If typeTok is a reference type, 
+                                             the box instruction does nothing.
+0x8D                 newarr
+0x8E                 ldlen
+0x8F                 ldelema
+0x90                 ldelem.i1
+0x91                 ldelem.u1
+0x92                 ldelem.i2
+0x93                 ldelem.u2
+0x94                 ldelem.i4
+0x95                 ldelem.u4
+0x96                 ldelem.i8
+0x97                 ldelem.i
+0x98                 ldelem.r4
+0x99                 ldelem.r8
+0x9A                 ldelem.ref
+0x9B                 stelem.i
+0x9C                 stelem.i1
+0x9D                 stelem.i2
+0x9E                 stelem.i4
+0x9F                 stelem.i8
+0xA0                 stelem.r4
+0xA1                 stelem.r8
+0xA2                 stelem.ref
+0xA3                 ldelem
+0xA4                 stelem
+0xA5                 unbox.any
+0xB3                 conv.ovf.i1
+0xB4                 conv.ovf.u1
+0xB5                 conv.ovf.i2
+0xB6                 conv.ovf.u2
+0xB7                 conv.ovf.i4
+0xB8                 conv.ovf.u4
+0xB9                 conv.ovf.i8
+0xBA                 conv.ovf.u8
+0xC2                 refanyval
+0xC3                 ckfinite
+0xC6                 mkrefany
+0xD0                 ldtoken
+0xD1                 conv.u2
+0xD2                 conv.u1
+0xD3                 conv.i
+0xD4                 conv.ovf.i
+0xD5                 conv.ovf.u
+0xD6                 add.ovf
+0xD7                 add.ovf.un
+0xD8                 mul.ovf
+0xD9                 mul.ovf.un
+0xDA                 sub.ovf
+0xDB                 sub.ovf.un
+0xDC                 endfinally(endfault)    End finally(fault) clause of an exception block. 
+                                             Return from the finally or fault clause of an exception block 
+                                             (see the Exception Handling subclause of Partition I for details).
+0xDD<int32>          leave target            Exit a protected region of code.
+0xDE<int8>           leave.s target          Exit a protected region of code, short form.
+                                             The leave instruction unconditionally transfers control to target. 
+                                             target is represented as a signed offset (4 bytes for leave, 1 byte 
+                                             for leave.s) from the beginning of the instruction following the current instruction.
+                                             The leave instruction is similar to the br instruction, but the former can be used 
+                                             to exit a try, filter, or catch block whereas the ordinary branch instructions can 
+                                             only be used in such a block to transfer control within it. The leave instruction 
+                                             empties the evaluation stack and ensures that the appropriate surrounding finally blocks 
+                                             are executed.
+0xDF                 stind.i
+0xE0                 conv.u
+0xFE 0x00            arglist
+0xFE 0x01            ceq
+0xFE 0x02            cgt
+0xFE 0x03            cgt.un
+0xFE 0x04            clt
+0xFE 0x05            clt.un
+0xFE 0x06            ldftn
+0xFE 0x07            ldvirtftn
+0xFE 0x09            ldarg
+0xFE 0x0A            ldarga
+0xFE 0x0B            starg
+0xFE 0x0C            ldloc
+0xFE 0x0D            ldloca
+0xFE 0x0E            stloc
+0xFE 0x0F            localloc
+0xFE 0x11            endfilter                 End an exception handling filter clause. (value -- )
+                                               Used to return from the filter clause of an exception 
+                                               (see the Exception Handling subclause of Partition I for a
+                                               discussion of exceptions). value (which shall be of type int32 
+                                               and one of a specific set of values) is returned from the filter 
+                                               clause. It should be one of:
+                                                 * exception_continue_search (0) to continue searching for an exception handler
+                                                 * exception_execute_handler (1) to start the second phase of exception handling where
+                                                   finally blocks are run until the handler associated with this filter clause is located. Then the
+                                                   handler is executed.
+                                               The result of using any other integer value is unspecified.
+
+0xFE 0x12            unaligned.
+0xFE 0x13            volatile.
+0xFE 0x14            tail.
+0xFE 0x15            initobj
+0xFE 0x17            cpblk
+0xFE 0x18            initblk
+0xFE 0x1A            rethrow
+0xFE 0x1C            sizeof
+0xFE 0x1D            refanytype
+
+TurboScript Extented Instructions:

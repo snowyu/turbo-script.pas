@@ -1,3 +1,157 @@
+2006-11-21
+～ 关于 JIT 即使编译器是可行的，保留内存区头部和数据区即可。
+
+2006-11-15
+~ 使用链表的意义在于可以在运行时刻快速的添加新的过程到模块而不必惊动编译器进行编译，这样极大的提高了速度。
+  现在剩下的问题就是编译时刻的Meta信息和运行时刻的Meta信息的侧重点不一样，如何处理？
+  TTurboMetaInfo = object //for typecast the memory.
+  TTurboSymbol = class //for compiler
+    FMetaInfo: PTurboMetaInfo; //通过连接的形式
+  end;
+
+终于明白自己为什么在Type定义这里卡住了原因，混淆了Delphi编译中使用，和让自己脚本本身能使用类型两个目的！
+!+ 定义于Type有关的指令，将TurboMetaInfo作为Delphi写的编译或供外部【Delphi】使用。
+   然后逐步过渡到使用脚本来写编译器。嘿嘿。
+   VarType (var-addr -- varTypeAddr)
+   现在我为啥需要编写TypeMetainfo，是因为编译的需要，建立语法树的需要！！所以~~~暂不管指令实现！
+
+
+~ 使用外部变量来表述该变量是运行时绑定的: var [external] myvar。
+
+!+ uTurboMetaInfo.pas  [将XXXEntry 里面的数据分离到本单元]
+  the turboScript basic metadata for type, constants etc.
+里面的字符串全部使用偏移量指向PShortString!
+是否启动virtual 方法，也就是使用动态对象，这样的话，必须保留第一个字段指向VMT, 而且必须在装入后对该地址重定位。如果不用就没有VMT表！
+先不管，做下去，看需要而定！
+  //定义最基本的类型，所有的用户扩展类型，全部都是由下面的基本类型派生的！！
+  TTurboTypeKind = ();
+  TTurboMetaInfoRec = record
+    VMT: Pointer; //使用动态方法
+    TypeKind:  TTurboTypeKind;
+    Name: PShortString;
+  end;
+
+  //the abstract 
+  TTurboMetaInfo = object
+    TypeKind:  TTurboTypeKind;
+    Name: PShortString; //point to the offset
+  end;
+
+2006-11-13
+!+ uTurboSymbols
+  TTurboMetaData: in fact the symbols are the metaData. 最后我觉得还是命名为 TurboSymbol 吧。
+  TTurboType = Class: the abstract turboScript base type.
+  TTurboConstant = 
+  TTurboVaraible = Class(TTurboConstant)
+  
+!+ uTurboTypes
+~ 重新规划保留区内存：
+  内存分配：
+    代码区分为两部分，前面部分为系统数据区，保存模块参数。注意系统数据区编译好后就不能改变！除非重新编译。
+    更改数据区为：MetaData数据区，用来保存类型信息，模块变量【字段】，字符串常量。
+  文件流中：
+    MetaData字段 保存的是MetaData在流中的偏移量。GlobalOptions 为MetaData大小。Executor 为代码区在流中的偏移量。
+  TPreservedCodeMemory = packed record
+    MetaData: Pointer; //point to the data memory.
+    GlobalOptions: PTurboGlobalOptions;
+    Executor: TCustomTurboModule;
+    //##abondoned:this Module unique Index in this program, allocated by compiler.
+    //##ModuleIndex: Integer;
+    ModuleType: TTurboModuleType;
+    UsedMemory: tsInt; //实际使用的大小
+    MemorySize: tsInt; //分配代码区的大小
+  end;
+  
+  //模块 MetaData 数据区前端内存分配
+  TTurboMetaData = record
+    InitializeProcEntry: PTurboProcEntry; //it is the offset address of the FMemory
+    FinalizeProcEntry: PTurboProcEntry; //当从内存中unload之前被调用如果存在的话。
+    //last Used(import) module entry.
+    LastModuleEntry: PTurboModuleEntry;
+    //有名字的函数链表，指向最后一个函数入口。
+    LastWordEntry: PTurboWordEntry;
+    //有名字的变量链表
+    LastVariableEntry: PTurboVariableEntry;
+    //RTTI TypeInfo 链表
+    LastTypeInfoEntry: PTurboTypeInfoEntry;
+  
+  end;
+
+  PTurboProcEntry = ^TTurboProcEntry;
+  TTurboProcEntry = record
+    Prior: PTurboTypeInfoEntry; //nil means no more
+    Proc: Pointer;
+  end;
+  TTurboTypeInfoEntry = record
+    Prior: PTurboTypeInfoEntry;
+    TypeInfo: PTurboType;
+  end;
+
+//废弃：
+PackageInfoTable: see system.pas:
+  PackageInfo = ^PackageInfoTable;
+  PackageInfoTable = packed record
+    UnitCount : Integer;      { number of entries in UnitInfo array; always >= 0 }
+    UnitInfo : PUnitEntryTable;
+  end;
+  { Compiler generated table to be processed sequentially to init & finit all package units }
+  { Init: 0..Max-1; Final: Last Initialized..0                                              }
+  UnitEntryTable = array [0..9999999] of PackageUnitEntry;
+  PUnitEntryTable = ^UnitEntryTable;
+  PackageUnitEntry = packed record
+    Init, FInit : Pointer;
+  end;
+
+
+2006-11-12
+!+ 定义最基础的数据类型：
+  按用途来说： Type, Contant, Variable, Statement
+  按Type来说： Integer, Float, String, Array, Record  //, Sequence(序列)
+  分析清楚这些最基本的MetaType，我才能在运行时刻定义新的数据类型.
+  【这只是一种尝试，暂缓构思】
+  TypeDef
+    Sequence = Type //也许这个类型该放入基本类型
+    Grammar:
+      '[' Element {, Element} ']'.
+
+    Protected
+      Count: Integer;
+      Element: Type;
+      Contents: array[1..Count] of Element;default;
+    end;
+    If = Statement
+    Grammar:
+      'IF' BoolVar:Identity 'THEN' DoThenStatementBlock:StatementBlock  'ELSE' DoElseStatementBlock:StatementBlock
+    end;
+  类型定义:
+    Integer(Ordinal): Int8(1byte), Int16(2Byte), Int32(4Byte), Int64(8Byte); 
+             UInt8(unsigned 8-bit integer), UInt16, UInt32, UInt64, 
+             Boolean, Char(1Byte), WideChar(2Byte)
+    
+  Float: float32(Single), float64(Double).
+  String:
+  
+!+ 构思语法树(=就是 TypeInfo):
+  语法结构不是等于类型，而是类型是语法结构中的一种！
+~ 阅读了 CLR扩展PE结构分析 后，发觉我完全可以参考 metadata中的#~流【heap】来实现我的类型流！
+  不过它把所有的名称字符串单独放入一个堆中，效率？当然在流中的时候肯定是该堆的偏移量。
+
+2006-11-11
+* TTurboVMInstruction prefix from in to op
+~ 是否所有的控制指令都使用偏移地址？CLR就是全部用偏移量！
+  暂时不管吧！
+!+ TTurboAddressRelocator： 哈，我想到了，可以将重定位功能放到 TPreservedCodeMemory 上面，呵呵我真聪明。
+   代码区地址重定位：
+     【本地】Call 地址
+     【本地】变量地址
+   数据区地址重定位：
+     为了能够在运行时刻动态添加新类型和方法过程，所以将类型、过程链表等结构放在数据区。另外我的主要设计目的是编译时刻的速度
+     所以那个需要在运行时候添加过程肯定稍微慢些。
+     【2006-11-12】今天又想了下，其实可以不用链表的形式，对于编译时刻定义的类型过程可以用数组的形式在代码区前面确定下来，这样代码区实际上由参数区，类型定义区，代码区构成。
+                   然后，运行时刻添加的类型过程，放入堆中。
+                   很显然，这样一来，Data区就没有必要存在了，因为模块变量也可以用这样的数组形式固定在代码区。而运行时刻的新变量则只在堆中。
+        
+
 2006-11-8
 * 分离代码区数据区
   * 重新调整文件结构

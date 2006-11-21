@@ -1,6 +1,4 @@
-TurboForth: 我的TurboScript 的底层就是它！
-
-Turbo Script Assembly language
+Turbo Script Assembly language Specification
 
 writen by riceball LEE
 
@@ -15,13 +13,15 @@ Feature:
 == Virtual Machine Specification ==
 
 Virtual CPU: 32 bit
-Registers: None
+States Register: CPU States Register 1 Byte.
+Common Registers: None
 Code-Memory: 0-High(TTurboInstruction) address preserved.
+Data-Memory: the first 4 bytes(int32) address preserved.
 Stack: Parameter Stack and Return Stack.
 Global Options: 
 Heap: 
 
-在引用代码区的地址为相对偏移量地址，堆上的为绝对地址。
+在引用代码区的地址为相对偏移量地址，堆上的为绝对地址。在非编译时刻全部为绝对地址。
 
 == Forth代码区流（文件）镜像 ==
 
@@ -166,10 +166,10 @@ type //in TurboScriptConsts
   end;
 
 == TurboForth Virtual Machine Codes ==
-用户自定义函数采用相对地址(相对于FMemory)表示。
+用户自定义函数采用相对地址(相对于FMemory)表示【在编译时刻】。
 由于我占用了代码区前面的至少1024个字节，所以用户函数地址不可能小于255，这样就可以判断该操作到底是VM指令还是用户函数地址。
 
-VM指令采用32位数据实现。一个VM指令至少占用4个字节。
+VM指令采用字节流实现。一个VM指令至少占用1个字节。
 
 用户自定义word(函数):序列： 没有Enter了！只有Exit.
 
@@ -180,6 +180,10 @@ VM指令采用32位数据实现。一个VM指令至少占用4个字节。
   1、节约内存，系统的扩建主要是在用户自定义单词上，如果调用用户自定义单词的次数远远多于调用VM指令次数的时候，显然这种方式比较节约内存。
   2、便于扩充系统指令，方式2最多只能有256个指令，而且无法扩充。
 
+【现在改为方式2了，指令以字节流的形式体现】：
+  1、尽量与 CLR 兼容
+  2、字节装载比Int32装载快
+  3、扩充可以通过某个指令扩展实现。
 
 VM 处理器寄存器：
 SP, RP, PC, TOS, W, StatesRegister, 
