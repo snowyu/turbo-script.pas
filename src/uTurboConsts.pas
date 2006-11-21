@@ -41,8 +41,12 @@ resourcestring
   rsWordNotFoundError = 'Fatal: Word not found:';
 
 type
+  PTsInt = ^ tsInt;
   tsInt = LongInt;
   tsPointer = Pointer;
+  PTsIntArray = ^tsIntArray; 
+  tsIntArray = array [0..(High(tsInt) div 8)] of tsInt;
+
   ETurboScriptError = class(Exception);
   {: the Module Type }
   {
@@ -78,131 +82,132 @@ type
   PTurboVMInstruction = ^TTurboVMInstruction;
   { Summary the FORTH Virtual Mache Codes}
   TTurboVMInstruction = (
-    inNone,
-    {## The FORTH CORE instructions }
-    inHalt,
-    inEnter, //inEnter Addr
-    inExit,
-    inNext,
+    opNoop,
+    {## The FORTH CORE opstructions }
+    opHalt,
+    opEnter, //inEnter Addr
+    opExit,
+    opNext,
     //Far Call, 对于公开的供其他模块调用的函数全部使用该方式
     //ForthDLL的模块链接方式调用
-    inEnterFar, //inEnterFar ModuleMemBase-addr Addr
-    inExitFar,  //对于远调用的返回指令必须是该指令! R: (MemoryBase PC -- )
+    opEnterFar, //inEnterFar ModuleMemBase-addr Addr
+    opExitFar,  //对于远调用的返回指令必须是该指令! R: (MemoryBase PC -- )
     
-    inPushByte, //in fact it will be expand to int, then inPush Byte (-- n)
-    inPushWord,
-    inPushInt,  // inPushInt Int (-- n)
-    inPushInt64, //two integer(int64). (-- int64)
-    inPopByte, //inPopByte ByteVar-Addr  (n --)
-    inPopWord, //inPopWord WordVar-Addr  (n --)
-    inPopInt, //inPopInt   IntVar-Addr  (n --)
-    inPopInt64, //inPopInt64 QWordVar-Addr (n --)
+    opPushByte, //in fact it will be expand to opt, then opPush Byte (-- n)
+    opPushWord,
+    opPushInt,  // opPushInt opt (-- n)
+    opPushInt64, //two opteger(int64). (-- opt64)
+    opPopByte, // opPopByte ByteVar-Addr  (n --)
+    opPopWord, // opPopWord WordVar-Addr  (n --)
+    opPopInt, // opPopInt   optVar-Addr  (n --)
+    opPopInt64, //opPopInt64 QWordVar-Addr (n --)
 
-    {## Memory Operation Instruction }
-    inStoreInt,  //! Store a Integer,pop data to memory (aInt offsetAddr --)
-    inStoreByte, //C! CStore
-    inStoreWord, //inStoreWord  (aWord aWord-addr --)
-    inStoreInt64, //int64, inStoreQWord (aQWord aQWord-addr --)
-    inStoreRP, //RP! Set return stack pointer (offsetAddr -- )
-    inFetchInt,  //Fetch, push a integer from memory. (offsetAddr -- aInt)
-    inFetchByte, //CFetch
-    inFetchWord, //inFetchWord (aWord-addr -- aWord) 
-    inFetchInt64,
-    inFetchRP, //RP@ Push current RP(returnStacck Poiinter) as data (-- RP)
+    {## Memory Operation opstruction }
+    opStoreInt,  //! Store a opteger,pop data to memory (aInt offsetAddr --)
+    opStoreByte, //C! CStore
+    opStoreWord, //inStoreWord  (aWord aWord-addr --)
+    opStoreInt64, //int64, opStoreQWord (aQWord aQWord-addr --)
+    opStoreRP, //RP! Set return stack pointer (offsetAddr -- )
+    opFetchInt,  //Fetch, push a opteger from memory. (offsetAddr -- aInt)
+    opFetchByte, //CFetch
+    opFetchWord, //inFetchWord (aWord-addr -- aWord) 
+    opFetchInt64,
+    opFetchRP, //RP@ Push current RP(returnStacck Poiinter) as data (-- RP)
     //Copies bytes from a source to a destination.
-    inMove, //Move(src-addr, dest-addr, count --)
-    inALLOT, //Allocate n bytes : usedMemory+n (n --) 
+    opMove, //Move(dest-addr, src-addr, size --)
+    opALLOT, //Allocate n bytes : usedMemory+n (n --) 
 
-    {## Arithmatic instructions }
-    {## for Integer}
-    inAddInt, //Add
-    inAddInt64, //Add int64
-    inSubInt, //subtract
-    inSubInt64, //subtract int64 (int64a, int64b) -- (int64 = int64b - int64a)
-    inIncInt, //add 1
-    inDecInt, //subtract 1
-    inUMULInt, //UM* Unsigned multiply(un1, un2 -- u-int64 ) 
-    inMULInt, //(n n -- n)
-    inMULInt64, //(n n -- int64)
-    inDIVInt, //divide (n n -- q)
-    inModInt, //(n n -- r)
-    inDivModInt, //(n n -- r q)
-    inDivModInt64, //M/Mod (int64 n -- r q) int64/n
-    inUDivModInt64, //UM/Mod (unsigned-int64 n -- unsigned-r unsigned-q)
-    inMULDIVMODInt, //n1*n2/n3 (n1 n2 n3 -- r q)
-    InMULDIVInt, // n1*n2/n3 (n1 n2 n3 -- q)
-    inIncNInt, //add N
-    inDecNInt, //subtract N
-    inMinInt, //Return the smaller of top two n1<n2 (n1,n2 -- n1)
-    inMaxInt, //Return the bigger of top two n1<n2 (n1,n2 -- n2)
-    inWithinUnsignedInt, //( u ul uh -- t )          Return true if ul <= u < uh 區間內
-    inAddStr, //(pShortString1 pShortString2 ---- pResult)
-    inAddLStr, //(pAnsiString1 pAnsiString2 ---- pAnsiResult)
+    {## Arithmatic opstructions }
+    {## for opteger}
+    opAddInt, //Add
+    opAddInt64, //Add opt64
+    opSubInt, //subtract
+    opSubInt64, //subtract opt64 (int64a, opt64b) -- (int64 = opt64b - opt64a)
+    opIncInt, //add 1
+    opDecInt, //subtract 1
+    opUMULInt, //UM* Unsigned multiply(un1, un2 -- u-int64 ) 
+    opMULInt, //(n n -- n)
+    opMULInt64, //(n n -- opt64)
+    opDIVInt, //divide (n n -- q)
+    opModInt, //(n n -- r)
+    opDivModInt, //(n n -- r q)
+    opDivModInt64, //M/Mod (int64 n -- r q) opt64/n
+    opUDivModInt64, //UM/Mod (unsigned-int64 n -- unsigned-r unsigned-q)
+    opMULDIVMODInt, //n1*n2/n3 (n1 n2 n3 -- r q)
+    opMULDIVInt, // n1*n2/n3 (n1 n2 n3 -- q)
+    opIncNInt, //add N
+    opDecNInt, //subtract N
+    opMinInt, //Return the smaller of top two n1<n2 (n1,n2 -- n1)
+    opMaxInt, //Return the bigger of top two n1<n2 (n1,n2 -- n2)
+    opWithinUnsignedInt, //( u ul uh -- t )          Return true if ul <= u < uh 區間內
+    opAddStr, //(pShortString1 pShortString2 ---- pResult)
+    opAddLStr, //(pAnsiString1 pAnsiString2 ---- pAnsiResult)
 
-    {## Logical instructions }
-    {## for Integer}
-    inLess0, //return true if n < 0 (n -- t)
-    inEQUInt, // return true if n1 = n2 (n1 n2 -- t)
-    inNEQInt, // not equ
-    inLESInt, //less than
-    inLEQInt, //less than and equ
-    inGERInt, //greater than
-    inGEQInt, //greater than and equ
-    inNOTInt, //logic NOT n (n -- n1)
-    inANDInt,
-    inORInt,
-    inXORInt,
-    inNEGATEInt, // Two's complement of top of stack (n -- -n)
-    inNegateInt64, // Two's complement of top of stack (int64 -- -int64)
-    inABSInt, //(n -- |n|)
-    inABSInt64,
+    {## Logical opstructions }
+    {## for opteger}
+    opLess0, //return true if n < 0 (n -- t)
+    opEQUInt, // return true if n1 = n2 (n1 n2 -- t)
+    opNEQInt, // not equ
+    opLESInt, //less than
+    opLEQInt, //less than and equ
+    opGERInt, //greater than
+    opGEQInt, //greater than and equ
+    opNOTInt, //logic NOT n (n -- n1)
+    opANDInt,
+    opORInt,
+    opXORInt,
+    opNEGATEInt, // Two's complement of top of stack (n -- -n)
+    opNegateInt64, // Two's complement of top of stack (int64 -- -int64)
+    opABSInt, //(n -- |n|)
+    opABSInt64,
     
-    {## Proc Operation Instruction: Flow Control }
-    inJMP, //JUMP Absolute address(related to FMemory)
+    {## Proc Operation opstruction: Flow Control }
+    opJMP, //JUMP Absolute address(related to FMemory)
     //inJMPByte, //JMP aByteInt(shortint offset) 
     //inJMPWord, //JMP aWordInt(smallint offset)
-    inJMPOffset,  //JMP aInt(offset) the real addr = FMemory + PC + offset
-    inGoto,   //(goto-addr -- )
-    inJZ, //jmp absolute address with condition(the TOS is 0) (n -- )
+    opJMPOffset,  //JMP aInt(offset) the real addr = FMemory + PC + offset
+    opGoto,   //(goto-addr -- )
+    opJZ, //jmp absolute address with condition(the TOS is 0) (n -- )
     //inJZByte,
     //inJZWord,
-    inJZOffset,
-    inJNZ,
-    inJNZOffset,
-    inTestIfFalse,//(bool -- bool) Jump if current data-stack is false, without removing value from stack
-    inTestIfTrue, //(bool -- bool) Jump if current data-stack is true, without removing value from stack
-    inExecute, //call(EXECUTE) the private word (CFA -- )
-    inCallFar,  //inCallFar PTurboModuleEntry(offset of Memory) cfa-addr
-    //inReturn, //= inExit
-    inWhile, //inWhile whileEnd-addr (bool -- )
-    inRepeat, //inRepeat RepeatEnd-addr (bool -- )
-    inFor,  //inFor ForEnd-addr (start, end -- )
-    inNoop,
-    inTryFinally, // inTryFinally inTryEnd-addr inFinallyEnd-addr
-    inTryExcept,  // inTryExcept inTryEnd-addr inExceptEnd-addr
+    opJZOffset,
+    opJNZ,
+    opJNZOffset,
+    opTestIfFalse,//(bool -- bool) Jump if current data-stack is false, without removing value from stack
+    opTestIfTrue, //(bool -- bool) Jump if current data-stack is true, without removing value from stack
+    opExecute, //call(EXECUTE) the private word (CFA -- )
+    opCallFar,  //inCallFar PTurboModuleEntry(offset of Memory) cfa-addr
+    //inReturn, //= opExit
+    opSwitch, //opSwitch<n[u-int32], t1,...,tn>  t1..tn is offsets(positive or negative) address 
+              //(i -- ) i = 0..n-1   
+    opWhile, //inWhile whileEnd-addr (bool -- )
+    opRepeat, //inRepeat RepeatEnd-addr (bool -- )
+    opFor,  //inFor ForEnd-addr (start, end -- )
+    opTryFinally, // opTryFinally opTryEnd-addr opFinallyEnd-addr
+    opTryExcept,  // opTryExcept opTryEnd-addr opExceptEnd-addr
     //Call other module subroutes.
 
-    {## data Stack Operation Instuction }
-    inDropInt,  //Discard top of stack (int --) 
-    inDropInt64,  //Discard top of stack (int64 --) 
-    inDUPInt,  //Duplicate the TOS (int -- int int)
-    inDUPInt64,  //Duplicate the TOS (int64 -- int64 int64)
-    inSWAPInt, //Exchange top two of stack (int1 int2 -- int2 int1)
-    inSWAPInt64, //Exchange top two of stack (int641 int642 -- int642 int641)
-    inOVERInt,  //Duplicate second of stack (i1 i2 -- i1 i2 i1)
-    inOVERInt64,  //Duplicate second of stack (i641 i642 -- i641 i642 i641)
-    inROTInt,
-    inROTInt64
+    {## data Stack Operation opstuction }
+    opDropInt,  //Discard top of stack (int --) 
+    opDropInt64,  //Discard top of stack (int64 --) 
+    opDUPInt,  //Duplicate the TOS (int -- opt opt)
+    opDUPInt64,  //Duplicate the TOS (int64 -- opt64 opt64)
+    opSWAPInt, //Exchange top two of stack (int1 opt2 -- opt2 opt1)
+    opSWAPInt64, //Exchange top two of stack (int641 opt642 -- opt642 opt641)
+    opOVERInt,  //Duplicate second of stack (i1 i2 -- i1 i2 i1)
+    opOVERInt64,  //Duplicate second of stack (i641 i642 -- i641 i642 i641)
+    opROTInt,
+    opROTInt64
 
-    {## Return Stack Operation Instuction }
-    , inRPushInt //>R: push to return stack  (int --) R(-- int)
-    , inRPopInt  //R>: Pop from return stack (-- int) R(int --)
-    , inRCopyInt //R@: Copy the TOS of return stack (-- int) R (int -- int)
-    , inEMIT  //(c --): send char out.
-    , inEmitString // (ShortStringAddr -- )
-    , inEmitLString // (AnsiStringAddr -- )
-    , inGetTickCount //(-- int64)
-    , inStoreTickCount //(int64Addr -- ) (int64Addr)^ = tickcount
+    {## Return Stack Operation opstuction }
+    , opRPushInt //>R: push to return stack  (int --) R(-- opt)
+    , opRPopInt  //R>: Pop from return stack (-- opt) R(int --)
+    , opRCopyInt //R@: Copy the TOS of return stack (-- opt) R (int -- opt)
+    , opEMIT  //(c --): send char out.
+    , opEmitString // (ShortStringAddr -- )
+    , opEmitLString // (AnsiStringAddr -- )
+    , opGetTickCount //(-- opt64)
+    , opStoreTickCount //(int64Addr -- ) (int64Addr)^ = tickcount
 
   ); 
 

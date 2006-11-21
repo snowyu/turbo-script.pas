@@ -786,44 +786,44 @@ end;
 
 procedure InitTurboCoreWordList;
 begin
-  GTurboCoreWords[inNext] := iVMNext;
-  GTurboCoreWords[inHalt] := iVMHalt;
+  GTurboCoreWords[opNext] := iVMNext;
+  GTurboCoreWords[opHalt] := iVMHalt;
 
-  GTurboCoreWords[inEnter] := iVMEnter;
-  GTurboCoreWords[inExit] := iVMExit;
-  GTurboCoreWords[inCallFar] := iVMCallFar;
+  GTurboCoreWords[opEnter] := iVMEnter;
+  GTurboCoreWords[opExit] := iVMExit;
+  GTurboCoreWords[opCallFar] := iVMCallFar;
 
-  GTurboCoreWords[inEnterFar] := iVMEnterFar;
-  GTurboCoreWords[inExitFar] := iVMExitFar;
+  GTurboCoreWords[opEnterFar] := iVMEnterFar;
+  GTurboCoreWords[opExitFar] := iVMExitFar;
   
-  GTurboCoreWords[inAddInt] := iVMAddInt;
-  GTurboCoreWords[inSubInt] := iVMSubInt;
-  GTurboCoreWords[inUMULInt] := iVMMulUnsignedInt;
-  GTurboCoreWords[inMULInt] := iVMMulInt;
-  GTurboCoreWords[inAddInt64] := iVMAddInt64;
-  GTurboCoreWords[inSubInt64] := iVMSubInt64;
+  GTurboCoreWords[opAddInt] := iVMAddInt;
+  GTurboCoreWords[opSubInt] := iVMSubInt;
+  GTurboCoreWords[opUMULInt] := iVMMulUnsignedInt;
+  GTurboCoreWords[opMULInt] := iVMMulInt;
+  GTurboCoreWords[opAddInt64] := iVMAddInt64;
+  GTurboCoreWords[opSubInt64] := iVMSubInt64;
 
   //Memory Operation Instruction with Param Stack
-  GTurboCoreWords[inFetchInt] := vFetchInt;
-  GTurboCoreWords[inStoreInt] := vStoreInt;
-  GTurboCoreWords[inFetchInt64] := vFetchInt64;
-  GTurboCoreWords[inStoreInt64] := vStoreInt64;
-  GTurboCoreWords[inFetchWord] := vFetchWord;
-  GTurboCoreWords[inStoreWord] := vStoreWord;
-  GTurboCoreWords[inFetchByte] := vFetchByte;
-  GTurboCoreWords[inStoreByte] := vStoreByte;
+  GTurboCoreWords[opFetchInt] := vFetchInt;
+  GTurboCoreWords[opStoreInt] := vStoreInt;
+  GTurboCoreWords[opFetchInt64] := vFetchInt64;
+  GTurboCoreWords[opStoreInt64] := vStoreInt64;
+  GTurboCoreWords[opFetchWord] := vFetchWord;
+  GTurboCoreWords[opStoreWord] := vStoreWord;
+  GTurboCoreWords[opFetchByte] := vFetchByte;
+  GTurboCoreWords[opStoreByte] := vStoreByte;
 
-  GTurboCoreWords[inPushInt] := iVMPushInt;
-  GTurboCoreWords[inPushByte] := iVMPushByte;
-  GTurboCoreWords[inPushWord] := iVMPushWord;
-  GTurboCoreWords[inDropInt] := iVMDropInt;
-  GTurboCoreWords[inPushInt64] := iVMPushInt64;
-  GTurboCoreWords[inDropInt64] := iVMDropInt64;
-  GTurboCoreWords[inEmit] := vEmitChar;
-  GTurboCoreWords[inEmitString] := vEmitString;
-  GTurboCoreWords[inEmitLString] := vEmitLString;
-  GTurboCoreWords[inGetTickCount] := vGetTickCount;
-  GTurboCoreWords[inStoreTickCount] := vStoreTickCount;
+  GTurboCoreWords[opPushInt] := iVMPushInt;
+  GTurboCoreWords[opPushByte] := iVMPushByte;
+  GTurboCoreWords[opPushWord] := iVMPushWord;
+  GTurboCoreWords[opDropInt] := iVMDropInt;
+  GTurboCoreWords[opPushInt64] := iVMPushInt64;
+  GTurboCoreWords[opDropInt64] := iVMDropInt64;
+  GTurboCoreWords[opEmit] := vEmitChar;
+  GTurboCoreWords[opEmitString] := vEmitString;
+  GTurboCoreWords[opEmitLString] := vEmitLString;
+  GTurboCoreWords[opGetTickCount] := vGetTickCount;
+  GTurboCoreWords[opStoreTickCount] := vStoreTickCount;
 
 end;
 
