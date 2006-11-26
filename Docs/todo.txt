@@ -1,5 +1,77 @@
+2006-11-26
+* CALLFAR 指令直接指向 TurboModuleInfo, 而不是ModuleEntry.
+* 将数据区和代码独立，测试通过，现在Code区只有代码！
+~ 模块、类、类实例 的区别
+  模块可以直接使用，类不能。类实例的每一个数据都是新建的【可以从类的数据中复制】，共享代码区。
+  是否考虑类实例的数据从堆中新建，而不是从DataMemory中复制，不过这样一来又增加了复杂度【俺编程苦啊，还是简单点吧，将DataMemory既作为MetaData也包括类字段数据】？
+* [Bug] Memory Leask: 
+  TCustomTurboModule.FModuleUnloadNotifies 忘记释放
+  [uTurboAccessor] FTurboModuleMgr 忘记释放
+  [uTurboAccessor] TTurboModuleAccessorList 里面的Accessor 忘记释放。
+
+
+2006-11-25
+* 数据区和代码独立，要想复用代码还必须要：
+    不能在代码区保存数据区的地址，而应该在数据区中保存代码区的地址！
+    当然，这样一来速度必然会降低【错误，速度不会降低，这个很少用到，我由专门的寄存器负责IP】。
+    把所有的参数都放入数据区，那么代码区就没有头结构了，全部都是代码！不能在代码区中开辟空间作为快速变量区，因为代码区是复用的！
+    只能在数据区中开辟空间作为快速变量区。
+- TTurboPreservedCodeMemory 参数全部移动到 TTurboPreservedDataMemory。
+
+~ 规范汇编的 TTurboVisibility :
+  fvHidden: 只能由本模块调用，近调用，该过程不会被连接到LastWordEntry中！没有Name信息。
+  fvPrivate: 只能由本模块调用，近调用，该过程会被连接到LastWordEntry中！一般没有Name信息。
+  fvProtected: 只能由本模块以及从该模块的子模块调用，远调用，该过程会被连接到LastWordEntry中！一般没有Name信息。
+  fvPublic: 任意模块均可调用，远调用，该过程会被连接到LastWordEntry中！一般没有Name信息。
+  fvPublished: 任意模块均可调用，远调用，该过程会被连接到LastWordEntry中！有Name信息。
+~ 汇编模块编译链接规则：
+  Word(过程):
+    fvProtected..fvPublished 的全部会被编译； 
+    fvHidden..fvPrivate,没有引用的，不会被编译。
+  常量，变量： 只有使用到的才会被编译入模块。
+
+!+ 俺需要编写一个最简单的能产生代码片段的编译器。
+  能编译常量变量和已知过程。
+  TTurboWordSymbol.Compile(const Src: string);
+
+  TTurboModelSymbol(TTurboWordSymbol.Parent)
+
+语法树搞定后，就该弄数据库对象。
+
+2006-11-24
+~ 将数据区和代码独立的好处：
+  1、建立外部对象，只需要复制数据区，公用代码区即可！
+  
+  对于分散在数据库中的对象的方法，只要从子类逐个查到父类，就是重载了。
+  暂时不思考对象，首先整理，然后建立基本语法树在说。
+
 2006-11-21
-～ 关于 JIT 即使编译器是可行的，保留内存区头部和数据区即可。
+~ 关于 JIT 即使编译器是可行的，保留内存区头部和数据区即可。
+!* 将所有的TXXXRntry 修改成如下的结构：
+  TTurboWordEntry = record
+    prior: PTurboWordEntry;
+    Value: TTurboWordInfo;
+  end;
+!* 将 DataMemory 改名为MetaData,表示专门用来存放Meta数据？算了额还是不改吧，字符串这些都在里面的。
+ 但是名称怎么取呢？？
+!* 将以下这些移到 DataMemory中。
+   TTurboPreservedDataMemory = packed record
+    InitializeProc: Pointer; //it is the offset address of the FMemory
+    FinalizeProc: Pointer; //如果是模块的话
+    //last Used(import) module entry.
+    LastModuleEntry: PTurboModuleEntry;
+    //有名字的函数链表，指向最后一个函数入口。
+    LastWordEntry: PTurboWordEntry;
+    //有名字的变量链表
+    LastVariableEntry: PTurboVariableEntry;
+    //RTTI TypeInfo 链表
+    LastTypeInfoEntry: PTurboTypeInfoEntry;
+    //reserved: array [SizeOf() ] of byte; 
+   end;
+~ 关于VMT表，虚方法表，到第用连接的形式，还是用的表的形式，表的形式，速度快，但是无法动态添加新的虚方法～～
+  我有注意了，哈哈，我想到DynamicMethod，凡是需要动态添加的方法，就是用动态方法，和Delphi类似，嘿嘿这样就解决了
+  速度和动态添加的问题。
+
 
 2006-11-15
 ~ 使用链表的意义在于可以在运行时刻快速的添加新的过程到模块而不必惊动编译器进行编译，这样极大的提高了速度。
@@ -1519,7 +1591,7 @@ TurboScript ASM 脚本：
   300 +
   (计时结束)
  
-结果运行时间：98 【比汇编慢38.8%倍,经过初步优化现在的运行时间已经是88（比汇编慢31.8%倍）； 当我进一步取消CPUStates(判断终止标志位)测试，运行时间居然和汇编差不多了：61！】
+结果运行时间：98 【比汇编慢38.8%倍,经过初步优化现在的运行时间已经是87（比汇编慢31.0%倍）； 当我进一步取消CPUStates(判断终止标志位)测试，运行时间居然和汇编差不多了：61！】
  
 子过程调用效率测试
 x86 汇编 子过程调用效率测试脚本:
@@ -1569,7 +1641,7 @@ TurboScript 子过程模块之间的VM DLL远调用效率
 使用的是按需加载技术，也就是仅当该函数被调用的时候才加载，然后加上Cache技术，后面的调用就在内存中处理。
 时间远远长于其它，是因为加载文件耗去了绝大部分时间
 不使用按需加载技术，而是预先加载模块：
-结果运行时间：212  <如果不使用Cache功能每次都要查找所花时间：1790>
+结果运行时间：202  <如果不使用Cache功能每次都要查找所花时间：1790>
 
 _______________________________
 EUPHORIA 完整脚本

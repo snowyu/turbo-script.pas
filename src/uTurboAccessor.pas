@@ -93,6 +93,8 @@ type
   TTurboModuleAccessorList = class(TList)
   private
     function GetItems(Index: Integer): TTurboModuleAccessor;
+  protected
+    procedure Notify(Ptr: Pointer; Action: TListNotification); override;
   public
     destructor Destroy; override;
     function IndexOf(AccessorClass: TTurboModuleAccessorClass): Integer;
@@ -275,6 +277,16 @@ begin
   Result := -1;
 end;
 
+procedure TTurboModuleAccessorList.Notify(Ptr: Pointer; Action:
+        TListNotification);
+begin
+  if (Action = lnDeleted) and (TObject(Ptr) is TObject) then
+  begin
+    TObject(Ptr).Free;
+    Ptr := nil;
+  end;
+end;
+
 
 
 function GTurboModuleManager: TTurboModuleManager;
@@ -298,5 +310,6 @@ end;
 initialization
   FTurboModuleAccessors := TTurboModuleAccessorList.Create;
 finalization
+  FreeAndNil(FTurboModuleMgr);
   FreeAndNil(FTurboModuleAccessors);
 end.

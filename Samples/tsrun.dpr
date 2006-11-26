@@ -8,6 +8,7 @@ program tsrun;
 {$APPTYPE CONSOLE}
 
 uses
+  //FastMM4,
   Windows,  SysUtils
   , uTurboConsts
   , uTurboExecutor
@@ -190,4 +191,5 @@ begin
     WriteLn('');
     writeln('ScriptExecTime(',c,'):',c/CountFreq*1000, ' (ms)');
   end;
+  aFileName := '';
 end.

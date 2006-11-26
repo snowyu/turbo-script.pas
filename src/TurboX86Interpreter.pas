@@ -13,7 +13,7 @@ TTurboForthProcessorStates, 为了能控制停止,状态寄存器放于保留内存中了。
 EAX: W Register 临时寄存器
 ECX:  临时寄存器
 
-EDI: FMemory基址
+EDI: FDataMemory基址
 
 这些核心过程是用无参数的过程实现。
 
@@ -53,6 +53,7 @@ uses
   Windows, //QueryPerformanceCounter
   SysUtils, Classes
   , uTurboConsts
+  , uTurboMetaInfo
   , uTurboExecutor
   ;
   
@@ -113,16 +114,13 @@ begin
     //PUSHAD
     //PUSH EAX
     //PUSH [EAX].FMemory
-    MOV  EDI, [EAX].FMemory
+    MOV  EDI, [EAX].FDataMemory
     //PUSH [EAX].FParameterStack
 
-    MOV  ESI, EDI  //ESI: IP
+    MOV  ESI, [EAX].FMemory  //ESI: IP
     ADD  ESI, aCFA
     //BTS  EDX, psRunning
     //MOV  [EDI].TPreservedCodeMemory.States, DL
-    {$ifdef TurboScript_FullSpeed}
-    MOV  DL, [EDI].TPreservedCodeMemory.States //EBX: FORTH Processor States
-    {$endif}
     MOV  EBP, [EAX].FSP //SP the data stack pointer.
     XOR  EBX, EBX //clear the TOS
     //MOV  EDX, EAX
@@ -131,7 +129,7 @@ begin
     //PUSH @@ReturnAdr
     CALL  iVMInit
   @@ReturnAdr:
-    MOV  EAX, [EDI].TPreservedCodeMemory.GlobalOptions
+    MOV  EAX, [EDI].TTurboPreservedDataMemory.GlobalOptions
     CMP  EBP, [EAX].TTurboGlobalOptions.ParamStackBottom
   //  CMP  EBP, [EDI].TPreservedCodeMemory.ParamStackBottom
     JE   @@skipStoreTOS
@@ -146,13 +144,10 @@ begin
     //POP EAX
     //POP EAX
     //POP EAX
-    MOV  EAX, [EDI].TPreservedCodeMemory.Executor
+    MOV  EAX, [EDI].TTurboPreservedDataMemory.Executor
     MOV  [EAX].TTurboX86Interpreter.FRP, ESP
     MOV  [EAX].TTurboX86Interpreter.FSP, EBP
     MOV  [EAX].TTurboX86Interpreter.FPC, ESI
-    {$ifdef TurboScript_FullSpeed}
-    MOV  [EDI].TPreservedCodeMemory.States, DL
-    {$endif}
 
     MOV  ESP, [EAX].TTurboX86Interpreter.FOldESP
     MOV  EBP, [EAX].TTurboX86Interpreter.FOldEBP
@@ -167,10 +162,12 @@ end;
 
 type
   TTurboExecutorAccess = class(TCustomTurboExecutor);
+  TTurboMetaInfoAccess = object(TTurboMetaInfo)
+  end;
   
 procedure iVMInit;
 asm
-  MOV  EAX, [EDI].TPreservedCodeMemory.GlobalOptions
+  MOV  EAX, [EDI].TTurboPreservedDataMemory.GlobalOptions
  
   MOV  [EAX].TTurboGlobalOptions.ReturnStackBottom, ESP
   MOV  [EAX].TTurboGlobalOptions.ParamStackBottom, EBP
@@ -182,7 +179,7 @@ end;
 //the interpreter core here:
 procedure iVMNext;
 asm
-  MOV  EAX, [EDI].TPreservedCodeMemory.GlobalOptions
+  MOV  EAX, [EDI].TTurboPreservedDataMemory.GlobalOptions
   MOV  DL, [EAX].TTurboGlobalOptions.States
 
   //TODO: BT is a 486 directive.
@@ -207,7 +204,7 @@ asm
   JZ   @@BadOpError
   JMP  EAX
 @@BadOpError:
-  MOV  EAX, [EDI].TPreservedCodeMemory.GlobalOptions
+  MOV  EAX, [EDI].TTurboPreservedDataMemory.GlobalOptions
  
   MOV  [EAX].TTurboGlobalOptions.LastErrorCode, errBadInstruction
   JMP  iVMHalt
@@ -239,7 +236,7 @@ end;
 procedure iVMEnter;
 asm
   LODSD
-  ADD  EAX, EDI
+  ADD  EAX, [EDI].TTurboPreservedDataMemory.Code
   PUSH ESI        //push the current IP.
   MOV  ESI, EAX   //set the new IP
   JMP iVMNext
@@ -252,7 +249,7 @@ asm
   MOV [EDI].TPreservedCodeMemory.States, DL
   JMP iVMNext
 }
-  MOV  EAX, [EDI].TPreservedCodeMemory.GlobalOptions
+  MOV  EAX, [EDI].TTurboPreservedDataMemory.GlobalOptions
   CMP  ESP, [EAX].TTurboGlobalOptions.ReturnStackBottom
   MOV  DL, [EAX].TTurboGlobalOptions.States
   BTR  EDX, psRunning //cTurboScriptIsRunningBit  //clear the cIsRunningBit to 0.
@@ -277,15 +274,10 @@ procedure iVMExitFar;
 asm
   //不能这样！这样的话如果是自己调用这个函数，退出的时候就会停止
   //另外，如果我正好这个时候发布停止，但是这里却重置了状态～～
-{  MOV DL, [EDI].TPreservedCodeMemory.States
-  BTR EDX, psRunning //cTurboScriptIsRunningBit  //clear the cIsRunningBit to 0.
-  MOV [EDI].TPreservedCodeMemory.States, DL
-  //Add this:
-  BTS EDX, psRunning //cTurboScriptIsRunningBit  //set the cIsRunningBit to 1.
-} 
+
   POP  ESI
   POP  EDI
-  //MOV [EDI].TPreservedCodeMemory.States, DL
+
   JMP  iVMNext
 end;
 
@@ -296,67 +288,65 @@ asm
   LODSD
   TEST EAX, EAX //CMP EAX, 0
   JZ @@LocalEnter 
-  //MOV DL, [EDI].TPreservedCodeMemory.States
   MOV  EDI, EAX //load the new MemoryBase
-  //MOV [EDI].TPreservedCodeMemory.States, DL
 
 @@LocalEnter:
   //JMP iVMEnter
   LODSD
-  ADD EAX, EDI
+  ADD EAX, [EDI].TTurboPreservedDataMemory.Code
   PUSH ESI        //push the current IP.
   MOV  ESI, EAX   //set the new IP
   JMP iVMNext
 end;
 
-//CALLFAR PTurboModuleEntry cfa-addr
-//if PTurboModuleEntry = nil means it's self, do not lookup.  
+//CALLFAR PTurboModuleInfo cfa-addr
+//if PTurboModuleInfo = nil means it's self, do not lookup.  
 //在返回栈中保存EDI(旧的 FMemory 基址), 
-//根据 PTurboModuleEntry 查找模块内存基址，如果找到就设置EDI成新的 FMemory 基址,
+//根据 PTurboModuleInfo 查找模块内存基址，如果找到就设置EDI成新的 FDataMemory 基址,
 //然后装入该函数的地址，其它就和VMEnter一样了，转去VMEnter。
 procedure iVMCallFar;
 asm
   PUSH EDI //save the current MemoryBase.
-  LODSD    //EAX= PTurboModuleEntry
+  LODSD    //EAX= PTurboModuleInfo
   TEST EAX, EAX //CMP EAX, 0
   JZ  @@DoLocalEnterFar
-  ADD  EAX, [EDI].TPreservedCodeMemory.Data //PTurboModuleEntry real addr
-  MOV  ECX, [EAX].TTurboModuleEntry.Module
+  ADD  EAX, EDI //PTurboModuleInfo real addr
+  MOV  ECX, [EAX].TTurboModuleInfo.Handle
   TEST ECX, ECX //CMP ECX, 0
   JZ   @@RequireModuleExecutor
-  MOV  EDI, [ECX].TTurboExecutorAccess.FMemory
+  MOV  EDI, [ECX].TTurboExecutorAccess.FDataMemory
   JMP  @@exit
 
 @@RequireModuleExecutor: //find and load the module into the memory.
-  PUSH EAX  //keep the PTurboModuleEntry 
+  PUSH EAX  //keep the PTurboModuleInfo 
   PUSH EBX
   PUSH ESI
   PUSH EBP
   
-  MOV  EDX, EAX
-  ADD  EDX, Offset TTurboModuleEntry.ModuleName
-  MOV  EAX, [EDI].TPreservedCodeMemory.Executor
+  //MOV  EDX, EAX
+  MOV  EDX, [EAX].TTurboMetaInfoAccess.FName
+  MOV  EAX, [EDI].TTurboPreservedDataMemory.Executor
   //function TCustomTruboExecutor.GetModuleMemoryAddr(aModuleIndex: Integer): Pointer;
   CALL TCustomTurboExecutor.RequireModule
   POP EBP
   POP ESI
   POP EBX
-  POP ECX  //restore the PTurboModuleEntry
+  POP ECX  //restore the PTurboModuleInfo
 
   TEST  EAX, EAX
   JZ   @@NotFoundError
 
-  MOV [ECX].TTurboModuleEntry.Module, EAX
+  MOV [ECX].TTurboModuleInfo.Handle, EAX
   //Copy CPU States to the New Module Memory.
   //MOV EDI, [ESP] //restore the old Module MemoryBase in TOS
   //MOV  CL, [EDI].TPreservedCodeMemory.States
-  MOV  EDI, [EAX].TTurboExecutorAccess.FMemory
+  MOV  EDI, [EAX].TTurboExecutorAccess.FDataMemory
   //MOV  [EDI].TPreservedCodeMemory.States, CL
   JMP @@Exit
 
 @@NotFoundError:
   POP  EDI
-  MOV  EAX, [EDI].TPreservedCodeMemory.GlobalOptions
+  MOV  EAX, [EDI].TTurboPreservedDataMemory.GlobalOptions
   MOV  [EAX].TTurboGlobalOptions.LastErrorCode, errModuleNotFound
   JMP  iVMHalt
 
@@ -365,7 +355,7 @@ asm
 @@Exit:
   //JMP iVMEnter
   LODSD
-  ADD EAX, EDI
+  ADD EAX, [EDI].TTurboPreservedDataMemory.Code
   PUSH ESI        //push the current IP.
   MOV  ESI, EAX   //set the new IP
   JMP iVMNext
@@ -379,7 +369,7 @@ asm
   //push the current IP.
   PUSH ESI        
   //set the new IP in the TOS
-  ADD  EBX, EDI //EBX: TOS
+  ADD  EBX, [EDI].TTurboPreservedDataMemory.Code //EBX: TOS
   MOV  ESI, EBX   
 
   {XCHG ESP, EBP
@@ -548,7 +538,7 @@ end;
 procedure vFetchInt;
 asm
   //EBX is TOS
-  MOV EAX, [EDI].TPreservedCodeMemory.Data
+  MOV EAX, EDI
   MOV EBX, [EAX+EBX] //[TOS + FDataMemory]
   JMP  iVMNext
 end;
@@ -558,7 +548,7 @@ asm
   //EBX is TOS
   MOV EAX, EBX
   XOR EBX, EBX
-  MOV ECX, [EDI].TPreservedCodeMemory.Data
+  MOV ECX, EDI
   MOV BL, [ECX+EAX]
   JMP  iVMNext
 end;
@@ -568,7 +558,7 @@ asm
   //EBX is TOS
   MOV EAX, EBX
   XOR EBX, EBX
-  MOV ECX, [EDI].TPreservedCodeMemory.Data
+  MOV ECX, EDI
   MOV BX, [ECX+EAX]
   JMP  iVMNext
 end;
@@ -577,7 +567,7 @@ procedure vFetchInt64;
 asm
   //EBX is TOS
   //MOV EAX, [EDI].TPreservedCodeMemory.Data
-  ADD EBX, [EDI].TPreservedCodeMemory.Data //TOS <- TOS + FDataMem
+  ADD EBX, EDI //TOS <- TOS + FDataMem
   MOV EAX, [EBX+4]
   MOV EBX, [EBX]
 
@@ -594,7 +584,7 @@ end;
 //(int addr -- )
 procedure vStoreInt;
 asm
-  ADD EBX, [EDI].TPreservedCodeMemory.Data 
+  ADD EBX, EDI 
   MOV EAX, [EBP]
   MOV [EBX], EAX
   INC EBP 
@@ -603,7 +593,7 @@ asm
   INC EBP
   MOV EBX, [EBP]
   //check whether is stackbottom
-  MOV EAX, [EDI].TPreservedCodeMemory.GlobalOptions
+  MOV EAX, [EDI].TTurboPreservedDataMemory.GlobalOptions
   CMP EBP, [EAX].TTurboGlobalOptions.ParamStackBase
   JLE @@exit //already is bottom then exit.
   INC EBP 
@@ -616,7 +606,7 @@ end;
 
 procedure vStoreInt64;
 asm
-  ADD EBX, [EDI].TPreservedCodeMemory.Data 
+  ADD EBX, EDI 
   MOV EAX, [EBP]
   MOV [EBX], EAX
   MOV EAX, [EBP+4]
@@ -632,7 +622,7 @@ asm
   INC EBP
   MOV EBX, [EBP]
   //check whether is stackbottom
-  MOV EAX, [EDI].TPreservedCodeMemory.GlobalOptions
+  MOV EAX, [EDI].TTurboPreservedDataMemory.GlobalOptions
   CMP EBP, [EAX].TTurboGlobalOptions.ParamStackBase
   JLE @@exit //already is bottom then exit.
   INC EBP 
@@ -645,7 +635,7 @@ end;
 
 procedure vStoreWord;
 asm
-  ADD EBX, [EDI].TPreservedCodeMemory.Data 
+  ADD EBX, EDI 
   MOV EAX, [EBP]
   MOV [EBX], AX
   INC EBP 
@@ -654,7 +644,7 @@ asm
   INC EBP
   MOV EBX, [EBP]
   //check whether is stackbottom
-  MOV EAX, [EDI].TPreservedCodeMemory.GlobalOptions
+  MOV EAX, [EDI].TTurboPreservedDataMemory.GlobalOptions
   CMP EBP, [EAX].TTurboGlobalOptions.ParamStackBase
   JLE @@exit //already is bottom then exit.
   INC EBP 
@@ -667,7 +657,7 @@ end;
 
 procedure vStoreByte;
 asm
-  ADD EBX, [EDI].TPreservedCodeMemory.Data 
+  ADD EBX, EDI 
   MOV EAX, [EBP]
   MOV [EBX], AL
   INC EBP 
@@ -676,7 +666,7 @@ asm
   INC EBP
   MOV EBX, [EBP]
   //check whether is stackbottom
-  MOV EAX, [EDI].TPreservedCodeMemory.GlobalOptions
+  MOV EAX, [EDI].TTurboPreservedDataMemory.GlobalOptions
   CMP EBP, [EAX].TTurboGlobalOptions.ParamStackBase
   JLE @@exit //already is bottom then exit.
   INC EBP 
@@ -695,7 +685,7 @@ asm
   XCHG ESP, EBP
   POP  EBX
   XCHG ESP, EBP
-  MOV  EAX, [EDI].TPreservedCodeMemory.Executor
+  MOV  EAX, [EDI].TTurboPreservedDataMemory.Executor
 
   PUSH EDI
   PUSH EBX
@@ -714,11 +704,11 @@ end;
 procedure vEmitString;
 asm
   MOV  EDX, EBX  //EDX <- TOS
-  ADD  EDX, [EDI].TPreservedCodeMemory.Data 
+  ADD  EDX, EDI 
   XCHG ESP, EBP
   POP  EBX
   XCHG ESP, EBP
-  MOV  EAX, [EDI].TPreservedCodeMemory.Executor
+  MOV  EAX, [EDI].TTurboPreservedDataMemory.Executor
 
   PUSH EDI
   PUSH EBX
@@ -737,11 +727,11 @@ end;
 procedure vEmitLString;
 asm
   MOV  EDX, EBX  //EDX <- TOS
-  ADD  EDX, [EDI].TPreservedCodeMemory.Data 
+  ADD  EDX, EDI 
   XCHG ESP, EBP
   POP  EBX
   XCHG ESP, EBP
-  MOV  EAX, [EDI].TPreservedCodeMemory.Executor
+  MOV  EAX, [EDI].TTurboPreservedDataMemory.Executor
 
   PUSH EDI
   PUSH EBX
@@ -775,7 +765,7 @@ end;
 //(int64Addr --)
 procedure vStoreTickCount;
 asm
-  ADD  EBX, [EDI].TPreservedCodeMemory.Data
+  ADD  EBX, EDI
   PUSH EBX
   CALL QueryPerformanceCounter
   XCHG ESP, EBP

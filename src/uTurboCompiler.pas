@@ -128,7 +128,7 @@ type
   private
     FCode: TCustomTurboModule;
   public
-    constructor Create;
+    constructor Create; override;
     destructor Destroy; override;
     property Code: TCustomTurboModule read FCode;
   end;

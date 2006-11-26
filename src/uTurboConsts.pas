@@ -42,7 +42,8 @@ resourcestring
 
 type
   PTsInt = ^ tsInt;
-  tsInt = LongInt;
+  tsInt  = LongInt;
+  tsUInt = LongWord; 
   tsPointer = Pointer;
   PTsIntArray = ^tsIntArray; 
   tsIntArray = array [0..(High(tsInt) div 8)] of tsInt;
@@ -60,10 +61,13 @@ type
   TTurboScriptOptions = set of TTurboScriptOption;
 
   {
-    fvHide, fvPrivate: only can view in the module
-    fvProtected-fvPublished: 采用远调用方式，其它模块可见。
+    @param fvHidden    只能由本模块调用，近调用，该过程不会被连接到LastWordEntry中！没有Name信息。
+    @param fvPrivate   只能由本模块调用，近调用，该过程会被连接到LastWordEntry中！一般没有Name信息。
+    @param fvProtected 只能由本模块以及从该模块的子模块调用，远调用，该过程会被连接到LastWordEntry中！一般没有Name信息。
+    @param fvPublic    任意模块均可调用，远调用，该过程会被连接到LastWordEntry中！一般没有Name信息。
+    @param fvPublished 任意模块均可调用，远调用，该过程会被连接到LastWordEntry中！有Name信息。
   }
-  TTurboVisibility = (fvHide, fvPrivate, fvProtected, fvPublic, fvPublished);
+  TTurboVisibility = (fvHidden, fvPrivate, fvProtected, fvPublic, fvPublished);
   //the Forth Execution priority fpHighest means cfsImmediately
   TTurboPriority = (fpLowest, fpLower, fpLow, fpNormal, fpHigh, pfHigher, fpHighest);
   TTurboCallStyle = (csForth, csRegister, csPascal, csCdecl, csStdCall, csFastCall);
@@ -77,7 +81,7 @@ type
       Visibility: TTurboVisibility; 
       CallStyle: TTurboCallStyle;
       CodeFieldStyle: TTurboCodeFieldStyle;
-  end;
+  end; //}
 
   PTurboVMInstruction = ^TTurboVMInstruction;
   { Summary the FORTH Virtual Mache Codes}

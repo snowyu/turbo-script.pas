@@ -7,7 +7,7 @@ COMPILER TurboForthCompiler
 
 DELPHI
 
-USES (INTERFACE) uStrUtils, uTurboConsts, uTurboExecutor, uTurboAccessor, uTurboModuleFileAccessor
+USES (INTERFACE) uStrUtils, uTurboConsts, uTurboMetaInfo, uTurboExecutor, uTurboAccessor, uTurboModuleFileAccessor
 
 TYPE
   TTurboLabelDeclarationRec = packed record
@@ -92,7 +92,7 @@ TYPE
   end;
 
   TTurboSimpleModule = object
-    Entry: PTurboModuleEntry; //offset address
+    Entry: PTurboModuleEntry;
     ModuleType: TTurboModuleType;
     Name: ShortString;
     Module: TCustomTurboModule;
@@ -406,11 +406,12 @@ begin
             begin
               if ExternalOptions.Name <> '' then aName := ExternalOptions.Name;
               i := Module.GetWordCFA(aName);
-              if i <> 0 then
+              if i <> -1 then
               begin
                 FModule.AddOpToMem(opCallFar);
                 //writeln(aName, '.ModEntry:',Integer(FUsedModules[ModuleIndex].Entry));
-                FModule.AddIntToMem(Integer(FUsedModules[ModuleIndex].Entry));
+                //point to the TurboModuleInfo
+                FModule.AddIntToMem(Integer(FUsedModules[ModuleIndex].Entry)+SizeOf(Pointer)-Integer(FModule.DataMemory));
                 FModule.AddIntToMem(i);
                 //writeln(aName, '.CFA:',i);
                 Result := True;
@@ -550,29 +551,24 @@ begin
 
     if Visibility >= fvProtected then
     begin
+      //FModule.AligData;
       Integer(vVaraibleEntry) := Integer(FModule.DataMemory) + FModule.UsedDataSize;
-      FModule.AddIntToData(Integer(FModule.LastVariableEntry));
-      FModule.AddIntToData(Size);
-      FModule.AddIntToData(0); //preserved.for addr.
-      FModule.AddIntToData(0); //preserved.for TypeInfo.
-      if Visibility >= fvPublished then
-      begin
-        //fill the variable name 
-        FModule.AddByteToData(Length(Name));
-        FModule.AddBufferToData(Name[1], Length(Name));
-      end
-      else 
-      begin
-        //no name
-        FModule.AddByteToData(0);
-      end;
+      FModule.AllocDataSpace(SizeOf(TTurboVariableEntry));
+      vVaraibleEntry.Prior := FModule.LastVariableEntry;
+      vVaraibleEntry.Variable.Size := Size;
+      vVaraibleEntry.Variable.Addr := nil;
+      vVaraibleEntry.Variable.TypeInfo := nil;
+      //FModule.AddIntToData(Integer(FModule.LastVariableEntry));
+      //FModule.AddIntToData(Size);
+      //FModule.AddIntToData(0); //preserved.for addr.
+      //FModule.AddIntToData(0); //preserved.for TypeInfo.
     end;
   
     if (TypeKind in cReqAlignMemTypes) then FModule.AlignData;
     Addr := FModule.UsedDataSize;
     if Visibility >= fvProtected then
     begin
-      Integer(vVaraibleEntry.Addr) := Addr;
+      Integer(vVaraibleEntry.Variable.Addr) := Addr;
       FModule.LastVariableEntry := Pointer(Integer(vVaraibleEntry) - Integer(FModule.DataMemory));
     end;
     Integer(vValue) := Integer(FModule.DataMemory)  + Addr;
@@ -582,7 +578,22 @@ begin
       SaveString(FModule); //if this is string 
       AssignValueTo(vValue);
     end;
+
+      if Visibility >= fvPublished then
+      begin
+        vVaraibleEntry.Variable.Name := Pointer(FModule.UsedDataSize);
+        //fill the variable name 
+        FModule.AddByteToData(Length(Name));
+        FModule.AddBufferToData(Name[1], Length(Name));
+      end
+      else if Visibility >= fvProtected then
+      begin
+        //no name
+        //FModule.AddByteToData(0);
+        vVaraibleEntry.Variable.Name := nil;
+      end;
   end;
+
   //SetLength(FVars, Length(FVars) + 1);
   //FindVar('');
 end;
@@ -600,23 +611,29 @@ begin
     FModule.AlignData;
     //writeln('FModule.UsedDataSize=',InttoHex(FModule.UsedDataSize,4));
     Integer(FDefinedWordEntry) := Integer(FModule.DataMemory) + FModule.UsedDataSize;
-    //p := FModule.LastWordEntry;
-    //writeln('dWerd.Last:',tsInt(FModule.LastWordEntry));
-    FModule.AddIntToData(tsInt(FModule.LastWordEntry));
-    FModule.AllocDataSpace(SizeOf(TTurboWordOptions));
-    FModule.AllocDataSpace(SizeOf(LongWord)); //the ParamFieldLength
-    FModule.AllocDataSpace(SizeOf(Integer)); //the CFA
+    FModule.AllocDataSpace(SizeOf(TTurboWordEntry));
+    FDefinedWordEntry.Prior := FModule.LastWordEntry;
+    //FModule.AddIntToData(tsInt(FModule.LastWordEntry));
+    //FModule.AllocDataSpace(SizeOf(TTurboWordOptions));
+    //FModule.AllocDataSpace(SizeOf(LongWord)); //the ParamFieldLength
+    //FModule.AllocDataSpace(SizeOf(Integer)); //the CFA
     if aWord.Options.Visibility >= fvProtected then
     begin
+      FDefinedWordEntry.Word.Name := Pointer(FModule.UsedDataSize);
       FModule.AddByteToData(Length(aWord.Name));
       FModule.AddBufferToData(aWord.Name[1], Length(aWord.Name));
     end
     else
-      FModule.AddByteToData(0);
+    begin
+      //FModule.AddByteToData(0);
+      FDefinedWordEntry.Word.Name := nil;
+    end;
     FLastWordCfa := FModule.UsedMemory;
-    FDefinedWordEntry.CFA := FLastWordCfa;
+    FDefinedWordEntry.Word.CFA := FLastWordCfa;
     aWord.CFA := FLastWordCfa;
-    FDefinedWordEntry.Options := aWord.Options;
+    FDefinedWordEntry.Word.Visibility := aWord.Options.Visibility;
+    FDefinedWordEntry.Word.CallStyle := aWord.Options.CallStyle;
+    FDefinedWordEntry.Word.CodeFieldStyle := aWord.Options.CodeFieldStyle;
 
     i := Length(FWords);
     SetLength(FWords, i+1);
@@ -629,17 +646,17 @@ procedure T-->Grammar<--.DefineWordEnd();
 var
   vPrior: PTurboWordEntry;
 begin
-  if FDefinedWordEntry.Options.Visibility >= fvProtected then
+  if FDefinedWordEntry.Word.Visibility >= fvProtected then
     FModule.AddOpToMem(opExitFar)
   else
     FModule.AddOpToMem(opExit);
-  FDefinedWordEntry.ParamFieldLength := FModule.UsedMemory - FLastWordCfa + 1;
-  FWords[Length(FWords)-1].ParamFieldLength := FDefinedWordEntry.ParamFieldLength;
+  FDefinedWordEntry.Word.ParamFieldLength := FModule.UsedMemory - FLastWordCfa + 1;
+  FWords[Length(FWords)-1].ParamFieldLength := FDefinedWordEntry.Word.ParamFieldLength;
 
-  vPrior := FModule.LastWordEntry;
+  //vPrior := FModule.LastWordEntry;
   FModule.LastWordEntry := Pointer(Integer(FDefinedWordEntry) - Integer(FModule.DataMemory));
   //writeln('dWerdE.Last:',tsInt(FModule.LastWordEntry));
-  FDefinedWordEntry.Prior := vPrior;
+  //FDefinedWordEntry.Prior := vPrior;
 end;
 
 function T-->Grammar<--.FindWord(const aName: String): Integer;
@@ -662,15 +679,19 @@ begin
     if i < 0 then i := AddUsedModule(aWord.ModuleName, aWord.ModuleType);
     if i >= 0 then
     begin
-      aWord.ExternalOptions.ModuleEntry := FUsedModules[i].Entry;
+      aWord.ExternalOptions.ModuleInfo := Pointer(Integer(FUsedModules[i].Entry) + SizeOf(Pointer));
       aWord.ModuleIndex := i;
       aWord.Module := FUsedModules[i].Module;
     end;
   end
   else with aWord.ExternalOptions do 
   begin
-    ModuleEntry := FModule.LastModuleEntry;
-    if ModuleEntry = nil then SynError(cDLLModuleMissError, aWord.Name);
+    if FModule.LastModuleEntry <> nil then
+    begin
+      ModuleInfo := Pointer(Integer(FModule.LastModuleEntry) + SizeOf(Pointer));
+    end
+    else 
+      SynError(cDLLModuleMissError, aWord.Name);
   end;
 end;
 
@@ -698,16 +719,22 @@ begin
     if aModuleType = mtLib then Module := vModule else Module := nil;
     with FModule do 
     begin
-      Integer(Entry) := UsedDataSize; //the offset address.
-      AddIntToData(tsInt(LastModuleEntry));
-      AddByteToData(Byte(aModuleType));
-      AddIntToData(0); //preserved for Module: Pointer
-      AllocDataSpace(SizeOf(LongWord)); //Revision
-      AllocDataSpace(SizeOf(TTimeStamp)); //BuildDate
+      Integer(Entry) := Integer(DataMemory) + UsedDataSize; //the offset address.
+      AllocDataSpace(SizeOf(TTurboModuleEntry));
+      Entry.Prior := LastModuleEntry;
+      Entry.Module.ModuleType := aModuleType;
+      Entry.Module.Revision := vModule.ModuleVersion;
+      Entry.Module.BuildDate := vModule.ModuleDate;
+      //AddIntToData(tsInt(LastModuleEntry));
+      //AddByteToData(Byte(aModuleType));
+      //AddIntToData(0); //preserved for Module: Pointer
+      //AllocDataSpace(SizeOf(LongWord)); //Revision
+      //AllocDataSpace(SizeOf(TTimeStamp)); //BuildDate
+      Entry.Module.Name := Pointer(UsedDataSize);
       AddByteToData(Length(aName));
       if Length(aName) > 0 then
         AddBufferToData(aName[1], Length(aName));
-      LastModuleEntry := Entry;
+      LastModuleEntry := Pointer(tsInt(Entry) - Integer(DataMemory));
     end;
   end;
 end;
@@ -764,7 +791,7 @@ begin
     begin
       FModule.IsLoaded := True;
       //writeln('InitProcCFA=', FInitProcCFA+SizeOf(TTurboModuleStreamHeader));
-      with PPreservedCodeMemory(FModule.Memory)^ do
+      with PTurboPreservedDataMemory(FModule.DataMemory)^ do
       begin
         Integer(InitializeProc) := FInitProcCFA;
       end;
@@ -968,7 +995,7 @@ PRODUCTIONS
   .
   WordVsibility< var aVisibility: TTurboVisibility > 
     = 
-    "HIDDEN"                                           (. aVisibility := fvHide; .)
+    "HIDDEN"                                           (. aVisibility := fvHidden; .)
     |"PRIVATE"                                         (. aVisibility := fvPrivate; .)
     |"PROTECTED"                                       (. aVisibility := fvProtected; .)
     |"PUBLIC"                                          (. aVisibility := fvPublic; .)
