@@ -85,6 +85,31 @@ const
   AnsiHexDigits              = ['0'..'9', 'A'..'F', 'a'..'f'];
   AnsiValidIdentifierLetters = ['0'..'9', 'A'..'Z', 'a'..'z', '_'];
 
+const
+  // CharType return values
+  C1_UPPER  = $0001; // Uppercase
+  C1_LOWER  = $0002; // Lowercase
+  C1_DIGIT  = $0004; // Decimal digits
+  C1_SPACE  = $0008; // Space characters
+  C1_PUNCT  = $0010; // Punctuation
+  C1_CNTRL  = $0020; // Control characters
+  C1_BLANK  = $0040; // Blank characters
+  C1_XDIGIT = $0080; // Hexadecimal digits
+  C1_ALPHA  = $0100; // Any linguistic character: alphabetic, syllabary, or ideographic
+
+  {$IFDEF MSWINDOWS}
+  {$IFDEF SUPPORTS_EXTSYM}
+  {$EXTERNALSYM C1_UPPER}
+  {$EXTERNALSYM C1_LOWER}
+  {$EXTERNALSYM C1_DIGIT}
+  {$EXTERNALSYM C1_SPACE}
+  {$EXTERNALSYM C1_PUNCT}
+  {$EXTERNALSYM C1_CNTRL}
+  {$EXTERNALSYM C1_BLANK}
+  {$EXTERNALSYM C1_XDIGIT}
+  {$EXTERNALSYM C1_ALPHA}
+  {$ENDIF SUPPORTS_EXTSYM}
+  {$ENDIF MSWINDOWS}
 
 
 {可以递归调用处理子目录以及旗下的文件}
@@ -125,8 +150,14 @@ function CharHex(const C: Char): Byte;
 function CharLower(const C: Char): Char; {$IFDEF CLR} inline; {$ENDIF}
 function CharUpper(const C: Char): Char; {$IFDEF CLR} inline; {$ENDIF}
 
+// Character Test Routines
 function CharIsUpper(const C: Char): Boolean; {$IFDEF CLR} inline; {$ENDIF}
 function CharIsLower(const C: Char): Boolean; {$IFDEF CLR} inline; {$ENDIF}
+function CharIsDigit(const C: Char): Boolean; {$IFDEF CLR} inline; {$ENDIF}
+function CharIsNumberChar(const C: Char): Boolean; {$IFDEF CLR} inline; {$ENDIF}
+
+// String Test Routines
+function StrIsInteger(const S: string): Boolean;
 
 Var
   gAppPath: String;
@@ -750,6 +781,36 @@ begin
   Result := Copy(S, Length(S) - Count + 1, Count);
 end;
 
+function StrIsInteger(const S: string): Boolean;
+var
+  i: Integer;
+begin
+  Result  := S <> '';
+  if Result then
+  begin
+    if (s[1] = '$') then
+    begin
+      if Length(s) > 1 then
+      begin
+        i := 2;
+        while (i <= Length(s)) and (s[i] in AnsiHexDigits) do inc(i);
+        dec(i);
+        Result := (i = Length(s)) and (s[i] in AnsiHexDigits);
+      end
+      else
+      begin
+        i := 1;
+        while (i <= Length(s)) and (s[i] in AnsiDecDigits) do inc(i);
+        dec(i);
+        Result := (i = Length(s)) and (s[i] in AnsiDecDigits);
+      end
+    end
+    else
+      for i := 1 to Length(S) do
+  end;
+    
+end;
+
 //=== Character Transformation Routines ======================================
 
 function CharHex(const C: Char): Byte;
@@ -780,6 +841,25 @@ begin
   {$ELSE}
   Result := (AnsiCharTypes[C] and C1_UPPER) <> 0;
   {$ENDIF CLR}
+end;
+
+function CharIsDigit(const C: Char): Boolean;
+begin
+  {$IFDEF CLR}
+  Result := System.Char.IsDigit(C);
+  {$ELSE}
+  Result := (AnsiCharTypes[C] and C1_DIGIT) <> 0;
+  {$ENDIF CLR}
+end;
+
+function CharIsNumberChar(const C: Char): Boolean;
+begin
+  {$IFDEF CLR}
+  Result := System.Char.IsDigit(C) or
+  {$ELSE}
+  Result := ((AnsiCharTypes[C] and C1_DIGIT) <> 0) or
+  {$ENDIF CLR}
+    (C in AnsiSigns) or (C = DecimalSeparator);
 end;
 
 function CharUpper(const C: Char): Char;

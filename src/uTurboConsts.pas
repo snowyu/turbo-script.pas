@@ -3,6 +3,8 @@ unit uTurboConsts;
 
 interface
 
+{$I TurboScript.inc}
+
 uses
   SysUtils, Classes
   ;
@@ -57,15 +59,25 @@ type
   }
   TTurboModuleType = (mtUnknown, mtProgram, mtLib, mtObject, mtFunction, mtHost, mtDLL);
 
-  TTurboScriptOption = (soOptimize, soLoadOnDemand, soBindingRuntime, soBindingCompileTime);
+  {
+    @param soTypeSafety the module is TypeSafety. all the indentities own the TypeInfo.
+                        当模块有这个参数的时候，编译器将强制把所有标识符的的类型信息编入内存。
+  }
+  TTurboScriptOption = (soOptimize, soLoadOnDemand 
+    , soBindingRuntime, soBindingCompileTime
+    , soTypeSafety
+    , soAssertSupport
+  );
   TTurboScriptOptions = set of TTurboScriptOption;
 
   {
-    @param fvHidden    只能由本模块调用，近调用，该过程不会被连接到LastWordEntry中！没有Name信息。
-    @param fvPrivate   只能由本模块调用，近调用，该过程会被连接到LastWordEntry中！一般没有Name信息。
-    @param fvProtected 只能由本模块以及从该模块的子模块调用，远调用，该过程会被连接到LastWordEntry中！一般没有Name信息。
-    @param fvPublic    任意模块均可调用，远调用，该过程会被连接到LastWordEntry中！一般没有Name信息。
-    @param fvPublished 任意模块均可调用，远调用，该过程会被连接到LastWordEntry中！有Name信息。
+    @param fvHidden    Word:只能由本模块调用，近调用，该过程不会被连接到LastWordEntry中！没有Name信息。
+                       Module: 嵌入到父亲模块
+    @param fvPrivate   Word:只能由本模块调用，近调用，该过程会被连接到LastWordEntry中！一般没有Name信息。
+                       Module: 嵌入到父亲模块
+    @param fvProtected Word:只能由本模块以及从该模块的子模块调用，远调用，该过程会被连接到LastWordEntry中！一般没有Name信息。
+    @param fvPublic    Word:任意模块均可调用，远调用，该过程会被连接到LastWordEntry中！一般没有Name信息。
+    @param fvPublished Word:任意模块均可调用，远调用，该过程会被连接到LastWordEntry中！有Name信息。
   }
   TTurboVisibility = (fvHidden, fvPrivate, fvProtected, fvPublic, fvPublished);
   //the Forth Execution priority fpHighest means cfsImmediately
@@ -87,8 +99,13 @@ type
   { Summary the FORTH Virtual Mache Codes}
   TTurboVMInstruction = (
     opNoop,
-    {## The FORTH CORE opstructions }
-    opHalt,
+    {## The FORTH CORE instructions }
+    //ErrorCode = 0 means no error
+    opHalt, //(ErrorCode -- )
+    //要想用断言，必须使用参数
+    //其中行号是编译器压入的
+    opAssert, //(ShortString(Msg), expr -- )
+    opError,  //(ErrorCode -- )
     opEnter, //inEnter Addr
     opExit,
     opNext,
@@ -146,6 +163,8 @@ type
     opWithinUnsignedInt, //( u ul uh -- t )          Return true if ul <= u < uh 區間內
     opAddStr, //(pShortString1 pShortString2 ---- pResult)
     opAddLStr, //(pAnsiString1 pAnsiString2 ---- pAnsiResult)
+    //the float types
+    opFAdd, //(double, double -- double)
 
     {## Logical opstructions }
     {## for opteger}
@@ -215,23 +234,30 @@ type
 
   ); 
 
-  //the Core procedure List, maybe procedure or method.
+  //the Core VM instructions List
   {: 核心虚拟指令表 } 
   TTurboCoreWords = array [TTurboVMInstruction] of TProcedure;
 
   {
-  @param errHalt there are some data stil in return stack when Halt, the ESP should be point to
+  @param psHaltError there are some data still in return stack when Halt, the ESP should be point to
     the stack bottom! put the current ESP to TPreservedCodeMemory.ReturnStackBottom.   
 
   Note: the state Must be a Byte for speed!!!
   }
   TTurboProcessorState = (psHalt, psRunning, psStepping, psCompiling
-    //, errHalt
+     , psHaltError
   );
   TTurboProcessorStates = set of TTurboProcessorState;
-  TTurboProcessorErrorCode = (errNone, errBadInstruction, errHalt, errDizZero
+  {
+    @param errOutMem 代码区内存无可用的空间
+    @param errOutOfMetaData MetaData区已无可用的空间
+  }
+  TTurboProcessorErrorCode = (errNone, errBadInstruction, errDizZero
     , errModuleNotFound
-    , errOutOfMem, errOutOfDataStack, errOutOfReturnStack 
+    , errOutOfMem
+    , errOutOfMetaData
+    , errOutOfDataStack, errOutOfReturnStack
+    , errAssertionFailed 
   );
 
   
@@ -264,6 +290,12 @@ const
   //cTurboScriptBadInstructionBit  = [psBadInstruction];
   cMaxTurboVMInstructionCount = SizeOf(TTurboCoreWords) div SizeOf(TProcedure); //the max turbo VM code directive count
   
+function IsInteger(const aValue: string): Boolean;
+{$IFDEF FPC}
+function AnsiExtractQuotedStr(var Src: PChar; Quote: Char): string;
+function AnsiDequotedStr(const S: string; AQuote: Char): string;
+{$ENDIF}
+
 implementation
 
 {
@@ -338,5 +370,68 @@ begin
   end;
 end;
 
+
+function IsInteger(const aValue: string): Boolean;
+begin
+  Result := Length(aValue) > 0;
+  if Result and (aValue[1] = '$') then
+  
+end;
+
+{$IFDEF FPC}
+function AnsiExtractQuotedStr(var Src: PChar; Quote: Char): string;
+var
+  P, Dest: PChar;
+  DropCount: Integer;
+begin
+  Result := '';
+  if (Src = nil) or (Src^ <> Quote) then Exit;
+  Inc(Src);
+  DropCount := 1;
+  P := Src;
+  Src := AnsiStrScan(Src, Quote);
+  while Src <> nil do   // count adjacent pairs of quote chars
+  begin
+    Inc(Src);
+    if Src^ <> Quote then Break;
+    Inc(Src);
+    Inc(DropCount);
+    Src := AnsiStrScan(Src, Quote);
+  end;
+  if Src = nil then Src := StrEnd(P);
+  if ((Src - P) <= 1) or ((Src - P - DropCount) = 0) then Exit;
+  if DropCount = 1 then
+    SetString(Result, P, Src - P - 1)
+  else
+  begin
+    SetLength(Result, Src - P - DropCount);
+    Dest := PChar(Result);
+    Src := AnsiStrScan(P, Quote);
+    while Src <> nil do
+    begin
+      Inc(Src);
+      if Src^ <> Quote then Break;
+      Move(P^, Dest^, Src - P);
+      Inc(Dest, Src - P);
+      Inc(Src);
+      P := Src;
+      Src := AnsiStrScan(Src, Quote);
+    end;
+    if Src = nil then Src := StrEnd(P);
+    Move(P^, Dest^, Src - P - 1);
+  end;
+end;
+
+function AnsiDequotedStr(const S: string; AQuote: Char): string;
+var
+  LText: PChar;
+begin
+  LText := PChar(S);
+  Result := AnsiExtractQuotedStr(LText, AQuote);
+  if ((Result = '') or (LText^ = #0)) and
+     (Length(S) > 0) and ((S[1] <> AQuote) or (S[Length(S)] <> AQuote)) then
+    Result := S;
+end;
+{$ENDIF}
 
 end.

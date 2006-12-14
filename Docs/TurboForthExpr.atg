@@ -7,15 +7,11 @@ COMPILER TurboForthCompiler
 
 DELPHI
 
-USES (INTERFACE) uStrUtils, uTurboConsts, uTurboMetaInfo, uTurboExecutor, uTurboAccessor, uTurboModuleFileAccessor
+USES (INTERFACE) uStrUtils, uTurboConsts, uTurboMetaInfo, uTurboExecutor, uTurboAccessor, uTurboModuleFileAccessor//, uTurboSymbols
 
 TYPE
-  TTurboLabelDeclarationRec = packed record
-    Name: String;
-    WordName: String;
-    Addr: Integer;
-  end;
-  
+  TTurboCompilerOptionState = (cosDefault, cosEnable, cosDisable);
+
   TTurboValueRec = packed record
     case Integer of
       0: (
@@ -56,6 +52,12 @@ TYPE
       7: (VLongword: Longword);
   end;
 
+  TTurboLabelDeclarationRec = packed record
+    Name: String;
+    WordName: String;
+    Addr: Integer;
+  end;
+  
   TTurboSimpleConst = object
   public
     Name: ShortString;
@@ -67,7 +69,7 @@ TYPE
     procedure SetTypeKind(aValue: TTurboSimpleTypeKind);
     function AssignValueTo(const Source: Pointer): Boolean;
     //根据aValue 如果aTypeKind is ttkUnknown 那么会自动判断其类型
-    function AssignValue(const aValue: string; const aTypeKind: TTurboSimpleTypeKind = ttkUnknown): Boolean;
+    function AssignValue(const aValue: string; aTypeKind: TTurboSimpleTypeKind = ttkUnknown): Boolean;
     procedure SaveString(const aModule: TCustomTurboModule);
   end;
 
@@ -88,7 +90,7 @@ TYPE
     ModuleType: TTurboModuleType;  //for external word
     ModuleIndex: Integer; //for external word
     Module: TCustomTurboModule; //for external forth word
-    ExternalOptions: TTurboExteralWordCFA; //Exteral Word Options
+    ExternalOptions: TTurboExteralWordOptions; //Exteral Word Options
   end;
 
   TTurboSimpleModule = object
@@ -117,11 +119,20 @@ PRIVATE
   procedure WriteStrLn(S : String);
   function  DefineWordBegin(var aWord: TTurboSimpleWord): Boolean;
   procedure DefineWordEnd();
-  procedure PushString();
+  procedure PushString(const aStr: string);
+  procedure PushStringSeqToStack(const aStr: string);
+  procedure PushInt32(const aStr: string);overload;
+  procedure PushInt32(const aInt: tsInt);overload;
+
+  procedure ProcessGrammarComment(Sender : TObject; CommentList : TCommentList);
+  procedure SetCompilerOption(const aOptionName: string; aEnabled : TTurboCompilerOptionState; 
+      ParamList : TStringList);
+  //case the aValue type push the aValue to CodeMem
+  procedure PushWordParam(const aValue: string);
   // Add Identifier CFA address into the memory. 
-  function AddIdentifierCFA(const aName: String): Boolean;
+  function AddIdentifierCFA(const aName: String; const aParams: TStringList): Boolean;
   // AddWordCFA address into the memory. 
-  function AddWordCFA(aName: String): Boolean;
+  function AddWordCFA(aName: String; const aParams: TStringList): Boolean;
   // Add Const address into the memory. 
   function AddConstCFA(const aName: String): Boolean;
   // Add Var address into the memory. 
@@ -136,7 +147,7 @@ PRIVATE
   //if not find then add new , return index else raise error.
   function  DefineConstEx(const aValue: TTurboSimpleConst): Integer;
   function FindConst(const aName: String): Integer;
-  function GetConstValue(const aTypeKind: TTurboSimpleTypeKind; const aName: string): TTurboValueRec;
+  function GetConstValueRec(const aTypeKind: TTurboSimpleTypeKind; const aName: string): TTurboValueRec;
 
   //if not find then add new , return index else raise error.
   function DefineVar(const aValue: TTurboSimpleVar): Integer;
@@ -158,6 +169,7 @@ PUBLIC
 CREATE
   FModule := TCustomTurboModule.Create;
   FModule.GlobalOptions := @FTurboGlobalOptions;
+  InternalGrammarComment := ProcessGrammarComment;
 DESTROY
   FreeAndNil(FModule);
 ERRORS
@@ -170,6 +182,11 @@ ERRORS
     cDLLModuleMissError: Result := rsDLLModuleMissSyntaxError;
     cFileNotFoundError:  Result := rsFileNotFoundError;
     cWordNotFoundError:  Result := rsWordNotFoundError;
+    cInvalidOptionError: Result := '"' + Data + '" is an invalid option';
+    cInvalidOptionParamError: Result := 'invalid modifiers for option "' + Data + '"';
+    cStrToIntCovnertError: Result := 'Can not convert the strin to int!';
+    cMessageCompilerOption: Result := Data;
+
 
 PUBLISHED
 
@@ -186,9 +203,44 @@ Const
   cDLLModuleMissError = 306;
   cFileNotFoundError  = 307;
   cWordNotFoundError  = 308;
+  cStrToIntCovnertError = 309;
+  cInvalidOptionError = 400;
+  cInvalidOptionParamError = 401;
+  cMessageCompilerOption = 500;
 
 Const
   cReqAlignMemTypes = [ttkUWord, ttkSWord, ttkULong, ttkSLong, ttkPointer, ttkString, ttkLString, ttkInt64, ttkQWord];
+
+type
+  TCocoRScannerAccess = Class(TCocoRScanner);
+
+function UnitStrToInt(s: string): integer;
+var
+  vUnit: integer;
+begin
+  vUnit := 1;
+  if Length(s) >= 3 then
+  begin
+    if UpCase(s[Length(s)]) = 'B' then
+    begin
+      if UpCase(s[Length(s)-1]) = 'K' then
+      begin
+        vUnit := 1024;
+        Delete(s, Length(s)-2, 2);
+      end
+      else if UpCase(s[Length(s)-1]) = 'M' then
+      begin
+        vUnit := 1024 * 1024;
+        Delete(s, Length(s)-2, 2);
+      end;
+    end;
+  end;
+    Result := StrToIntDef(s, -1);
+    if Result > 0 then 
+    begin 
+      Result := Result * vUnit;
+    end;
+end;
 
 function GetSimpleTurboTypeSize(const aTypeKind: TTurboSimpleTypeKind): Integer;
 begin
@@ -208,55 +260,82 @@ begin
   end;
 end;
 
-function TTurboSimpleConst.AssignValue(const aValue: string; const aTypeKind: TTurboSimpleTypeKind): Boolean;
+function TTurboSimpleConst.AssignValue(const aValue: string; aTypeKind: TTurboSimpleTypeKind): Boolean;
 begin
   Result := True;
   //writeln('AssignValue:', Integer(aTypeKind));
-  if aValue[1] = '''' then
+  if (aTypeKind = ttkUnknown) and (aValue[1] = '''') then
   begin
-    ValueStr := AnsiDequotedStr(aValue, '''');
-    if aTypeKind = ttkUnknown then
-    begin
-       TypeKind := ttkString;
-      {if Length(ValueStr) < 256 then
+       aTypeKind := ttkString;
+      {
+      if Length(ValueStr) = 1 then
+        aTypeKind := ttkChar
+      else if Length(ValueStr) < 256 then
       begin
-        TypeKind := ttkString;
+        aTypeKind := ttkString;
       end
       else begin
-        TypeKind := ttkLString;
+        aTypeKind := ttkLString;
       end;}
-    end 
-    else if aTypeKind = ttkChar then
+  end;
+  Case aTypeKind of
+    ttkString, ttkLString: 
+    begin
+      ValueStr := AnsiDequotedStr(aValue, '''');
+    end;
+    ttkChar:
+    begin
+      ValueStr := AnsiDequotedStr(aValue, '''');
       Value.VByte := Ord(ValueStr[1]);
-  end
-  else
+    end;
+    ttkSByte, ttkUByte, ttkSWord, ttkUWord, ttkSLong, ttkULong, ttkInt64:
     try
       ValueStr := aValue;
       Value.VInt64 := StrToInt64(aValue);
-      //writeln(Name,'=',Value.VByte);
-      if aTypeKind = ttkUnknown then
-      begin
-        if (Value.VInt64 >= Low(ShortInt)) and (Value.VInt64<=High(ShortInt)) then
-          TypeKind := ttkSByte
-        else if (Value.VInt64 >= Low(Byte)) and (Value.VInt64<=High(Byte)) then
-          TypeKind := ttkUByte
-        else if (Value.VInt64 >= Low(SmallInt)) and (Value.VInt64<=High(SmallInt)) then
-          TypeKind := ttkSWord
-        else if (Value.VInt64 >= Low(Word)) and (Value.VInt64<=High(Word)) then
-          TypeKind := ttkUWord
-        else if (Value.VInt64 >= Low(LongInt)) and (Value.VInt64<=High(LongInt)) then
-          TypeKind := ttkSLong
-        else if (Value.VInt64 >= Low(LongWord)) and (Value.VInt64<=High(LongWord)) then
-          TypeKind := ttkULong
-        else //if (Value.VInt64 >= Low(Int64)) and (Value.VInt64<=High(Int64)) then
-          TypeKind := ttkInt64;
-      end;
     except
-      TypeKind := ttkUnknown;
+      aTypeKind := ttkUnknown;
       Result := False;
+    end
+    else //Case-Else aTypeKind
+    begin
+      ValueStr := aValue;
+      try //is Integer?
+        Value.VInt64 := StrToInt64(aValue);
+        if (Value.VInt64 >= Low(ShortInt)) and (Value.VInt64<=High(ShortInt)) then
+          aTypeKind := ttkSByte
+        else if (Value.VInt64 >= Low(Byte)) and (Value.VInt64<=High(Byte)) then
+          aTypeKind := ttkUByte
+        else if (Value.VInt64 >= Low(SmallInt)) and (Value.VInt64<=High(SmallInt)) then
+          aTypeKind := ttkSWord
+        else if (Value.VInt64 >= Low(Word)) and (Value.VInt64<=High(Word)) then
+          aTypeKind := ttkUWord
+        else if (Value.VInt64 >= Low(LongInt)) and (Value.VInt64<=High(LongInt)) then
+          aTypeKind := ttkSLong
+        else if (Value.VInt64 >= Low(LongWord)) and (Value.VInt64<=High(LongWord)) then
+          aTypeKind := ttkULong
+        else //if (Value.VInt64 >= Low(Int64)) and (Value.VInt64<=High(Int64)) then
+          aTypeKind := ttkInt64;
+      except
+        aTypeKind := ttkUnknown;
+        Result := False;
+      end;
+
+      if aTypeKind = ttkUnknown then
+      try //is Float?
+        Value.VDouble := StrToFloat(aValue);
+        {if (Value.VDouble >= Low(Single)) and (Value.VDouble<=High(Single)) then //can not get low..High
+          aTypeKind := ttkSingle
+        else}
+          aTypeKind := ttkDouble;
+      except
+        aTypeKind := ttkUnknown;
+        Result := False;
+      end
     end;
+  End; //Case
+
+  TypeKind := aTypeKind;
   if aTypeKind <> ttkUnknown then begin
-    TypeKind := aTypeKind;
     Result := True;
   end;
   if Result then
@@ -310,15 +389,168 @@ end;
 
 { T-->Grammar<-- }
 
-function T-->Grammar<--.AddIdentifierCFA(const aName: string): Boolean;
+procedure T-->Grammar<--.ProcessGrammarComment(Sender : TObject; CommentList : TCommentList);
+var
+  i, j: integer;
+  vOptionName : string;
+  vEnabled : TTurboCompilerOptionState;
+  ParamList : TStringList;
 begin
-  Result := AddConstCFA(aName);
-  if Result then exit;
+  with CommentList do 
+  for i := 0 to Count - 1 do
+  begin
+    vOptionName := Comments[i];
+    if (Length(vOptionName) >= 2) and (vOptionName[1]='{') and (vOptionName[2]='$') and (vOptionName[Length(vOptionName)]='}') then
+    begin
+      Delete(vOptionName, 1, 2);
+      Delete(vOptionName, Length(vOptionName), 1);
+      ParamList := TStringList.Create;
+      try
+        ParamList.QuoteChar := '''';
+        ParamList.Delimiter := ',';
+			
+        j := Pos(' ', vOptionName);
+        if j > 0 then
+        begin
+          inc(j);
+          ParamList.DelimitedText := Copy(vOptionName, j, Length(vOptionName)-j);
+          Dec(j);
+          Delete(vOptionName, j, MaxInt);
+        end;
+          if (Length(vOptionName) > 0) then
+          begin
+            vEnabled := cosDefault;
+            writeln('ApplyCompilerOption:',vOptionName);
+            if vOptionName[Length(vOptionName)] = '+' then 
+            begin
+              vEnabled := cosEnable;
+              Delete(vOptionName, Length(vOptionName), 1);
+            end
+            else if vOptionName[Length(vOptionName)] = '-' then
+            begin
+              vEnabled := cosDisable;
+              Delete(vOptionName, Length(vOptionName), 1);
+            end
+            else if ParamList.Count > 0 then
+            begin
+              if SameText(ParamList[0], 'ON') then
+              begin
+                vEnabled := cosEnable;
+                ParamList.Delete(0);
+              end
+              else if SameText(ParamList[0], 'OFF') then
+              begin
+                vEnabled := cosDisable;
+                ParamList.Delete(0);
+              end;
+            end;
+            SetCompilerOption(UpperCase(vOptionName), vEnabled, ParamList);
+          end;
+      finally
+        ParamList.Free;
+      end;
+    end;
+  end;
+end;
 
-  Result := AddVarCFA(aName);
-  if Result then exit;
+procedure T-->Grammar<--.SetCompilerOption(const aOptionName: string; aEnabled : TTurboCompilerOptionState;
+    ParamList : TStringList);
+var
+  vMsgType: Integer;
+  s: string;
+begin
+  if (aOptionName = 'C') or (aOptionName = 'ASSERTIONS') then
+  begin
+    if aEnabled = cosDisable then
+      FModule.Options := FModule.Options - [soAssertSupport]
+    else
+      FModule.Options := FModule.Options + [soAssertSupport];
+  end
+  else if (aOptionName = 'MAXCODESIZE') then
+  begin
+    if (ParamList.Count > 1) or (ParamList.Count = 0)  then
+    begin
+      SemError(cInvalidOptionParamError, aOptionName);
+    end
+    else 
+    begin
+      vMsgType := UnitStrToInt(ParamList[0]);
+      if vMsgType > 0 then
+        FModule.MemorySize := vMsgType
+      else
+        SemError(cInvalidOptionParamError, aOptionName);
+    end;
+  end
+  else if (aOptionName = 'MAXDATASIZE') then
+  begin
+    if (ParamList.Count > 1) or (ParamList.Count = 0)  then
+    begin
+      SemError(cInvalidOptionParamError, aOptionName);
+    end
+    else 
+    begin
+      vMsgType := UnitStrToInt(ParamList[0]);
+      if vMsgType > 0 then
+        FModule.DataMemorySize := vMsgType
+      else
+        SemError(cInvalidOptionParamError, aOptionName);
+    end;
+  end
+  else if (aOptionName = 'MESSAGE') then
+  begin
+    if (ParamList.Count > 2) or (ParamList.Count = 0)  then
+    begin
+      SemError(cInvalidOptionParamError, aOptionName);
+    end
+    else
+    begin
+      if ParamList.Count = 2 then
+      begin
+        s := ParamList[0];
+        if s = 'HINT' then 
+          vMsgType := etHint
+        else if s = 'SYNTAX' then
+          vMsgType := etSyntax
+        else if s = 'SYMANTIC' then
+          vMsgType := etSymantic
+        else if s = 'WARN' then
+          vMsgType := etWarn
+        else begin
+          SemError(cInvalidOptionParamError, aOptionName);
+          vMsgType := -1;
+        end
+        ;
+        s := ParamList[1];
+      end
+      else begin
+        vMsgType := etHint;
+        s := ParamList[0];
+      end;
+      //if vMsgType <> -1 then
+      Case vMsgType of
+        etHint: Writeln('Hint:', s);
+        etWarn: Writeln('Warn:', s);
+        Else
+          ErrorMsg(cMessageCompilerOption, s, vMsgType);
+      End;
+    end;
+  end
+  else
+    SemError(cInvalidOptionError, aOptionName);
+end;
 
-  Result := AddWordCFA(aName);
+function T-->Grammar<--.AddIdentifierCFA(const aName: string; const aParams: TStringList): Boolean;
+begin
+  if not Assigned(aParams) then
+  begin
+    Result := AddConstCFA(aName);
+    if Result then exit;
+
+    Result := AddVarCFA(aName);
+    if Result then exit;
+  end;
+
+  Result := AddWordCFA(aName, aParams);
   if Result then exit;
 
   //writeln('cUnknownWordError:',aName);
@@ -347,7 +579,7 @@ begin
           else 
           begin
             FModule.AddOpToMem(opPushInt);
-            Size := SizeOf(Integer);
+            Size := SizeOf(tsInt);
           end;
         end;//case
       end
@@ -373,7 +605,23 @@ begin
     end
 end;
 
-function T-->Grammar<--.AddWordCFA(aName: string): Boolean;
+procedure T-->Grammar<--.PushWordParam(const aValue: string);
+begin
+  if aValue = '' then exit;
+  if (Length(aValue) >= 2) and (aValue[1] = '''') then
+  begin
+    // it's a string
+    PushString(aValue);
+  end
+  else if StrIsInteger(aValue) then
+  begin
+    PushInt32(aValue);
+  end
+  else //暂时不支持内嵌参数的word
+    AddIdentifierCFA(aValue, nil);
+end;
+
+function T-->Grammar<--.AddWordCFA(aName: string; const aParams: TStringList): Boolean;
 var
   i: Integer;
 begin
@@ -381,6 +629,14 @@ begin
   i := FindWord(aName);
   if i >= 0 then with FWords[i] do
   begin
+    if Assigned(aParams) then
+    begin
+      //push the parameters
+      for i := aParams.Count - 1 downto 0 do
+      begin
+        PushWordParam(aParams[i]);
+      end;
+    end;
     case Options.CodeFieldStyle of
       cfsFunction:
       begin
@@ -446,7 +702,7 @@ begin
   end;
 end;
 
-function T-->Grammar<--.GetConstValue(const aTypeKind: TTurboSimpleTypeKind; const aName: String): TTurboValueRec;
+function T-->Grammar<--.GetConstValueRec(const aTypeKind: TTurboSimpleTypeKind; const aName: String): TTurboValueRec;
 var
   i: Integer;
 begin
@@ -765,7 +1021,8 @@ begin
   with FModule do
   begin
     ClearMemory;
-    MemorySize := cMaxMemorySize;
+    if MemorySize < cMaxMemorySize then
+      MemorySize := cMaxMemorySize;
     Status := [psCompiling];
   end;
   SetLength(FLabels, 0);
@@ -814,12 +1071,44 @@ begin
   SetLength(FUsedModules, 0);
 end;
 
-procedure T-->Grammar<--.PushString();
+procedure T-->Grammar<--.PushInt32(const aInt: tsInt);
+begin
+  FModule.AddOpToMem(opPushInt);
+  FModule.AddIntToMem(aInt);
+end;
+
+procedure T-->Grammar<--.PushInt32(const aStr: string);
+begin
+  try
+    PushInt32(StrToInt(aStr));
+  except
+    SynError(cStrToIntCovnertError, aStr);
+  end;
+end;
+
+procedure T-->Grammar<--.PushString(const aStr: string);
+var
+  vConst: TTurboSimpleConst;
+  p: Pointer;
+begin
+  if vConst.AssignValue(aStr) then
+  begin
+    vConst.SaveString(FModule); //if this is string 
+    FModule.AddOpToMem(opPushInt);
+    Integer(p) := Integer(FModule.Memory) + FModule.UsedMemory;
+    FModule.AllocSpace(SizeOf(Pointer));
+    vConst.AssignValueTo(p);
+  end
+  else
+    SynError(cConstRedeclarationError, 'Invalid String:'+ aStr);
+end;
+
+procedure T-->Grammar<--.PushStringSeqToStack(const aStr: string);
 var
   s: string;
   i: Integer;
 begin
-  s := AnsiDequotedStr(LexString, '''');
+  s := AnsiDequotedStr(aStr, '''');
   for i := length(s) downto 1 do
   begin
     FModule.AddOpToMem(opPushInt);
@@ -851,6 +1140,7 @@ CHARACTERS
  LF=CHR(10).
  noQuote = ANY - "'" .
  noDblQuote = ANY - '"' .               
+ noEOL = ANY - EOL .
  HexDigit = "0123456789ABCDEF" .
 
 TOKENS
@@ -864,19 +1154,24 @@ NAMES
 
 
 IGNORE TAB+EOL+LF
-PRAGMAS
 
-COMMENTS FROM "(" TO ")"
+PRAGMAS
+   //CompilerDirective DESCRIPTION "TurboScript Assembler Compiler Directive" 
+     // = "[$" { noEOL } "]". (. Writeln('SDDSSDL:'+ LexString); .) //古怪得很，LexString 取得的值是上一个标识的，而不是这个CompilerDirective的！
+
+//COMMENTS FROM "(" TO ")"
 COMMENTS FROM "//" TO EOL
-//COMMENTS FROM "{" TO "}"
+COMMENTS FROM "{" TO "}"
 
 
 
 PRODUCTIONS
 
   (* TurboForthCompiler = Statement {Statement}  . *)  
-  TurboForthCompiler 
+  TurboForthCompiler DESCRIPTION "TurboScript Assembler Compiler"
     =                                                  (. Init ; .)  
+
+
     ( "PROGRAM"                                        (. FModule.ModuleType := mtProgram; .)
       |"UNIT"                                          (. FModule.ModuleType := mtLib; .) 
     )
@@ -884,7 +1179,7 @@ PRODUCTIONS
     [DeclarationBlock]  
     "BEGIN"                                            (. FInitProcCFA := FModule.UsedMemory;  .)
     ASMStatementBlock
-    "END."                                             (. FModule.AddOpToMem(opHalt); .)
+    "END."                                             (. FModule.AddOpToMem(opPushInt); FModule.AddIntToMem(0); FModule.AddOpToMem(opHalt); .)
     (. Final ; .) .
 
    DeclarationBlock 
@@ -944,7 +1239,7 @@ PRODUCTIONS
   Value< var aValue: TTurboSimpleConst >
     = 
     (StringToken|IntegerToken|HexNumberToken)           (. aValue.AssignValue(LexString, aValue.TypeKind); .)
-//    |Identifier                                       (. aValue.Value := GetConstValue(aValue.TypeKind, LexString); .)
+//    |Identifier                                       (. aValue.Value := GetConstValueRec(aValue.TypeKind, LexString); .)
   .
 
   DefineWord (. Var vSucc: Boolean; vWord: TTurboSimpleWord; .)
@@ -988,7 +1283,7 @@ PRODUCTIONS
     |"DLL"                                                 (. aType := mtDLL;  .)
     |"HOST"                                                (. aType := mtHost; .)
   .
-  ExternalWordOptionPart < var aOptions: TTurboExteralWordCFA >
+  ExternalWordOptionPart < var aOptions: TTurboExteralWordOptions >
     =
    ["Name" StringToken (. aOptions.Name := AnsiDequotedStr(LexString, ''''); .) ]
    ["Index" IntegerToken (. aOptions.Index := StrToInt(LexString); .)]
@@ -1029,6 +1324,7 @@ PRODUCTIONS
     | EmitAsmStatement
     | "@TICK" (. FModule.AddOpToMem(opGetTickCount); .)
     | "!TICK" (. FModule.AddOpToMem(opStoreTickCount); .)
+    | AssertStatement
     | WordAsmStatement
   .
 
@@ -1036,7 +1332,7 @@ PRODUCTIONS
     "Label" Identifier   (. DefineLabelEx(LexString); .)  .
 
   PushIntAsmStatement = 
-    ( IntegerToken|HexNumberToken ) (. FModule.AddOpToMem(opPushInt); FModule.AddIntToMem(StrToInt(LexString));.) .
+    ( IntegerToken|HexNumberToken ) (. PushInt32(LexString); .) .
   AddIntAsmStatement  = "+" (. FModule.AddOpToMem(opAddInt); .) .
   SubIntAsmStatement  = "-" (. FModule.AddOpToMem(opSubInt); .) .
   MulIntAsmStatement  = "*" (. FModule.AddOpToMem(opMulInt); .) .
@@ -1047,7 +1343,54 @@ PRODUCTIONS
     | ".LS" (. FModule.AddOpToMem(opEmitLString); .) 
   .
 
-  PushStringAsmStatement = "#" StringToken (. PushString(); .) .
+  PushStringAsmStatement = "#" StringToken (. PushStringSeqToStack(LexString); .) .
 
-  WordAsmStatement = Identifier (. AddIdentifierCFA(LexString); .).
+  WordAsmStatement 
+    (.Var vName: string; vParams: TStringList; .)
+    =
+    (.vParams := nil; .)
+      Identifier 
+      (. vName := LexString;  //Writeln('pARSER word param::');
+    try .)
+      [(. vParams := TStringList.Create; .) WordParams<vParams>  ]
+      (. 
+      //writeln('EndParams');
+      AddIdentifierCFA(vName, vParams);
+      //if Assigned(vParams) then writeln(vName, ' WordParams:', vParams.CommaText) else writeln(vName, ' Not Assigned Params');
+      //writeln('sym:',LexString);
+    finally
+      FreeAndNil(vParams);
+    end; .)
+  .
+  WordParams< const aParams: TStringList >
+    (. var vParam: string; .)
+    =
+    "("
+    [ WordParam< vParam > (. aParams.Add(vParam); .)
+    {"," WordParam< vParam > (. aParams.Add(vParam); .) } ]
+    ")"
+  .
+  WordParam< var aParam: string >
+    =
+    ( IntegerToken|HexNumberToken|Identifier|StringToken ) (. aParam := LexString; .)
+  .
+  AssertStatement
+    (. var vExpr: string; vMsg: string; .)
+    =
+    "ASSERT(" WordParam< vExpr > "," WordParam< vMsg > ")"
+    (. if soAssertSupport in FModule.Options then
+       begin
+         //the current line No. 由于暂时没实现IntToStr以及StrConcat,所以 现在只压入2个参数
+         //WriteLn('AddAssert at ', TCocoRScannerAccess(Scanner).CurrLine);
+         vMsg := '''Assert failed at line:'+IntToStr(TCocoRScannerAccess(Scanner).CurrentSymbol.line)+'. '''+ vMsg+ '''''';
+         //PushInt32(TCocoRScannerAccess(Scanner).CurrLine);
+         PushString(vMsg);
+         PushWordParam(vExpr);
+         FModule.AddOpToMem(opAssert);
+       end;
+    .)
+  .
+    
+
+
 END TurboForthCompiler.

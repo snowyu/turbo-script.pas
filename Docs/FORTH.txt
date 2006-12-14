@@ -15,13 +15,21 @@ Feature:
 Virtual CPU: 32 bit
 States Register: CPU States Register 1 Byte.
 Common Registers: None
-Code-Memory: 0-High(TTurboInstruction) address preserved.
-Data-Memory: the first 4 bytes(int32) address preserved.
+Code-Memory: 
+Data-Memory: the metaInfo of the Code-memory, string cosntants and the module varaibles.
 Stack: Parameter Stack and Return Stack.
 Global Options: 
 Heap: 
 
-在引用代码区的地址为相对偏移量地址，堆上的为绝对地址。在非编译时刻全部为绝对地址。
+在引用代码区的地址为相对偏移量地址，堆上的为绝对地址。
+变量空间: 模块变量的地址为数据区的相对地址；字符串常量的地址为数据区的相对地址；对象、序列（字符串，动态数组）变量、GetMem分配的空间在堆上。
+字符串常量的引用计数是-1，而在_LStrAsg()中规定：
+  * 如果引用计数小于0，那么重新分配堆内存并复制字符串
+  * 如果引用计数等于0，则释放字符串所占用空间。
+
+  对于模块变量，如果是引用其它模块的模块变量，那么复制过程总是发生的【LStrAsg】，这是为了避免动态装入的模块卸载后内存不存在。
+  LStrAsg： 是用于联系模块字符串变量，LStrLAsg() 用于联系局部字符串变量。
+
 
 == Forth代码区流（文件）镜像 ==
 
@@ -34,6 +42,61 @@ Heap:
   end;
 对于存放于数据库中的模块名称，如果以流中的名称为准，那么改名字的时候就麻烦了，因为是Full Name,如果路径有改变，流中的名称也要改！！
 所以在流中不设模块名称，模块名称由Accessor单独处理！
+
+== 错误和异常处理机制 ==
+
+本版本实现的是Delphi的错误异常处理机制。
+
+=== 错误处理机制 ===
+这里的错误，是指堆栈、序列等的边界错误、无效的内存指针以及IO错误。当错误发生的时候，调用 iVMError 过程.
+
+  {System.pas}
+  TRuntimeError = (reNone, reOutOfMemory, reInvalidPtr, reDivByZero,
+  reRangeError, reIntOverflow, reInvalidOp, reZeroDivide, reOverflow,
+  reUnderflow, reInvalidCast, reAccessViolation, rePrivInstruction,
+  reControlBreak, reStackOverflow,
+  { reVar* used in Variants.pas }
+  reVarTypeCast, reVarInvalidOp,
+  reVarDispatch, reVarArrayCreate, reVarNotArray, reVarArrayBounds,
+  reAssertionFailed,
+  reExternalException, { not used here; in SysUtils }
+  reIntfCastError, reSafeCallError
+{$IFDEF LINUX}
+  , reQuit, reCodesetConversion
+{$ENDIF}
+  );
+
+iVMError(ErrorCode: TRuntimeError);
+asm
+        AND     EAX,127    //屏蔽最高位
+        MOV     EDX,[ESP]
+        JMP     ErrorAt
+end;
+
+procedure RunErrorAt(ErrCode: Integer; ErrorAtAddr: Pointer);
+begin
+  ErrorAddr := ErrorAtAddr;
+  _Halt(ErrCode);
+end;
+
+procedure ErrorAt(ErrorCode: Byte; ErrorAddr: Pointer);
+
+const
+  reMap: array [TRunTimeError] of Byte = (
+  ....
+);
+
+begin
+  errorCode := errorCode and 127;
+  if Assigned(ErrorProc) then
+    ErrorProc(errorCode, ErrorAddr); //这是实现异常处理的关键，在SysUtils中，通过勾挂该过程到ErrorHandler，触发异常 在指定的 ErrorAddr
+  if errorCode = 0 then
+    errorCode := InOutRes  //I/O Result 
+  else if errorCode <= Byte(High(TRuntimeError)) then
+    errorCode := reMap[TRunTimeError(errorCode)];
+  RunErrorAt(errorCode, ErrorAddr);
+end;
+
 
 == Forth代码源文件编写指南 ==
 
@@ -124,12 +187,12 @@ TypeName =
 
 == Forth代码区内存镜像(TCustomTurboExecutor.Memory) ==
 
-每一个Executor 实例都有一个独立的内存区，内存区的头几k字节是保留的，内容见 TPreservedCodeMemory 记录.
+每一个Executor 实例都有一个独立的代码内存区和数据区，数据区的头几k字节是保留的，内容见 TTurboPreservedDataMemory 记录.
 
 type //in TurboScriptConsts
-  PPreservedCodeMemory = ^ TPreservedCodeMemory;
+  PTurboPreservedDataMemory = ^ TTurboPreservedDataMemory;
   //the typecast for code memory area to get the parameters
-  TPreservedCodeMemory = packed record
+  TTurboPreservedDataMemory = packed record
     States: TTurboForthProcessorStates;
     Executor: TCustomTurboExecutor;
     //this Module unique Index in this program, allocated by compiler.

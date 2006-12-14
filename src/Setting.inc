@@ -8,7 +8,7 @@
 {------------------------------------------------------------------------------}
 { Please change this to suit your needs                                        }
 {------------------------------------------------------------------------------}
-{$define Debug}
+{.$define Debug}
 
 {------------------------------------------------------------------------------}
 { Common compiler defines                                                      }
@@ -30,6 +30,7 @@
   {$J+ Writeable typed constants}
   {$R- No Range checking}
   {$Z1 MIN ENUM SIZE}
+  {$T- Typed Address Off}
 
 {$IFDEF BCB}
   {$OBJEXPORTALL ON}
@@ -38,11 +39,17 @@
 // additional tests for debugging
 {$IFDEF DEBUG}
   {$HINTS ON; WARNINGS ON}
-  {$D+,L+,W+,Y+,YD,Q+,T+}
+  {$D+,L+,W+,Y+,Q+}
+  {$IFNDEF FPC}
+    {$DEFINITIONINFO ON}
+  {$ENDIF}
 {$ELSE}
   {$HINTS OFF; WARNINGS OFF}
-  {$D-,L-,Y-,Q-,W-,T-}
-  {$IMAGEBASE $00400000}
+  {$D-,L-,Y-,Q-,W-}
+  {$IFNDEF FPC}
+    {$DEFINITIONINFO OFF}
+    {$IMAGEBASE $00400000}
+  {$ENDIF}
 {$ENDIF}
 
 {$ENDIF ~SETTING_INC}

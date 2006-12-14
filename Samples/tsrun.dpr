@@ -23,6 +23,20 @@ type
     procedure DoPrintString(const aStr: String); override;
   end;
 
+const
+  cRunTimeErrors : array [TTurboProcessorErrorCode] of string =
+  (
+    ''
+    , 'Bad Instruction'
+    , 'DizZero'
+    , 'ModuleNotFound'
+    , '代码区内存无可用的空间'
+    ,'MetaData区已无可用的空间'
+    , 'OutOfDataStack'
+    , 'errOutOfReturnStack'
+    , 'Assertion Failed'
+  );
+
 procedure TMyInterpreter.DoPrintChar(aChar: Char);
 begin
 	 write(aChar);
@@ -63,6 +77,7 @@ var
   c: int64;
   r: integer;
   lastErr: TTurboProcessorErrorCode;
+  LastAddr: tsInt;
   aFileName: string;
   s: string;
   CountFreq: Int64;
@@ -126,6 +141,7 @@ begin
         QueryPerformanceCounter(tEnd);
         c := c + tEnd - tBegin;
         lastErr := LastErrorCode;
+        LastAddr := tsInt(GGlobalOptions.ErrorAddr);// - tsInt(Memory);
 
         Integer(P) := SP;
         if vShowDebugInfo and (Integer(P) < (Integer(ParameterStack)+cStackMaxSize-SizeOf(Integer)))  then
@@ -184,7 +200,8 @@ begin
   if lastErr <> errNone then
   begin
     WriteLn('');
-    writeln('lasterr=', Integer(lasterr));
+    write('lasterr(', Integer(lasterr) ,'):', cRunTimeErrors[lasterr], ' at address:'+ IntToHex(LastAddr, 4));
+    WriteLn('');
   end;
   if vShowDebugInfo then 
   begin

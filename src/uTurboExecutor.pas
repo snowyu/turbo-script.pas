@@ -24,8 +24,8 @@ interface
 uses
   SysUtils, Classes
   , TypInfo
-  , uMeTypes
-  , uMeProcType
+  //, uMeTypes
+  //, uMeProcType
   , uTurboConsts
   , uTurboMetaInfo
   ;
@@ -53,7 +53,7 @@ type
     , ttkMethod, ttkProcedure, ttkInterface, ttkPointer, ttkParam
     , ttkSet, ttkEnumeration
   );
-  TTurboSimpleTypes = array [TTurboSimpleTypeKind] of PMeType;
+  //TTurboSimpleTypes = array [TTurboSimpleTypeKind] of PMeType;
 
   //PTurboPreservedCodeMemory = ^ TTurboPreservedCodeMemory;
   PTurboPreservedDataMemory = ^ TTurboPreservedDataMemory;
@@ -61,7 +61,6 @@ type
   PTurboModuleEntry = ^ TTurboModuleEntry;
   PTurboWordEntry = ^ TTurboWordEntry;
   PTurboTypeInfoEntry = ^ TTurboTypeInfoEntry;
-  PTurboExteralWordCFA = ^TTurboExteralWordCFA;
   PTurboGlobalOptions = ^TTurboGlobalOptions;
 
   TCustomTurboPEFormat = class;
@@ -109,19 +108,22 @@ type
   private
     function GetGlobalOptions: PTurboGlobalOptions;
     function GetLastModuleEntry: PTurboModuleEntry;
+    function GetOptions: TTurboScriptOptions;
     procedure SetGlobalOptions(Value: PTurboGlobalOptions);
     procedure SetLastModuleEntry(Value: PTurboModuleEntry);
+    procedure SetOptions(Value: TTurboScriptOptions);
   protected
     FAccessor: TObject;
     FDataMemory: Pointer;
     FIsLoaded: Boolean;
+    FMaxDataMemorySize: tsInt;
+    FMaxMemorySixe: tsInt;
     {: The Code Memory }
     FMemory: Pointer;
     FModuleDate: TTimeStamp;
     FModuleUnloadNotifies: TList;
     FModuleVersion: LongWord;
     FName: string;
-    FOptions: TTurboScriptOptions;
     FParent: TCustomTurboModule;
     FPC: Integer;
     FRP: Integer;
@@ -133,13 +135,13 @@ type
     }
     FTextIndex: Integer;
     FVisibility: TTurboVisibility;
-    function GetDataMemorySize: Integer;
+    function GetDataMemorySize: tsInt;
     function GetInitializeProc: Integer;
     function GetLastErrorCode: TTurboProcessorErrorCode;
     function GetLastTypeInfoEntry: PTurboTypeInfoEntry;
     function GetLastVariableEntry: PTurboVariableEntry;
     function GetLastWordEntry: PTurboWordEntry;
-    function GetMemorySize: Integer;
+    function GetMemorySize: tsInt;
     function GetModuleType: TTurboModuleType;
     function GetParameterStack: Pointer;
     function GetParameterStackSize: Integer;
@@ -147,17 +149,17 @@ type
     function GetReturnStackSize: Integer;
     function GetRoot: TCustomTurboModule;
     function GetStatus: TTurboProcessorStates;
-    function GetUsedDataSize: Integer;
-    function GetUsedMemory: Integer;
+    function GetUsedDataSize: tsInt;
+    function GetUsedMemory: tsInt;
     procedure Grow(const aSize: Integer = 0);
     procedure GrowData(const aSize: Integer = 0);
     procedure LoadUsedModules;
     procedure SendUnloadNotification;
-    procedure SetDataMemorySize(Value: Integer);
+    procedure SetDataMemorySize(Value: tsInt);
     procedure SetLastTypeInfoEntry(const Value: PTurboTypeInfoEntry);
     procedure SetLastVariableEntry(const Value: PTurboVariableEntry);
     procedure SetLastWordEntry(const Value: PTurboWordEntry);
-    procedure SetMemorySize(Value: Integer);
+    procedure SetMemorySize(Value: tsInt);
     procedure SetModuleType(Value: TTurboModuleType);
     procedure SetParameterStack(Value: Pointer);
     procedure SetParameterStackSize(Value: Integer);
@@ -165,8 +167,8 @@ type
     procedure SetReturnStack(Value: Pointer);
     procedure SetReturnStackSize(Value: Integer);
     procedure SetStatus(Value: TTurboProcessorStates);
-    procedure SetUsedDataSize(Value: Integer);
-    procedure SetUsedMemory(Value: Integer);
+    procedure SetUsedDataSize(Value: tsInt);
+    procedure SetUsedMemory(Value: tsInt);
   public
     constructor Create(const aParent: TCustomTurboModule = nil; aVisibility:
             TTurboVisibility = fvPublished); virtual;
@@ -272,7 +274,7 @@ type
     { Description
     warining: if in the running status, you may be get trouble!!
     }
-    property DataMemorySize: Integer read GetDataMemorySize write
+    property DataMemorySize: tsInt read GetDataMemorySize write
             SetDataMemorySize;
     property GlobalOptions: PTurboGlobalOptions read GetGlobalOptions write
             SetGlobalOptions;
@@ -297,7 +299,7 @@ type
     { Description
     warining: if in the running status, you may be get trouble!!
     }
-    property MemorySize: Integer read GetMemorySize write SetMemorySize;
+    property MemorySize: tsInt read GetMemorySize write SetMemorySize;
     { Description
     (The ModuleDate field indicates the number of calendar days since the start
     of the calendar (the number of days since 1/1/0001 plus one).)
@@ -309,7 +311,7 @@ type
     property ModuleVersion: LongWord read FModuleVersion write FModuleVersion;
     {: the module full name(include path: Module.SubModule.ModuleName) }
     property Name: string read FName write FName;
-    property Options: TTurboScriptOptions read FOptions write FOptions;
+    property Options: TTurboScriptOptions read GetOptions write SetOptions;
     {: : the Parameter Stack }
     { Description
     指向栈底： @Stack[0]
@@ -375,13 +377,13 @@ type
     也就是指向最大的可用内存：
     从该地址起的内存未用：FMemory[UsedMemory] 
     }
-    property UsedDataSize: Integer read GetUsedDataSize write SetUsedDataSize;
+    property UsedDataSize: tsInt read GetUsedDataSize write SetUsedDataSize;
     {: 已经使用的内存 }
     { Description
     也就是指向最大的可用内存：
     从该地址起的内存未用：FMemory[UsedMemory] 
     }
-    property UsedMemory: Integer read GetUsedMemory write SetUsedMemory;
+    property UsedMemory: tsInt read GetUsedMemory write SetUsedMemory;
     property Visibility: TTurboVisibility read FVisibility write FVisibility;
   end;
 
@@ -430,7 +432,7 @@ type
     @param aCFA the Code Field Address(related to FMemory).
     相对于FMemory的偏移量。
     }
-    function iExecuteExternalWord(const aWord: PTurboExteralWordCFA; const
+    function iExecuteExternalWord(const aWord: PTurboExteralWordOptions; const
             aCallStyle: TTurboCallStyle): Integer;
     {: Init before the Execution. }
     procedure InitExecution; virtual;
@@ -558,14 +560,23 @@ type
 *)
 
   TTurboGlobalOptions = record  //do not use the packed.
-    States: TTurboProcessorStates; //如果放在这里，速度会下降
+    States: TTurboProcessorStates;
     LastErrorCode: TTurboProcessorErrorCode;
     ParamStackBase: Pointer;
     ParamStackSize: Integer; //bytes
     ParamStackBottom: Pointer;
     ReturnStackBase: Pointer;
     ReturnStackSize: Integer; //bytes
+    //if halt with errHlat then the ReturnStackBottom will be the Old RSP.   
     ReturnStackBottom: Pointer;
+    //{:  放到系统单元库中？ 好处是移植自举，缺点是速度变慢吧。
+    ErrorAddr: Pointer;
+    ErrorProc: Pointer; 
+    AssertErrorProc: Pointer;
+    //The built-in I/O routines use InOutResult to store the value that 
+    //the next call to the IOResult standard function will return.
+    IOResult: tsInt;  
+    //}
   end;
 
   //the typecast for data memory area to get the parameters
@@ -576,6 +587,7 @@ type
     //##abondoned:this Module unique Index in this program, allocated by compiler.
     //##ModuleIndex: Integer;
     ModuleType: TTurboModuleType;
+    ModuleOptions: TTurboScriptOptions;
     ModuleName: PShortString; //nil const, base name only.
     //if Module is Class then the ModuleParent is classParent
     //in LastModuleEntry 链表中
@@ -617,10 +629,10 @@ procedure TurboConvertAddrRelatedToAbsolute(Mem: Pointer; Data:
 procedure TurboConvertAddrAbsoluteToRelated(Mem: Pointer; Data:
         PTurboPreservedDataMemory);
 //remove registered types of this module
-procedure RemoveModuleTypes(const aModuleName: string);
+//procedure RemoveModuleTypes(const aModuleName: string);
 
-var 
-  SimpleTurboTypes: TTurboSimpleTypes;
+//var 
+  //SimpleTurboTypes: TTurboSimpleTypes;
 
 
 implementation
@@ -652,10 +664,11 @@ begin
   FreeAndNil(FModuleUnloadNotifies);
   if not StoredInParent then
   begin
+    if ModuleType <> mtFunction then
+      FreeMem(FDataMemory);
+    FDataMemory := nil;
     FreeMem(FMemory);
     FMemory := nil;
-    FreeMem(FDataMemory);
-    FDataMemory := nil;
   end;
   inherited Destroy;
 end;
@@ -822,6 +835,7 @@ begin
       Code := FMemory;
       DataSize := vPreserved;
       UsedDataSize := SizeOf(TTurboPreservedDataMemory);//SizeOf(tsInt); //preserved the first integer
+      ModuleOptions := [soAssertSupport];
 
       InitializeProc := nil;
       FinalizeProc := nil;
@@ -967,7 +981,7 @@ begin
   Result := nil;
 end;
 
-function TCustomTurboModule.GetDataMemorySize: Integer;
+function TCustomTurboModule.GetDataMemorySize: tsInt;
 begin
   Result := PTurboPreservedDataMemory(FDataMemory).DataSize;
 end;
@@ -1013,7 +1027,7 @@ begin
   Result := PTurboPreservedDataMemory(FDataMemory).LastWordEntry;
 end;
 
-function TCustomTurboModule.GetMemorySize: Integer;
+function TCustomTurboModule.GetMemorySize: tsInt;
 begin
   Result := PTurboPreservedDataMemory(FDataMemory).MemorySize;
 end;
@@ -1021,6 +1035,11 @@ end;
 function TCustomTurboModule.GetModuleType: TTurboModuleType;
 begin
   Result := PTurboPreservedDataMemory(FDataMemory).ModuleType;
+end;
+
+function TCustomTurboModule.GetOptions: TTurboScriptOptions;
+begin
+  Result := PTurboPreservedDataMemory(FDataMemory).ModuleOptions;
 end;
 
 function TCustomTurboModule.GetParameterStack: Pointer;
@@ -1081,12 +1100,12 @@ begin
   end;
 end;
 
-function TCustomTurboModule.GetUsedDataSize: Integer;
+function TCustomTurboModule.GetUsedDataSize: tsInt;
 begin
   Result := PTurboPreservedDataMemory(FDataMemory).UsedDataSize;
 end;
 
-function TCustomTurboModule.GetUsedMemory: Integer;
+function TCustomTurboModule.GetUsedMemory: tsInt;
 begin
   Result := PTurboPreservedDataMemory(FDataMemory).UsedMemory;
 end;
@@ -1169,10 +1188,6 @@ begin
   begin
     //backup the data in the Memory
     vOptions := GlobalOptions;
-    {vParameterStack := ParameterStack;
-    vReturnStack := ReturnStack;
-    vReturnStackSize := ReturnStackSize;
-    vParameterStackSize := ParameterStackSize;}
   end;
 
   UsedDataSize := SizeOf(TTurboPreservedDataMemory);
@@ -1182,11 +1197,6 @@ begin
   Integer(p) := Integer(FDataMemory) + SizeOf(TTurboPreservedDataMemory);
   aStream.ReadBuffer(p^, UsedDataSize-SizeOf(TTurboPreservedDataMemory));
 
-  //ReallocMem(FDataMemory, DataMemorySize);
-  //writeln('Load.UsedDataOff=',aStream.Position);
-  //aStream.ReadBuffer(FDataMemory^, UsedDataSize);
-  //MemorySize := Count-SizeOf(TTurboModuleStreamHeader);
-  //aStream.ReadBuffer(FMemory^, MemorySize);
   ReallocMem(FMemory, MemorySize);
   aStream.ReadBuffer(FMemory^, UsedMemory);
 
@@ -1194,10 +1204,6 @@ begin
   begin
     //now restore the data
     GlobalOptions := vOptions;
-    {ParameterStack := vParameterStack;
-    ReturnStack := vReturnStack;
-    ReturnStackSize := vReturnStackSize;
-    ParameterStackSize := vParameterStackSize; //}
   end;
 
   Reset;
@@ -1234,7 +1240,12 @@ end;
 
 procedure TCustomTurboModule.NotifyModuleFree(Sender: TObject);
 begin
-  RemoveUnloadNotification(TCustomTurboModule(Sender).NotifyModuleUnloaded);
+  if Sender is TCustomTurboModule then
+  begin
+    RemoveUnloadNotification(TCustomTurboModule(Sender).NotifyModuleUnloaded);
+    if Sender = FParent then
+      Self.Free;
+  end;
 end;
 
 procedure TCustomTurboModule.NotifyModuleUnloaded(Sender: TObject);
@@ -1339,6 +1350,10 @@ begin
     ReturnStack := 0;
     ReturnStackSize := 0;
     ParameterStackSize := 0;}
+    if FMaxDataMemorySize = -1 then
+      DataSize := UsedDataSize;
+    if FMaxMemorySize = -1 then
+      MemorySize := UsedMemory;
   end;
 
   aStream.WriteBuffer(FDataMemory^, UsedDataSize);
@@ -1375,11 +1390,16 @@ begin
   FModuleUnloadNotifies.Clear;
 end;
 
-procedure TCustomTurboModule.SetDataMemorySize(Value: Integer);
+procedure TCustomTurboModule.SetDataMemorySize(Value: tsInt);
 var
   vOld: Pointer;
 begin
-  if PTurboPreservedDataMemory(FDataMemory).DataSize <> Value then
+  if Value = -1 then
+    FMaxDataMemorySize := -1
+  else
+    FMaxDataMemorySize := Value;
+  if (PTurboPreservedDataMemory(FDataMemory).DataSize <> Value)
+    and (PTurboPreservedDataMemory(FDataMemory).UsedDataSize <= Value) then
   begin
     PTurboPreservedDataMemory(FDataMemory).DataSize := Value;
     vOld := FDataMemory;
@@ -1416,11 +1436,16 @@ begin
   PTurboPreservedDataMemory(FDataMemory).LastWordEntry := Value;
 end;
 
-procedure TCustomTurboModule.SetMemorySize(Value: Integer);
+procedure TCustomTurboModule.SetMemorySize(Value: tsInt);
 var
   vOld: Pointer;
 begin
-  if PTurboPreservedDataMemory(FDataMemory).MemorySize <> Value then
+  if Value = -1 then
+    FMaxMemorySixe := -1
+  else
+    FMaxMemorySixe := Value;
+  if (PTurboPreservedDataMemory(FDataMemory).MemorySize <> Value) and
+    (PTurboPreservedDataMemory(FDataMemory).UsedMemory <= Value) then
   begin
     PTurboPreservedDataMemory(FDataMemory).MemorySize := Value;
     vOld := FMemory;
@@ -1436,6 +1461,11 @@ end;
 procedure TCustomTurboModule.SetModuleType(Value: TTurboModuleType);
 begin
   PTurboPreservedDataMemory(FDataMemory).ModuleType := Value;
+end;
+
+procedure TCustomTurboModule.SetOptions(Value: TTurboScriptOptions);
+begin
+  PTurboPreservedDataMemory(FDataMemory).ModuleOptions := Value;
 end;
 
 procedure TCustomTurboModule.SetParameterStack(Value: Pointer);
@@ -1491,22 +1521,34 @@ begin
   end;
 end;
 
-procedure TCustomTurboModule.SetUsedDataSize(Value: Integer);
+procedure TCustomTurboModule.SetUsedDataSize(Value: tsInt);
 begin
   if Value < SizeOf(TTurboPreservedDataMemory) then
     Value  := SizeOf(TTurboPreservedDataMemory);
-  if Value > DataMemorySize then
-    GrowData(Value - DataMemorySize);
+
+  if (Value > DataMemorySize) then
+  begin
+    if (psCompiling in Status) then
+      GrowData(Value - DataMemorySize)
+    else
+      Raise Exception.Create('Out Of DataMemory');
+  end;
+
   PTurboPreservedDataMemory(FDataMemory).UsedDataSize := Value;
 end;
 
-procedure TCustomTurboModule.SetUsedMemory(Value: Integer);
+procedure TCustomTurboModule.SetUsedMemory(Value: tsInt);
 begin
-  if Value < SizeOf(TTurboPreservedDataMemory) then
-    Value  := SizeOf(TTurboPreservedDataMemory);
+  //if Value < SizeOf(TTurboPreservedDataMemory) then
+    //Value  := SizeOf(TTurboPreservedDataMemory);
 
   if Value > MemorySize then
-    Grow(Value - MemorySize);
+  begin
+    if (psCompiling in Status) then
+      Grow(Value - MemorySize)
+    else
+      Raise Exception.Create('Out Of Memory');
+  end;
 
   PTurboPreservedDataMemory(FDataMemory).UsedMemory := Value;
 end;
@@ -1514,7 +1556,9 @@ end;
 function TCustomTurboModule.StoredInParent: Boolean;
 begin
   Result := Assigned(Parent) and
-     ((Visibility <= fvPrivate) or (Parent.ModuleType = mtFunction));
+     ((Visibility <= fvPrivate)
+       //or (Parent.ModuleType = mtFunction)
+     );
 end;
 
 procedure TCustomTurboModule.Unload;
@@ -1522,7 +1566,7 @@ begin
   if FIsLoaded and not StoredInParent then
   begin
     SendUnloadNotification;
-    if Name <> '' then RemoveModuleTypes(Name);
+    //if Name <> '' then RemoveModuleTypes(Name);
     ClearMemory;
   end;
 end;
@@ -1604,7 +1648,7 @@ begin
 end;
 
 function TCustomTurboExecutor.iExecuteExternalWord(const aWord:
-        PTurboExteralWordCFA; const aCallStyle: TTurboCallStyle): Integer;
+        PTurboExteralWordOptions; const aCallStyle: TTurboCallStyle): Integer;
 begin
   {case aCallStyle of
     csForth: with aWord^ do begin
@@ -1763,7 +1807,7 @@ type
     MetaInfo: TTurboMetaInfo;
   end;
 
-//remove registered types of this module
+{//remove registered types of this module
 procedure RemoveModuleTypes(const aModuleName: string);
 var
   i,j: integer;
@@ -1780,7 +1824,7 @@ begin
       end;
     end;
 end;
-
+//}
 procedure TurboConvertEntryRelatedToAbsolute(Mem: Pointer; var aEntry: PTurboEntry);
 var
   vEntry: PTurboEntry; 

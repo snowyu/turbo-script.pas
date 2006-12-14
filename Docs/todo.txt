@@ -1,14 +1,229 @@
+TODO: 
+  1. 必须找到一种重新分配内存（扩充空间）的时候，基地址不变的方法【可能需要在FastMM中找】。
+     可以直接使用API调用【或者类似的函数】，然后保留下最大的内存地址范围，即可。
+     换句话说，必须要有MaxSize参数设定！
+  2. think about how to impl the procedure with parameters, see also CLR.
+!+ MaxStackSize directive 设定数据栈的大小。 要修改结构，才能放入,只有在Program和DLL(Package)中才会存在。
+    Syntax    {$MaxStackSize  Size[KB|MB] }
+    注意：必须放在Program|Unit之后
+
+2006-12-14
+自己事务计划
+  分析微软CLR框架以及CIL核心。
+
+单位事务计划
+
+~ 模块，程序集和AppDomain（Application Domain）
+程序集就是DLL或Exe（多了一个RVA主程序入口地址）
+模块(Module)类似于以前的单元，用于分割不同的类和类型，以及资源(resource, 资源记录就是字符串，图象以及其它数据，他们只在需要的时候才会被调入内存)。类型的Meta信息也是模块的一部分。
+
+既然模块种包含类型的Meta信息，类型检查系统就可以联合静态和动态技术。当IL运行的时候，执行环境能得知
+所有变量参数的类型Meta信息，自然就能执行运行时刻的类型检查——这被称之为 reflection(它的含义为解释自描述类型，类型的影子)。
+
+多个模块文件可以被链接成一个程序集(assembly)。在程序集上多了一个清单（manifest），用来描述该程序集以及模块的列表，一个主入口，导出的类型定义列表（私有模块中公开的类型）。这份清单被放在一个模块上，
+在该模块上的公开的类型不会出现在导出类型定义列表上！
+
+程序集是CLI发布管理(deployment managed)的单位。程序集是可重用的软件组件。程序集甚至能动态绑定调用代码。
+  * 程序集是独立的软件组件子集，无须重新编译。
+  * 程序集是定制软件
+  * 程序集能被独立发布
+  * 程序集导出的API能和其它组件完美的交互。
+
+程序集在文件系统中是用PE(portable executable)格式存放。
+
+一个程序集将被加载到一个Application Domain(AppDomain)中执行？ 外部引用的其它程序集将在同样同一AppDomain下运行。
+换句话说，AppDomain 将程序集聚集在一起，实现最终功能。
+每一个AppDomain定义了一个由CLI执行引擎管理的地址空间。所有的地址引用将确保实在同一个AppDomain中。
+CLI地址空间是有层次的：AppDomain 能被加载入一个CLI地址空间。
+CLI地址空间可以被概略的认为是OS中的进程地址空间（至少在Rotor CLI中是这样）。每一个地址空间都有明确的地址边界。
+
+每一个CLI地址空间可以包含多个AppDomain： 其中一个AppDomain就是系统程序集，另一个AppDomain包含与其他与AppDomain共享的程序集。
+只有CLI管理器(the supervision of the CLI)才能跨越AppDomain的地址空间访问进行交互。AppDomain之间的交互通讯是通过远程(Remoting)类型检查机制
+完成。同样的机制被用于跨越地址空间，如接口和OS IPC.
+
+模块，程序集，AppDomain和地址空间（address space）的关系是，模块是编译器建立的最小的单元文件，由一个或n个模块组成程序集，程序集是进行分发的
+最小单元文件，程序集能组合在一个AppDomain下执行。多个AppDomain能在单个地址空间下执行。
+
+【问】如果对其它程序集过程的调用，意味着需要开辟新的VirtualExecutionEngine?,堆栈这些全部都要新的？？
+
+注：
+Common Language Infrastructure (CLI) 通用语言基础组织
+
+2006-12-11
+* TCustomTurboModule
+  + FMaxMemorySixe
+  + FMaxDataMemorySize
+  -1 means the max size is equ used memory size when save the module stream 
+  我只是当成标志用，在保存的时候判断下是否-1如果是就节约内存。
+
+
+2006-12-7
+~ 需要编写赋值语句
+!+ 模块编写，嵌入模块指令， import XXX 该指令将XXX模块合并到其中！
+  + ImportModules: string; 包括了所有合并进来的模块名称，用逗号分隔.  ,XXX1,XXX2,XXX3,
+    然后修改查找模块的方法。
+  + 划分出设计时间用的单元【所有语法符号都会被编译】，和运行时间用的单元【只有公开的使用的才会被编译】。
+~ 我的用户错误处理入口挂接是在全局参数上，该怎么访问？
+
+2006-12-6
++ 继续编写Assert错误处理。
+  断言编写完毕，不过俺是显示断言信息，当断言为假的时候。应该改为断言为假的时候显示信息，并终止执行。
+  已经改正！当断言为假触发，运行时间错误errAssertionFailed，然后终止执行。
+  当异常机制完成后，就该是触发 EAssertionFailed exception 了。
+* TurboForthCompiler 过程调用支持这样的格式 Assert(False, 'helo'); 编译自动转换，首先压入参数，最后调用。参数第一个是栈顶，第二个是次栈顶，依此类推。
+  测试通过
+~ 明天开始弄异常机制。
+ 
+2006-12-5
++ TFCC 在FPC下编译通过，不过需要更改，我发现FPC的集合类型似乎是用的Int32而不是Byte!!
+~ [FPC] 2.0.4 中汇编最好使用 [EAX+TRec.F] 的形式而不是用 [EAX].TRec.F! 两者的结果不一致！ FPC 的 Self 指针是用ESI！
+
+2006-12-4
+~ 查了，证实CLR的过程调用的参数传递走的是数据栈。
+  怀疑，C#自动判断了参数栈最大尺寸，建立 .MaxStack 的大小。
+
+2006-12-3
++ TurboForthCompiler 过程调用支持这样的格式 Assert(False, 'helo'); 第一个是栈顶，第二个是字符串，依此类推。然后编译器自动转换为：
+  push 'Hello'
+  push False
+  Call Assert
+~ 如何使用绝对地址而又不担心基址改变的方法：那就是在运行时刻固定住MaxCodeSize，内容的变化范围不能超过MaxCodeSize！
+
+2006-12-2
+~ 异常机制，分析Delphi的异常机制
+~ 是否该考虑嵌入单元了，这样俺的系统单元才能出来。
+  主程序模块：一个可运行脚本有且只有一个主程序模块，主程序模块将自动嵌入 System 单元。
+  初期灭有这样复杂.
+* TTurboGlobalOptions: 以后这些参数放入系统单元的。
+  + ErrorAddr: Pointer;
+  + ErrorProc: Pointer;
+  + AssertErrorProc: Pointer;
+  + IOResult: tsInt; //The built-in I/O routines use InOutRes(ult) to store the value that the next call to the IOResult standard function will return. 
++ Compiler Switch: 没法子，COCO PRAGMAS不能存在注释中，我暂时将参数作为可选项放在头部。
+  + Assert directives
+    Syntax	{$C+} or {$C-}
+            {$ASSERTIONS ON} or {$ASSERTIONS OFF}
+    Default	{$C+}
+            {$ASSERTIONS ON}
+    Scope	  Local
+    和Delphi类似，如果关闭，则不会编译Assert过程。
+    要想使用断言，必须使用参数，可以这样编译，增加过程参数，然后翻译，比如: 将语句Assert(False, 'helo'); 自动翻译成：
+      Push False; Push 'Helo'; CALL Assert
+  + MESSAGE directive
+    Syntax    {$MESSAGE  HINT|WARN|SYNTAX|SYMANTIC 'text string' }
+    Examples: {$MESSAGE 'Boo!'}                   emits a hint 
+  + MaxCodeSize directive
+    Syntax    {$MaxCodeSize  Size[KB|MB] }
+    注意：必须放在Program|Unit之后
+  + MaxDataSize directive
+    Syntax    {$MaxDataSize  Size[KB|MB] }
+
+哈，我找到了可以通过InternalGrammarComment 事件拦截注释：
+  InternalGrammarComment := ProcessGrammarComment;
+procedure T-->Grammar<--.ProcessGrammarComment(Sender : TObject; CommentList : TCommentList);
+var
+  vOptionName : string;
+  vEnabled : boolean;
+  ParamList : TStringList;
+begin
+  //Process Compiler Options here
+  SetCompilerOption...
+end;
+搞定,这下指令可以到处写了！支持如下几种格式：
+  {$CompierDirective[+|-] param1, param2, ...., paramN}
+  {$CompierDirective [ON|OFF] param1, param2, ...., paramN}
+
+
+2006-12-1
+今天完成将atg里面的简单的移植到语法树【遇到麻烦，反正都要改，算了还是先折磨异常机制，暂时不忙慌写语法树，等更成熟些再说，俺看了书再来】
+编译流程 
+  ForthCompiler 建立语法树
+    ProgramSymbol.Compile; 编译
+      首先编译主过程：事实上在ForthCompiler建立语法树的时候已经编译了。
+      然后是过程：对于 Published 的过程不管有没有引用都将编入内存。
+      然后编译变量和常量：
+      最后编译类型信息：
+      最后在解决地址空位 ResolveRefs。
+~ 碰到问题了，如果将Word的过程体指令直接编入内存，那么里面的地址引用就是一个问题！必须将指令也转为符号管理。
+  还有一个办法就是将定义的所有Word直接压入主内存区，这样地址自然就都存在了，然后如果定义了优化参数，
+  另外建立一个内存区，在处理！
+  管它的，现在就不管这么多，全部直接压入！以后再来折磨这个语法树。
+
+2006-11-30
+~TODO: 
+  将atg里面的简单的移植到语法树
+  整理提取适当的方法名称
+  实现Delphi类似的异常机制
+  实现字符串处理
+  实现字段（变量）后期绑定、过程（方法）后期绑定
+    GetBindingField PString, GetBindingMethod PString
+    然后在指令处理中还要根据模块类型，决定是否添加模块名称前缀在字段名前
+  构思宏类，所谓宏类就是存放于数据库中的类【抽象出来的知识】
+
+~ 编译标识符
+  可以分为标识符本体编译，和标识符的引用编译。
+  常量除开字符串常量外，没有本体！
+  变量的本体就是变量数据所在地址空间，引用编译则是将该数据地址编入代码区内存。
+  过程的本体就是过程的代码，引用编译就是将过程的入口地址编译到指定的内存。
+  编译本体的方法：
+    CompileTo() 将标识符本体编译（添加到）到指定的模块。
+    ReferenceTo(aMem: Pointer): 将标识符引用编译（添加到）到指定的地址，注意你必须保证有足够的空间容纳该地址。
+
+2006-11-27
+* [BUG] FastMM4 俺更新到11-09号4.74版本，最后一个内存泄漏就没有！
+* TurboForthExpr.atg 初步修改使用语法树。
++ TTurboPreservedDataMemory.ModuleOptions: TTurboScriptOptions;
++ TTurboScriptOptions.soTypeSafety
+  当模块有这个参数的时候，编译器将强制把所有标识符的的类型信息(RTTI)编入内存。
+~ 需要增加一个语法，用来注明该标识符需要编入RTTI信息。注：如果模块有soTypeSafety，
+  那么不管有没有该语法，都将强制编入RTTI信息。就叫 Typed 吧.
+  : [Public] [Typed] Word1;
+  Var [Public] [Typed] Variable1;
+~ 如果我不需要SimpleType，那么该如何？需要TypeInfo. 这样我还需要将基本类型全部联入才行。
+  打造 System 单元？考虑象Delphi那样，有包编译方式【尺寸最小】和普通编译方式。
+  Use System, XX; //是DLL调用方式 不会嵌入
+  Imports System, XX; //是嵌入方式。对于System 单元默认是嵌入方式，除非明确指定。
+  ProgramSymbol -> ModuleSymbol
+
+~ 关于类型的Size，有固定大小的类型，如Int32等，有非固定大小的类型：序列。
+对于非固定大小的类型，需要变量实例才能确定其真实的大小。
+  SizeOfVar(Var), SizeOfType.怎么提取公用性？在TypeInfo中添加方法：
+  function Size(aVariable: Pointer): tsUInt;
+  如果要想在用户自定义的类型中也能如此，那么就必须使用虚方法，这是真的么？我觉得不是，我可以专门定一个用户自定义类型的类，然后
+  在该类中添加一个静态Size方法。
+
 2006-11-26
 * CALLFAR 指令直接指向 TurboModuleInfo, 而不是ModuleEntry.
 * 将数据区和代码独立，测试通过，现在Code区只有代码！
 ~ 模块、类、类实例 的区别
   模块可以直接使用，类不能。类实例的每一个数据都是新建的【可以从类的数据中复制】，共享代码区。
   是否考虑类实例的数据从堆中新建，而不是从DataMemory中复制，不过这样一来又增加了复杂度【俺编程苦啊，还是简单点吧，将DataMemory既作为MetaData也包括类字段数据】？
+  还有和过程的区别？过程的 Parent 是模块或类。过程没有只有代码区，没有数据区（或者说是公用父亲的数据区存放Meta数据）
+    也就是说，过程不能独立于模块或类存在。
+  模块类别可以是：过程模块【整个模块就是一个过程】mtFunction； 容器 mtModule； 类模块【整个模块就是一个类】mtClass； 模块类实例【整个模块就是一个实例】mtObject
+  mtFunction: 和 mtProgram 类似，但是MUST HAVE Parent. 是通过LastWordEntry链表挂上的。
+              嗯，在LastModuleEntry中也有，所以应该是在LastModuleEntry中加载，然后设置好父亲信息，如果父亲Free则必须跟着Free。
+              它的过程入口CFA就挂在InitProc上，FinalProc没有用。
+  mtModule:
+* [Bug] TCustomTurboModule.NotifyModuleFree() 当Parent释放后，儿子没有跟着被释放。
+  
 * [Bug] Memory Leask: 
   TCustomTurboModule.FModuleUnloadNotifies 忘记释放
   [uTurboAccessor] FTurboModuleMgr 忘记释放
   [uTurboAccessor] TTurboModuleAccessorList 里面的Accessor 忘记释放。
-
+~ 先构建最简单的语法树：
+  对于Word该如何把握还真是头疼啊。涉及到的问题有：
+  如果单独空间编译过程体，涉及到的其它过程地址的定位问题。还有引用的模块、变量地址
+  干脆一个过程作为一个Module：
+   然后如果该过程被用到再复制。
+   那么引用变量的问题如何解决？
+   对于语法树中的我只需要分配代码区,而数据区则公用模块的。该如何在CustomTurboModule中体现？
+   由于在汇编中没有过程的局部变量，所以可以不管。
+   TTurboWordSymbol= 
+     Parent: ModuleSymbol; 就是y拥有它的Module
+     Word: TCustomTurboModule;
+   TTurboModuleSymbol=
+     Module: TCustomTurboModule;
 
 2006-11-25
 * 数据区和代码独立，要想复用代码还必须要：
@@ -1562,7 +1777,10 @@ _______________________________
 它的解释器采用的是和我的TurboScript类似的脚本执行机构!但是在它的解释器中似乎没有提供中断、暂停的渠道，除非是编译的时候插入调试指令，而TurboScript则在每执行一个指令前都要检查是否需要停止。我想这是它比TurboScript快的原因吧，不过它的核心代码实在是太难读了，根本不是人读的，注释又少。直接虚拟指令运行效率比较，TurboScript比它慢0.25倍。不过值得高兴的是它的调用子过程的效率比 TurboScript 慢太多了，调用子过程的效率TurboScript比它高70%倍。下面是我的测试方法：
  
 全部采用 QueryPerformanceCounter 高精度计数。
+
+测试指令：简单测试加法运算；总共测试2017个加法指令与常数直接相加， 300*2017=605100
  
+整数加：
 x86汇编:
   ;计时开始
   MOV EBX, 300  BB2C010000
@@ -1573,7 +1791,7 @@ x86汇编:
  
 结果运行时间：60
  
-EUPHORIA 加法指令顺序执行效率测试脚本：
+EUPHORIA 加法指令顺序执行效率测试脚本：【的内置数字类型只有 integer, 没有内置的小数类型，只能使用atom模拟。】
   --计时开始
     count = 300
     count +=300
@@ -1583,6 +1801,16 @@ EUPHORIA 加法指令顺序执行效率测试脚本：
  
 结果运行时间：74 【难以置信，只比汇编慢18.9%倍】
  
+Lua Script 脚本：【错误，Lua没有整数类型，它的数字类型只有一种：Double。】
+  (计时开始)
+  local count = 300
+  count = count + 300
+    ..... （总计 2017 次）
+  count = count + 300
+  (计时结束)
+
+【Lua5.0.2】结果运行时间：110 【Lua5.1版本运行时间为：120 】
+
 TurboScript ASM 脚本：
   (计时开始)
   300
@@ -1593,6 +1821,7 @@ TurboScript ASM 脚本：
  
 结果运行时间：98 【比汇编慢38.8%倍,经过初步优化现在的运行时间已经是87（比汇编慢31.0%倍）； 当我进一步取消CPUStates(判断终止标志位)测试，运行时间居然和汇编差不多了：61！】
  
+
 子过程调用效率测试
 x86 汇编 子过程调用效率测试脚本:
 function add(a,b: integer): integer;
@@ -1615,13 +1844,27 @@ function iAdd(integer a, integer b)
 end function
 --计时开始
 count = 300
-iAdd(count, 300)
+count = iAdd(count, 300)
 ..... --- 总计 2017 次
-iAdd(count, 300)
+count = iAdd(count, 300)
 --计时结束
  
 结果运行时间：522 【比汇编慢了近75.9%倍，比TurboScript 近调用慢近70%倍】
+
  
+Lua Script 脚本：
+function iAdd(a, b)
+  return a+b
+end function
+  (计时开始)
+  local count = 300
+  count = iAdd(count, 300)
+    ..... （总计 2017 次）
+  count = iAdd(count, 300)
+  (计时结束)
+
+【Lua5.0.2】结果运行时间：1270 【Lua5.1版本运行时间为：1820 】
+
 TurboScript 子过程近调用效率测试
 : Add +;
 --计时开始
@@ -1637,11 +1880,28 @@ TurboScript 子过程模块内的远调用效率
 
 TurboScript 子过程模块之间的VM DLL远调用效率
 : Add external 'test'; //该函数在另一文件中。
-需加载技术的结果运行时间：1082【不稳定徘徊在1082-8828】 <如果不使用Cache功能每次都要查找：2676-9980>
+启用按需加载技术的结果运行时间：1082【不稳定徘徊在1082-8828】 <如果不使用Cache功能每次都要查找：2676-9980>
 使用的是按需加载技术，也就是仅当该函数被调用的时候才加载，然后加上Cache技术，后面的调用就在内存中处理。
 时间远远长于其它，是因为加载文件耗去了绝大部分时间
 不使用按需加载技术，而是预先加载模块：
 结果运行时间：202  <如果不使用Cache功能每次都要查找所花时间：1790>
+
+原来lua 引擎是统一用double 实现的数字！不过，EUPHORIA 的数字类型却只是整数，然后就是 atom 这个应该算是variant，无法比。只有比比看看他们解释器的运行的空耗了。
+
+以汇编运行为全速，空耗为0，计算比值！
+
+double 汇编浮点加法直接执行的时间： 70
+double 汇编浮点加法过程调用执行的时间： 80
+
+直接 VM指令 执行：
+EUPHORIA 空耗： 100-81.08=18.92
+Lua  空耗： 100-63.64=36.36
+
+VM 过程调用：
+EUPHORIA 空耗： 100-24.14=75.86
+Lua  空耗： 100-6.30=93.7
+
+不管怎么说，EUPHORIA和Lua 都是是目前脚本引擎速度最快的，当然他们侧重点各有不同。通过速度比较，可以看出他们依然还有提升性能空间。
 
 _______________________________
 EUPHORIA 完整脚本
@@ -1752,4 +2012,131 @@ printf(1, "time: %.2f\n", total[1])
 if getc(0) then  -- wait for key press
 end if
 
-    
+_______________________________
+Lua 测试脚本
+由于 Lua 不支持 int64 所以我不得不先为Lua添加过程:
+
+program mLua;
+{$APPTYPE CONSOLE}
+uses
+  Windows,  SysUtils,  Classes,
+  lua;
+
+var
+  tB, tE: Int64;
+
+function lua_startCount(L: Plua_State): Integer; cdecl;
+begin
+  QueryPerformanceCounter(tB);
+  Result := 0;
+end;
+
+function lua_stopCount(L: Plua_State): Integer; cdecl;
+begin
+  QueryPerformanceCounter(tE);
+  Result := 0;
+end;
+
+function lua_ShowCount(L: Plua_State): Integer; cdecl;
+begin
+  Writeln('Count:', tE-tB);
+  Result := 0;
+end;
+
+//function to print lua data via delphi
+function lua_print(L: Plua_State): Integer; cdecl;
+var
+  i, n: Integer;
+begin
+  write('Lua: ');
+  n := lua_gettop(L);
+  for i := 1 to n do
+  begin
+    if i > 1 then
+      Write(#9);
+    if lua_isstring(L, i) then
+      Write(lua_tostring(L, i))
+    else
+      Write(Format('%s:%p', [lua_type(L, i), lua_topointer(L, i)]));
+  end;
+  WriteLn;
+  Result := 0;
+end;
+
+var
+  L: Plua_State = nil; //lua state
+  script: tstringlist; //a stringlist to hold the lua script
+  result: integer;     //0 if script executes ok
+
+begin
+  if ParamCount <= 0 then
+  begin
+    WriteLn('Usage: min.exe filename');
+    Exit;
+  end;
+
+  //init lua dll
+  LoadLua;
+  LoadLuaLib;
+  L := lua_open;
+ try
+ //register pseudo delphi array (class) in lua
+  luaopen_array(L);
+
+  //Register a delphi procedure/funtion for use in Lua
+  lua_register(L, 'print', lua_print);
+  lua_register(L, 'startCount', lua_startCount);
+  lua_register(L, 'stopCount', lua_stopCount);
+  lua_register(L, 'showCount', lua_ShowCount);
+
+  //Load a lua script from a buffer
+  script:=tstringList.Create;
+  try
+    try
+     script.LoadFromFile(PChar(ParamStr(1)));
+    except
+      writeln('Can not load Script File:'+ParamStr(1));
+      exit;
+    end;
+    lual_loadbuffer(L, script.gettext, length(script.gettext), 'myluascript');
+  finally
+    Script.Free; //clean up
+  end;
+
+  //Ask Lua to run our little script
+  result := 0;
+  result := lua_pcall(l, 0, LUA_MULTRET, 0);
+  if result>0 then
+  begin
+    writeln('bad, bad script'); //should provide more usefull info
+    lua_error(L);
+  end
+  else
+    writeln('done with script');
+
+ finally
+  //close lua dll
+  lua_close(L);
+  UnLoadLua;
+  UnLoadLuaLib;
+ end;
+end;
+
+Lua 脚本：
+————————————————————————————————
+function iAdd(a, b)
+  return a + b
+end
+
+startCount()
+local count = 300
+    count = iAdd(count, 300)
+    --....
+    count = iAdd(count, 300)
+stopCount()
+
+print("hello world, from Lua!\n")
+showCount()
+print("\nthe resut:")
+print(count)
+————————————————————————————————

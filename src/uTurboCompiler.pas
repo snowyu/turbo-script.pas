@@ -133,18 +133,6 @@ type
     property Code: TCustomTurboModule read FCode;
   end;
 
-  {: keep the function body symbol. }
-  TTurboWordSymbolList = class(TTurboSymbolList)
-  private
-    function GetItems(Index: Integer): TAbstractTurboWordSymbol;
-    function GetOwner: TCustomTurboWordSymbol;
-  public
-    function Add(const aWord: TAbstractTurboWordSymbol): Integer;
-    property Items[Index: Integer]: TAbstractTurboWordSymbol read GetItems;
-            default;
-    property Owner: TCustomTurboWordSymbol read GetOwner;
-  end;
-
 
 implementation
 
@@ -315,27 +303,6 @@ destructor TCustomTurboWordSymbol.Destroy;
 begin
   FreeAndNil(FCode);
   inherited Destroy;
-end;
-
-{
-***************************** TTurboWordSymbolList *****************************
-}
-function TTurboWordSymbolList.Add(const aWord: TAbstractTurboWordSymbol):
-        Integer;
-begin
-  aWord.Parent := TCustomTurboWordSymbol(FOwner);
-  Result :=  inherited Add(aWord);
-end;
-
-function TTurboWordSymbolList.GetItems(Index: Integer):
-        TAbstractTurboWordSymbol;
-begin
-  Result := TAbstractTurboWordSymbol(inherited Get(Index));
-end;
-
-function TTurboWordSymbolList.GetOwner: TCustomTurboWordSymbol;
-begin
-  Result := TCustomTurboWordSymbol(FOwner);
 end;
 
 

@@ -53,14 +53,17 @@ Var
 begin
   With Error Do
   Begin
-    s := T-->Grammar<--(Sender).ErrorStr(ErrorCode, Data) + ' --- '+ Data;
+    s := T-->Grammar<--(Sender).ErrorStr(ErrorCode, Data);
+    If Data <> '' then  s := s + ' --- '+ Data;
     errStr := Format('at line %d, position %d: %s',  [Line, Col - 1, S]);
     s := GFileName + '(' + IntToStr(Line) + ')';
     Case ErrorType of
-      etSyntax: s := s + ' Syntax ';
-      etSymantic:s := s + ' Symantic ';
+      etSyntax: s := s + ' Syntax Error(E'+ IntToStr(ErrorCode) + ')';
+      etSymantic:s := s + ' Symantic Error(E'+ IntToStr(ErrorCode) + ')';
+      etWarn: s := s + ' Warn  ';
+      etHint: s := s + ' Hint  ';
     End;
-    s := s + 'Error(E'+ IntToStr(ErrorCode) + ') ' + errStr;
+    s := s + ' ' + errStr;
   End;
   Writeln(s);
 End;

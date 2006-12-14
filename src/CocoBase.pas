@@ -14,6 +14,8 @@ const
   { Standard Error Types }
   etSyntax = 0;
   etSymantic = 1;
+  etWarn = 2;
+  etHint = 3;
 
   chCR = #13;
   chLF = #10;
@@ -273,6 +275,7 @@ type
     function LookAheadName : string;
     function LookAheadString : string;
     procedure StreamToListFile(s : string; const AddEndOfLine : boolean);
+    procedure ErrorMsg(const errNo : integer; const Data : string; const aErrType: integer);
     procedure SemError(const errNo : integer; const Data : string);
     procedure SynError(const errNo : integer; const Data : string = '');
 
@@ -745,6 +748,13 @@ begin {PrintErr}
     [lnr, Col - 1, S]), TRUE);
   StreamToListFile('', TRUE)
 end; {PrintErr}
+
+procedure TCocoRGrammar.ErrorMsg(const errNo : integer; const Data : string; const aErrType: integer);
+begin
+  if errDist >= minErrDist then
+    Scanner.ScannerError(errNo, Scanner.CurrentSymbol, Data, aErrType);
+  errDist := 0;
+end; {ErrorMsg}
 
 procedure TCocoRGrammar.SemError(const errNo : integer; const Data : string);
 begin

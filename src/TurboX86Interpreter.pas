@@ -80,8 +80,11 @@ implementation
 
 procedure iVMInit;forward;
 procedure iVMNext;forward;
+procedure _iVMHalt(ErrorCode: TTurboProcessorErrorCode);forward;
 procedure iVMHalt;forward;
 procedure iVMEnter;forward;
+procedure vEmitLString;forward;
+procedure _iVMErrorAt(ErrorCode: tsInt; ErrorAddr: Pointer);forward;
 
 {
 ***************************** TTurboX86Interpreter *****************************
@@ -204,10 +207,10 @@ asm
   JZ   @@BadOpError
   JMP  EAX
 @@BadOpError:
-  MOV  EAX, [EDI].TTurboPreservedDataMemory.GlobalOptions
- 
-  MOV  [EAX].TTurboGlobalOptions.LastErrorCode, errBadInstruction
-  JMP  iVMHalt
+  //MOV  EAX, [EDI].TTurboPreservedDataMemory.GlobalOptions
+  //MOV  [EAX].TTurboGlobalOptions.LastErrorCode, errBadInstruction
+  MOV  EAX, errBadInstruction
+  JMP  _iVMHalt
   //Bad OpCode: no procedure assigned to the OpCode.
 {@@IsUserWord:
   ADD  EAX, EDI //指向用户定义的word入口
@@ -236,32 +239,101 @@ end;
 procedure iVMEnter;
 asm
   LODSD
+@DoVMEnter:
   ADD  EAX, [EDI].TTurboPreservedDataMemory.Code
   PUSH ESI        //push the current IP.
   MOV  ESI, EAX   //set the new IP
   JMP iVMNext
 end;
 
+//input EAX the word CFA. 
+procedure _DoVMEnter;
+asm
+  ADD  EAX, [EDI].TTurboPreservedDataMemory.Code
+  PUSH ESI        //push the current IP.
+  MOV  ESI, EAX   //set the new IP
+  JMP iVMNext
+end;
+
+//(ErrorCode -- )
 procedure iVMHalt;
+asm
+  MOV EAX, EBX
+
+  //move the top in stack to EAX 
+  MOV  EBX, [EBP] 
+  //Increment the data stack pointer.
+  //ADD  EBP, Type(tsInt)
+  INC EBP
+  INC EBP
+  INC EBP
+  INC EBP
+  
+  JMP _iVMHalt 
+end;
+
+procedure _iVMHalt(ErrorCode: TTurboProcessorErrorCode);assembler;
 asm
 {  MOV DL, [EDI].TPreservedCodeMemory.States
   BTR EDX, psRunning //cTurboScriptIsRunningBit  //clear the cIsRunningBit to 0.
   MOV [EDI].TPreservedCodeMemory.States, DL
   JMP iVMNext
 }
-  MOV  EAX, [EDI].TTurboPreservedDataMemory.GlobalOptions
-  CMP  ESP, [EAX].TTurboGlobalOptions.ReturnStackBottom
-  MOV  DL, [EAX].TTurboGlobalOptions.States
+  MOV  ECX, [EDI].TTurboPreservedDataMemory.GlobalOptions
+  MOV  [ECX].TTurboGlobalOptions.LastErrorCode, ErrorCode  
+  //cmpare the ESP and ReturnStackBottom, it should be equ.
+  CMP  ESP, [ECX].TTurboGlobalOptions.ReturnStackBottom
+  MOV  DL, [ECX].TTurboGlobalOptions.States
   BTR  EDX, psRunning //cTurboScriptIsRunningBit  //clear the cIsRunningBit to 0.
   BTS  EDX, psHalt
-  MOV  [EAX].TTurboGlobalOptions.States, DL
+  BTR  EDX, psHaltError
   JZ   @@byebye  //ok
 @@HaltErr:
-  MOV  [EAX].TTurboGlobalOptions.LastErrorCode, errHalt
-  MOV  ECX, ESP
-  MOV  ESP, [EAX].TTurboGlobalOptions.ReturnStackBottom
-  MOV  [EAX].TTurboGlobalOptions.ReturnStackBottom, ECX
+  BTS  EDX, psHaltError
+  //MOV  [ECX].TTurboGlobalOptions.LastErrorCode, errHalt
+  MOV  EAX, ESP
+  MOV  ESP, [ECX].TTurboGlobalOptions.ReturnStackBottom
+  MOV  [ECX].TTurboGlobalOptions.ReturnStackBottom, EAX
 @@byebye:
+  MOV  [ECX].TTurboGlobalOptions.States, DL
+end;
+
+//(ErrorCode, ErrorAdr -- )
+procedure iVMErrorAt;
+asm
+  MOV  EAX, [EBP]
+  MOV  EDX, EBX
+   INC  EBP
+   INC  EBP
+   INC  EBP
+   INC  EBP
+  MOV  EBX, [EBP]
+   INC  EBP
+   INC  EBP
+   INC  EBP
+   INC  EBP
+  JMP  _iVMErrorAt
+end;
+
+procedure _iVMErrorAt(ErrorCode: tsInt; ErrorAddr: Pointer);
+asm
+  MOV  ECX, [EDI].TTurboPreservedDataMemory.GlobalOptions
+  MOV  [ECX].TTurboGlobalOptions.ErrorAddr, ErrorAddr
+  JMP  _iVMHalt
+end;
+
+//(ErrorCode -- )
+procedure iVMError;
+asm
+  MOV  EAX, EBX
+  MOV  EDX, [ESP]  //the TOS is ErrorAddr Now.
+  MOV  EBX, [EBP]
+  INC  EBP
+  INC  EBP
+  INC  EBP
+  INC  EBP
+
+  JMP  _iVMErrorAt
 end;
 
 procedure iVMExit;
@@ -346,9 +418,9 @@ asm
 
 @@NotFoundError:
   POP  EDI
-  MOV  EAX, [EDI].TTurboPreservedDataMemory.GlobalOptions
-  MOV  [EAX].TTurboGlobalOptions.LastErrorCode, errModuleNotFound
-  JMP  iVMHalt
+  //MOV  EAX, [EDI].TTurboPreservedDataMemory.GlobalOptions
+  MOV  EAX, errModuleNotFound
+  JMP  _iVMHalt
 
 @@DoLocalEnterFar:
 
@@ -361,6 +433,56 @@ asm
   JMP iVMNext
 end;
 
+procedure _DoAssert;
+asm
+  MOV  EDX, [EBP]  //EDX <- the second Stack TOp
+  ADD  EDX, EDI 
+  MOV  EAX, [EDI].TTurboPreservedDataMemory.Executor
+
+  PUSH EDI
+  PUSH EBX
+  PUSH ESI
+  PUSH EBP
+  //MOV  ESI, [EAX]
+  CALL TTurboX86Interpreter.DoPrintShortString
+  POP  EBP
+  POP  ESI
+  POP  EBX
+  POP  EDI
+
+   INC  EBP
+   INC  EBP
+   INC  EBP
+   INC  EBP
+   MOV  EBX, [EBP]
+   INC  EBP
+   INC  EBP
+   INC  EBP
+   INC  EBP
+
+   MOV  EAX, errAssertionFailed
+   MOV  EDX, [ESP]
+   JMP  _iVMErrorAt
+end;
+
+procedure iVMAssert;
+asm
+   CMP  EBX, 0 
+   JZ   _DoAssert
+@SkipAssert:
+   INC  EBP
+   INC  EBP
+   INC  EBP
+   INC  EBP
+
+   MOV  EBX, [EBP]
+   INC  EBP
+   INC  EBP
+   INC  EBP
+   INC  EBP
+
+   JMP  iVMNext
+end;
 
 //call(EXECUTE) the user defined word
 //(CFA --- )
@@ -495,6 +617,23 @@ procedure iVMSubInt;
 asm
   SUB EBX, [EBP]
   ADD EBP, Type(tsInt)
+  JMP  iVMNext
+end;
+
+//(Doublea, Doubleb) -- (Double = Doubleb + Doublea)
+procedure iVMAddDouble;
+asm
+  DEC  EBP
+  DEC  EBP
+  DEC  EBP
+  DEC  EBP
+  MOV  [EBP], EBX
+  FLD  qword ptr [EBP]
+  FADD qword ptr [EBP+Type(qword)]
+  SHL  EBP, 3 //=Add EBP, 8 2^3
+  FSTP [EBP]
+  MOV  EBX, [EBP]
+  SHL  EBP, 2 //=Add EBP, 4 2^2 
   JMP  iVMNext
 end;
 
@@ -728,9 +867,15 @@ procedure vEmitLString;
 asm
   MOV  EDX, EBX  //EDX <- TOS
   ADD  EDX, EDI 
-  XCHG ESP, EBP
-  POP  EBX
-  XCHG ESP, EBP
+  //XCHG ESP, EBP
+  //POP  EBX
+  //XCHG ESP, EBP
+  MOV  EBX, [EBP]
+  //ADD EBP, Type(tsInt)
+  INC  EBP
+  INC  EBP
+  INC  EBP
+  INC  EBP
   MOV  EAX, [EDI].TTurboPreservedDataMemory.Executor
 
   PUSH EDI
@@ -743,6 +888,7 @@ asm
   POP  ESI
   POP  EBX
   POP  EDI
+@Skip:
   JMP  iVMNext
 end;
 
@@ -778,6 +924,7 @@ procedure InitTurboCoreWordList;
 begin
   GTurboCoreWords[opNext] := iVMNext;
   GTurboCoreWords[opHalt] := iVMHalt;
+  GTurboCoreWords[opAssert] := iVMAssert;
 
   GTurboCoreWords[opEnter] := iVMEnter;
   GTurboCoreWords[opExit] := iVMExit;
