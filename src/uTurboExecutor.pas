@@ -117,7 +117,7 @@ type
     FDataMemory: Pointer;
     FIsLoaded: Boolean;
     FMaxDataMemorySize: tsInt;
-    FMaxMemorySixe: tsInt;
+    FMaxMemorySize: tsInt;
     {: The Code Memory }
     FMemory: Pointer;
     FModuleDate: TTimeStamp;
@@ -1441,9 +1441,9 @@ var
   vOld: Pointer;
 begin
   if Value = -1 then
-    FMaxMemorySixe := -1
+    FMaxMemorySize := -1
   else
-    FMaxMemorySixe := Value;
+    FMaxMemorySize := Value;
   if (PTurboPreservedDataMemory(FDataMemory).MemorySize <> Value) and
     (PTurboPreservedDataMemory(FDataMemory).UsedMemory <= Value) then
   begin

@@ -7,11 +7,69 @@ TODO:
     Syntax    {$MaxStackSize  Size[KB|MB] }
     注意：必须放在Program|Unit之后
 
-2006-12-14
-自己事务计划
-  分析微软CLR框架以及CIL核心。
+2006-12-18
+!+ uTurboPEImage.pas
+ This unit contains various classes and support routines to read/write the contents of portable executable (PE) files. 
+我的目的：生成标准的PE文件，读入标准的PE文件。首先实现将模块放入资源段，这最简单，然后编写一个DLL： tsCoreEE.dll，然后在桩中打入调用该DLL入口执行。
+  TTurboPE = object
+  protected
+  public
+  end;
 
-单位事务计划
+2006-12-17
+俺的模块准备分为主模块和模块
+主模块就是带有清单的模块。
+然后就是实现Table
+
+2006-12-16
+~ Namespace 语句和AppDomain以及模块的关系
+如果Namespace只是一种结构的话，那么意味着每一进程都将独立装入同样的系统内裤。浪费？
+现目前我的模块的实现不也是如此，如果准备实现系统单元。
+
+俺的模块准备分为主模块和模块
+主模块就是带有清单的模块。
+
+tsrun test.tpc: 占用内存Working Set 2.052M
+.net hello 占用内存Working Set 4.752M
+
+2006-12-15
+~ downlaod some perfect CLI e-books:
+  Addison.Wesley.The.Common.Language.Infrastructure.Annotated.Standard.eBook-DDU.chm 其实就是 Ecma 但是组织得更好
+  Inside Microsoft .NET IL Assembler.CHM
+  Applied.Microsoft.NET.Framework Programming.pdf
+  Customizing the Microsoft dot NET Framework Common Language Runtime.chm
+~ 关于类型的思索，想到字符串，想到引用，为啥必须要引用应该可以让用户自己选择是否需要：
+  Array = ComplexType
+    
+    BaseElementType: TypeInfo;
+  end;
+  SimpleArray  = 没有引用计数的动态数组定义
+  SimpleString    = SimpleArray of Char; //没有引用计数的字符串定义
+
+2006-12-14
+~ 自己事务计划
+    最近在看CLI架构，发现CLI的许多设想，和俺的架构类似，都是面向堆栈虚拟机，模块化，支持按需加载模块，模块可以不在本机，当然它的模块分类比俺的细致，它区分了程序集模块（assembly）和模块，而我则就是一种模块。设计思想的不同之处在于：
+    CLI设想的虚拟机执行机构只能是JITter(即时编译器)，根本没有考虑解释器执行。
+    CLI是强类型化的，所有的变量和类型都必须有Meta信息支持。
+    CLI的VEE支持垃圾回收机制
+    将类放在VM中作为基本类型
+    所有的过程全是方法【如何处理类，类是特殊模块？】
+    计划：
+    
+    重点分析它的模块架构，以资借鉴 【1周】
+    模块加载到内存后，它是如何管理代码地址空间的 【2周】
+    重新构造TurboScript的模块架构 【2周】
+    解决代码地址空间管理【2周】
+    脚本加载后将所有的相对地址全部重定位成绝对地址，构造 AddressResolver AddressBinding【1周】
+    分析类类型，如何实现
+    赋值指令和在类型之间值转换
+    错误异常处理机构【必须独立，方便更换，初期实现类似Delphi的异常错误处理机制】
+    类型对象变量的后期绑定机制
+    
+    唉，事情真是一大堆啊。
+
+~ 单位事务计划
+
 
 ~ 模块，程序集和AppDomain（Application Domain）
 程序集就是DLL或Exe（多了一个RVA主程序入口地址）

@@ -6,6 +6,27 @@ CIR(Common Intermediate Language (CIL))·ÖÎö
 ËüµÄ¼Ó·¨Ö¸ÁîÖ»ÓĞÒ»ÖÖĞÎÊ½£¬ÕâËµÃ÷ËüµÄ¼Ó·¨Ö¸ÁîµÄÊı¾İÀàĞÍÊÇºóÆÚÔ¼ÊøµÄ£¬²»¹ıÕâÑùÒ»À´£¬¹¹³É¼Ó·¨µÄÖ¸ÁîµÄÊı¾İ±ØĞëÒªÓĞÊı¾İÀàĞÍÁË£¡
 CLR ±ÈÎÒ¶àÁËÒ»¸ö²ÎÊı±íÓÃÓÚ´«µİ¹ı³ÌµÄ²ÎÊı¡£
 
+= CLI Architecture =
+The Common Language Infrastructure (CLI) provides a specification for executable code and the execution environment (the Virtual Execution System, or VES) in which it runs.
+
+The general CLI architecture as it relates to supporting mobile code, specifically
+including
+ *  ĞéÄâ»úÉè¼Æ
+    * Ïß³Ì
+    * ¶¯Ì¬°ó¶¨ classes, assemblies, and application domains.
+    * ·Ö²¼Ê½ÎÄ¼ş¼ÓÔØ
+    * ±£»¤»úÖÆ
+    * CTS(Common Type System) - Self-describing type system
+    * Cross assembly method/member function invocation
+    * Side-by-side execution (simultaneous support for separate versions of the same component)
+    * Managed and unmanaged code interoperability(Ğ­Í¬¹¤×÷ÄÜÁ¦)
+ *  Ô´ÓïÑÔ¶ÀÁ¢ Source language independence
+ *  Èí¼ş×é¼ş°æ±¾¹ÜÀí Software component version management
+ *  Èí¼ş·Ö·¢Ä£Ê½ The software deployment model
+ *  °²È«»úÖÆ Security mechanisms that address the mechanism that allows such general distribution of mobile code
+ *  CLI Í¨Ñ¶»úÖÆ CLI communication mechanisms
+
+
 == Ä£¿é(Module) ==
 Ä£¿é(Module)ÀàËÆÓÚÒÔÇ°µÄµ¥Ôª£¬ÓÃÓÚ·Ö¸î²»Í¬µÄÀàºÍÀàĞÍ£¬ÒÔ¼°×ÊÔ´(resource, ×ÊÔ´¼ÇÂ¼¾ÍÊÇ×Ö·û´®£¬Í¼ÏóÒÔ¼°ÆäËüÊı¾İ£¬ËûÃÇÖ»ÔÚĞèÒªµÄÊ±ºò²Å»á±»µ÷ÈëÄÚ´æ)¡£ÀàĞÍµÄMetaĞÅÏ¢Ò²ÊÇÄ£¿éµÄÒ»²¿·Ö¡£
 CLR µÄ³ÌĞò¼¯ÊÇÓÉÄ£¿é¹¹³ÉµÄ£¬CLR Ä£¿éÊÇÒ»ÖÖÁ÷Êı¾İ£¨×Ö½ÚÁ÷£©£¬Í¨³£ÊÇÒÔÎÄ¼şµÄĞÎÊ½´æÔÚÓÚ±¾µØÎÄ¼şÏµÍ³»òWeb·şÎñÆ÷ÉÏ¡£
@@ -25,7 +46,9 @@ CLR µÄ³ÌĞò¼¯ÊÇÓÉÄ£¿é¹¹³ÉµÄ£¬CLR Ä£¿éÊÇÒ»ÖÖÁ÷Êı¾İ£¨×Ö½ÚÁ÷£©£¬Í¨³£ÊÇÒÔÎÄ¼şµÄĞÎÊ½´æ
   * ³ÌĞò¼¯ÄÜ±»¶ÀÁ¢·¢²¼
   * ³ÌĞò¼¯µ¼³öµÄAPIÄÜºÍÆäËü×é¼şÍêÃÀµÄ½»»¥¡£
 
-³ÌĞò¼¯ÔÚÎÄ¼şÏµÍ³ÖĞÊÇÓÃPE(portable executable)¸ñÊ½´æ·Å¡£
+³ÌĞò¼¯ÔÚÎÄ¼şÏµÍ³ÖĞÊÇÓÃPE(portable executable)¸ñÊ½´æ·Å¡£ÒıÓÃµÄ³ÌĞò¼¯ÊÇ°´Ğè¼ÓÔØµÄ£¬»»¾ä»°Ëµ£¬Ö»ÓĞµ±µ÷ÓÃµ½¸Ã³ÌĞò¼¯µÄº¯Êı»òÀàĞÍÖ®ºó£¬¸Ã³ÌĞò¼¯²Å»á±»¼ÓÔØ£º
+  ³ÌĞò¼¯¼ÓÔØÆ÷(assembly loader)½«µ÷ÓÃ CLI ÏÂÔØÆ÷(downloader)¼ÓÔØ¸Ã³ÌĞò¼¯
+    CLI ÏÂÔØÆ÷ ¸ù¾İËÑË÷Ë³Ğò´ÓÓ¦ÓÃ³ÌĞòÄ¿Â¼£¬×ÓÄ¿Â¼£¬±¾µØÎÄ¼şCacheÄ¿Â¼£¬»òÍøÂçURLÖĞ×°ÔØ¡£
 
 JefferµÄÊéÖĞËµ£¬Çåµ¥ÔªÊı¾İ±íÖĞÓĞÒ»·İÃû½ĞExportedTypesDefµÄ±í£¬ÆäÖĞ¶¨ÒåÁËËùÓĞµÄµ¼³öÀàĞÍÌõÄ¿¡£µ«ÊÇÎÒÔÚ²é¿´µ¥ÎÄ¼ş³ÌĞò¼¯µÄÊ±ºòÈ´Ã»ÓĞ·¢ÏÖÔªÊı¾İµ±ÖĞÓĞExportedTypesµÄ¶¨Òå¡£ºóÀ´ÓÖ×ĞÏ¸¿´ÁËÒ»ÏÂÊé²ÅÃ÷°×£¬ÎªÁË½ÚÊ¡ÎÄ¼ş¿Õ¼ä£¬ËùÒÔÔÚÔªÊı¾İ¶¨ÒåÔªÊı¾İ±íÖĞËù¶¨ÒåµÄµ¼³öÀàĞÍÊÇ²»»áÔÚExportedTypesDef±íÖĞÖØ¸´³öÀ´µÄ¡£ÕâÒ²¾ÍÊÇËµ£¬Ö»ÓĞµ±Ò»¸ö³ÌĞò¼¯ÊÇÓÉ¶à¸öÄ£¿é¿éÎÄ¼ş×é³ÉµÄÊ±ºò£¬ÆäËüÄ£¿éÎÄ¼şÖĞµ¼³öµÄÀàĞÍ²Å»áÔÚ³ÌĞò¼¯Çåµ¥ÖĞ±»¶¨Òå¡£Ê¹ÓÃÁËÕâÖÖ¶¨Òå·½Ê½¡£Ïàµ±ÓÚÔÚ³ÌĞò¼¯Çåµ¥ÖĞÌá¹©Ò»¸ö²éÕÒ³ÌĞòÖĞËù¶¨ÒåÀàĞÍµÄË÷Òı¡£µ±CLR²éÕÒ³ÌĞò¼¯ÖĞÀàĞÍÊ±£¬Ëü»á¸ù¾İ³ÌĞò¼¯Çåµ¥ ExportdTypesDef±íµÄ¶¨Òå£¬ÔÚÏàÓ¦µÄÄ£¿éÎÄ¼şµ±ÖĞ²éÕÒµ½ĞèÒªµÄÀàĞÍ¶¨Òå¡£
 
@@ -38,7 +61,7 @@ AssemblyVersion£ºÕâ¸öÌØĞÔ±êÊ¶µÄ°æ±¾ºÅÎªCLR±¾ÉíËùÊ¶±ğµÄ°æ±¾ºÅ£¬CLRÍ¨¹ıÕâ¸ö°æ±¾ºÅÀ
 
 == AppDomainºÍµØÖ·¿Õ¼ä ==
 
-Ò»¸ö³ÌĞò¼¯½«±»¼ÓÔØµ½Ò»¸öApplication Domain(AppDomain)ÖĞÖ´ĞĞ£¿ Íâ²¿ÒıÓÃµÄÆäËü³ÌĞò¼¯½«ÔÚÍ¬ÑùÍ¬Ò»AppDomainÏÂÔËĞĞ¡£
+Ò»¸ö³ÌĞò¼¯½«±»¼ÓÔØµ½Ò»¸öApplication Domain(AppDomain)ÖĞÖ´ĞĞ¡£ Íâ²¿ÒıÓÃµÄÆäËü³ÌĞò¼¯½«ÔÚÍ¬ÑùÍ¬Ò»AppDomainÏÂÔËĞĞ¡£
 »»¾ä»°Ëµ£¬AppDomain ½«³ÌĞò¼¯¾Û¼¯ÔÚÒ»Æğ£¬ÊµÏÖ×îÖÕ¹¦ÄÜ¡£
 Ã¿Ò»¸öAppDomain¶¨ÒåÁËÒ»¸öÓÉCLIÖ´ĞĞÒıÇæ¹ÜÀíµÄµØÖ·¿Õ¼ä¡£ËùÓĞµÄµØÖ·ÒıÓÃ½«È·±£ÊµÔÚÍ¬Ò»¸öAppDomainÖĞ¡£
 CLIµØÖ·¿Õ¼äÊÇÓĞ²ã´ÎµÄ£ºAppDomain ÄÜ±»¼ÓÔØÈëÒ»¸öCLIµØÖ·¿Õ¼ä¡£
@@ -51,7 +74,11 @@ CLIµØÖ·¿Õ¼ä¿ÉÒÔ±»¸ÅÂÔµÄÈÏÎªÊÇOSÖĞµÄ½ø³ÌµØÖ·¿Õ¼ä£¨ÖÁÉÙÔÚRotor CLIÖĞÊÇÕâÑù£©¡£Ã¿Ò»
 Ä£¿é£¬³ÌĞò¼¯£¬AppDomainºÍµØÖ·¿Õ¼ä£¨address space£©µÄ¹ØÏµÊÇ£¬Ä£¿éÊÇ±àÒëÆ÷½¨Á¢µÄ×îĞ¡µÄµ¥ÔªÎÄ¼ş£¬ÓÉÒ»¸ö»òn¸öÄ£¿é×é³É³ÌĞò¼¯£¬³ÌĞò¼¯ÊÇ½øĞĞ·Ö·¢µÄ
 ×îĞ¡µ¥ÔªÎÄ¼ş£¬³ÌĞò¼¯ÄÜ×éºÏÔÚÒ»¸öAppDomainÏÂÖ´ĞĞ¡£¶à¸öAppDomainÄÜÔÚµ¥¸öµØÖ·¿Õ¼äÏÂÖ´ĞĞ¡£
 
-¡¾ÎÊ¡¿Èç¹û¶ÔÆäËü³ÌĞò¼¯¹ı³ÌµÄµ÷ÓÃ£¬ÒâÎ¶×ÅĞèÒª¿ª±ÙĞÂµÄVirtualExecutionEngine?,¶ÑÕ»ÕâĞ©È«²¿¶¼ÒªĞÂµÄ£¿£¿
+¡¾ÎÊ¡¿1. Èç¹û¶ÔÆäËü³ÌĞò¼¯¹ı³ÌµÄµ÷ÓÃ£¬ÒâÎ¶×ÅĞèÒª¿ª±ÙĞÂµÄVirtualExecutionEngine?,¶ÑÕ»ÕâĞ©È«²¿¶¼ÒªĞÂµÄ£¿£¿
+  2. address space ÊÇÔõÃ´¹¹ÔìµÄ£¿×î¶àÄÜÈİÄÉ¼¸¸öAppDomain£¿Ê²Ã´Ê±ºòĞèÒªĞÂ½¨ÁíÍâÒ»¸öaddress space£¿
+¡¾´ğ¡¿
+2¡¢»ù±¾ÉÏ Ò»¸öCLR Host½ø³Ì¾ÍÊÇÒ»¸öaddress space£¬È»ºó½¨Á¢¶à¸ö AppDomain£¬ÖÁÓÚ¸öÊıÄÇÊÇÎŞËùÎ½µÄ¡£AppDomain Ê¹ÓÃÀ´¸ôÀë³ÌĞò¼¯µÄ¡£±ÈÈç£º ASP.Net »òÕß  Microsoft SQL Server¡£
+Ã¿Ò»¸öAppDomainÖ®¼ä²»ÄÜ±Ë´ËÓ°Ïì£¬ÊÇÍêÈ«¶ÀÁ¢µÄ£¬ÕâÑù±£Ö¤ÁËAppDomainµÄ°²È«£¡±ØĞë×öµ½Ò»¸öAppDomainÖĞ³öÁË´íÎó£¬¶ø²»Ó°Ïìµ½ÁíÒ»¸öAppDomain.
 
 ×¢£º
 Common Language Infrastructure (CLI) Í¨ÓÃÓïÑÔ»ù´¡×éÖ¯
@@ -59,7 +86,7 @@ Common Language Infrastructure (CLI) Í¨ÓÃÓïÑÔ»ù´¡×éÖ¯
 == Virtual Execution System(VES) ==
 VESÊÇCLI DVM(·Ö²¼Ê½ĞéÄâ»ú)µÄĞÄÔà¡£Execution Engine (EE) ÔòÊÇÆäºËĞÄÁË£¬´úÂëÔÚ MSCOREE (Microsoft Common Object Runtime EE ¨C a name that is left over from the commercial
 CLR code) ÖĞ¡£
-ÒıÓÃµÄ³ÌĞò¼¯¿ÉÒÔ´æÔÚÓÚÈÎºÎµØ·½£¬±ÈÈçÒ»Ì¨web·şÎñÆ÷ÉÏ£¬µ±EE±»ÇëÇó×°ÔØ(Downloading)¸Ã³ÌĞò¼¯µÄÊ±ºò£¬½«»á×öÒ»ÏÂµÄÊÂÇé£º
+ÒıÓÃµÄ³ÌĞò¼¯¿ÉÒÔ´æÔÚÓÚÈÎºÎµØ·½£¬±ÈÈçÒ»Ì¨web·şÎñÆ÷ÉÏ£¬µ±EE±»ÇëÇó×°ÔØ(Downloading)¸Ã³ÌĞò¼¯µÄÊ±ºò£¬½«»á×öÒÔÏÂµÄÊÂÇé£º
   ¼ì²éµ÷ÓÃÕßÈÏÖ¤
   ¼ì²é³ÌĞò¼¯ÊÇ·ñÓĞĞ§
   Ò»ÇĞ¸ã¶¨Ôò½«³ÌĞò¼¯×°ÔØµ½AppDomain
@@ -69,7 +96,250 @@ CLR code) ÖĞ¡£
 µ±µÚÒ»´ÎÒıÓÃÀà³ÉÔ±µÄÊ±ºò£¬ËüµÄĞÎÊ½»¹ÊÇÖĞ¼ä´úÂë£¬CLI ×ÜÊÇÊ¹ÓÃJIT±àÒëÆ÷(JITter)½«ÖĞ¼ä´úÂë·­Òë³É±¾µØ»úÆ÷Âë£¬È»ºóµ±ÏÂ´ÎÔÙ´Î
 ÒıÓÃµÄÊ±ºò¾Í»áÖ±½ÓÖ´ĞĞ±àÒëºÃµÄ±¾µØ»úÆ÷Âë¡£EE»¹°üÀ¨ÁËÀ¬»øÊÕ¼¯Æ÷ºÍ½á¹¹»¯Òì³£´¦ÀíÆ÷¡£
 
+EE Ö´ĞĞÁ÷³Ì£¬Í¨¹ıÒ»¸ö×î¼òµ¥µÄÖ÷³ÌĞòËµÃ÷£º
+static void Main() {
+  Console.WriteLine("Hello");
+}
+
+ÔÚ Main ·½·¨±»Ö´ĞĞÇ°£¬CLR½«¼ì²âËùÓĞ±»MainÖĞµÄ´úÂëÒıÓÃµÄÀàĞÍ£¬CLR½«»áÎªËùÓĞµÄÒıÓÃÀàĞÍ·ÖÅäÒ»¿éÄÚ²¿Êı¾İ£¬ÄÚ²¿Êı¾İÖĞ°üº¬ÁË¶¨ÒåµÄÀàĞÍÖĞµÄÃ¿Ò»¸ö·½·¨µÄÈë¿Ú¡£
+Ã¿Ò»¸ö·½·¨Èë¿Ú°üº¬ÁË¸Ã·½·¨µÄÖ´ĞĞµØÖ·£¬µ±¸ÃÄÚ²¿Êı¾İ³õÊ¼»¯µÄÊ±ºò£¬CLR½«Ã¿Ò»¸öÈë¿ÚÖ¸ÏòÒ»¸öÄÚ²¿º¯Êı£ºJITCompiler.
+ok, µÚÒ»´Îµ÷ÓÃWriteLine·½·¨µÄÊ±ºò£¬Êµ¼ÊÉÏÊÇ JITCompiler º¯Êı±»µ÷ÓÃ£¬JITCompiler º¯ÊıÖªµÀ±»µ÷ÓÃ·½·¨ÊÇÄÄÒ»¸ö£¨¸ù¾İ´«ÈëµÄSelf¶ÔÏóÖ¸Õë£©£¬È»ºó JITCompiler
+º¯Êı²éÕÒ³ÌĞò¼¯µÄMetaDataÈ¡µÃ¸Ã·½·¨µÄIL£¬È»ºóĞ£Ñé²¢±àÒëIL³ÉÎª±¾µØCPUÖ¸Áî£¬±àÒëµÄ±¾µØCPUÖ¸Áî±»·ÅÔÚ¶¯Ì¬·ÖÅäµÄÄÚ´æ¿éÖĞ£¬½Ó×Å JITCompiler º¯Êı½«WriteLineµÄ
+ÄÚ²¿Êı¾İµÄ·½·¨Èë¿ÚÌæ»»³É±àÒëºÃµÄ±¾µØCPUÖ¸ÁîÖ´ĞĞÈë¿Ú¡£×îºó£¬ JITCompiler º¯ÊıÌø×ªµ½¸ÃÈë¿Ú´¦Ö´ĞĞ¡£
+
+JITCompiler ´æ·ÅµÄ±¾µØCPUÖ¸ÁîËæ×ÅÓ¦ÓÃµÄÖÕÖ¹¶ø×Ô¶¯±»ÊÍ·Å£¨³ı·ÇÊ¹ÓÃ NGen.exe£©£¬µ±ÔÙ´ÎÔËĞĞµÄÊ±ºò£¬ÄÇÃ´JITCompiler½«ÔÙ´Î±àÒë£¬Èç¹ûÄãÍ¬Ê±ÔËĞĞÁ½¸öÓ¦ÓÃÊµÀı
+ÄÇÃ´JITCompilerÒ²½«»áÔÙ±àÒëÒ»´Î¡£ºÙºÙ£¬Èç¹ûÄãµÄÓ¦ÓÃ³ÌĞò´ó²¿·ÖµÄ·½·¨´úÂë¶¼Ö»±»µ÷ÓÃÒ»´Î£¬ÄÇÃ´ÕâËÙ¶ÈĞÔÄÜ½«±äµÃºÜÔã¸â£¬ÓÈÆäÊÇ´ò¿ªÁËJITCompilerÓÅ»¯µÄÇé¿öÏÂ
+¸üÂı£¬µ±È»´ó¶àÊıÓ¦ÓÃ³ÌĞò¾ö²»¿ÉÄÜĞ´³öµÄ·½·¨´úÂëÖ»±»µ÷ÓÃÒ»´ÎµÄ£¬ÕâÖ»ÄÜÊÓ×÷¼«¶ËÇé¿ö¡£
+
+ÁíÍâ£¬ÎÒºÜÏëÖªµÀµÄ£¬IL(MetaData)¼ÓÔØµ½ÄÚ´æÊÇÊ²Ã´Ê±ºò£¿Êµ¼ÊÉÏILÖ»ÓĞµ±JITCompiler±àÒëµÄÊ±ºò²ÅĞèÒª£¬Èç¹ûÒ»Ö±¶¼·ÅÔÚÄÚ´æÄÇ¾ÍÌ«ÀË·ÑÁË¡£
+
+== Remoting »úÖÆ ==
+Remoting »úÖÆ×÷ÎªÔÚAppDomainÖ®¼ä¹µÍ¨µÄÇÅÁº£¬µ±ÄãÒıÓÃÄãÒ»¸öAppDomainµÄ¶ÔÏó»ò³ÉÔ±µÄÊ±ºò£¬Remoting¾ÍÒª¸ºÔğ´¦ÀíÁË¡£Remoting Ò²±»ÓÃÓÚ
+ÔÚµØÖ·¿Õ¼äÖ®¼ä¹µÍ¨¡£Remoting ÊÇÔÚ MarshalByRefObject ÀàÖĞÊµÏÖµÄ¡£
+ËüµÄÊµÏÖ»úÖÆÈçÏÂ£º
+·şÎñÆ÷¶Ë£ºÔ¶³Ì·ÃÎÊµÄ¶ÔÏóÊÇ MarshalByRefObject ×ÓÀàµÄÊµÀı£¬Í¨¹ıÊ¹ÓÃ¸Ã»ùÀà£¬CLI¾ÍÓĞÄÜÁ¦ÎªÔ¶³Ì¶ÔÏó½¨Á¢Real Proxy server Stub£¬
+Õâ¸ö´úÀí·şÎñÆ÷½«±»×¢²áµ½È«¾ÖÃû³Æ¿Õ¼ä£¬È»ºó×¼±¸ºÃÔËĞĞÊ±¼äÁ´½Ó£¨µ±¿Í»§¶ÔÏóµ÷ÓÃÔ¶³Ì¶ÔÏóµÄÊ±ºòÓÃÒÔÖ§³ÖRMI£©¡£
+Í¨µÀ£¨Channel£©¶ÔÏó±»MarshalByRefObject×ÓÀàÊµÀı»¯²¢×¢²á¡£
+
+¿Í»§¶Ë£ºÍ¨µÀÔÚÊ¹ÓÃÇ°±ØĞëÏÈ×¢²á¡£µ±¿Í»§ÒıÓÃÔ¶³Ì¶ÔÏó£¬Î»ÓÚ¿Í»§¶ËµÄÍ¸Ã÷´úÀí(Transparent Proxy)±»½¨Á¢¡£½«µ÷ÓÃÊı¾İĞòÁĞ»¯£¨serializes£©ºó
+Í¨¹ı´úÁ·±»´«ËÍµ½·şÎñÆ÷¡£
+
+¿´Ñù×Ó£¬¾ÍËãÊÇÍ¬Ò»½ø³ÌÏÂµÄ²»Í¬AppDomainÖ®¼äµÄµ÷ÓÃÍ¨Ñ¶£¬Ò²ÊÇÂıµÃ²»µÃÁË°¡¡£Õâ¸ö²»Íâºõ¾ÍÊÇÒÔÇ°µÄAOÊµÏÖµÄÔ¶³Ìµ÷ÓÃ£¬Ö»²»¹ı±»°ü¹üÔÚÄÚºË
+ÆÕÍ¨¿ª·¢Õß¿´²»µ½£¬Õâ¸öÔİ»ºÑĞ¾¿¡£
+
+== ³ÌĞò¼¯µÄ¼ÓÔØºÍÖ´ĞĞ ==
+
+³ÌĞò¼¯¼ÓÔØÆ÷£º²éÕÒ³ÌĞò¼¯£¬ÕÒµ½½«³ÌĞò¼¯×°ÔØµ½µ÷ÓÃÕßµÄAppDomainÖĞ£¬ÔÚ×°ÔØÇ°¼ÓÔØÆ÷½«Ê¹ÓÃPolicy ManagerĞ£ÑéÏàÓ¦µÄ°²È«È¨ÏŞ£¬È·±£µ÷ÓÃÕß±»ÔÊĞíÊ¹ÓÃ¸Ã³ÌĞò¼¯¡£
+³ÌĞò¼¯ÏÂÔØÕß(downloader)ÊÇ³ÌĞò¼¯¼ÓÔØÆ÷µÄÒ»²¿·Ö£¬ÓÃÓÚ²éÕÒ³ÌĞò¼¯£¬²¢½«ÆäÏÂÔØµ½±¾µØ£¨Èç¹û³ÌĞò¼¯²»ÔÚ±¾µØ£©£¬ÒÔ±ã×°ÔØ£¬¿ª·¢Õß¿ÉÒÔÔÚÅäÖÃÎÄ¼şÖĞÖ¸¶¨¸½¼ÓµÄ
+ÏÂÔØÎ»ÖÃ£¬ÅäÖÃÎÄ¼ş±ØĞëºÍÓ¦ÓÃ³ÌĞòÔÚÍ¬Ò»Ä¿Â¼£¬²¢×ñÑ­ÈçÏÂµÄÃüÃû£¬ÔÚ³ÌĞò¼¯ÎÄ¼şÃûºó¸½¼ÓÀ©Õ¹Ãû¡°.config¡±£¬Èç£º xxx.exe.config¡£Ô´³ÌĞòµÄÎ»ÖÃÔÚ£º/clr/src/fusion¡£
+Ä¿Â¼µÄ²éÕÒË³Ğò¡¾Ò²ĞíÓĞÎó¡¿£º
+  GACÄ¿Â¼
+  Ó¦ÓÃÄ¿Â¼
+  Ó¦ÓÃ×ÓÄ¿Â¼
+  ÅäÖÃÎÄ¼şÖĞµÄ¸½¼ÓÎ»ÖÃ
+
+³ÌĞò¼¯ÕÒµ½ºó£¬ÏÂÔØÆ÷½«³ÌĞò¼¯Á÷£¨ÎÄ¼şÃû£©´«µİ¸ø¼ÓÔØÆ÷£¬¼ÓÔØÆ÷Ê¹ÓÃPolicy ManagerĞ£ÑéÏàÓ¦µÄ°²È«È¨ÏŞ£¬È·±£³ÌĞò¼¯ÄÜÔÚ¸Ã»·¾³ÏÂÔËĞĞÒÔ¼°ÓÃ»§ÓĞÖ´ĞĞ¸Ã³ÌĞò¼¯µÄĞí¿É¡£
+È»ºó£¬¼ÌĞøfusion£¬½«³ÌĞò¼¯¼ÓÔØµ½AppDomain£¬²¢µ÷ÓÃÀà¼ÓÔØÆ÷£¨class loader£©¡£
+
+  nExitCode = _CorExeMain2(NULL, 0, pFileName, NULL, pCmdLine);                       //clr\src\tools\clix\clix.cpp:
+    result = CoInitializeEE(COINITEE_DEFAULT | COINITEE_MAIN);  //³õÊ¼»¯ĞéÄâÖ´ĞĞÒıÇæ  //clr\src\vm\ceemain.cpp:
+    bRetVal = ExecuteEXE(pImageNameIn);
+          SystemDomain::ExecuteMainMethod(hMod);    //clr\src\vm\assembly.cpp
+          hr = ClassLoader::RunMain(pMeth, 1, &iRetVal, stringArgs); //clr\src\vm\clsload.cpp
+          È»ºóÅªÁËÒ»¸öÏß³Ì£¬ÔÚÏß³ÌÀïÔËĞĞ
+             ARG_SLOT stackVar = ObjToArgSlot(StrArgArray); //ÔÚÕâÀï²Å×°Èë£¿
+  ·ÖÎöclix¸Ğ¾õ²»¶Ô£¬Policy ManagerÒÔ¼°downloader¶¼Ã»ÓĞ¿´µ½£¡
+
+=== Àà¼ÓÔØÆ÷ ===
+µ±Àà×¼±¸Ö´ĞĞµÄÊ±ºòÀà¼ÓÔØÆ÷¾Í»á±»µ÷ÓÃ¡£Õâ·¢ÉúÔÚ£º
+  1¡¢³ÌĞò¼¯µÄÖ÷Èë¿Úµã±»¼ÓÔØ
+  2¡¢ÕıÔÚÖ´ĞĞµÄ¶ÔÏóÒıÓÃÁËÒ»¸ö´ÓÎ´¼ÓÔØµÄ¶ÔÏó¡£
+Àà¼ÓÔØÆ÷½«´Ó³ÌĞò¼¯ÖĞ¼ÓÔØ¸ÃÀàµÄÈ«²¿¶¨Òå£¬È»ºó×¼±¸ÏàÓ¦µÄ¶ÔÏóÊµÀı»¯£º
+  ¸´ÖÆILÒÔ¼°¸ÃÀàµÄMetaData
+  ×¼±¸ÀàµÄÊı¾İ½á¹¹(EEClass)
+  ´´½¨³õÊ¼»¯ÀàµÄµÄ·½·¨±í(MethodTable and Vtable)
+
+== CLI±àÒëµÄÖ´ĞĞÎÄ¼ş½á¹¹ ==
+ÆäÊµ¾ÍÊÇPEÎÄ¼ş½á¹¹£¬²»¹ıÀûÓÃPE½á¹¹ÖĞµÄIMAGE_OPTIONAL_HEADER.DataDirectory[IMAGE_DIRECTORY_ENTRY_COM_DESCRIPTOR]±£´æ
+ÁËCLRµÄIMAGE_COR20_HEADERÍ·¡£È»ºó½«_CorExeMain ×®ÒÔ¼°IL£¬metaData£¬µ¼ÈëµØÖ·±íÈ«²¿·ÅÔÚ.text½ÚÖĞ¡£
+
+=== MS-DOS Stub ===
+Ê×ÏÈÊÇ MS-DOS Stub: ÓÃÓÚÔÚDos»·¾³ÏÂÏÔÊ¾¸Ã³ÌĞò²»ÄÜÔËĞĞÔÚDOSÏÂµÄÌáÊ¾¡£
+ÔÚÎÄ¼şÆ«ÒÆÁ¿0x3CµÄÎ»ÖÃÊÇÖ¸ÏòPE Ç©Ãû(signature) µÄÖ¸Õë: 80 00 00 00,¾ÍÊÇ 0x80.
+
+00000000h: 4D 5A 90 00 03 00 00 00 04 00 00 00 FF FF 00 00 ; MZ?........ÿÿ..
+00000010h: B8 00 00 00 00 00 00 00 40 00 00 00 00 00 00 00 ; ?......@.......
+00000020h: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 ; ................
+00000030h: 00 00 00 00 00 00 00 00 00 00 00 00 80 00 00 00 ; ............€...
+...
+00000080h: 50 45 00 00 4C 01 03 00 92 38 84 45 00 00 00 00 ; PE..L...?„E....
+00000090h: 00 00 00 00 E0 00 0E 01 0B 01 06 00 00 04 00 00 ; ....?..........
+
+  _IMAGE_DOS_HEADER = record //¿ÉÒÔÊÓ×÷¹Ì¶¨µÄ,ÕÕ°á¡£
+    e_magic: Word;     // Magic number: "MZ"
+    e_cblp: Word;      // Bytes on last page of file
+    e_cp: Word;        // Pages in file
+    e_crlc: Word;      // Relocations
+    e_cparhdr: Word;   // Size of header in paragraphs
+    e_minalloc: Word;  // Minimum extra paragraphs needed
+    e_maxalloc: Word;  // Maximum extra paragraphs needed
+    e_ss: Word;        // Initial (relative) SS value
+    e_sp: Word;        // Initial SP value
+    e_csum: Word;      // Checksum
+    e_ip: Word;        // Initial IP value
+    e_cs: Word;        // Initial (relative) CS value
+    e_lfarlc: Word;    // File address of relocation table
+    e_ovno: Word;      // Overlay number
+    e_res: array [0..3] of Word;    // Reserved words
+    e_oemid: Word;     // OEM identifier (for e_oeminfo)
+    e_oeminfo: Word;   // OEM information; e_oemid specific
+    e_res2: array [0..9] of Word;  // Reserved words
+    e_lfanew: Longint; // File address of new exe header ÎÄ¼şÆ«ÒÆÁ¿£º0x3C
+  end;
+
+PE Ç©Ãû(signature) ½ô½Ó×ÅMS-DOS Stub,ÊÇ4¸ö×Ö½Ú£¬ÄÚÈİÎª ¡°PE¡±È»ºóÊÇÁ½¸ö×Ö½Ú0: 0x00004550
+  _IMAGE_NT_HEADERS = record
+    Signature: DWORD;                      //PE signature: 0x00004550
+    FileHeader: IMAGE_FILE_HEADER;         //The COFF header
+    OptionalHeader: IMAGE_OPTIONAL_HEADER; //The PE header. 32Î»Í·ºÍ64Î»Í·ÂÔÓĞ²îÒì£¬CLRÄ¿Ç°°æ±¾Í³Ò»Ê¹ÓÃ32Î»½á¹¹¡£
+  end;
+
+=== COFF Í· ===
+ÔÚ PE Ç©Ãû(signature) Ö®ºóÊÇ COFF Í·£¬ÄÚÈİÈçÏÂ£º
+  _IMAGE_FILE_HEADER = record //JwaWinNT.pas
+    Machine: WORD;               //Ä¿±ê»úÆ÷ÀàĞÍ×Ö¶Î£¬ÍĞ¹ÜµÄIL´úÂëÉèÖÃ¸Ã×Ö¶ÎÎª IMAGE_FILE_MACHINE_I386 (0x014C)
+    NumberOfSections: WORD;      //Section½ÚµÄ¸öÊı£¬Section½Ú½ô½Ó×ÅPEÍ·
+    TimeDateStamp: DWORD;        //ÎÄ¼şµÄ´´½¨Ê±¼ä
+    PointerToSymbolTable: DWORD; //·ûºÅ±íµÄÎÄ¼şÎ»ÖÃÖ¸Õë£¬ÔÚÍĞ¹ÜµÄILÖĞÎ´ÓÃ£¬×ÜÊÇ0¡£
+    NumberOfSymbols: DWORD;      //·ûºÅ±íµÄµÄ¸öÊı£¬ÔÚÍĞ¹ÜµÄILÖĞÎ´ÓÃ£¬×ÜÊÇ0¡£ £¨ÕâÀïµÄÎ»ÖÃÔÚ£º0x90£©
+    SizeOfOptionalHeader: WORD;  //PEÍ·µÄ´óĞ¡¡£
+    Characteristics: WORD;       //ÎÄ¼şÊôĞÔ±êÊ¾¡£¶ÔÓÚÒ»°ãµÄÍĞ¹Ü´úÂë¿ÉÖ´ĞĞÎÄ¼şµÄÊôĞÔÎª0x010E, DLLÊÇ0x210E.
+  end;
+
+Ä¿±ê»úÆ÷ÀàĞÍ×Ö¶ÎµÄ¿ÉÄÜµÄÖµÒÔ¼°º¬ÒåÈçÏÂ£º
+  IMAGE_FILE_MACHINE_UNKNOWN   = 0;
+  IMAGE_FILE_MACHINE_I386      = $014c; // Intel 386. For managed PE files, contents are applicable to any machine type.
+  IMAGE_FILE_MACHINE_R3000     = $0162; // MIPS little-endian, 0x160 big-endian
+  IMAGE_FILE_MACHINE_R4000     = $0166; // MIPS little-endian
+  IMAGE_FILE_MACHINE_R10000    = $0168; // MIPS little-endian
+  IMAGE_FILE_MACHINE_WCEMIPSV2 = $0169; // MIPS little-endian WinCE v2
+  IMAGE_FILE_MACHINE_ALPHA     = $0184; // Alpha_AXP
+  IMAGE_FILE_MACHINE_SH3       = $01a2; // SH3 little-endian
+  IMAGE_FILE_MACHINE_SH3DSP    = $01a3;
+  IMAGE_FILE_MACHINE_SH3E      = $01a4; // SH3E little-endian
+  IMAGE_FILE_MACHINE_SH4       = $01a6; // SH4 little-endian
+  IMAGE_FILE_MACHINE_SH5       = $01a8; // SH5
+  IMAGE_FILE_MACHINE_ARM       = $01c0; // ARM Little-Endian
+  IMAGE_FILE_MACHINE_THUMB     = $01c2; // ARM processor with Thumb decompressor
+  IMAGE_FILE_MACHINE_AM33      = $01d3;
+  IMAGE_FILE_MACHINE_POWERPC   = $01F0; // IBM PowerPC Little-Endian
+  IMAGE_FILE_MACHINE_POWERPCFP = $01f1;
+  IMAGE_FILE_MACHINE_IA64      = $0200; // Intel IA64
+  IMAGE_FILE_MACHINE_MIPS16    = $0266; // MIPS
+  IMAGE_FILE_MACHINE_ALPHA64   = $0284; // ALPHA64
+  IMAGE_FILE_MACHINE_MIPSFPU   = $0366; // MIPS
+  IMAGE_FILE_MACHINE_MIPSFPU16 = $0466; // MIPS
+  IMAGE_FILE_MACHINE_AXP64     = IMAGE_FILE_MACHINE_ALPHA64;
+  IMAGE_FILE_MACHINE_TRICORE   = $0520; // Infineon
+  IMAGE_FILE_MACHINE_CEF       = $0CEF;
+  IMAGE_FILE_MACHINE_EBC       = $0EBC; // EFI Byte Code
+  IMAGE_FILE_MACHINE_AMD64     = $8664; // AMD64 (K8)
+  IMAGE_FILE_MACHINE_M32R      = $9041; // M32R little-endian
+  IMAGE_FILE_MACHINE_CEE       = $C0EE;
+
+ÎÄ¼şÊôĞÔ±êÊ¶µÄÖµÒÔ¼°º¬Òå£º
+  IMAGE_FILE_RELOCS_STRIPPED         = $0001; // Relocation info stripped from file. ÍĞ¹Ü´úÂë²»ÄÜÉèÖÃ¸Ã±êÖ¾ÎªÕæ¡£
+  IMAGE_FILE_EXECUTABLE_IMAGE        = $0002; // File is executable  (i.e. no unresolved externel references). ÍĞ¹Ü´úÂë±ØĞëÉèÖÃ¸Ã±êÖ¾ÎªÕæ¡£
+  IMAGE_FILE_LINE_NUMS_STRIPPED      = $0004; // Line nunbers stripped from file. ÍĞ¹Ü´úÂë±ØĞëÉèÖÃ¸Ã±êÖ¾ÎªÕæ¡£ÒòÎª²»ÄÜÇ¶Èëµ÷ÊÔĞÅÏ¢¡£
+  IMAGE_FILE_LOCAL_SYMS_STRIPPED     = $0008; // Local symbols stripped from file. ÍĞ¹Ü´úÂë±ØĞëÉèÖÃ¸Ã±êÖ¾ÎªÕæ¡£
+  IMAGE_FILE_AGGRESIVE_WS_TRIM       = $0010; // Agressively trim working set ÍĞ¹Ü´úÂë²»ÄÜÉèÖÃ¸Ã±êÖ¾ÎªÕæ¡£
+  IMAGE_FILE_LARGE_ADDRESS_AWARE     = $0020; // App can handle >2gb addresses ÍĞ¹Ü´úÂë²»ÄÜÉèÖÃ¸Ã±êÖ¾ÎªÕæ¡£
+  IMAGE_FILE_BYTES_REVERSED_LO       = $0080; // Little endian. Bytes of machine word are reversed. ÍĞ¹Ü´úÂë²»ÄÜÉèÖÃ¸Ã±êÖ¾ÎªÕæ¡£
+  IMAGE_FILE_32BIT_MACHINE           = $0100; // 32 bit word machine.  µ±Ç°°æ±¾µÄÍĞ¹Ü´úÂëÉèÖÃ¸Ã±êÖ¾ÎªÕæ¡£
+  IMAGE_FILE_DEBUG_STRIPPED          = $0200; // Debugging info stripped from file in .DBG file
+  IMAGE_FILE_REMOVABLE_RUN_FROM_SWAP = $0400; // If Image is on removable media, copy and run from the swap file.  ÍĞ¹Ü´úÂë²»ÄÜÉèÖÃ¸Ã±êÖ¾ÎªÕæ¡£
+  IMAGE_FILE_NET_RUN_FROM_SWAP       = $0800; // If Image is on Net, copy and run from the swap file.   ÍĞ¹Ü´úÂë²»ÄÜÉèÖÃ¸Ã±êÖ¾ÎªÕæ¡£
+  IMAGE_FILE_SYSTEM                  = $1000; // System File.   ÍĞ¹Ü´úÂë²»ÄÜÉèÖÃ¸Ã±êÖ¾ÎªÕæ¡£
+  IMAGE_FILE_DLL                     = $2000; // File is a DLL.
+  IMAGE_FILE_UP_SYSTEM_ONLY          = $4000; // File should only be run on a UP machine   ÍĞ¹Ü´úÂë²»ÄÜÉèÖÃ¸Ã±êÖ¾ÎªÕæ¡£
+  IMAGE_FILE_BYTES_REVERSED_HI       = $8000; // Big endian. Bytes of machine word are reversed.  ÍĞ¹Ü´úÂë²»ÄÜÉèÖÃ¸Ã±êÖ¾ÎªÕæ¡£
+ 
+EXE ÍĞ¹ÜÎÄ¼şµÄÎÄ¼şÊôĞÔÊÇ 0x010E (IMAGE_FILE_EXECUTABLE_IMAGE ©¦ IMAGE_FILE_LINE_NUMS_ STRIPPED ©¦ IMAGE_FILE_LOCAL_SYMS_STRIPPED ©¦ IMAGE_FILE_32BIT_ MACHINE). 
+DLL ÍĞ¹ÜÎÄ¼şµÄÎÄ¼şÊôĞÔÊÇ 0x210E (IMAGE_FILE_ EXECUTABLE_IMAGE ©¦ IMAGE_FILE_LINE_NUMS_STRIPPED ©¦ IMAGE_FILE_ LOCAL_SYMS_STRIPPED ©¦ IMAGE_FILE_32BIT_MACHINE ©¦ IMAGE_FILE_DLL).
+
+=== PE Í· ===
+½ô½Ó×ÅCOFFÍ·µÄ¾ÍÊÇPEÍ·ÁË£¬¾¡¹ÜËü±»³Æ×÷¿ÉÑ¡Í·£¬µ«ÊÇÊµ¼ÊÉÏ¶ÔÓÚExeºÍDLLÎÄ¼şÀ´Ëµ£¬È´×ÜÊÇ´æÔÚµÄ¡£PEÍ·µÄ´óĞ¡²»ÊÇ¹Ì¶¨µÄ£¬ËüÓÉÊı¾İÄ¿Â¼µÄ´óĞ¡¾ö¶¨¡£
+Ëü»á¸æËßÎÒÃÇ¸Ã¶ş½øÖÆÎÄ¼şÔõÑù±»ÔØÈëµÄ¸ü¶àĞÅÏ¢£º¿ªÊ¼µÄµØÖ·¡¢±£ÁôµÄ¶ÑÕ»Êı¡¢Êı¾İ¶ÎµÄ´óĞ¡µÈµÈ¡£
+
+00000098h: 0B 01 06 00 00 04 00 00 00 04 00 00 00 00 00 00 ; ................
+000000a8h: FE 22 00 00 00 20 00 00 00 40 00 00 00 00 40 00 ; ?... ...@....@.
+000000b8h: 00 20 00 00 00 02 00 00 04 00 00 00 00 00 00 00 ; . ..............
+000000c8h: 04 00 00 00 00 00 00 00 00 80 00 00 00 02 00 00 ; .........€......
+
+  _IMAGE_OPTIONAL_HEADER = record
+    //
+    // Standard fields.
+    //
+    Magic: Word;               //Ä§Êı±êÊ¶¸ÃPE¾µÏñÎÄ¼şµÄ×´Ì¬£¬0x010B±íÊ¾32Î»PEÎÄ¼ş£¬ÍĞ¹Ü´úÂë×ÜÊÇ0x010B.
+    MajorLinkerVersion: Byte;  //Á´½ÓÆ÷µÄÖ÷°æ±¾ºÅ£¬MC++ÉèÖÃ¸Ã×Ö¶ÎÎª7£¬ÆäËü¹«Ë¾µÄ´¿IL´úÂëÁ´½ÓÆ÷ÉèÖÃÎª6¡£
+    MinorLinkerVersion: Byte;  //Á´½ÓÆ÷µÄ´Î°æ±¾ºÅ
+    SizeOfCode: DWORD;         //×Ü´úÂë½ÚÇøµÄ´óĞ¡(.text),ÍĞ¹Ü´úÂëÖ»ÓĞÒ»¸ö´úÂëÇø¡£
+    SizeOfInitializedData: DWORD; //×Ü³õÊ¼»¯Êı¾İ½ÚÇøµÄ´óĞ¡(Í³¼ÆËùÓĞµÄÊı¾İ½ÚÇøµÄSizeOfRawData×Ö¶Î)£¬ĞèÒª³õÊ¼»¯µÄÊı¾İ¡£
+    SizeOfUninitializedData: DWORD; //×Ü²»ĞèÒª³õÊ¼»¯µÄÊı¾İ½ÚÇø´óĞ¡(.bss),¸ÃÊı¾İÇø²»Õ¼ÓÃ´ÅÅÌ¿Õ¼ä£¬Ö»ÊÇ×°ÔØºóÓÉOS¼ÓÔØÆ÷·ÖÅäÄÚ´æ¿Õ¼ä¡£
+    AddressOfEntryPoint: DWORD;     //´úÂëÈë¿ÚµØÖ·RVA £¬¶ÔÓÚÍĞ¹Ü´úÂë£¨DLL»òExe£©×ÜÊÇÖ¸ÏòCLRµ÷ÓÃ×®¡£(ÔÚÎÄ¼şÆ«ÒÆÁ¿£º0x0a8)
+    BaseOfCode: DWORD;              //´úÂë»ùÖ·RVA 
+    BaseOfData: DWORD;              //Êı¾İ»ùÖ·RVA 
+    //
+    // NT additional fields.
+    //
+    ImageBase: DWORD;              //Ó³ÏóÎÄ¼ş»ùÖ·,Ìá¹©Õû¸ö¶ş½øÖÆÎÄ¼şµÄÓÅÏÈ£¨ÏßĞÔ£©ÔØÈëµØÖ·£¬ÔÚILAsmÖĞ¿ÉÒÔÊ¹ÓÃ .imagebase <integer value> Ö¸ÁîÖ¸¶¨¡£
+    SectionAlignment: DWORD;       //½Ú¶ÔÆëÖµ£¬¸ÃÖµ±ØĞë´óÓÚµÈÓÚFileAlignment£¬Ä¬ÈÏÊÇÄÚ´æÒ³´óĞ¡¡£
+    FileAlignment: DWORD;          //ÎÄ¼ş¶ÔÆëÖµ£¬Èç¹ûSectionAlignmentµÄÖµĞ¡ÓÚÄÚ´æÒ³µÄ´óĞ¡£¬¸ÃÖµÔòÊÇ2µÄn´Î·½£¬´Ó512¡«64K¡£ FileAlignment ±ØĞëÆ¥Åä SectionAlignment!
+                                   // .file alignment <integer value>
+    MajorOperatingSystemVersion: Word;
+    MinorOperatingSystemVersion: Word;
+    MajorImageVersion: Word;
+    MinorImageVersion: Word;
+    MajorSubsystemVersion: Word;
+    MinorSubsystemVersion: Word;
+    Win32VersionValue: DWORD;
+    SizeOfImage: DWORD;            //Ó³ÏóÎÄ¼ş½«ÒªÊ¹ÓÃµÄÄÚ´æÊıÁ¿
+    SizeOfHeaders: DWORD;          //¸ø³öËùÓĞÍ·µÄ×Ü³¤¶È£¬°üÀ¨Êı¾İÄ¿Â¼ºÍ½ÚÍ·¡£Í¬Ê±£¬ËüÒ²ÊÇ´ÓÎÄ¼şµÄ¿ªÍ·µ½µÚÒ»½ÚµÄÔ­Ê¼Êı¾İµÄÆ«ÒÆÁ¿¡£
+    CheckSum: DWORD;               //´ÅÅÌÎÄ¼şµÄĞ£ÑéºÍ
+    Subsystem: Word;               //×ÓÏµÍ³: Çı¶¯³ÌĞò,¿ØÖÆÌ¨³ÌĞò(Console), GUI,etc
+    DllCharacteristics: Word;      //·ÏÆú£¬×ÜÊÇ0
+    SizeOfStackReserve: DWORD;     //±£ÁôµÄÕ»µÄ´óĞ¡,Ä¬ÈÏÊÇ1M£¬²¢Ã»ÓĞÕæÕı·ÖÅä¿Õ¼ä
+    SizeOfStackCommit: DWORD;      //³õÊ¼Ê±Ö¸¶¨Õ»´óĞ¡,Ä¬ÈÏÊÇ1Ò³£¬Êµ¼Ê·ÖÅä¿Õ¼äµÄ´óĞ¡£¬Í¬Ê±Ò²ÊÇÖ¸¶¨µÄÔö¼ÓµÄÊıÁ¿¡£
+    SizeOfHeapReserve: DWORD;      //±£ÁôµÄ¶ÑµÄ´óĞ¡£¬Ä¬ÈÏÊÇ1M£¬²¢Ã»ÓĞÕæÕı·ÖÅä¿Õ¼ä
+    SizeOfHeapCommit: DWORD;       //³õÊ¼Ê±Ö¸¶¨¶Ñ´óĞ¡,Ä¬ÈÏÊÇ1Ò³£¬Êµ¼Ê·ÖÅä¿Õ¼äµÄ´óĞ¡£¬Í¬Ê±Ò²ÊÇÖ¸¶¨µÄÔö¼ÓµÄÊıÁ¿¡£
+    LoaderFlags: DWORD;            //·ÏÆú£¬×ÜÊÇ0
+    NumberOfRvaAndSize: DWORD;     //Êı¾İÄ¿Â¼Êı£¬ÖÁÉÙÊÇ16¡£
+    DataDirectory: array [0..IMAGE_NUMBEROF_DIRECTORY_ENTRIES - 1] of IMAGE_DATA_DIRECTORY;
+  end;
+
+Ä§Êı±êÊ¶¸ÃPE¾µÏñÎÄ¼şµÄ×´Ì¬£º
+  IMAGE_NT_OPTIONAL_HDR32_MAGIC = $10b;
+  IMAGE_NT_OPTIONAL_HDR64_MAGIC = $20b;
+  IMAGE_ROM_OPTIONAL_HDR_MAGIC  = $107;
+
+×ÓÏµÍ³:
+  IMAGE_SUBSYSTEM_UNKNOWN                 = 0; // Unknown subsystem.
+  IMAGE_SUBSYSTEM_NATIVE                  = 1; // Image doesn't require a subsystem.
+  IMAGE_SUBSYSTEM_WINDOWS_GUI             = 2; // Image runs in the Windows GUI subsystem.
+  IMAGE_SUBSYSTEM_WINDOWS_CUI             = 3; // Image runs in the Windows character subsystem.
+  IMAGE_SUBSYSTEM_OS2_CUI                 = 5; // image runs in the OS/2 character subsystem.
+  IMAGE_SUBSYSTEM_POSIX_CUI               = 7; // image runs in the Posix character subsystem.
+  IMAGE_SUBSYSTEM_NATIVE_WINDOWS          = 8; // image is a native Win9x driver.
+  IMAGE_SUBSYSTEM_WINDOWS_CE_GUI          = 9; // Image runs in the Windows CE subsystem.
+  IMAGE_SUBSYSTEM_EFI_APPLICATION         = 10;
+  IMAGE_SUBSYSTEM_EFI_BOOT_SERVICE_DRIVER = 11;
+  IMAGE_SUBSYSTEM_EFI_RUNTIME_DRIVER      = 12;
+  IMAGE_SUBSYSTEM_EFI_ROM                 = 13;
+  IMAGE_SUBSYSTEM_XBOX                    = 14;
+
 == Metadata ==
+Token µÄ¶¨Òå£º uint32, xxyyyyyy; xx´ú±íÊÇµÚ¼¸¸ö±í£¨0x70³ıÍâ£¬´ú±í#USÁ÷£©£» yyyyyy´ú±íÔÚ±íÖĞµÄĞòºÅ£¬¾ÍÊÇindex
+
 Ì¸Ì¸MetadataÔÚPEÖĞµÄ×éÖ¯½á¹¹¡£CLRµÄÍ·ĞÅÏ¢ÀïÃæ×¨ÃÅÓĞÒ»¸ö×Ö¶ÎÖ¸ÏòMetadataÊı¾İ¿é£¬Êµ¼ÊÉÏÕâ¸öÊı¾İ¿éÖ»ÊÇMetadataµÄÒ»¸öÍ·½á¹¹£¬
 ±£´æÓĞMetadataµÄÈ«¾ÖĞÅÏ¢£¬¶øMetadataµÄÊµ¼ÊÊı¾İ£¬ÊÇÍ¨¹ıÈô¸É²»Í¬µÄHeap»òÕßËµStream±£´æµÄ¡£ÕâÀïÎÒÍ³Ò»Ê¹ÓÃStreamÁ÷×÷ÎªËû
 µÄÃû×Ö£¬µ«ºÜ¶àÎÄµµÖĞÒÔHeap¶Ñ×÷ÎªÆä³Æºô£¬ÎÒÃÇ¿ÉÒÔÀí½âËûÊÇÒ»¸ö¶ş½øÖÆÁ÷£¬ÆäÖĞÊı¾İÒÔ¶ÑµÄ½á¹¹½øĞĞ×éÖ¯¡£ÔÚÎÄ¼şÖĞÊÇÁ÷£¬×°ÈëÄÚ´æ
@@ -117,13 +387,13 @@ l         ÀûÓÃÔªÊı¾İ£¬ÎÒÃÇ¿ÉÒÔ½«Ò»¸ö¶ÔÏóµÄ×Ö¶ÎĞòÁĞ»¯µ½Ò»¸öÄÚ´æ¿éÖĞ£¬È»ºóÔ¶³Ì´«ËÍ
 
 l         ÀûÓÃÔªÊı¾İ£¬À¬»øÊÕ¼¯Æ÷Òª°É×·×Ù¶ÔÏóµÄÉú´æÖÜÆÚ¡£¶ÔÓÚÈÎºÎ¶ÔÏó£¬À¬»øÊÕ¼¯Æ÷¶¼ÄÜ¹»Í¨¹ıÔªÊı¾İÀ´È·¶¨¸Ã¶ÔÏóµÄÀàĞÍ£¬²¢ÇÒ¿ÉÒÔ»ñÖª¸Ã¶ÔÏóµÄÄÄĞ©×Ö¶ÎÒıÓÃÁËÆäËüµÄ¶ÔÏó¡£
 
-l          
+l
 
 3£®  ÔªÊı¾İÖÖÀà
 
 .NetÖĞµÄÔªÊı¾İÊÇÓÉ²»Í¬µÄÊı¾İ±í¹¹³ÉµÄ¡£ÔªÊı¾İ±íÔÚ.Netµ±ÖĞ±»·Ö³ÉÎªÈıÀà£¨Ã¿ÀàÓĞ¶à¸ö±í£©£¬ËüÃÇ·Ö±ğÊÇ£¬¶¨ÒåÔªÊı¾İ±í£¬ÒıÓÃÔªÊı¾İ±í»¹ÓĞÇåµ¥ÔªÊı¾İ±í¡£
 
-¶¨ÒåÔªÊı¾İ±íÊÇÓÃÀ´ÃèÊö.Net PeÎÄ¼ş±¾ÉíËù¶¨ÒåµÄÊı¾İÀàĞÍµÄ¡£ÔÚÎÒÃÇ³ÌĞòµ±ÖĞµÄ¶¨ÒåµÄÀà£¬½á¹¹µÈµÈÒ»ÇĞµÄÀàĞÍĞÅÏ¢£¬×îÖÕ¶¼»á³öÏÖÔÚ¶¨ÒåÔªÊı¾İ±íÖĞ¡£
+¶¨ÒåÔªÊı¾İ±íÊÇÓÃÀ´ÃèÊö.Net PEÎÄ¼ş±¾ÉíËù¶¨ÒåµÄÊı¾İÀàĞÍµÄ¡£ÔÚÎÒÃÇ³ÌĞòµ±ÖĞµÄ¶¨ÒåµÄÀà£¬½á¹¹µÈµÈÒ»ÇĞµÄÀàĞÍĞÅÏ¢£¬×îÖÕ¶¼»á³öÏÖÔÚ¶¨ÒåÔªÊı¾İ±íÖĞ¡£
 
 ÒıÓÃÊı¾İ±íÓÃÀ´ÃèÊö.Net Peµ±ÖĞËùÒıÓÃµ½µÄÍâ²¿ÀàĞÍ¡£ÔÚÎÒÃÇ³ÌĞòµ±ÖĞÒıÓÃµÄFCLÀàĞÍ¡¢×Ô¶¨ÒåÀàĞÍ£¨×¢1£©ÒÔ¼°µÚÈı·½ÀàĞÍµÄ¶¨Òå¶¼»á³öÏÖÔÚÒıÓÃÊı¾İ±íÄÚ¡£
 
@@ -179,7 +449,7 @@ Format                Assembly Format   Description
                                         [It might be thought that ldnull is redundant: why not use ldc.i4.0 or ldc.i8.0 instead? The answer is
                                         that ldnull provides a size-agnostic null ¨C analogous to an ldc.i instruction, which does not exist. However,
                                         even if CIL were to include an ldc.i instruction it would still benefit verification algorithms to retain the ldnull
-                                        instruction because it makes type tracking easier. ]
+                                        instruction because it makes type tracking easier. ] agnostic ²»¿ÉÖªµÄ
                                           ldc.<type>: load numeric constant
 0x15                  ldc.i4.m1           Push -1 onto the stack as int32.
 0x15                  ldc.i4.M1           Push -1 of type int32 onto the stack as int32 (alias for ldc.i4.m1).
@@ -233,9 +503,9 @@ Format                Assembly Format   Description
 0x43 ble.un
 0x44 blt.un
 0x45<unsigned int32>  switch(t1, t2 ¡­ tN) table switch based on value. Jump to one of n values. Stack:(Value -- )
-   <int32>¡­ <int32>                       The switch instruction implements a jump table. The format of the instruction is 
-                                           an unsigned int32 representing the number of targets N, followed by N int32 values 
-                                           specifying jump targets: these targets are represented as offsets (positive or negative) 
+   <int32>¡­ <int32>                       The switch instruction implements a jump table. The format of the instruction is
+                                           an unsigned int32 representing the number of targets N, followed by N int32 values
+                                           specifying jump targets: these targets are represented as offsets (positive or negative)
                                            from the beginning of the instruction following this switch instruction.
 0x46                  ldind.i1             Indirect load value of type int8 as int32 on the stack. Stack:(addr -- Value)
 0x47                  ldind.u1
@@ -294,8 +564,8 @@ Format                Assembly Format   Description
 0x7E                 ldsfld
 0x7F                 ldsflda
 0x80                 stsfld
-0x81<T>              stobj typeTok           Store a value of type typeTok at an address. (dest, src --) 
-                                             If typeTok is a value type, the stobj instruction copies the value src to the address dest. 
+0x81<T>              stobj typeTok           Store a value of type typeTok at an address. (dest, src --)
+                                             If typeTok is a value type, the stobj instruction copies the value src to the address dest.
                                              If typeTok is a reference type, the stobj instruction has the same effect as stind.ref.
 0x82                 conv.ovf.i1.un
 0x83                 conv.ovf.i2.un
@@ -308,12 +578,12 @@ Format                Assembly Format   Description
 0x8A                 conv.ovf.i.un
 0x8B                 conv.ovf.u.un
 0x8C<T>              box typeTok             Convert a boxable value to its boxed form. (val -- obj)
-                                             If typeTok is a value type, the box instruction converts val to its boxed form. 
-                                             When typeTok is a non-nullable type (¡ì1.8.2.4), this is done by creating a new 
-                                             object and copying the data from val into the newly allocated object. If it is 
-                                             a nullable type, this is done by inspecting val¡¯s HasValue property; if it is 
-                                             false, a null reference is pushed onto the stack; otherwise, the result of boxing 
-                                             val¡¯s Value property is pushed onto the stack. If typeTok is a reference type, 
+                                             If typeTok is a value type, the box instruction converts val to its boxed form.
+                                             When typeTok is a non-nullable type (¡ì1.8.2.4), this is done by creating a new
+                                             object and copying the data from val into the newly allocated object. If it is
+                                             a nullable type, this is done by inspecting val¡¯s HasValue property; if it is
+                                             false, a null reference is pushed onto the stack; otherwise, the result of boxing
+                                             val¡¯s Value property is pushed onto the stack. If typeTok is a reference type,
                                              the box instruction does nothing.
 0x8D                 newarr
 0x8E                 ldlen
@@ -363,18 +633,18 @@ Format                Assembly Format   Description
 0xD9                 mul.ovf.un
 0xDA                 sub.ovf
 0xDB                 sub.ovf.un
-0xDC                 endfinally(endfault)    End finally(fault) clause of an exception block. 
-                                             Return from the finally or fault clause of an exception block 
+0xDC                 endfinally(endfault)    End finally(fault) clause of an exception block.
+                                             Return from the finally or fault clause of an exception block
                                              (see the Exception Handling subclause of Partition I for details).
 0xDD<int32>          leave target            Exit a protected region of code.
 0xDE<int8>           leave.s target          Exit a protected region of code, short form.
-                                             The leave instruction unconditionally transfers control to target. 
-                                             target is represented as a signed offset (4 bytes for leave, 1 byte 
+                                             The leave instruction unconditionally transfers control to target.
+                                             target is represented as a signed offset (4 bytes for leave, 1 byte
                                              for leave.s) from the beginning of the instruction following the current instruction.
-                                             The leave instruction is similar to the br instruction, but the former can be used 
-                                             to exit a try, filter, or catch block whereas the ordinary branch instructions can 
-                                             only be used in such a block to transfer control within it. The leave instruction 
-                                             empties the evaluation stack and ensures that the appropriate surrounding finally blocks 
+                                             The leave instruction is similar to the br instruction, but the former can be used
+                                             to exit a try, filter, or catch block whereas the ordinary branch instructions can
+                                             only be used in such a block to transfer control within it. The leave instruction
+                                             empties the evaluation stack and ensures that the appropriate surrounding finally blocks
                                              are executed.
 0xDF                 stind.i
 0xE0                 conv.u
@@ -394,10 +664,10 @@ Format                Assembly Format   Description
 0xFE 0x0E            stloc
 0xFE 0x0F            localloc
 0xFE 0x11            endfilter                 End an exception handling filter clause. (value -- )
-                                               Used to return from the filter clause of an exception 
+                                               Used to return from the filter clause of an exception
                                                (see the Exception Handling subclause of Partition I for a
-                                               discussion of exceptions). value (which shall be of type int32 
-                                               and one of a specific set of values) is returned from the filter 
+                                               discussion of exceptions). value (which shall be of type int32
+                                               and one of a specific set of values) is returned from the filter
                                                clause. It should be one of:
                                                  * exception_continue_search (0) to continue searching for an exception handler
                                                  * exception_execute_handler (1) to start the second phase of exception handling where

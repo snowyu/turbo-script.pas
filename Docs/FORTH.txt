@@ -369,10 +369,10 @@ Moving Forth简介
   UP ：使用者管理用缓存器，为多任务管理用缓存器，指向task作用区。记录其Task相关信息。
   W  ：辅助工作用缓存器，辅助字典动作或运算用。
 
-3.Forth字典运作
+3.Forth字典Word执行机制
 以该单词定义说明： ": SQUARE  DUP * ;"
 
-  Forth字典运作有四种方式：
+  Forth字典Word执行机制有四种方式：
   Indirect Thread Code(ITC)
   Direct Thread Code(DTC)
   Subroution Thread Code(STC)
