@@ -7,6 +7,21 @@ TODO:
     Syntax    {$MaxStackSize  Size[KB|MB] }
     注意：必须放在Program|Unit之后
 
+2006-12-21
+!+ 讲编译的VM代码直接嵌入Exe，这样可以直接执行，有两种形式：
+  1、讲执行引擎（EE）放入DLL中，通过调用DLL的函数： CorExeMain(const aExeFileName: string; const pCmdLine: PChar);
+  2、执行引擎直接在Exe中！
+  本次实现，将VM块直接放入资源节中(.script). 需要编写一个Exe stub实现上述功能.先实现方式2
+  tsrun.exe
+    首先试图装入资源（看样子不行，没有找到资料，UpdateResource函数只有在win2000以上的版本用，只有装入新节）中装入
+    不行则查找参数行，看有没有文件名。
+    找到直接添加资源的资料了，在 XNResourceEditor\ResourceUtils\Source\下的： unitPEFile.pas，unitResourceDetails.pas
+    EurekaLog 5 将这两个文件合并成了一个，取消了一些功能，我改成了 uTurboPE.pas
+    const cScriptResType = 'SCRIPT'; //资源名以及资源类型名必须大写
+    WriteResourceInStream(vExeStream, 'MAIN', vData.Memory, vData.Size, cScriptResType);
+    ReadResourceToStream('t.exe', scriptStream, 'MAIN', cScriptResType);
+    
+
 2006-12-18
 !+ uTurboPEImage.pas
  This unit contains various classes and support routines to read/write the contents of portable executable (PE) files. 

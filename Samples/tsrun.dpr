@@ -1,7 +1,9 @@
-{: Turbo Script command line intercepter}
+{: Turbo Script command line Console intercepter}
 { Description
   开关：
   -d: 显示调试信息（显示数据栈和返回栈数据）
+    首先试图装入资源（'SCRIPT', 'MAIN'）中装入
+    不行则查找参数行，看有没有文件名。
 }
 program tsrun;
 
@@ -9,7 +11,8 @@ program tsrun;
 
 uses
   //FastMM4,
-  Windows,  SysUtils
+  Windows,  SysUtils, Classes
+  , uTurboPE
   , uTurboConsts
   , uTurboExecutor
   , uTurboModuleFileAccessor
@@ -50,20 +53,14 @@ end;
 
 const
   Copyright = 'Turbo Script command line intercepter 1.0'#13#10'    Copyright(c) by Riceball<riceballl@hotmail.com>';
+  cScriptResType = 'SCRIPT';
+  cScriptResName = 'MAIN';
 
 
-procedure Help;
-begin
-  Writeln('');
-  Writeln('Usage:   tsrun <afile.'+cTurboCompiledProgramFileExt+'>');
-  Writeln('         run the compiled turbo-script program.');
-  Writeln('Example:');
-  Writeln('         tsrun test.tpc');
-end;
 
-procedure AddSwitch(const aSwitch: string);
-begin
-end;
+type
+  TTurboExecutorOption  = (eoShowDebugInfo, eoShowHelp, eoInternalRun, eoDisableInternalRun);
+  TTurboExecutorOptions = set of TTurboExecutorOption;
 
 const
   cStackMaxSize = 1024 * 10;
@@ -81,33 +78,51 @@ var
   aFileName: string;
   s: string;
   CountFreq: Int64;
-  vShowDebugInfo: Boolean;
-begin
-	QueryPerformanceFrequency(CountFreq);
-  Writeln(Copyright);
-  if (ParamCount < 1) then
-  begin
-    Help;
-    exit;
-  end;
-  for i := 1 to ParamCount do
-  begin
-  	s := ParamStr(i);
-    if (s[1] = '-') or (s[1] = '/') then AddSwitch(s) else aFileName := Trim(s);
-  end;
-  if aFileName = '' then
-  begin
-    Help;
-    exit;
-  end;
-  if ExtractFileExt(aFileName) = '' then aFileName := aFileName + cTurboCompiledProgramFileExt;
-  if not FileExists(aFileName) then
-  begin
-  	Writeln(aFileName + ' is not exists.');
-  	exit;
-  end;
-  vShowDebugInfo := FindCmdLineSwitch('d');
+  vExeOptions: TTurboExecutorOptions;
+  vStream: TStream;
+  vSize: LongWord;
 
+
+procedure Help;
+begin
+  Writeln('');
+  Write('Usage:   ', ExtractFileName(ParamStr(0)));
+  if not (eoInternalRun in vExeOptions) then
+  else
+    Writeln('<afile.'+cTurboCompiledProgramFileExt+'>');
+  Writeln('         run the compiled turbo-script program.');
+  Writeln('-d  show debug info: the param/return stack data if any.');
+  Writeln('-?  show help.:');
+  if not (eoInternalRun in vExeOptions) then
+  begin
+    Writeln('Example:');
+    Writeln('       ',ExtractFileName(ParamStr(0)),' test.tpc');
+  end;
+end;
+
+procedure TryLoadFromRes;
+begin
+  p := ReadResourceToPointer(HInstance, cScriptResName, vSize, cScriptResType);
+  if Assigned(p) then
+  begin
+    //vStream := TStaticMemoryStream.Create(p, vSize);
+    Include(vExeOptions, eoInternalRun);
+  end;
+end;
+
+procedure AddSwitch(const aSwitch: string);
+begin
+  if aSwitch = 'D' then 
+    Include(vExeOptions, eoShowDebugInfo)
+  else if (aSwitch = 'H') or (aSwitch = '?') then 
+    Include(vExeOptions, eoShowHelp)
+  else if (aSwitch = 'I') then 
+    Include(vExeOptions, eoDisableInternalRun)
+  ;
+end;
+
+procedure ExecuteScript;
+begin
   c := 0;
     GTurboExecutor := TMyInterpreter.Create;
     try
@@ -130,9 +145,13 @@ begin
       begin
         //CFA := UsedMemory;
         //IsLoaded := True;
-        if vShowDebugInfo then writeln(aFileName + ' loading...');
-        writeln('');
-        LoadFromFile(aFileName);
+        if (eoShowDebugInfo in vExeOptions) and not (eoInternalRun in vExeOptions) then
+        begin 
+          writeln(aFileName + ' loading...');
+          writeln('');
+        end;
+        LoadFromStream(vStream);
+        FreeAndNil(vStream);
         //Reset;
         CFA := InitializeProc;
         //AddIntToMem(Integer(inMULUnsignedInt));
@@ -144,7 +163,7 @@ begin
         LastAddr := tsInt(GGlobalOptions.ErrorAddr);// - tsInt(Memory);
 
         Integer(P) := SP;
-        if vShowDebugInfo and (Integer(P) < (Integer(ParameterStack)+cStackMaxSize-SizeOf(Integer)))  then
+        if (eoShowDebugInfo in vExeOptions) and (Integer(P) < (Integer(ParameterStack)+cStackMaxSize-SizeOf(Integer)))  then
         begin
         WriteLn('');
         WriteLn('______________________________');
@@ -167,7 +186,7 @@ begin
         end;
 
         Integer(P) := RP;
-        if vShowDebugInfo and (Integer(P) < (Integer(ReturnStack)+cStackMaxSize)) then
+        if (eoShowDebugInfo in vExeOptions) and (Integer(P) < (Integer(ReturnStack)+cStackMaxSize)) then
         begin
         WriteLn('______________________________');
         WriteLn('The ReturnStack Data :');
@@ -195,18 +214,70 @@ begin
         //ReturnStack := nil;
       FreeAndNil(GTurboExecutor);
     end;
+end;
 
-  WriteLn('');
+begin
+	QueryPerformanceFrequency(CountFreq);
+	vStream := nil;
+  if eoShowDebugInfo in vExeOptions then
+    Writeln(Copyright);
+  for i := 1 to ParamCount do
+  begin
+  	s := ParamStr(i);
+    if (s[1] = '-') or (s[1] = '/') then
+    begin
+      Delete(s, 1, 1); 
+      AddSwitch(UpperCase(s));
+    end 
+    else 
+      aFileName := Trim(s);
+  end;
+
+  if eoShowHelp in vExeOptions then
+  begin
+    Help;
+    exit;
+  end;
+
+  if not (eoDisableInternalRun in vExeOptions) then TryLoadFromRes;
+
+  if eoInternalRun in vExeOptions then
+  begin
+    vStream := TStaticMemoryStream.Create(p, vSize);
+  end
+  else
+  begin
+    if aFileName = '' then
+    begin
+      Help;
+      exit;
+    end;
+    if ExtractFileExt(aFileName) = '' then aFileName := aFileName + cTurboCompiledProgramFileExt;
+    if not FileExists(aFileName) then
+    begin
+    	Writeln(aFileName + ' is not exists.');
+    	exit;
+    end;
+    vStream := TFileStream.Create(aFileName, fmOpenRead);
+  end;
+  try
+    ExecuteScript();
+  finally
+    FreeAndNil(vStream);
+  end;
+
   if lastErr <> errNone then
   begin
+    WriteLn('');
     WriteLn('');
     write('lasterr(', Integer(lasterr) ,'):', cRunTimeErrors[lasterr], ' at address:'+ IntToHex(LastAddr, 4));
     WriteLn('');
   end;
-  if vShowDebugInfo then 
+  if eoShowDebugInfo in vExeOptions then 
   begin
     WriteLn('');
     writeln('ScriptExecTime(',c,'):',c/CountFreq*1000, ' (ms)');
   end;
   aFileName := '';
+  s := '';
 end.

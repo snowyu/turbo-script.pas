@@ -163,6 +163,8 @@ Remoting »úÖÆ×÷ÎªÔÚAppDomainÖ®¼ä¹µÍ¨µÄÇÅÁº£¬µ±ÄãÒıÓÃÄãÒ»¸öAppDomainµÄ¶ÔÏó»ò³ÉÔ±µ
 ÆäÊµ¾ÍÊÇPEÎÄ¼ş½á¹¹£¬²»¹ıÀûÓÃPE½á¹¹ÖĞµÄIMAGE_OPTIONAL_HEADER.DataDirectory[IMAGE_DIRECTORY_ENTRY_COM_DESCRIPTOR]±£´æ
 ÁËCLRµÄIMAGE_COR20_HEADERÍ·¡£È»ºó½«_CorExeMain ×®ÒÔ¼°IL£¬metaData£¬µ¼ÈëµØÖ·±íÈ«²¿·ÅÔÚ.text½ÚÖĞ¡£
 
+RVA: Ïà¶ÔĞéÄâµØÖ·£¨Relative Virtual Addresses£©
+
 === MS-DOS Stub ===
 Ê×ÏÈÊÇ MS-DOS Stub: ÓÃÓÚÔÚDos»·¾³ÏÂÏÔÊ¾¸Ã³ÌĞò²»ÄÜÔËĞĞÔÚDOSÏÂµÄÌáÊ¾¡£
 ÔÚÎÄ¼şÆ«ÒÆÁ¿0x3CµÄÎ»ÖÃÊÇÖ¸ÏòPE Ç©Ãû(signature) µÄÖ¸Õë: 80 00 00 00,¾ÍÊÇ 0x80.
@@ -293,9 +295,9 @@ DLL ÍĞ¹ÜÎÄ¼şµÄÎÄ¼şÊôĞÔÊÇ 0x210E (IMAGE_FILE_ EXECUTABLE_IMAGE ©¦ IMAGE_FILE_LINE
     // NT additional fields.
     //
     ImageBase: DWORD;              //Ó³ÏóÎÄ¼ş»ùÖ·,Ìá¹©Õû¸ö¶ş½øÖÆÎÄ¼şµÄÓÅÏÈ£¨ÏßĞÔ£©ÔØÈëµØÖ·£¬ÔÚILAsmÖĞ¿ÉÒÔÊ¹ÓÃ .imagebase <integer value> Ö¸ÁîÖ¸¶¨¡£
-    SectionAlignment: DWORD;       //½Ú¶ÔÆëÖµ£¬¸ÃÖµ±ØĞë´óÓÚµÈÓÚFileAlignment£¬Ä¬ÈÏÊÇÄÚ´æÒ³´óĞ¡¡£
-    FileAlignment: DWORD;          //ÎÄ¼ş¶ÔÆëÖµ£¬Èç¹ûSectionAlignmentµÄÖµĞ¡ÓÚÄÚ´æÒ³µÄ´óĞ¡£¬¸ÃÖµÔòÊÇ2µÄn´Î·½£¬´Ó512¡«64K¡£ FileAlignment ±ØĞëÆ¥Åä SectionAlignment!
-                                   // .file alignment <integer value>
+    SectionAlignment: DWORD;       //ÄÚ´æÖĞ½Ú¶ÔÆëÖµ£¬¸ÃÖµ±ØĞë´óÓÚµÈÓÚFileAlignment£¬Ä¬ÈÏÊÇÄÚ´æÒ³´óĞ¡¡£ÀıÈç£¬Èç¹û¸ÃÖµÊÇ4096 ($1000)£¬ÄÇÃ´Ã¿½ÚµÄÆğÊ¼µØÖ·±ØĞëÊÇ4096µÄ±¶Êı
+    FileAlignment: DWORD;          //ÎÄ¼şÖĞ½Ú¶ÔÆëÖµ£¬Èç¹ûSectionAlignmentµÄÖµĞ¡ÓÚÄÚ´æÒ³µÄ´óĞ¡£¬¸ÃÖµÔòÊÇ2µÄn´Î·½£¬´Ó512¡«64K¡£ FileAlignment ±ØĞëÆ¥Åä SectionAlignment!
+                                   // .file alignment <integer value> ÀıÈç£¬Èç¹û¸ÃÖµÊÇ($200)£¬ÄÇÃ´Ã¿½ÚµÄÆğÊ¼µØÖ·±ØĞëÊÇ512µÄ±¶Êı
     MajorOperatingSystemVersion: Word;
     MinorOperatingSystemVersion: Word;
     MajorImageVersion: Word;
@@ -313,8 +315,8 @@ DLL ÍĞ¹ÜÎÄ¼şµÄÎÄ¼şÊôĞÔÊÇ 0x210E (IMAGE_FILE_ EXECUTABLE_IMAGE ©¦ IMAGE_FILE_LINE
     SizeOfHeapReserve: DWORD;      //±£ÁôµÄ¶ÑµÄ´óĞ¡£¬Ä¬ÈÏÊÇ1M£¬²¢Ã»ÓĞÕæÕı·ÖÅä¿Õ¼ä
     SizeOfHeapCommit: DWORD;       //³õÊ¼Ê±Ö¸¶¨¶Ñ´óĞ¡,Ä¬ÈÏÊÇ1Ò³£¬Êµ¼Ê·ÖÅä¿Õ¼äµÄ´óĞ¡£¬Í¬Ê±Ò²ÊÇÖ¸¶¨µÄÔö¼ÓµÄÊıÁ¿¡£
     LoaderFlags: DWORD;            //·ÏÆú£¬×ÜÊÇ0
-    NumberOfRvaAndSize: DWORD;     //Êı¾İÄ¿Â¼Êı£¬ÖÁÉÙÊÇ16¡£
-    DataDirectory: array [0..IMAGE_NUMBEROF_DIRECTORY_ENTRIES - 1] of IMAGE_DATA_DIRECTORY;
+    NumberOfRvaAndSize: DWORD;     //Number of entries in the DataDirectory array; at least 16. ¾¡¹Ü¿ÉÒÔÓĞ¶àÓÚ16¸öµÄÊı¾İÄ¿Â¼µ«ÊÇÒ»°ã±àÒëÆ÷×ÜÊÇÖ»²úÉú16¸ö¡£
+    DataDirectory: array [0..IMAGE_NUMBEROF_DIRECTORY_ENTRIES - 1] of IMAGE_DATA_DIRECTORY;  //±£ÁôµÄ16¸öÊı¾İÄ¿Â¼¡£
   end;
 
 Ä§Êı±êÊ¶¸ÃPE¾µÏñÎÄ¼şµÄ×´Ì¬£º
@@ -336,6 +338,83 @@ DLL ÍĞ¹ÜÎÄ¼şµÄÎÄ¼şÊôĞÔÊÇ 0x210E (IMAGE_FILE_ EXECUTABLE_IMAGE ©¦ IMAGE_FILE_LINE
   IMAGE_SUBSYSTEM_EFI_RUNTIME_DRIVER      = 12;
   IMAGE_SUBSYSTEM_EFI_ROM                 = 13;
   IMAGE_SUBSYSTEM_XBOX                    = 14;
+
+DataDirectory ÊÇIMAGE_NUMBEROF_DIRECTORY_ENTRIES ¸ö£¨Ò»°ã¶¼ÊÇ16¸ö£©Êı¾İÄ¿Â¼±íÊı×é£¬Ã¿Ò»¸öÊı¾İÄ¿Â¼ÏîµÄÄÚÈİÎª£º
+  _IMAGE_DATA_DIRECTORY = record
+    VirtualAddress: DWORD;  //½ÚµÄÎ»ÖÃ£¬ÊÇÒ»¸öÏà¶ÔµØÖ·(RVA)£¬Ïà¶ÔÓÚImageBase£¨Ó³ÏóÎÄ¼ş»ùÖ·£©¡£
+    Size: DWORD;            //½ÚµÄ´óĞ¡
+  end;
+
+ÒÑ¶¨ÒåµÄÊı¾İÄ¿Â¼Ë÷ÒıÓĞ:
+    IMAGE_DIRECTORY_ENTRY_EXPORT (0)          µ¼³ö·ûºÅÄ¿Â¼£»´ó¶àÓÃÓÚDLLÎÄ¼şµÄµ¼³öº¯Êı¡£´¿IL-codeÎ´ÓÃ¡£
+    IMAGE_DIRECTORY_ENTRY_IMPORT (1)          µ¼Èë·ûºÅÄ¿Â¼£»µ¼ÈëµÄDLLº¯Êı£¬CLRÖ»ÓĞÒ»¸öÈë¿Ú£¬Ö¸ÏòÖ´ĞĞÒıÇæDLLµÄµ÷ÓÃº¯Êı.
+    IMAGE_DIRECTORY_ENTRY_RESOURCE (2)        ×ÊÔ´Ä¿Â¼¡£´¿IL-codeÎ´ÓÃ¡£
+    IMAGE_DIRECTORY_ENTRY_EXCEPTION (3)       Òì³£Ä¿Â¼¡£´¿IL-codeÎ´ÓÃ¡£
+    IMAGE_DIRECTORY_ENTRY_SECURITY (4)        °²È«Ä¿Â¼£¬²»»á×°ÈëÄÚ´æ(IamgeFile)£¬µØÖ·ÊÇÎÄ¼şÖ¸Õë²»ÊÇRVA¡£
+    IMAGE_DIRECTORY_ENTRY_BASERELOC (5)       »ùÖ·ÖØ¶¨Î»±í¡£
+    IMAGE_DIRECTORY_ENTRY_DEBUG (6)           µ÷ÊÔÄ¿Â¼ - ÄÚÈİ±àÒëÆ÷Ïà¹Ø¡£´ËÍâ, Ğí¶à±àÒëÆ÷½«±àÒëĞÅÏ¢ÌîÈë´úÂë½Ú£¬²¢²»Îª´Ë´´½¨Ò»¸öµ¥¶ÀµÄ½Ú¡£CLRÎ´ÓÃ£¬È«²¿Öµ0¡£
+    IMAGE_DIRECTORY_ENTRY_COPYRIGHT (7)       ÃèÊö×Ö·û´® - Ò»Ğ©ËæÒâµÄ°æÈ¨ĞÅÏ¢Ö®Àà¡£
+    IMAGE_DIRECTORY_ENTRY_GLOBALPTR (8)       ¸ÃÖµÎª0£¬Global pointer  RVA of the value to be stored in the global pointer register.¡£
+    IMAGE_DIRECTORY_ENTRY_TLS (9)             Ïß³Ì¼¶¾Ö²¿´æ´¢Ä¿Â¼ £»°üº¬ÉùÃ÷Îª¡°__declspec(thread)¡±µÄ±äÁ¿, Ò²¾ÍÊÇÃ¿Ïß³ÌµÄÈ«¾Ö±äÁ¿¡£
+    IMAGE_DIRECTORY_ENTRY_LOAD_CONFIG (10)    ÔØÈëÅäÖÃÄ¿Â¼ - ½á¹¹ºÍÓÃÍ¾²»Ïê¡£
+    IMAGE_DIRECTORY_ENTRY_BOUND_IMPORT (11)   °ó¶¨ÊäÈëÄ¿Â¼ - ²Î¼ûÊäÈëÄ¿Â¼µÄÃèÊö¡£
+    IMAGE_DIRECTORY_ENTRY_IAT (12)            ÊäÈëµØÖ·±í - ²Î¼ûÊäÈëÄ¿Â¼µÄÃèÊö¡£
+    IMAGE_DIRECTORY_ENTRY_DELAY_IMPORT (13);  Delay Load Import Descriptors
+    IMAGE_DIRECTORY_ENTRY_COM_DESCRIPTOR (14) Common Language Runtime header address and size
+    Reserved(15)
+
+=== ½ÚÍ·±í ===
+½ÚÍ·±í½ô¸úPEÍ·ºó¡£ COFF Í·ÖĞµÄ NumberOfSections ×Ö¶Î¶¨ÒåÁË½ÚÍ·µÄÊıÄ¿¡£
+  _IMAGE_SECTION_HEADER = record //¹²40¸ö×Ö½Ú
+    Name: array [0..IMAGE_SIZEOF_SHORT_NAME - 1] of BYTE; //8¸ö×Ö½ÚµÄANSI string,½ÚÃûÒÔ¡°.¡±´òÍ·£¬Èç.text. ²»×ã8Î»ÒÔ0²¹×ã¡£
+                                                          //Èç¹û½ÚÃû³¤ÓÚ8Î»£¬ÄÇÃ´Ãû³Æ½«±»·ÅÓÚ×Ö·û´®±í£¬ÕâÀï¾ÍÊÇÔÚ×Ö·û´®±íÖĞµÄÊ®½øÖÆ×Ö·û´®Æ«ÒÆÁ¿£¬ÒÔ"/"´òÍ·£¬
+    Misc: TImgSecHdrMisc;  //ÕâÀïÊÇ½ÚµÄVirtualSize(unaligned size)£¬¡¾Ö»ÓĞ¶ÔÄ¿±êÎÄ¼ş(.obj)²ÅÊÇPhysicalAddress¡£ÕâÀï²»¹Ü¡¿
+    VirtualAddress: DWORD; //½ÚÊ×µØÖ·RVA  (.tezt:ÊÇ$2000)
+    SizeOfRawData: DWORD;  //RawDataµÄ´óĞ¡£¨RawDataÊÇÖ¸ĞèÒª³õÊ¼»¯µÄÊı¾İ£©£¬¸ÃÖµ±ØĞëÊÇFileAlignmentµÄÕûÊı±¶£¡Èç¹û¸ÃÖµĞ¡ÓÚVirtualSize,ÄÇÃ´Ê£ÏÂµÄ½«±»Ìî0¡£
+    PointerToRawData: DWORD; //ÎÄ¼şÖ¸Õë£¬ËüÊÇ´ÓÎÄ¼şµÄ¿ªÍ·µ½½ÚÖĞÊı¾İµÚÒ»Ò³µÄÆ«ÒÆÁ¿£¬±ØĞëÊÇFileAlignmentµÄÕûÊı±¶¡£
+    PointerToRelocations: DWORD; //ÎÄ¼şÖ¸Õë£¬Ö¸ÏòÖØ¶¨Î»Èë¿ÚµÄÆğµã£¬Èç¹ûÎª0£¬±íÃ÷¸Ã½Ú²»ĞèÒªÖØ¶¨Î»¡£Î´ÓÃÊ¼ÖÕÎª0¡£
+    PointerToLinenumbers: DWORD; //Î´ÓÃÊ¼ÖÕÎª0¡£
+    NumberOfRelocations: WORD; //Î´ÓÃÊ¼ÖÕÎª0¡£
+    NumberOfLinenumbers: WORD; //Î´ÓÃÊ¼ÖÕÎª0¡£
+    Characteristics: DWORD; //ÃèÊö½ÚµÄÌØĞÔ,bits
+  end;
+  TImgSecHdrMisc = record
+    case Integer of
+      0: (PhysicalAddress: DWORD);
+      1: (VirtualSize: DWORD);
+  end;
+
+00000178h: 2E 74 65 78 74 00 00 00 04 03 00 00 00 20 00 00 ; .text........ ..
+00000188h: 00 04 00 00 00 02 00 00 00 00 00 00 00 00 00 00 ; ................
+00000198h: 00 00 00 00 20 00 00 60 2E 72 73 72 63 00 00 00 ; .... ..`.rsrc...
+000001a8h: 98 01 00 00 00 40 00 00 00 02 00 00 00 06 00 00 ; ?...@..........
+000001b8h: 00 00 00 00 00 00 00 00 00 00 00 00 40 00 00 40 ; ............@..@
+000001c8h: 2E 72 65 6C 6F 63 00 00 0C 00 00 00 00 60 00 00 ; .reloc.......`..
+000001d8h: 00 02 00 00 00 08 00 00 00 00 00 00 00 00 00 00 ; ................
+000001e8h: 00 00 00 00 40 00 00 42 00 00 00 00 00 00 00 00 ; ....@..B........
+000001f8h: 00 00 00 00 00 00 00 00 EC 22 00 00 00 00 00 00 ; ........?......
+
+½ÚµÄÌØĞÔ£º
+  IMAGE_SCN_SCALE_INDEX = $00000001; // Tls index is scaled (.tls section only).
+  IMAGE_SCN_CNT_CODE               = $00000020; // Section contains code.
+  IMAGE_SCN_CNT_INITIALIZED_DATA   = $00000040; // Section contains initialized data.
+  IMAGE_SCN_CNT_UNINITIALIZED_DATA = $00000080; // Section contains uninitialized data.
+  IMAGE_SCN_LNK_NRELOC_OVFL = $01000000; // Section contains extended relocations.
+  IMAGE_SCN_MEM_DISCARDABLE = $02000000; // Section can be discarded.
+  IMAGE_SCN_MEM_NOT_CACHED  = $04000000; // Section is not cachable.
+  IMAGE_SCN_MEM_NOT_PAGED   = $08000000; // Section is not pageable.
+  IMAGE_SCN_MEM_SHARED      = $10000000; // Section is shareable.
+  IMAGE_SCN_MEM_EXECUTE     = $20000000; // Section is executable.
+  IMAGE_SCN_MEM_READ        = $40000000; // Section is readable.
+  IMAGE_SCN_MEM_WRITE       = DWORD($80000000); // Section is writeable.
+
+The ILAsm compiler generates the following sections in a PE file:
+.text  A read-only section containing the common language runtime header, the metadata, the IL code, managed structured exception handling information, and managed resources.
+.sdata  A read/write section containing data.
+.reloc  A read-only section containing relocations.
+.rsrc  A read-only section containing unmanaged resources.
+.tls  A read/write section containing thread local storage data.
+
 
 == Metadata ==
 Token µÄ¶¨Òå£º uint32, xxyyyyyy; xx´ú±íÊÇµÚ¼¸¸ö±í£¨0x70³ıÍâ£¬´ú±í#USÁ÷£©£» yyyyyy´ú±íÔÚ±íÖĞµÄĞòºÅ£¬¾ÍÊÇindex
