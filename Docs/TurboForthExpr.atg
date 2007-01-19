@@ -94,7 +94,7 @@ TYPE
   end;
 
   TTurboSimpleModule = object
-    Entry: PTurboModuleEntry;
+    Entry: PTurboModuleRefEntry;
     ModuleType: TTurboModuleType;
     Name: ShortString;
     Module: TCustomTurboModule;
@@ -465,6 +465,13 @@ begin
       FModule.Options := FModule.Options - [soAssertSupport]
     else
       FModule.Options := FModule.Options + [soAssertSupport];
+  end
+  else if (aOptionName = 'L') or (aOptionName = 'LOADONDEMAND') then
+  begin
+    if aEnabled = cosDisable then
+      FModule.Options := FModule.Options - [soLoadOnDemand]
+    else
+      FModule.Options := FModule.Options + [soLoadOnDemand];
   end
   else if (aOptionName = 'MAXCODESIZE') then
   begin
@@ -839,8 +846,9 @@ begin
       begin
         vVaraibleEntry.Variable.Name := Pointer(FModule.UsedDataSize);
         //fill the variable name 
-        FModule.AddByteToData(Length(Name));
+        //FModule.AddByteToData(Length(Name));
         FModule.AddBufferToData(Name[1], Length(Name));
+        FModule.AddByteToData(0);
       end
       else if Visibility >= fvProtected then
       begin
@@ -876,8 +884,9 @@ begin
     if aWord.Options.Visibility >= fvProtected then
     begin
       FDefinedWordEntry.Word.Name := Pointer(FModule.UsedDataSize);
-      FModule.AddByteToData(Length(aWord.Name));
+      //FModule.AddByteToData(Length(aWord.Name));
       FModule.AddBufferToData(aWord.Name[1], Length(aWord.Name));
+      FModule.AddByteToData(0);
     end
     else
     begin
@@ -935,16 +944,16 @@ begin
     if i < 0 then i := AddUsedModule(aWord.ModuleName, aWord.ModuleType);
     if i >= 0 then
     begin
-      aWord.ExternalOptions.ModuleInfo := Pointer(Integer(FUsedModules[i].Entry) + SizeOf(Pointer));
+      aWord.ExternalOptions.ModuleRef := Pointer(Integer(FUsedModules[i].Entry) + SizeOf(Pointer));
       aWord.ModuleIndex := i;
       aWord.Module := FUsedModules[i].Module;
     end;
   end
   else with aWord.ExternalOptions do 
   begin
-    if FModule.LastModuleEntry <> nil then
+    if FModule.LastModuleRefEntry <> nil then
     begin
-      ModuleInfo := Pointer(Integer(FModule.LastModuleEntry) + SizeOf(Pointer));
+      ModuleRef := Pointer(Integer(FModule.LastModuleRefEntry) + SizeOf(Pointer));
     end
     else 
       SynError(cDLLModuleMissError, aWord.Name);
@@ -959,7 +968,7 @@ begin
   Result := -1;
   if aModuleType = mtLib then
   begin
-    vModule := FModule.RequireModule(aName);
+    vModule := FModule.RequireModule(PChar(aName));
     if vModule = nil then
     begin
       SynError(cFileNotFoundError, aName);
@@ -976,21 +985,22 @@ begin
     with FModule do 
     begin
       Integer(Entry) := Integer(DataMemory) + UsedDataSize; //the offset address.
-      AllocDataSpace(SizeOf(TTurboModuleEntry));
-      Entry.Prior := LastModuleEntry;
+      AllocDataSpace(SizeOf(TTurboModuleRefEntry));
+      Entry.Prior := LastModuleRefEntry;
       Entry.Module.ModuleType := aModuleType;
       Entry.Module.Revision := vModule.ModuleVersion;
       Entry.Module.BuildDate := vModule.ModuleDate;
-      //AddIntToData(tsInt(LastModuleEntry));
+      //AddIntToData(tsInt(LastModuleRefEntry));
       //AddByteToData(Byte(aModuleType));
       //AddIntToData(0); //preserved for Module: Pointer
       //AllocDataSpace(SizeOf(LongWord)); //Revision
       //AllocDataSpace(SizeOf(TTimeStamp)); //BuildDate
       Entry.Module.Name := Pointer(UsedDataSize);
-      AddByteToData(Length(aName));
+      //AddByteToData(Length(aName));
       if Length(aName) > 0 then
         AddBufferToData(aName[1], Length(aName));
-      LastModuleEntry := Pointer(tsInt(Entry) - Integer(DataMemory));
+      AddByteToData(0);
+      LastModuleRefEntry := Pointer(tsInt(Entry) - Integer(DataMemory));
     end;
   end;
 end;
@@ -1259,7 +1269,7 @@ PRODUCTIONS
   .
   ExternalWordOption< var aWord: TTurboSimpleWord >
     = 
-    //the default is the lastModuleEntry if no the module name.
+    //the default is the LastModuleRefEntry if no the module name.
                                                             (. aWord.ModuleName := ''; 
                                                                aWord.ExternalOptions.Name := '';
                                                             .)
@@ -1324,6 +1334,7 @@ PRODUCTIONS
     | EmitAsmStatement
     | "@TICK" (. FModule.AddOpToMem(opGetTickCount); .)
     | "!TICK" (. FModule.AddOpToMem(opStoreTickCount); .)
+    | "NOOP"  (. FModule.AddOpToMem(opNoop); .)
     | AssertStatement
     | WordAsmStatement
   .

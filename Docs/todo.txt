@@ -1,4 +1,4 @@
-TODO: 
+iushTODO: 
   1. 必须找到一种重新分配内存（扩充空间）的时候，基地址不变的方法【可能需要在FastMM中找】。
      可以直接使用API调用【或者类似的函数】，然后保留下最大的内存地址范围，即可。
      换句话说，必须要有MaxSize参数设定！
@@ -6,6 +6,56 @@ TODO:
 !+ MaxStackSize directive 设定数据栈的大小。 要修改结构，才能放入,只有在Program和DLL(Package)中才会存在。
     Syntax    {$MaxStackSize  Size[KB|MB] }
     注意：必须放在Program|Unit之后
+
+2007-1-9
+~ 又有一个idea ti attach the script to the exe:
+  Ref/GDataOnFile.pas
+  原理是将文件附加在尾部，然后在最后的字节上添加一个标识结构，比如：
+  TTurboFileTailer = packed record
+    MagicId: array [0..3] of char; //标识： MeFT
+    HeaderOffset: Longword; //偏移量，从文件当前位置开始的，指出附加的文件在Host文件的位置： PhyPosition= PositionOf(TurboFileTailer) - HeaderOffset;
+  end;
+
+2007-1-5
+* the re-struct MetaInfo.Name from PShortString to PChar.
+
+2006-12-25
+~ 决定主要使用List表结构存放，和CLR类似，放弃链表结构；在内存动态扩充类可以将表结构的第一个元素作为动态扩充的链接起点【暂时不忙实现】，
+  因为我主要是想实现，将字段、方法、类动态绑定到数据库。
+~ 决定将所有的数据全部都是看作类，和CLR一样，引入 static 类的概念：
+  Module is static class
+  Package(Assembly) is static class derived from Module.
+~ P1.dpr
+  CFA:= iAdd(CFA,300);inc(C);aArray[C] := CFA;
+  Debug-Optimal+ IDE: 940
+  Debug+Optimal- IDE: 1210
+  CFA:= iAdd(CFA,300);
+  Debug-Optimal+ IDE: 830
+  Debug+Optimal- IDE: 1084
+    iAdd(CFA,300); //JITter will compile this method bofore the first call
+    QueryPerformanceCounter(tBegin);
+    CFA:= iAdd(CFA,300);
+  Debug-Optimal+ IDE: 210
+
+~ P2.dpr 
+  Debug-Optimal+ IDE: 180
+  Debug+Optimal- IDE: 190
+
+2006-12-24
+~ CLR模块加载到内存后，它是如何管理代码地址空间的 【2周】
+当第一次引用某个类型的时候，根据其Meta信息通过调用类构筑器(.cctor)，才分配内存空间。
+~ 俺的程序集：与普通Module一样，只不过编译器将几个文件内容编译成了一个Module文件，但是与普通module文件的扩展名不一样： Lib.
+  还是要将程序集分出来，程序集将比MOdule多了清单，以及程序集自身的描述。腰部还是混在一起算了，关键还是要整理出MetaData的结构。
+  它的在字符串存放采用的是PChar形式，我也准备采用，因为可能255放不下类型名称。
+~ 构造通用的数据结构，让所有的Meta信息都一致。在CLR中使用的是IMAGE_DATA_DIRECTORY的结构装载所有的数据的，
+
+* Compiler Switch: 
+  + LoadOnDemand directive
+    是否预先加载（引用的）模块，还是按需要加载（仅当脚本调用到模块的过程的时候才去加载）
+    Syntax    {$L+|-} or {$LoadOnDemand ON|OFF}
+    Default:  {$LoadOnDemand OFF}
+    注意：打开按需加载的好处是如果脚本没有执行到某个模块的过程时不会该模块不会在内存中（甚至该模块文件可以不存在），能节省内存，但是影响了效率。
+
 
 2006-12-21
 !+ 讲编译的VM代码直接嵌入Exe，这样可以直接执行，有两种形式：

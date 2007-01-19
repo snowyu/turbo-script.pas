@@ -34,6 +34,13 @@ CLR 的程序集是由模块构成的，CLR 模块是一种流数据（字节流），通常是以文件的形式存
 既然模块种包含类型的Meta信息，类型检查系统就可以联合静态和动态技术。当IL运行的时候，执行环境能得知
 所有变量参数的类型Meta信息，自然就能执行运行时刻的类型检查——这被称之为 reflection(它的含义为解释自描述类型，类型的影子)。
 
+【namespace 解疑】
+namespace 只是C#等高级语言为了引用和书写对象名称方便引入的概念，在CLR中并不存在。
+所以，从属于一个namespace的类型可能在不同的程序集中，而在同一个程序集中也可能包括不同的namespace。
+在 C#中 namespace 指令只是指示C#编译器为源代码出现的每个类型名称前附加namespace名称前缀，这样可以减少编程人员的录入量。
+
+CLR中包和类名的最大长度都是1024。
+ 
 == 程序集(Assembly) ==
 程序集(Assembly)本身就是一个模块，程序集(Assembly)和模块(Module)间的区别，在于多了一个维护清单 manifest 【描述引用了哪些程序集，包含了那些模块文件，导出了哪些类型（其它模块中的），以及对自身的描述】。
 
@@ -419,9 +426,70 @@ The ILAsm compiler generates the following sections in a PE file:
 == Metadata ==
 Token 的定义： uint32, xxyyyyyy; xx代表是第几个表（0x70除外，代表#US流）； yyyyyy代表在表中的序号，就是index
 
-谈谈Metadata在PE中的组织结构。CLR的头信息里面专门有一个字段指向Metadata数据块，实际上这个数据块只是Metadata的一个头结构，
-保存有Metadata的全局信息，而Metadata的实际数据，是通过若干不同的Heap或者说Stream保存的。这里我统一使用Stream流作为他
-的名字，但很多文档中以Heap堆作为其称呼，我们可以理解他是一个二进制流，其中数据以堆的结构进行组织。在文件中是流，装入内存
+CLR的头以及其MetaData（IL, Resource） 全部放在.text 节，这意味着加载的时候所有的Metadata将全部装入内存，好处就是可以让系统重定位内存。
+不过由于它是采用流的形式存放，必须读入，这样反而浪费内存。所有的 MetaData 信息全部在 IMAGE_COR20_HEADER.MetaData字段指向的地址中，其
+入口内容是 TClrMetadataHeader 。
+
+  IMAGE_COR20_HEADER = record
+    // Header versioning
+    cb: DWORD;  //IMAGE_COR20_HEADER结构的大小。
+    MajorRuntimeVersion: WORD; //执行此程序所需的最低CLR版本号。
+    MinorRuntimeVersion: WORD; //执行此程序所需的最低CLR版本号。
+    // Symbol table and startup information
+    MetaData: IMAGE_DATA_DIRECTORY;
+    Flags: DWORD; // 描述此CLR映像的执行属性
+    EntryPointToken: DWORD; //主程序入口点，是一个指向MethodDef表的或File表的入口Token
+    // Binding information
+    Resources: IMAGE_DATA_DIRECTORY;
+    StrongNameSignature: IMAGE_DATA_DIRECTORY;
+    // Regular fixup and binding information
+    CodeManagerTable: IMAGE_DATA_DIRECTORY; //不关心
+    VTableFixups: IMAGE_DATA_DIRECTORY;  //是由使用VTable的语言如C++使用的，类似原来PE结构中的重定向表
+    ExportAddressTableJumps: IMAGE_DATA_DIRECTORY; //不关心
+    // Precompiled image info (internal use only - set to zero)
+    ManagedNativeHeader: IMAGE_DATA_DIRECTORY; //不关心
+  end;
+  _IMAGE_DATA_DIRECTORY = record
+    VirtualAddress: DWORD;  //数据入口
+    Size: DWORD;            //数据大小
+  end;
+
+CLR映像的执行属性:
+  COMIMAGE_FLAGS_ILONLY               = $00000001; //此CLR程序由纯IL代码组成
+  COMIMAGE_FLAGS_32BITREQUIRED        = $00000002; //此CLR映像只能在32位系统上执行
+  COMIMAGE_FLAGS_IL_LIBRARY           = $00000004; //此CLR映像是作为IL代码库存在的
+  COMIMAGE_FLAGS_STRONGNAMESIGNED     = $00000008; //此CLR映像是有strong name signature的
+  COMIMAGE_FLAGS_TRACKDEBUGDATA       = $00010000; //此CLR映像是有tracked debug data
+
+
+  //指向MetaData的入口内容，是MetaData Header：
+  TClrMetadataHeader = packed record
+    Signature: DWORD;   // Magic signature for physical metadata : $424A5342.
+    MajorVersion: Word; // Major version, 1  Metadata格式的版本号
+    MinorVersion: Word; // Minor version, 1
+    Reserved: DWORD;    // Reserved, always 0
+    Length: DWORD;      // Length of version string in bytes, say m.
+    Version: array [0..0] of Char; //UTF8格式的编译环境版本号
+    // UTF8-encoded version string of length m
+    // Padding to next 4 byte boundary, say x.
+    {
+    Version: array [0..((m+3) and (not $3))-1] of Char;
+    Flags,              // Reserved, always 0
+    Streams: Word;      // Number of streams, say n.
+    // Array of n StreamHdr structures.
+    StreamHeaders: array [0..n-1] of TClrStreamHeader;
+    }
+  end;
+  TClrStreamHeader = packed record
+    Offset: DWORD; // Memory offset to start of this stream from start of the metadata root, 相对于Metadata头(PClrMetadataHeader)的偏移量
+    Size: DWORD;   // Size of this stream in bytes, shall be a multiple of 4.
+    // Name of the stream as null terminated variable length
+    // array of ASCII characters, padded with \0 characters
+    Name: array [0..MaxWord] of Char; //流的名字有必要？
+  end;
+
+
+Metadata的实际数据，是通过若干不同的Stream保存的。其中数据以堆的结构进行组织。在文件中是流，装入内存
 后是堆。实际上就是俺的数据区。不过它分得更加细致。
 
 Metadata里最常见的有五种流，#String, #Blob, #Guid,#US(User String)和#~流("#"是流名字的前缀)。每种类型流最多只能出现一次，
@@ -431,19 +499,36 @@ Metadata里最常见的有五种流，#String, #Blob, #Guid,#US(User String)和#~流("#"是流
 而用户的字符串如字符串常量，则以Unicode编码保存在#US(User String)堆内。
 值得注意的是，US流和String流在二进制结构组织上不同，我们后面将分析时会详细提及。
 
-Guid流是保存程序中使用到的Guid的数组，如Assembly中Module的MVID。
+#Guid流是保存程序中使用到的Guid的数组，定长记录。如Assembly中Module的MVID。
 
-Blob流是一个通用存储空间，除了Guid和字符串以外基本上所有剩下的东西都以二进制数据形式放在里面，如PublicKey，常量的值等等。
+#Blob流是一个通用存储空间，除了Guid和字符串以外基本上所有剩下的东西都以二进制数据形式放在里面，如PublicKey，常量的值等等。
 等效于我的数据区中分配的变量区。
 
-最重要的是#~流，这是Metadata核心信息存放的地方。#~流物理上以若干张表(Table)的形式组织，每张表存储某一方面的Metadata信息，
+最重要的是#~流，存放各种类型信息，这是Metadata核心信息存放的地方。#~流物理上以若干张表(Table)的形式组织，每张表存储某一方面的Metadata信息，
 如MethodDef表存储所有方法的信息。每张表又由若干的行(Row)组成每行有n个列(Column)，每列代表一种信息，如MethodDef表中每一行
 都有一个方法的RVA,类型标志,名字,Signature等等信息。在其中通过各种索引来相互关联，整个组织结构和关系数据库很相似。
 
-比较特殊的是，这里所有的表通过一个64bit的有效位图来表示表存在与否每种类型的表有一个编号，如MethodDef表的编号是6，则第(1<<(6-1))位置1
-因而每个表的每一行，可以使用一个唯一的Token表示。此Token是一个32bit无符号整型数，最高一个字节表示表的序号，低三个字节表示表中的索引号。
-如0x06000003表示0x06表（MethodDef）中第3行（如MyApp::Add）这个Token概念在CLR中频繁使用，如IL代码调用函数、使用变量都是使用Token。
-与之类似的还有Coded Index，等会讲二进制实现时再说。
+  PClrTableStreamHeader = ^TClrTableStreamHeader;
+  TClrTableStreamHeader = packed record
+    Reserved: DWORD;    // Reserved, always 0
+    MajorVersion: Byte; // Major version of table schemata, always 1
+    MinorVersion: Byte; // Minor version of table schemata, always 0
+    HeapSizes: Byte;    // Bit vector for heap sizes. 
+    Reserved2: Byte;    // Reserved, always 1
+    Valid: Int64;       // Bit vector of present tables, let n be the number of bits that are 1. 64bit的有效位图列表，指出存在了哪些类型的表，总共可以有64种类型的列表。
+    Sorted: Int64;      // Bit vector of sorted tables. 指示对应的列表是否排序。
+    // Array of n four byte unsigned integers indicating the number of rows
+    // for each present table.
+    Rows: array [0..MaxWord] of DWORD; // 对Valid位图进行从低到高位扫描，发现一个表存在，则可到Rows中获取此表中记录的行数, Rows 的数目n是实际存在的表的数目。存放的内容是该表的记录数。
+    //Rows: array [0..n-1] of DWORD;
+    //Tables: array // 实际表数据的开始，存放是按照Rows所在的顺序，依次存放的。一个表接着一个表。
+  end;
+
+这里所有的表通过一个64bit的有效位图来表示表存在与否每种类型的表有一个编号，换句话说，最多可以有64种不同的表类型，如MethodDef表的编号
+是6，则第Valid字段的第6位置1。因而每个表的每一行，可以使用一个唯一的Token表示。此Token是一个32bit无符号整型数，最高一个字节表示表的
+序号，低三个字节表示表中的索引号。如0x06000003表示0x06表（MethodDef）中第3行（如MyApp::Add）这个Token概念在CLR中频繁使用，如IL代码
+调用函数、使用变量都是使用Token。与之类似的还有Coded Index，等会讲二进制实现时再说。比如程序集的定义也是一个表类型，只不过它的记录只
+有一个。
 
 
 此篇笔记为现在的体会，我感觉比较浅薄，而且当中也应该会有一些错误。这些问题留待以对元数据有更深的理解后现进行修正。
@@ -500,6 +585,56 @@ CLR的代码验证过程可以利用元数据来确保代码仅执行“安全”的操作。
 利用元数据，我们可以将一个对象的字段序列化到一个内存块中，然后远程传送给另一台机器，最后再在远程计算机上执行反序列化，从而重新创建对象和他的状态（我想这里Jeffery先生可能指的是通过元数据可以获取到对象的布局，进而可以序列化它，而和远程不远程的没有什么关系）。
 
 利用元数据，垃圾收集器要吧追踪对象的生存周期。对于任何对象，垃圾收集器都能够通过元数据来确定该对象的类型，并且可以获知该对象的哪些字段引用了其它的对象（美妙的元数据）。
+
+
+
+C# 2.0 - Static Class
+本文资料引用自李建忠先生的演讲稿
+
+C# 2.0 提供了静态类，在1.x中我们要实现静态类需要使用下面的代码。
+
+1.0
+public sealed class Class1
+{
+  private Class1(){}
+}
+
+在C# 2.0中我们可以使用static class来更加优雅地解决这个问题。
+public static class Class1
+{
+}
+
+我们反编译一下，会了解其实现机制。
+.class public abstract auto ansi sealed beforefieldinit Program
+ extends object
+{
+}
+
+原来编译器将该类声明为 abstract sealed，自然不能被继承被实例化了。
+但是C#编译器并不允许我们在代码中直接声明一个abstract sealed类型，下面的代码无法通过编译。
+public abstract sealed class Class1
+{
+}
+
+静态类的限制
+
+1. 静态类不能有实例构造器。
+2. 静态类不能有任何实例成员。
+3. 静态类上不能使用abstract和sealed修饰符。
+4. 静态类默认继承自System.Object，不能显式指定任何其他基类。
+5. 静态类不能指定任何接口实现。
+6. 静态类的成员不能有protected或者protected internal访问保护修饰符。
+
+让我们再来猜测一下 MS 开发人员的想法：他们的目的是想获得 abstract sealed class 的效果，但却为语义上的矛盾而苦恼不已，大家想获得一个优美的解决方式，于是就为 C# 2.0 新增了一个 static 关键字，完美的解决了这个问题。 
+
+也许有人会问：为什么不是 static class = abstract class + static member limit 而要加上 sealed 的限制呢？理由是继承一个只有 static 成员的类和重新写一个类完全没有区别。为什么这么说呢？因为 static 必然是not virtual，继承它又能有什么用呢？
+
+static class 还有一个限制，那就是只能从 System.Object 继承，为什么会有这个限制，理由和上面差不多。
+
+每每提到 static 关键字，我就想起了 static constructor，感谢 MS 的开发人员提供了这么好的一个特性。但是 C# 提供了 static constructor 却没有提供 static destructor，不过在 Applied Microsoft .NET Framework Programming 一书中 Jeffery Richter 给我们提供了一个办法就是通过 System.AppDomain.DomainUnload 事件去达到同样的效果。
+
+使用 static constructor 要注意的就是这里抛出任何异常都会导致该类型在重新加载 AppDoamin 之前不再可用，所以要加倍小心，另外 static contructor 中很容易有两个类型死锁的情况发生，在编写代码的时候一定要想清楚。
+
 
 CIL Instructions
 _________________________________________________
@@ -765,3 +900,265 @@ Format                Assembly Format   Description
 0xFE 0x1D            refanytype
 
 TurboScript Extented Instructions:
+
+
+_________________________________________________
+C# 2.0 之 partial[1]
+作者：佚名    文章来源：本站收藏    点击数：3    更新时间：2006-11-4     	
+           	【字体：小 大】
+常常看见大家在热火朝天的讨论 VS.Net Whidbey 和 .Net FrameWork 2.0 的新功能，而我却现在还在这边比对了半天才敢确定我的“Whidbey”这七个字母没有敲错。：（
+
+今天刚刚在 VPC 中装上了 VS.Net 2005 Community Technology Preview，决心好好体验一把 .Net Framework 2.0 和 C# 2.0 的犀利之处。
+
+打开新的 VS.Net，新建一个 WinForm Application，马上就发现了不同之处：“窗体设计器生成的代码”哪里去了？InitializeComponent()那里去了？
+
+端详片刻，才发现原来是这个 partial 关键字搞的鬼。
+
+partial 关键字的作用是将你的 class 分为多个部分，编译器会将多个部分拼到一起去。
+
+public partial class SampleClass
+...{
+public void MethodA()
+...{
+}
+}
+
+public partial class SampleClass
+...{
+public void MethodB()
+...{
+}
+}
+
+和
+
+public class SampleClass
+...{
+public void MethodA()
+...{
+}
+public void MethodB()
+...{
+}
+}
+
+
+是等价的。
+
+我猜想这个东西出现的初衷是为了解决掉：“窗体设计器生成的代码”这个令人讨厌的 region。
+
+对我们来说，在团队开发当中这个东西或许也会有点用处。
+
+我观察了一下生成的 IL 代码，使用 partial 生成的代码并没有什么特殊的标记，这说明 partial 纯粹是语言的特性，CLR 完全不知道这么个玩意的存在，这也就意味着不要指望将 partial class 编译为 assembly 或者 module 什么的再与其他的人写的 partial class 去进行拼接：它只能在编译的时候起作用。
+
+为了考验一下编译器，我试着让某一个 partial class 不显式指定父类，发现代码仍然能够正确的通过编译，编译器会按照某一个显式指定了父类的 partial 进行编译，只有在多个 partial 指定了不同父类时才会报错。同样，如果多个 partial 指定了自相矛盾的修饰符的话，编译时也会报错的。
+
+有意思的是，我们还可以写以下这样的代码：
+
+public partial class Sample
+...{
+public partial class SampleSon
+...{
+public partial class SampleGrandson
+...{
+}
+}
+}
+public partial class Sample
+...{
+public partial class SampleSon
+...{
+public partial class SampleGrandson
+...{
+}
+}
+}
+
+刘敏（Rustle Liu） http://ms.mblogger.cn/rustle/ 
+
+_________________________________________________
+
+Static Classes and Static Class Members (C# Programming Guide) 
+
+Static classes and class members are used to create data and functions that can be accessed without creating an instance of the class. Static class members can be used to separate data and behavior that is independent of any object identity: the data and functions do not change regardless of what happens to the object. Static classes can be used when there is no data or behavior in the class that depends on object identity.
+Static ClassesStatic Classes
+
+A class can be declared static, indicating that it contains only static members. It is not possible to create instances of a static class using the new keyword. Static classes are loaded automatically by the .NET Framework common language runtime (CLR) when the program or namespace containing the class is loaded.
+
+Use a static class to contain methods that are not associated with a particular object. For example, it is a common requirement to create a set of methods that do not act on instance data and are not associated to a specific object in your code. You could use a static class to hold those methods.
+
+The main features of a static class are:
+
+    *
+
+      They only contain static members.
+    *
+
+      They cannot be instantiated.
+    *
+
+      They are sealed.
+    *
+
+      They cannot contain Instance Constructors (C# Programming Guide).
+
+Creating a static class is therefore much the same as creating a class that contains only static members and a private constructor. A private constructor prevents the class from being instantiated.
+
+The advantage of using a static class is that the compiler can check to make sure that no instance members are accidentally added. The compiler will guarantee that instances of this class cannot be created.
+
+Static classes are sealed and therefore cannot be inherited. Static classes cannot contain a constructor, although it is still possible to declare a static constructor to assign initial values or set up some static state. For more information, see Static Constructors (C# Programming Guide).
+When to Use Static ClassesWhen to Use Static Classes
+
+Suppose you have a class CompanyInfo that contains the following methods to get information about the company name and address.
+C#
+
+class CompanyInfo
+{
+    public string GetCompanyName() { return "CompanyName"; }
+    public string GetCompanyAddress() { return "CompanyAddress"; }
+    //...
+}
+
+These methods do not need to be attached to a specific instance of the class. Therefore, instead of creating unnecessary instances of this class, you can declare it as a static class, like this:
+C#
+
+static class CompanyInfo
+{
+    public static string GetCompanyName() { return "CompanyName"; }
+    public static string GetCompanyAddress() { return "CompanyAddress"; }
+    //...
+}
+
+Use a static class as a unit of organization for methods not associated with particular objects. Also, a static class can make your implementation simpler and faster because you do not have to create an object in order to call its methods. It is useful to organize the methods inside the class in a meaningful way, such as the methods of the Math class in the System namespace.
+Static MembersStatic Members
+
+A static method, field, property, or event is callable on a class even when no instance of the class has been created. If any instances of the class are created, they cannot be used to access the static member. Only one copy of static fields and events exists, and static methods and properties can only access static fields and static events. Static members are often used to represent data or calculations that do not change in response to object state; for instance, a math library might contain static methods for calculating sine and cosine.
+
+Static class members are declared using the static keyword before the return type of the member, for example:
+C#
+
+public class Automobile
+{
+    public static int NumberOfWheels = 4;
+    public static int SizeOfGasTank
+    {
+        get
+        {
+            return 15;
+        }
+    }
+    public static void Drive() { }
+    public static event EventType RunOutOfGas;
+
+    //other non-static fields and properties...
+}
+
+Static members are initialized before the static member is accessed for the first time, and before the static constructor, if any is called. To access a static class member, use the name of the class instead of a variable name to specify the location of the member. For example:
+C#
+
+Automobile.Drive();
+int i = Automobile.NumberOfWheels;
+
+ExampleExample
+
+Here is an example of a static class that contains two methods that convert temperature from Celsius to Fahrenheit and vice versa:
+C#
+
+public static class TemperatureConverter
+{
+    public static double CelsiusToFahrenheit(string temperatureCelsius)
+    {
+        // Convert argument to double for calculations.
+        double celsius = System.Double.Parse(temperatureCelsius);
+
+        // Convert Celsius to Fahrenheit.
+        double fahrenheit = (celsius * 9 / 5) + 32;
+
+        return fahrenheit;
+    }
+
+    public static double FahrenheitToCelsius(string temperatureFahrenheit)
+    {
+        // Convert argument to double for calculations.
+        double fahrenheit = System.Double.Parse(temperatureFahrenheit);
+
+        // Convert Fahrenheit to Celsius.
+        double celsius = (fahrenheit - 32) * 5 / 9;
+
+        return celsius;
+    }
+}
+
+class TestTemperatureConverter
+{
+    static void Main()
+    {
+        System.Console.WriteLine("Please select the convertor direction");
+        System.Console.WriteLine("1. From Celsius to Fahrenheit.");
+        System.Console.WriteLine("2. From Fahrenheit to Celsius.");
+        System.Console.Write(":");
+
+        string selection = System.Console.ReadLine();
+        double F, C = 0;
+
+        switch (selection)
+        {
+            case "1":
+                System.Console.Write("Please enter the Celsius temperature: ");
+                F = TemperatureConverter.CelsiusToFahrenheit(System.Console.ReadLine());
+                System.Console.WriteLine("Temperature in Fahrenheit: {0:F2}", F);
+                break;
+
+            case "2":
+                System.Console.Write("Please enter the Fahrenheit temperature: ");
+                C = TemperatureConverter.FahrenheitToCelsius(System.Console.ReadLine());
+                System.Console.WriteLine("Temperature in Celsius: {0:F2}", C);
+                break;
+
+            default:
+                System.Console.WriteLine("Please select a convertor.");
+                break;
+        }
+    }
+}
+
+InputInput
+
+2
+
+98.6
+
+Sample Output:Sample Output:
+
+Please select the convertor
+
+1. From Celsius to Fahrenheit.
+
+2. From Fahrenheit to Celsius.
+
+:2
+
+Please enter the Fahrenheit temperature: 98.6
+
+Temperature in Celsius: 37.00
+
+Additional sample output might look as follows:
+
+Please select the convertor
+
+1. From Celsius to Fahrenheit.
+
+2. From Fahrenheit to Celsius.
+
+:1
+
+Please enter the Celsius temperature: 37.00
+
+Temperature in Fahrenheit: 98.60
+C# Language SpecificationC# Language Specification
+
+For more information, see the following sections in the C# Language Specification:
+
+    *      25.2 Static Classes
+
+See AlsoSee Also

@@ -40,6 +40,7 @@ type
             abstract;
   end;
 
+  {: Abstract TurboModule Accessor[singleton] }
   TTurboModuleAccessor = class(TTurboAccessor)
   public
     {: if found then create the Stream and load the module to the Stream else
@@ -53,6 +54,20 @@ type
             IsLoaded: Boolean): TCustomTurboModule;
   end;
 
+  {: The TurboScript Module Manager }
+  { Description
+  the GTurboModuleManager global 
+  variable manages all the loaded 
+  modules. And register the new 
+  ModuleAccessor to GTurboModuleManager.
+
+  Require method return the 
+  specified module. It first 
+  searches in the memory if 
+  not found, try load from 
+  the module through registered
+  module accessores.
+  }
   TTurboModuleManager = class(TTurboAccessor)
   private
     FDefaultAccessor: TTurboModuleAccessor;

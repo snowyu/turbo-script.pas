@@ -55,10 +55,31 @@ type
   );
   //TTurboSimpleTypes = array [TTurboSimpleTypeKind] of PMeType;
 
+  TTurboGlobalOptions = record  //do not use the packed.
+    States: TTurboProcessorStates;
+    LastErrorCode: TTurboProcessorErrorCode;
+    ParamStackBase: Pointer;
+    ParamStackSize: Integer; //bytes
+    ParamStackBottom: Pointer;
+    ReturnStackBase: Pointer;
+    ReturnStackSize: Integer; //bytes
+    //if halt with errHlat then the ReturnStackBottom will be the Old RSP.   
+    ReturnStackBottom: Pointer;
+    //{:  放到系统单元库中？ 好处是移植自举，缺点是速度变慢吧。
+    ErrorAddr: Pointer;
+    ErrorProc: Pointer; 
+    AssertErrorProc: Pointer;
+    //The built-in I/O routines use InOutResult to store the value that 
+    //the next call to the IOResult standard function will return.
+    IOResult: tsInt;  
+    //}
+  end;
+
+
   //PTurboPreservedCodeMemory = ^ TTurboPreservedCodeMemory;
   PTurboPreservedDataMemory = ^ TTurboPreservedDataMemory;
   PTurboVariableEntry = ^ TTurboVariableEntry;
-  PTurboModuleEntry = ^ TTurboModuleEntry;
+  PTurboModuleRefEntry = ^ TTurboModuleRefEntry;
   PTurboWordEntry = ^ TTurboWordEntry;
   PTurboTypeInfoEntry = ^ TTurboTypeInfoEntry;
   PTurboGlobalOptions = ^TTurboGlobalOptions;
@@ -107,10 +128,10 @@ type
   TCustomTurboModule = class(TCustomTurboObject)
   private
     function GetGlobalOptions: PTurboGlobalOptions;
-    function GetLastModuleEntry: PTurboModuleEntry;
+    function GetLastModuleRefEntry: PTurboModuleRefEntry;
     function GetOptions: TTurboScriptOptions;
     procedure SetGlobalOptions(Value: PTurboGlobalOptions);
-    procedure SetLastModuleEntry(Value: PTurboModuleEntry);
+    procedure SetLastModuleRefEntry(Value: PTurboModuleRefEntry);
     procedure SetOptions(Value: TTurboScriptOptions);
   protected
     FAccessor: TObject;
@@ -220,7 +241,7 @@ type
     { Description
     nil means not found.
     }
-    function FindModuleEntry(const aName: string): PTurboModuleEntry;
+    function FindModuleEntry(const aName: string): PTurboModuleRefEntry;
     {: nil means not found. }
     function FindTypeInfoEntry(const aName: string): PTurboTypeInfoEntry;
     function FindUnloadNotification(aProc: TNotifyEvent): Integer;
@@ -254,7 +275,7 @@ type
     { Description
     add self to the module Unload notification.
     }
-    function RequireModule(const aModuleName: ShortString): TCustomTurboModule;
+    function RequireModule(const aModuleName: PChar): TCustomTurboModule;
     {: reset the stack pointers. }
     procedure Reset;
     procedure SaveToFile(const aFileName: String);
@@ -285,8 +306,8 @@ type
     }
     property IsLoaded: Boolean read FIsLoaded write FIsLoaded;
     property LastErrorCode: TTurboProcessorErrorCode read GetLastErrorCode;
-    property LastModuleEntry: PTurboModuleEntry read GetLastModuleEntry write
-            SetLastModuleEntry;
+    property LastModuleRefEntry: PTurboModuleRefEntry read
+            GetLastModuleRefEntry write SetLastModuleRefEntry;
     property LastTypeInfoEntry: PTurboTypeInfoEntry read GetLastTypeInfoEntry
             write SetLastTypeInfoEntry;
     property LastVariableEntry: PTurboVariableEntry read GetLastVariableEntry
@@ -476,6 +497,7 @@ type
     procedure SetReturnStackSize(const Value: Integer);
   protected
     FExecutor: TCustomTurboExecutor;
+    FGlobalOptions: TTurboGlobalOptions;
     procedure DoPrintChar(aChar: Char); override;
     procedure DoPrintString(const aStr: String); override;
     {: Finalize after the execution. }
@@ -527,9 +549,9 @@ type
   end;
   
   //the import module for uses.
-  TTurboModuleEntry = packed record
-    Prior: PTurboModuleEntry; //nil means no more
-    Module: TTurboModuleInfo;
+  TTurboModuleRefEntry = packed record
+    Prior: PTurboModuleRefEntry; //nil means no more
+    Module: TTurboModuleRefInfo;
   end;
 
   TTurboTypeInfoEntry = packed record
@@ -559,26 +581,6 @@ type
   end;
 *)
 
-  TTurboGlobalOptions = record  //do not use the packed.
-    States: TTurboProcessorStates;
-    LastErrorCode: TTurboProcessorErrorCode;
-    ParamStackBase: Pointer;
-    ParamStackSize: Integer; //bytes
-    ParamStackBottom: Pointer;
-    ReturnStackBase: Pointer;
-    ReturnStackSize: Integer; //bytes
-    //if halt with errHlat then the ReturnStackBottom will be the Old RSP.   
-    ReturnStackBottom: Pointer;
-    //{:  放到系统单元库中？ 好处是移植自举，缺点是速度变慢吧。
-    ErrorAddr: Pointer;
-    ErrorProc: Pointer; 
-    AssertErrorProc: Pointer;
-    //The built-in I/O routines use InOutResult to store the value that 
-    //the next call to the IOResult standard function will return.
-    IOResult: tsInt;  
-    //}
-  end;
-
   //the typecast for data memory area to get the parameters
   TTurboPreservedDataMemory = packed record
     Code: Pointer; //need relocate addr. point to the FMemory
@@ -591,7 +593,7 @@ type
     ModuleName: PShortString; //nil const, base name only.
     //if Module is Class then the ModuleParent is classParent
     //in LastModuleEntry 链表中
-    ModuleParent: PTurboModuleInfo;
+    ModuleParent: PTurboModuleRefInfo;
     UsedMemory: tsInt;//实际使用的大小
     MemorySize: tsInt;//分配代码区的大小
     UsedDataSize: tsInt;
@@ -601,7 +603,7 @@ type
     InitializeProc: Pointer; //it is the offset address of the FMemory
     FinalizeProc: Pointer; //如果是模块的话
     //last Used(import) module entry.
-    LastModuleEntry: PTurboModuleEntry;
+    LastModuleRefEntry: PTurboModuleRefEntry;
     //有名字的函数链表，指向最后一个函数入口。
     LastWordEntry: PTurboWordEntry;
     //有名字的变量链表
@@ -842,7 +844,7 @@ begin
       LastWordEntry := nil;
       LastVariableEntry := nil;
       LastTypeInfoEntry := nil;
-      LastModuleEntry := nil;
+      LastModuleRefEntry := nil;
       //States := [];
     end;
 
@@ -851,11 +853,11 @@ begin
 end;
 
 function TCustomTurboModule.FindModuleEntry(const aName: string):
-        PTurboModuleEntry;
+        PTurboModuleRefEntry;
 var
-  vName: PShortString;
+  vName: PChar;
 begin
-  Result := LastModuleEntry;
+  Result := LastModuleRefEntry;
   while (Result <> nil) do
   begin
     if psCompiling in Status then
@@ -867,7 +869,7 @@ begin
       begin
         Integer(vName)  := Integer(FDataMemory) + Integer(vName);
       end;
-      if vName^ = aName then
+      if vName = aName then
       begin
         Exit;
       end;
@@ -880,7 +882,7 @@ end;
 function TCustomTurboModule.FindTypeInfoEntry(const aName: string):
         PTurboTypeInfoEntry;
 var
-  vName: PShortString;
+  vName: PChar;
 begin
   Result := LastTypeInfoEntry;
   while (Result <> nil) do
@@ -922,7 +924,7 @@ end;
 function TCustomTurboModule.FindVariableEntry(const aName: string):
         PTurboVariableEntry;
 var
-  vName: PShortString;
+  vName: PChar;
 begin
   Result := LastVariableEntry;
   while (Result <> nil) do
@@ -949,7 +951,7 @@ end;
 function TCustomTurboModule.FindWordEntry(const aName: string; const
         aCallStyle: TTurboCallStyle = csForth): PTurboWordEntry;
 var
-  vName: PShortString;
+  vName: PChar;
 begin
   Result := LastWordEntry;
   while (Result <> nil) do
@@ -971,7 +973,7 @@ begin
         writeln('FindWordEntry:', Integer(Result.Options.CallStyle));
         writeln('aCallStyle:', Integer(aCallStyle));
       end;//}
-      if (Result.Word.CallStyle = aCallStyle) and AnsiSameText(vName^, aName) then
+      if (Result.Word.CallStyle = aCallStyle) and AnsiSameText(vName, aName) then
       begin
         Exit;
       end;
@@ -1007,9 +1009,9 @@ begin
   end;
 end;
 
-function TCustomTurboModule.GetLastModuleEntry: PTurboModuleEntry;
+function TCustomTurboModule.GetLastModuleRefEntry: PTurboModuleRefEntry;
 begin
-  Result := PTurboPreservedDataMemory(FDataMemory).LastModuleEntry;
+  Result := PTurboPreservedDataMemory(FDataMemory).LastModuleRefEntry;
 end;
 
 function TCustomTurboModule.GetLastTypeInfoEntry: PTurboTypeInfoEntry;
@@ -1220,21 +1222,21 @@ end;
 
 procedure TCustomTurboModule.LoadUsedModules;
 var
-  vModuleEntry: PTurboModuleEntry;
+  vModuleRefEntry: PTurboModuleRefEntry;
   vModule: TCustomTurboModule;
 begin
-  vModuleEntry := LastModuleEntry;
-  while (vModuleEntry <> nil) do
+  vModuleRefEntry := LastModuleRefEntry;
+  while (vModuleRefEntry <> nil) do
   begin
     if psCompiling in Status then
-      Integer(vModuleEntry) := Integer(FDataMemory) + Integer(vModuleEntry);
+      Integer(vModuleRefEntry) := Integer(FDataMemory) + Integer(vModuleRefEntry);
     vModule := nil;
-    case vModuleEntry.Module.ModuleType of
-      mtLib: vModule := RequireModule(vModuleEntry.Module.Name^);
+    case vModuleRefEntry.Module.ModuleType of
+      mtLib: vModule := RequireModule(vModuleRefEntry.Module.Name);
     end; //case
     if Assigned(vModule) then
-      vModuleEntry.Module.Handle := vModule;
-    vModuleEntry := vModuleEntry.Prior;
+      vModuleRefEntry.Module.Handle := vModule;
+    vModuleRefEntry := vModuleRefEntry.Prior;
   end;
 end;
 
@@ -1250,25 +1252,25 @@ end;
 
 procedure TCustomTurboModule.NotifyModuleUnloaded(Sender: TObject);
 var
-  vModule: PTurboModuleEntry;
+  vModuleRef: PTurboModuleRefEntry;
 begin
   if (Sender = FParent) and StoredInParent then
   begin
     FIsLoaded := False;
   end;
 
-  vModule := LastModuleEntry;
-  while (vModule <> nil) do
+  vModuleRef := LastModuleRefEntry;
+  while (vModuleRef <> nil) do
   begin
     if psCompiling in Status then
-      Integer(vModule) := Integer(FDataMemory) + Integer(vModule);
-    if vModule.Module.Handle = Sender then
+      Integer(vModuleRef) := Integer(FDataMemory) + Integer(vModuleRef);
+    if vModuleRef.Module.Handle = Sender then
     begin
-      vModule.Module.Handle := nil;
+      vModuleRef.Module.Handle := nil;
       Exit;
     end
     else
-      vModule := vModule.Prior;
+      vModuleRef := vModuleRef.Prior;
   end;
 end;
 
@@ -1281,7 +1283,7 @@ begin
     FModuleUnloadNotifies.Delete(i);
 end;
 
-function TCustomTurboModule.RequireModule(const aModuleName: ShortString):
+function TCustomTurboModule.RequireModule(const aModuleName: PChar):
         TCustomTurboModule;
 begin
   Result := GTurboModuleManager.Require(aModuleName, TTurboModuleClass(ClassType), GlobalOptions, True);
@@ -1414,9 +1416,9 @@ begin
   PTurboPreservedDataMemory(FDataMemory).GlobalOptions := Value;
 end;
 
-procedure TCustomTurboModule.SetLastModuleEntry(Value: PTurboModuleEntry);
+procedure TCustomTurboModule.SetLastModuleRefEntry(Value: PTurboModuleRefEntry);
 begin
-  PTurboPreservedDataMemory(FDataMemory).LastModuleEntry := Value;
+  PTurboPreservedDataMemory(FDataMemory).LastModuleRefEntry := Value;
 end;
 
 procedure TCustomTurboModule.SetLastTypeInfoEntry(const Value:
@@ -1724,6 +1726,7 @@ constructor TTurboProgram.Create(const aParent: TCustomTurboModule = nil;
         aVisibility: TTurboVisibility = fvPublished);
 begin
   inherited Create(aParent, aVisibility);
+  GlobalOptions := @FGlobalOptions;
   ParameterStackSize := cDefaultParamStackSize;
   ReturnStackSize := cDefaultReturnStackSize;
 end;
@@ -1877,7 +1880,7 @@ begin
   TurboConvertEntryRelatedToAbsolute(Data, PTurboEntry(Data.LastTypeInfoEntry));  
   TurboConvertVarEntryRelatedToAbsolute(Data, Data.LastVariableEntry);  
   TurboConvertEntryRelatedToAbsolute(Data, PTurboEntry(Data.LastWordEntry));  
-  TurboConvertEntryRelatedToAbsolute(Data, PTurboEntry(Data.LastModuleEntry));  
+  TurboConvertEntryRelatedToAbsolute(Data, PTurboEntry(Data.LastModuleRefEntry));  
 end;
 
 procedure TurboConvertEntryAbsoluteToRelated(Mem: Pointer; var aEntry: PTurboEntry);
@@ -1934,7 +1937,7 @@ begin
     Dec(Integer(Mem.FinalizeProc), Integer(Mem));
 }
   TurboConvertEntryAbsoluteToRelated(Data, PTurboEntry(Data.LastWordEntry));  
-  TurboConvertEntryAbsoluteToRelated(Data, PTurboEntry(Data.LastModuleEntry));  
+  TurboConvertEntryAbsoluteToRelated(Data, PTurboEntry(Data.LastModuleRefEntry));  
   TurboConvertVarEntryAbsoluteToRelated(Data, Data.LastVariableEntry);  
   TurboConvertEntryAbsoluteToRelated(Data, PTurboEntry(Data.LastTypeInfoEntry));  
 end;

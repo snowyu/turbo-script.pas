@@ -3,14 +3,25 @@
 我将它命名为： TurboScriptEngine. 
 
 设计目标：
+  高度可重用性
+      * 层次分明，高度部件（组件）化： 在框架中的各个部件高度独立，可拆可组（任意拆卸，任意组合），着力通用。
+      * 部件细化，设计精巧，运行高效，内存占用低。
+      * 耦合度低(可拆可组)
+  延展：我们需要架构具有可拓展性，以适应未来可能的变化。
+    据库执行功能：the run-time script types, constants, global variables and procedures can be stored in the memory or database.
+  高度自由缩放性：即可作为脚本解释器，也可JIT运行，也可作为高级语言编译器。
   高速（既能够解释执行，也能够编译成机器码直接执行），小巧，高效；
-  数据库执行功能：the run-time script types, constants, global variables and procedures can be stored in the memory or database.
+  安全：运行安全稳定【可以通过完善TDD测试机制来保障】
+  简明：一个复杂的架构不论是测试还是维护都是困难的。我们希望架构能够在满足目的的情况下尽可能的简单明了。
+
+设计架构优秀的 Framework - 兼谈 ORM Framework
+架构设计是一种权衡和取舍。一个Framework是为了解决某一个领域内的某些问题的代码复用而因运而生的，而问题总是有多种的解决方案的。而我们要确定唯一的架构设计的解决方案，就意味着我们要在不同的矛盾体之间做出一个取舍。我们在设计的过程总是可以看到很多的矛盾体：开放和整合，一致性和特殊化等等。任何一对矛盾体都源于我们对Framework的不同期望，需要我们在各种方案中作出不同的取舍。没有一个Framework能够满足所有的要求，只是架构的侧重不同。而一个设计优秀的 Framework 则是体现在其架构简单明了，层次分明，重用价值高；运行高效率，稳定（完善的TDD测试机制）。
 
 首先由编译模块将程序全部翻译成Forth虚拟机器码,再由执行器将虚拟机器码翻译成不同平台的执行码并执行或者由执行器解释执行.
 
-两大模块：编译器模块，执行器模块
+因此可以分为两大部件：编译器，执行器。
 
-编译器模块
+编译器
 抽象层: uTurboCompiler.pas(CustomTurboCompiler, CustomTurboScriptModule)
 使用层: TurboForthCompiler.pas, TurboPascalCompiler.pas, TurboBasicCompiler.pas, TurboCCompiler.pas, etc
 扩展层: 
@@ -18,10 +29,18 @@
 连接器模块：根据需要将编译好的VM单元静态引入主脚本程序模块，需要处理地址重定位，优化（如：其它unit的初始化过程是对某个单元变量赋值，但是该变量并没有被主程序使用，那么该初始化过程就不会被连接进入或执行）
 抽象与使用层: uTurboLinker.pas
 
-执行器模块
-抽象层: uTurboExecutor.pas(include abstract PEFormat, executor , debugger and TurboProgram classes)
-使用层: TurboX86Executor.pas; TurboZ80Executor.pas, TurboJavaVMExecutor.pas
-扩展层: 如, TurboInterpreter.pas; TurboDebugger.pas;  
+执行器
+抽象层: 
+  执行引擎核心：uTurboExecutor.pas(include abstract executor, TurboProgram classes)
+    模块内存镜像类： TCustomTurboModule
+    执行引擎抽象类： TCustomTurboExecutor
+    AppDomain类： TTurboProgram 一个程序就是一个AppDomain.
+  加载器： uTurboAccessor.pas (抽象的模块加载器，以及加载器的管理器)
+    文件加载器： 加载文件模块
+    数据库加载器： 加载存放于数据库种的模块
+  
+使用层: TurboInterpreter.pas, TurboJITExecutor.pas, TurboX86Executor.pas; TurboZ80Executor.pas, TurboJavaVMExecutor.pas
+扩展层: 如 TurboDebugger.pas
 
 JIT Translator 即时翻译模块：由执行器调用，将VM及时翻译成本族语言直接执行。
 
@@ -200,16 +219,18 @@ end.
 ForthDLL：与DLL类似，不过里面的代码不是机器码，而是Forth的VM码。
 
 
-uTurboModuleAccessor(模块装入保存机制详述):
+uTurboModuleAccessor(模块加载保存机制详述):
 
 TTurboModuleAccessor: abstract class  <-- TTurboModuleFileAccessor, TTurboModuleDataSetAccessor
-TTurboModuleAccessorClasses: register the accessor class to here.
+TTurboModuleAccessorList: register the accessor to here. 所有注册的加载器全部在这里。
 
-TTurboModuleManager: manage the Turbo Module Accessores.
-  Require(aModuleName: string): TCustomTurboExecutor; //find and load the module into memory.
+TTurboModuleManager: manage the Turbo Module Accessores. 所有的在内存中的模块都在这里。
+   //find and load the module into memory.
+  function Require(const aModuleName: String; const aModuleClass: TTurboModuleClass; const aGlobal: PTurboGlobalOptions; const IsLoaded: Boolean): TCustomTurboModule;
 
 函数说明：
-RegisterTurboModuleAccessor(aClass: TTurboModuleAccessorClass);
+function GTurboModuleManager.RegisterAccessor(const AccessorClass: TTurboModuleAccessorClass; const IsDefault: Boolean = False): Boolean;
+注册加载器，所有的加载器都是singleton单件实例。
 
 uTurboModuleFileAccessor
 

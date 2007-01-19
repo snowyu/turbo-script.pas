@@ -272,6 +272,11 @@ asm
   JMP _iVMHalt 
 end;
 
+procedure iVMNoop;
+asm
+  JMP  iVMNext
+end;
+
 procedure _iVMHalt(ErrorCode: TTurboProcessorErrorCode);assembler;
 asm
 {  MOV DL, [EDI].TPreservedCodeMemory.States
@@ -922,6 +927,7 @@ end;
 
 procedure InitTurboCoreWordList;
 begin
+  GTurboCoreWords[opNoop] := iVMNoop;
   GTurboCoreWords[opNext] := iVMNext;
   GTurboCoreWords[opHalt] := iVMHalt;
   GTurboCoreWords[opAssert] := iVMAssert;

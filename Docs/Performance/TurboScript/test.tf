@@ -1,4 +1,4 @@
-( test program )
+//test lib
 Program test
 
 const
@@ -15,12 +15,9 @@ var
 : Published LN 10 13 EMIT EMIT;
 
 begin
-{  33 67 +
-  50 Add Add2
-  1 2 3 4 5 6
-  7 8 9 10 11 12 -
-}
- {vCC vBB} vAA @ .S LN vBC @ .LS (10 13 #'Food' EMIT EMIT EMIT EMIT EMIT EMIT)
+ vAA @ .S 
+ LN 
+ vBC @ .LS
  23 32 Add
  45 add
  $7FFFFFF1 $7FFFFFF2 $7FFFFFF3 $7FFFFFF4 $7FFFFFF5 $7FFFFFF6 $7FFFFFF7 $7FFFFFF8 $7FFFFFFF

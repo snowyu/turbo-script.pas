@@ -73,33 +73,132 @@ unit uTurboPE;
 
 interface
 
-uses Windows,
+uses
+  Windows,
   Classes,
   SysUtils;
 
+{$IFDEF FPC}
+const
+  IMAGE_SIZEOF_SHORT_NAME                  = 8;
+  IMAGE_NUMBEROF_DIRECTORY_ENTRIES        = 16;
+  IMAGE_NT_OPTIONAL_HDR_MAGIC            = $010B;
+  IMAGE_DIRECTORY_ENTRY_RESOURCE           = 2;  { Resource Directory }
+{$ENDIF}
+
 type
-  PImageDosHeader = ^TImageDosHeader;
-  TImageDosHeader = packed record { DOS .EXE header                  }
-    e_magic: Word; //               { Magic number                     }
-    e_cblp: Word; //                { Bytes on last page of file       }
-    e_cp: Word; //                  { Pages in file                    }
-    e_crlc: Word; //                { Relocations                      }
-    e_cparhdr: Word; //             { Size of header in paragraphs     }
-    e_minalloc: Word; //            { Minimum extra paragraphs needed  }
-    e_maxalloc: Word; //            { Maximum extra paragraphs needed  }
-    e_ss: Word; //                  { Initial (relative) SS value      }
-    e_sp: Word; //                  { Initial SP value                 }
-    e_csum: Word; //                { Checksum                         }
-    e_ip: Word; //                  { Initial IP value                 }
-    e_cs: Word; //                  { Initial (relative) CS value      }
-    e_lfarlc: Word; //              { File address of relocation table }
-    e_ovno: Word; //                { Overlay number                   }
-    e_res: array[0..3] of Word; //  { Reserved words                   }
-    e_oemid: Word; //               { OEM identifier (for e_oeminfo)   }
-    e_oeminfo: Word; //             { OEM information; e_oemid specific}
-    e_res2: array[0..9] of Word; // { Reserved words                   }
-    _lfanew: LongInt; //            { File address of new exe header   }
+{$IFDEF FPC}
+	LCID = DWORD;
+  TISHMisc = packed record
+    case Integer of
+      0: (PhysicalAddress: DWORD);
+      1: (VirtualSize: DWORD);
   end;
+  PImageDataDirectory = ^TImageDataDirectory;
+  _IMAGE_DATA_DIRECTORY = record
+    VirtualAddress: DWORD;
+    Size: DWORD;
+  end;
+  TImageDataDirectory = _IMAGE_DATA_DIRECTORY;
+  IMAGE_DATA_DIRECTORY = _IMAGE_DATA_DIRECTORY;
+
+  PImageFileHeader = ^TImageFileHeader;
+  _IMAGE_FILE_HEADER = packed record
+    Machine: Word;
+    NumberOfSections: Word;
+    TimeDateStamp: DWORD;
+    PointerToSymbolTable: DWORD;
+    NumberOfSymbols: DWORD;
+    SizeOfOptionalHeader: Word;
+    Characteristics: Word;
+  end;
+  {$EXTERNALSYM _IMAGE_FILE_HEADER}
+  TImageFileHeader = _IMAGE_FILE_HEADER;
+  IMAGE_FILE_HEADER = _IMAGE_FILE_HEADER;
+  {$EXTERNALSYM IMAGE_FILE_HEADER}
+  PPImageSectionHeader = ^PImageSectionHeader;
+  PImageSectionHeader = ^TImageSectionHeader;
+  _IMAGE_SECTION_HEADER = packed record
+    Name: packed array[0..IMAGE_SIZEOF_SHORT_NAME-1] of Byte;
+    Misc: TISHMisc;
+    VirtualAddress: DWORD;
+    SizeOfRawData: DWORD;
+    PointerToRawData: DWORD;
+    PointerToRelocations: DWORD;
+    PointerToLinenumbers: DWORD;
+    NumberOfRelocations: Word;
+    NumberOfLinenumbers: Word;
+    Characteristics: DWORD;
+  end;
+  {$EXTERNALSYM _IMAGE_SECTION_HEADER}
+  TImageSectionHeader = _IMAGE_SECTION_HEADER;
+  IMAGE_SECTION_HEADER = _IMAGE_SECTION_HEADER;
+  {$EXTERNALSYM IMAGE_SECTION_HEADER}
+  PImageOptionalHeader = ^TImageOptionalHeader;
+  _IMAGE_OPTIONAL_HEADER = packed record
+    { Standard fields. }
+    Magic: Word;
+    MajorLinkerVersion: Byte;
+    MinorLinkerVersion: Byte;
+    SizeOfCode: DWORD;
+    SizeOfInitializedData: DWORD;
+    SizeOfUninitializedData: DWORD;
+    AddressOfEntryPoint: DWORD;
+    BaseOfCode: DWORD;
+    BaseOfData: DWORD;
+    { NT additional fields. }
+    ImageBase: DWORD;
+    SectionAlignment: DWORD;
+    FileAlignment: DWORD;
+    MajorOperatingSystemVersion: Word;
+    MinorOperatingSystemVersion: Word;
+    MajorImageVersion: Word;
+    MinorImageVersion: Word;
+    MajorSubsystemVersion: Word;
+    MinorSubsystemVersion: Word;
+    Win32VersionValue: DWORD;
+    SizeOfImage: DWORD;
+    SizeOfHeaders: DWORD;
+    CheckSum: DWORD;
+    Subsystem: Word;
+    DllCharacteristics: Word;
+    SizeOfStackReserve: DWORD;
+    SizeOfStackCommit: DWORD;
+    SizeOfHeapReserve: DWORD;
+    SizeOfHeapCommit: DWORD;
+    LoaderFlags: DWORD;
+    NumberOfRvaAndSizes: DWORD;
+    DataDirectory: packed array[0..IMAGE_NUMBEROF_DIRECTORY_ENTRIES-1] of TImageDataDirectory;
+  end;
+  {$EXTERNALSYM _IMAGE_OPTIONAL_HEADER}
+  TImageOptionalHeader = _IMAGE_OPTIONAL_HEADER;
+  IMAGE_OPTIONAL_HEADER = _IMAGE_OPTIONAL_HEADER;
+  PImageNtHeaders = ^TImageNtHeaders;
+  _IMAGE_NT_HEADERS = packed record
+    Signature: DWORD;
+    FileHeader: TImageFileHeader;
+    OptionalHeader: TImageOptionalHeader;
+  end;
+  {$EXTERNALSYM _IMAGE_NT_HEADERS}
+  TImageNtHeaders = _IMAGE_NT_HEADERS;
+  IMAGE_NT_HEADERS = _IMAGE_NT_HEADERS;
+  {$EXTERNALSYM IMAGE_NT_HEADERS}
+  PImageDebugDirectory = ^TImageDebugDirectory;
+  _IMAGE_DEBUG_DIRECTORY = packed record
+    Characteristics: DWORD;
+    TimeDateStamp: DWORD;
+    MajorVersion: Word;
+    MinorVersion: Word;
+    _Type: DWORD;
+    SizeOfData: DWORD;
+    AddressOfRawData: DWORD;
+    PointerToRawData: DWORD;
+  end;
+  {$EXTERNALSYM _IMAGE_DEBUG_DIRECTORY}
+  TImageDebugDirectory = _IMAGE_DEBUG_DIRECTORY;
+  IMAGE_DEBUG_DIRECTORY = _IMAGE_DEBUG_DIRECTORY;
+  {$EXTERNALSYM IMAGE_DEBUG_DIRECTORY}
+ {$ENDIF}
 
   TResourceDetails = class;
 
@@ -320,17 +419,17 @@ procedure WriteResourceInStream(PEStream: TMemoryStream; ResName: string;
 
 function ReadResourceToString(const FileName: string; 
   const ResName: PChar;
-  const ResType: PChar = RT_RCDATA): String;
+  const ResType: PChar {$IFNDEF FPC}= RT_RCDATA {$ENDIF}): String;
 function ReadResourceToPointer(Module: THandle; 
   const ResName: PChar;
-  var Size: DWord; const ResType: PChar = RT_RCDATA): Pointer;
+  var Size: DWord; const ResType: PChar {$IFNDEF FPC}= RT_RCDATA {$ENDIF}): Pointer;
 
 {
 -1: not succsess
 0: succsess
 other: can not load to stream.
 }
-function ReadResourceToStream(const FileName: string; const aStream: TStream; const ResName: PChar; const ResType: PChar = RT_RCDATA): Integer;
+function ReadResourceToStream(const FileName: string; const aStream: TStream; const ResName: PChar; const ResType: PChar {$IFNDEF FPC}= RT_RCDATA {$ENDIF}): Integer;
 
 implementation
 
@@ -937,9 +1036,9 @@ begin
   // Load the DOS header
   fDOSHeader := PImageDosHeader(Memory)^;
 
-  offset := fDOSHeader._lfanew;
+  offset := fDOSHeader.{$IFDEF FPC}e_lfanew{$ELSE}_lfanew{$ENDIF};
   fDOSStub.Write((PChar(Memory) + sizeof(fDOSHeader))^,
-    fDOSHeader._lfanew - sizeof(fDOSHeader));
+    fDOSHeader.{$IFDEF FPC}e_lfanew{$ELSE}_lfanew{$ENDIF} - sizeof(fDOSHeader));
   // Check the COFF signature
   if PDWORD(PChar(Memory) + offset)^ <> IMAGE_NT_SIGNATURE then
     raise EPEException.Create(rstInvalidCOFFSignature);
