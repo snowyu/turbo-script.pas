@@ -34,7 +34,7 @@ type
     procedure DoCompile; virtual;
     class procedure InitModuleType; virtual;
   public
-    constructor Create(const aParent: TCustomTurboModule = nil; aVisibility:
+    constructor Create(const aOwner: TCustomTurboModule = nil; aVisibility:
             TTurboVisibility = fvPublished); override;
     destructor Destroy; override;
     { Description
@@ -94,7 +94,7 @@ type
     procedure DoCompile; override;
     class procedure InitModuleType; override;
   public
-    constructor Create(const aParent: TCustomTurboModule = nil; aVisibility:
+    constructor Create(const aOwner: TCustomTurboModule = nil; aVisibility:
             TTurboVisibility = fvPublished); override;
     destructor Destroy; override;
     {: 它的子模块列表:被 Parser 或Tree使用 }
@@ -139,10 +139,10 @@ implementation
 {
 ******************************* TCustomTurboWord *******************************
 }
-constructor TCustomTurboWord.Create(const aParent: TCustomTurboModule = nil;
+constructor TCustomTurboWord.Create(const aOwner: TCustomTurboModule = nil;
         aVisibility: TTurboVisibility = fvPublished);
 begin
-  inherited Create(aParent, aVisibility);
+  inherited Create(aOwner, aVisibility);
   InitModuleType;
   FSymbols := TList.Create;
   FUsedModules := TList.Create;
@@ -266,10 +266,10 @@ end;
 {
 ******************************** TTTurboModule *********************************
 }
-constructor TTTurboModule.Create(const aParent: TCustomTurboModule = nil;
+constructor TTTurboModule.Create(const aOwner: TCustomTurboModule = nil;
         aVisibility: TTurboVisibility = fvPublished);
 begin
-  inherited Create(aParent, aVisibility);
+  inherited Create(aOwner, aVisibility);
   FChilds := TTurboModuleList.Create(Self);
 end;
 

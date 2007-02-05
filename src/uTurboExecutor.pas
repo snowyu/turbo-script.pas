@@ -78,10 +78,6 @@ type
 
   //PTurboPreservedCodeMemory = ^ TTurboPreservedCodeMemory;
   PTurboPreservedDataMemory = ^ TTurboPreservedDataMemory;
-  PTurboVariableEntry = ^ TTurboVariableEntry;
-  PTurboModuleRefEntry = ^ TTurboModuleRefEntry;
-  PTurboWordEntry = ^ TTurboWordEntry;
-  PTurboTypeInfoEntry = ^ TTurboTypeInfoEntry;
   PTurboGlobalOptions = ^TTurboGlobalOptions;
 
   TCustomTurboPEFormat = class;
@@ -145,7 +141,7 @@ type
     FModuleUnloadNotifies: TList;
     FModuleVersion: LongWord;
     FName: string;
-    FParent: TCustomTurboModule;
+    FOwner: TCustomTurboModule;
     FPC: Integer;
     FRP: Integer;
     {: the Parameter Stack(or data stack) Pointer }
@@ -161,7 +157,7 @@ type
     function GetLastErrorCode: TTurboProcessorErrorCode;
     function GetLastTypeInfoEntry: PTurboTypeInfoEntry;
     function GetLastVariableEntry: PTurboVariableEntry;
-    function GetLastWordEntry: PTurboWordEntry;
+    function GetLastWordEntry: PTurboMethodEntry;
     function GetMemorySize: tsInt;
     function GetModuleType: TTurboModuleType;
     function GetParameterStack: Pointer;
@@ -179,19 +175,19 @@ type
     procedure SetDataMemorySize(Value: tsInt);
     procedure SetLastTypeInfoEntry(const Value: PTurboTypeInfoEntry);
     procedure SetLastVariableEntry(const Value: PTurboVariableEntry);
-    procedure SetLastWordEntry(const Value: PTurboWordEntry);
+    procedure SetLastWordEntry(const Value: PTurboMethodEntry);
     procedure SetMemorySize(Value: tsInt);
     procedure SetModuleType(Value: TTurboModuleType);
+    procedure SetOwner(const Value: TCustomTurboModule);
     procedure SetParameterStack(Value: Pointer);
     procedure SetParameterStackSize(Value: Integer);
-    procedure SetParent(const Value: TCustomTurboModule);
     procedure SetReturnStack(Value: Pointer);
     procedure SetReturnStackSize(Value: Integer);
     procedure SetStatus(Value: TTurboProcessorStates);
     procedure SetUsedDataSize(Value: tsInt);
     procedure SetUsedMemory(Value: tsInt);
   public
-    constructor Create(const aParent: TCustomTurboModule = nil; aVisibility:
+    constructor Create(const aOwner: TCustomTurboModule = nil; aVisibility:
             TTurboVisibility = fvPublished); virtual;
     destructor Destroy; override;
     {: add a integer to the free memory, and add UsedMemory }
@@ -249,7 +245,7 @@ type
     function FindVariableEntry(const aName: string): PTurboVariableEntry;
     {: nil means not found. }
     function FindWordEntry(const aName: string; const aCallStyle:
-            TTurboCallStyle = csForth): PTurboWordEntry;
+            TTurboCallStyle = csForth): PTurboMethodEntry;
     {: Get the Local forth word entry. }
     { Description
     Note: 0 means not found.
@@ -281,8 +277,8 @@ type
     procedure SaveToFile(const aFileName: String);
     {: save FMemory to stream }
     procedure SaveToStream(const aStream: TStream);
-    {: 是否被存放在Parent 中. }
-    function StoredInParent: Boolean;
+    {: 是否被存放在 Owner 中. }
+    function StoredInOwner: Boolean;
     {: unload from memory }
     procedure Unload;
     {: Ensures that a object is notified that the executor is going to be
@@ -312,7 +308,7 @@ type
             write SetLastTypeInfoEntry;
     property LastVariableEntry: PTurboVariableEntry read GetLastVariableEntry
             write SetLastVariableEntry;
-    property LastWordEntry: PTurboWordEntry read GetLastWordEntry write
+    property LastWordEntry: PTurboMethodEntry read GetLastWordEntry write
             SetLastWordEntry;
     {: The Code Memory }
     property Memory: Pointer read FMemory write FMemory;
@@ -333,6 +329,11 @@ type
     {: the module full name(include path: Module.SubModule.ModuleName) }
     property Name: string read FName write FName;
     property Options: TTurboScriptOptions read GetOptions write SetOptions;
+    {: 它的父亲:被 Parser 或Tree使用. nil means root. }
+    { Description
+    如果该模块是私有的,那么内存就是使用的父亲的内存.
+    }
+    property Owner: TCustomTurboModule read FOwner write SetOwner;
     {: : the Parameter Stack }
     { Description
     指向栈底： @Stack[0]
@@ -347,11 +348,6 @@ type
     }
     property ParameterStackSize: Integer read GetParameterStackSize write
             SetParameterStackSize;
-    {: 它的父亲:被 Parser 或Tree使用. nil means root. }
-    { Description
-    如果该模块是私有的,那么内存就是使用的父亲的内存.
-    }
-    property Parent: TCustomTurboModule read FParent write SetParent;
     {: : program counter. }
     { Description
     program counter, which contains the address 
@@ -453,8 +449,8 @@ type
     @param aCFA the Code Field Address(related to FMemory).
     相对于FMemory的偏移量。
     }
-    function iExecuteExternalWord(const aWord: PTurboExteralWordOptions; const
-            aCallStyle: TTurboCallStyle): Integer;
+    function iExecuteExternalWord(const aWord: PTurboExteralMethodOptions;
+            const aCallStyle: TTurboCallStyle): Integer;
     {: Init before the Execution. }
     procedure InitExecution; virtual;
   public
@@ -481,7 +477,7 @@ type
     @param aCFA the Code Field Address(related to FMemory).
     相对于FMemory的偏移量。
     }
-    function ExecuteWordEntry(const aWord: PTurboWordEntry): Integer;
+    function ExecuteWordEntry(const aWord: PTurboMethodEntry): Integer;
     procedure Stop;
     property OnPrintChar: TTurboPrintCharEvent read FOnPrintChar write
             FOnPrintChar;
@@ -517,7 +513,7 @@ type
     { Description
     为了在多个 executor 中管理共享数据栈＆返回栈以及运行参数。
     }
-    constructor Create(const aParent: TCustomTurboModule = nil; aVisibility:
+    constructor Create(const aOwner: TCustomTurboModule = nil; aVisibility:
             TTurboVisibility = fvPublished); override;
     destructor Destroy; override;
     {: the turbo script program class }
@@ -536,28 +532,6 @@ type
 
 
 
-  //For type-cast the Mem
-  TTurboWordEntry = packed record
-    Prior: PTurboWordEntry; //前一个单词 0 means 为最前面。
-    Word: TTurboWordInfo;
-  end;
-
-  TTurboVariableEntry = packed record
-    Prior: PTurboVariableEntry;
-    Variable: TTurboVariableInfo; 
-    //Value: ....
-  end;
-  
-  //the import module for uses.
-  TTurboModuleRefEntry = packed record
-    Prior: PTurboModuleRefEntry; //nil means no more
-    Module: TTurboModuleRefInfo;
-  end;
-
-  TTurboTypeInfoEntry = packed record
-    Prior: PTurboTypeInfoEntry; //nil means no more
-    TypeInfo: TTurboTypeInfo;
-  end;
 (*
   PTurboMethodTypeData = ^TTurboMethodTypeData;
   TTurboMethodTypeData = packed record
@@ -586,18 +560,19 @@ type
     Code: Pointer; //need relocate addr. point to the FMemory
     GlobalOptions: PTurboGlobalOptions;
     Executor: TCustomTurboModule;
-    //##abondoned:this Module unique Index in this program, allocated by compiler.
-    //##ModuleIndex: Integer;
+
+    UsedMemory: tsInt;//实际使用的大小
+    MemorySize: tsInt;//分配代码区的大小
+    UsedDataSize: tsInt;
+    DataSize: tsInt; 
+
     ModuleType: TTurboModuleType;
     ModuleOptions: TTurboScriptOptions;
     ModuleName: PShortString; //nil const, base name only.
     //if Module is Class then the ModuleParent is classParent
     //in LastModuleEntry 链表中
     ModuleParent: PTurboModuleRefInfo;
-    UsedMemory: tsInt;//实际使用的大小
-    MemorySize: tsInt;//分配代码区的大小
-    UsedDataSize: tsInt;
-    DataSize: tsInt; 
+
     //如果ModuleType是模块，那么就是装载运行该模块前执行的初始化过程，入口地址
     //如果是函数，则是该函数的入口地址
     InitializeProc: Pointer; //it is the offset address of the FMemory
@@ -605,7 +580,7 @@ type
     //last Used(import) module entry.
     LastModuleRefEntry: PTurboModuleRefEntry;
     //有名字的函数链表，指向最后一个函数入口。
-    LastWordEntry: PTurboWordEntry;
+    LastWordEntry: PTurboMethodEntry;
     //有名字的变量链表
     LastVariableEntry: PTurboVariableEntry;
     //RTTI TypeInfo 链表
@@ -648,12 +623,12 @@ const
 {
 ****************************** TCustomTurboModule ******************************
 }
-constructor TCustomTurboModule.Create(const aParent: TCustomTurboModule = nil;
+constructor TCustomTurboModule.Create(const aOwner: TCustomTurboModule = nil;
         aVisibility: TTurboVisibility = fvPublished);
 begin
   inherited Create;
   FModuleUnloadNotifies := TList.Create;
-  FParent := aParent;
+  FOwner := aOwner;
   FVisibility := aVisibility;
   //FOptions := [soLoadOnDemand];
   ClearMemory;
@@ -664,7 +639,7 @@ begin
   Unload;
 
   FreeAndNil(FModuleUnloadNotifies);
-  if not StoredInParent then
+  if not StoredInOwner then
   begin
     if ModuleType <> mtFunction then
       FreeMem(FDataMemory);
@@ -822,7 +797,7 @@ procedure TCustomTurboModule.ClearMemory;
 var
   vPreserved: Integer;
 begin
-  if not StoredInParent then
+  if not StoredInOwner then
   begin
     //vPreserved := SizeOf(TTurboPreservedDataMemory);
     //if vPreserved < Integer(High(TTurboVMInstruction)) then
@@ -949,7 +924,7 @@ begin
 end;
 
 function TCustomTurboModule.FindWordEntry(const aName: string; const
-        aCallStyle: TTurboCallStyle = csForth): PTurboWordEntry;
+        aCallStyle: TTurboCallStyle = csForth): PTurboMethodEntry;
 var
   vName: PChar;
 begin
@@ -1024,7 +999,7 @@ begin
   Result := PTurboPreservedDataMemory(FDataMemory).LastVariableEntry;
 end;
 
-function TCustomTurboModule.GetLastWordEntry: PTurboWordEntry;
+function TCustomTurboModule.GetLastWordEntry: PTurboMethodEntry;
 begin
   Result := PTurboPreservedDataMemory(FDataMemory).LastWordEntry;
 end;
@@ -1082,10 +1057,10 @@ end;
 
 function TCustomTurboModule.GetRoot: TCustomTurboModule;
 begin
-  Result := Parent;
-  while Assigned(Result) and Assigned(Result.Parent) do
+  Result := Owner;
+  while Assigned(Result) and Assigned(Result.Owner) do
   begin
-    Result := Result.Parent;
+    Result := Result.Owner;
   end;
 
   if Result = nil then Result := Self;
@@ -1117,7 +1092,7 @@ begin
   Result := Integer(FindWordEntry(aWord));
   if Result <> 0 then
   begin
-    Result := PTurboWordEntry(Result).Word.CFA;
+    Result := PTurboMethodEntry(Result).Word.CFA;
   end
   else
     Result := -1;
@@ -1245,7 +1220,7 @@ begin
   if Sender is TCustomTurboModule then
   begin
     RemoveUnloadNotification(TCustomTurboModule(Sender).NotifyModuleUnloaded);
-    if Sender = FParent then
+    if Sender = FOwner then
       Self.Free;
   end;
 end;
@@ -1254,7 +1229,7 @@ procedure TCustomTurboModule.NotifyModuleUnloaded(Sender: TObject);
 var
   vModuleRef: PTurboModuleRefEntry;
 begin
-  if (Sender = FParent) and StoredInParent then
+  if (Sender = FOwner) and StoredInOwner then
   begin
     FIsLoaded := False;
   end;
@@ -1433,7 +1408,7 @@ begin
   PTurboPreservedDataMemory(FDataMemory).LastVariableEntry := Value;
 end;
 
-procedure TCustomTurboModule.SetLastWordEntry(const Value: PTurboWordEntry);
+procedure TCustomTurboModule.SetLastWordEntry(const Value: PTurboMethodEntry);
 begin
   PTurboPreservedDataMemory(FDataMemory).LastWordEntry := Value;
 end;
@@ -1470,6 +1445,18 @@ begin
   PTurboPreservedDataMemory(FDataMemory).ModuleOptions := Value;
 end;
 
+procedure TCustomTurboModule.SetOwner(const Value: TCustomTurboModule);
+begin
+  if Value <> FOwner then
+  begin
+    if Assigned(FOwner) then
+      FOwner.RemoveUnloadNotification(NotifyModuleUnloaded);
+    FOwner := Value;
+    if Assigned(FOwner) then
+      FOwner.UnloadNotification(NotifyModuleUnloaded);
+  end;
+end;
+
 procedure TCustomTurboModule.SetParameterStack(Value: Pointer);
 begin
   PTurboPreservedDataMemory(FDataMemory).GlobalOptions.ParamStackBase := Value;
@@ -1478,18 +1465,6 @@ end;
 procedure TCustomTurboModule.SetParameterStackSize(Value: Integer);
 begin
   PTurboPreservedDataMemory(FDataMemory).GlobalOptions.ParamStackSize := Value;
-end;
-
-procedure TCustomTurboModule.SetParent(const Value: TCustomTurboModule);
-begin
-  if Value <> FParent then
-  begin
-    if Assigned(FParent) then
-      FParent.RemoveUnloadNotification(NotifyModuleUnloaded);
-    FParent := Value;
-    if Assigned(FParent) then
-      FParent.UnloadNotification(NotifyModuleUnloaded);
-  end;
 end;
 
 procedure TCustomTurboModule.SetReturnStack(Value: Pointer);
@@ -1555,9 +1530,9 @@ begin
   PTurboPreservedDataMemory(FDataMemory).UsedMemory := Value;
 end;
 
-function TCustomTurboModule.StoredInParent: Boolean;
+function TCustomTurboModule.StoredInOwner: Boolean;
 begin
-  Result := Assigned(Parent) and
+  Result := Assigned(Owner) and
      ((Visibility <= fvPrivate)
        //or (Parent.ModuleType = mtFunction)
      );
@@ -1565,7 +1540,7 @@ end;
 
 procedure TCustomTurboModule.Unload;
 begin
-  if FIsLoaded and not StoredInParent then
+  if FIsLoaded and not StoredInOwner then
   begin
     SendUnloadNotification;
     //if Name <> '' then RemoveModuleTypes(Name);
@@ -1620,7 +1595,7 @@ begin
     Result := -1;
 end;
 
-function TCustomTurboExecutor.ExecuteWordEntry(const aWord: PTurboWordEntry):
+function TCustomTurboExecutor.ExecuteWordEntry(const aWord: PTurboMethodEntry):
         Integer;
 begin
   InitExecution;
@@ -1650,7 +1625,7 @@ begin
 end;
 
 function TCustomTurboExecutor.iExecuteExternalWord(const aWord:
-        PTurboExteralWordOptions; const aCallStyle: TTurboCallStyle): Integer;
+        PTurboExteralMethodOptions; const aCallStyle: TTurboCallStyle): Integer;
 begin
   {case aCallStyle of
     csForth: with aWord^ do begin
@@ -1722,10 +1697,10 @@ end;
 {
 ******************************** TTurboProgram *********************************
 }
-constructor TTurboProgram.Create(const aParent: TCustomTurboModule = nil;
+constructor TTurboProgram.Create(const aOwner: TCustomTurboModule = nil;
         aVisibility: TTurboVisibility = fvPublished);
 begin
-  inherited Create(aParent, aVisibility);
+  inherited Create(aOwner, aVisibility);
   GlobalOptions := @FGlobalOptions;
   ParameterStackSize := cDefaultParamStackSize;
   ReturnStackSize := cDefaultReturnStackSize;

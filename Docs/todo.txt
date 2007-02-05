@@ -7,6 +7,45 @@ iushTODO:
     Syntax    {$MaxStackSize  Size[KB|MB] }
     注意：必须放在Program|Unit之后
 
+2007-2-2
+~  我想将执行引擎从代码内存镜像中分离出来
+
+2007-2-1
+!定下工作顺序： 暂时不忙实现数组列表的形式(Variables...),不过位置预留。
+  1. 拆开 StaticClass
+  2. 将外部引用从其中分离出来单独，链表
+   !+ LastWordRefEntry 外部的方法
+   !+ LastVariableRefEntry 外部的变量
+   !+ LastTypeInfoRefEntry 外部的类型
+
+2007-1-31
+* TTurboPreservedDataMemory 
+  * 里面的一些字段调整了下顺序
+
+2007-1-28
+* rename TCustomTurboModule.Parent to TCustomTurboModule.Owner
+* rename TCustomTurboModule.StoreInParent to TCustomTurboModule.StoreInOwner
+
+2007-1-26
+TurboBlock -> TurboStaticClass -> TurboModule
+                              |-> TurboClass
+TurboBlock: Statement Block. 里面只有代码！抽象该类的目的是供数据库中的过程用，让过程也能单独存放在数据库中。
+也就是说 Aceesor 加载引擎必须能支持 TurboBlock, TurboStaticClass , TurboModule 的加载！
+
+2007-1-24
+!* 将Module中保存机制(LoadFromStream, SaveToStream)放到Accessor中【不用，还是放在各自的类中，作为流格式】。
+!+ 只有Module上才该有 RefList，这样一来在上面的引用外部的汇编咋弄？好像没法弄了
+类如果单独保存的话？可以通过Owner连接。
+
+2007-1-19
+将类作为基本，难点：
+  类本身不分配内存，只有模块才能
+  模块是类
+  类应该是作为MetaInfo类
+如何在MM中，使用Object，建立一个基本类（该类其实就是Object），不出现在文件中,然后所有的从该类派生，但是关键字用的是Class
+唉，或者第一版就全部用Class, TObject 基类没有增加任何字段，只是VMT表变大了。不过第1个DWORD总是指向VMT表了。
+还是不好办，还是将 TCustomTurboModule 里面的东西抽点出来放在 TTurboModuleInfo(object) 中。
+
 2007-1-9
 ~ 又有一个idea ti attach the script to the exe:
   Ref/GDataOnFile.pas

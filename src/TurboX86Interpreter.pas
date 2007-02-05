@@ -387,8 +387,8 @@ asm
   LODSD    //EAX= PTurboModuleInfo
   TEST EAX, EAX //CMP EAX, 0
   JZ  @@DoLocalEnterFar
-  ADD  EAX, EDI //PTurboModuleInfo real addr
-  MOV  ECX, [EAX].TTurboModuleInfo.Handle
+  ADD  EAX, EDI //PTurboModuleRefInfo real addr
+  MOV  ECX, [EAX].TTurboModuleRefInfo.Handle
   TEST ECX, ECX //CMP ECX, 0
   JZ   @@RequireModuleExecutor
   MOV  EDI, [ECX].TTurboExecutorAccess.FDataMemory
@@ -413,7 +413,7 @@ asm
   TEST  EAX, EAX
   JZ   @@NotFoundError
 
-  MOV [ECX].TTurboModuleInfo.Handle, EAX
+  MOV [ECX].TTurboModuleRefInfo.Handle, EAX
   //Copy CPU States to the New Module Memory.
   //MOV EDI, [ESP] //restore the old Module MemoryBase in TOS
   //MOV  CL, [EDI].TPreservedCodeMemory.States

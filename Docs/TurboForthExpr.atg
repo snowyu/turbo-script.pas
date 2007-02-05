@@ -90,7 +90,7 @@ TYPE
     ModuleType: TTurboModuleType;  //for external word
     ModuleIndex: Integer; //for external word
     Module: TCustomTurboModule; //for external forth word
-    ExternalOptions: TTurboExteralWordOptions; //Exteral Word Options
+    ExternalOptions: TTurboExteralMethodOptions; //Exteral Word Options
   end;
 
   TTurboSimpleModule = object
@@ -104,7 +104,7 @@ PRIVATE
   FTurboGlobalOptions: TTurboGlobalOptions;
   FInitProcCFA: Integer;
   //正在定义的Word,如果存在 
-  FDefinedWordEntry: PTurboWordEntry;
+  FDefinedWordEntry: PTurboMethodEntry;
   FLastWordCfa: Integer;
   FModule: TCustomTurboModule;
 
@@ -875,7 +875,7 @@ begin
     FModule.AlignData;
     //writeln('FModule.UsedDataSize=',InttoHex(FModule.UsedDataSize,4));
     Integer(FDefinedWordEntry) := Integer(FModule.DataMemory) + FModule.UsedDataSize;
-    FModule.AllocDataSpace(SizeOf(TTurboWordEntry));
+    FModule.AllocDataSpace(SizeOf(TTurboMethodEntry));
     FDefinedWordEntry.Prior := FModule.LastWordEntry;
     //FModule.AddIntToData(tsInt(FModule.LastWordEntry));
     //FModule.AllocDataSpace(SizeOf(TTurboWordOptions));
@@ -909,7 +909,7 @@ end;
 
 procedure T-->Grammar<--.DefineWordEnd();
 var
-  vPrior: PTurboWordEntry;
+  vPrior: PTurboMethodEntry;
 begin
   if FDefinedWordEntry.Word.Visibility >= fvProtected then
     FModule.AddOpToMem(opExitFar)
@@ -1293,7 +1293,7 @@ PRODUCTIONS
     |"DLL"                                                 (. aType := mtDLL;  .)
     |"HOST"                                                (. aType := mtHost; .)
   .
-  ExternalWordOptionPart < var aOptions: TTurboExteralWordOptions >
+  ExternalWordOptionPart < var aOptions: TTurboExteralMethodOptions >
     =
    ["Name" StringToken (. aOptions.Name := AnsiDequotedStr(LexString, ''''); .) ]
    ["Index" IntegerToken (. aOptions.Index := StrToInt(LexString); .)]
