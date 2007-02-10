@@ -86,6 +86,12 @@ procedure iVMEnter;forward;
 procedure vEmitLString;forward;
 procedure _iVMErrorAt(ErrorCode: tsInt; ErrorAddr: Pointer);forward;
 
+type
+  TTurboMemoryModuleAccess = class(TCustomTurboModule);
+  TTurboExecutorAccess = class(TCustomTurboExecutor);
+  TTurboMetaInfoAccess = object(TTurboMetaInfo)
+  end;
+
 {
 ***************************** TTurboX86Interpreter *****************************
 }
@@ -117,10 +123,12 @@ begin
     //PUSHAD
     //PUSH EAX
     //PUSH [EAX].FMemory
-    MOV  EDI, [EAX].FDataMemory
+    MOV  EDI, [EAX].FMemory
+    MOV  EDI, [EDI].TTurboMemoryModuleAccess.FDataMemory
     //PUSH [EAX].FParameterStack
 
     MOV  ESI, [EAX].FMemory  //ESI: IP
+    MOV  ESI, [ESI].TTurboMemoryModuleAccess.FMemory  //ESI: IP
     ADD  ESI, aCFA
     //BTS  EDX, psRunning
     //MOV  [EDI].TPreservedCodeMemory.States, DL
@@ -163,10 +171,6 @@ end;
 
 {----Helper functions ----}
 
-type
-  TTurboExecutorAccess = class(TCustomTurboExecutor);
-  TTurboMetaInfoAccess = object(TTurboMetaInfo)
-  end;
   
 procedure iVMInit;
 asm
@@ -390,11 +394,11 @@ asm
   ADD  EAX, EDI //PTurboModuleRefInfo real addr
   MOV  ECX, [EAX].TTurboModuleRefInfo.Handle
   TEST ECX, ECX //CMP ECX, 0
-  JZ   @@RequireModuleExecutor
+  JZ   @@RequireModule
   MOV  EDI, [ECX].TTurboExecutorAccess.FDataMemory
   JMP  @@exit
 
-@@RequireModuleExecutor: //find and load the module into the memory.
+@@RequireModule: //find and load the module into the memory.
   PUSH EAX  //keep the PTurboModuleInfo 
   PUSH EBX
   PUSH ESI

@@ -7,6 +7,30 @@ iushTODO:
     Syntax    {$MaxStackSize  Size[KB|MB] }
     注意：必须放在Program|Unit之后
 
+2007-2-7
+!* 将SP,PC,Executor 等指针移动到 GlobalOptions. 将执行引擎彻底解藕。
+  需要在 XPInterceptor中增加一个寄存器保存 GlobalOptions？ 其实可以将当前执行的模块基址也放到 GlobalOptions，这样就可以不必增加寄存器了。
+
+2007-2-5
+* TurboExecutor 彻底于TurboModule分离了
+要执行，必须要内存镜像，执行的内容就是内存镜像。 不用分离的好处：利于线程执行？
+对于使用其它方式的Executor可以通过cast对象实现（不过前提是派生类不能有新的字段）。
+如果分离执行引擎，那么如果将每种执行引擎视为singleton单件类的话，那么如何保障线程执行？
+如果不是singleton的话，可以将每一个执行引擎实例视作一个AppDomain上的执行引擎。.
+  + OnReset 事件，以便当加载模块到内存的时候，executor有机会更新自己的指针 DataMem.Executor := Self.
+TTurboMemoryModule =
+  CodeArea: Pointer;  //FMemory
+  DataArea: Pointer;  //FDataMem
+TTurboExecutor = 
+   Memory: TTurboMemory
+TTurboProgram = //one TurboProgram means one AppDomain
+  GlobalOptions: TTurboGlobalOptions;
+  Executor: TTurboExecutor;
+end;
+!? RequreModule 到底是属于 MemoryModule 的方法还是 Executor 的方法？
+!+ 确保 Unload 发生的时候没有执行器在执行！
+!+ 如果要在运行时候修改代码区或数据区，那么必须确保同一时刻只能有一个执行器可以修改。
+
 2007-2-2
 ~  我想将执行引擎从代码内存镜像中分离出来
 

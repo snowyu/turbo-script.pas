@@ -41,6 +41,7 @@ resourcestring
   rsDLLModuleMissSyntaxError = 'Error: No DLL Module assigned!';
   rsFileNotFoundError = 'Fatal: File not found:';
   rsWordNotFoundError = 'Fatal: Word not found:';
+  rsTurboScriptNoMemError = 'Error: No The turbo Memory assigned to the executor engine.';
 
 type
   PTsInt = ^ tsInt;
