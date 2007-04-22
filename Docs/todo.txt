@@ -1,4 +1,4 @@
-iushTODO: 
+TODO: 
   1. 必须找到一种重新分配内存（扩充空间）的时候，基地址不变的方法【可能需要在FastMM中找】。
      可以直接使用API调用【或者类似的函数】，然后保留下最大的内存地址范围，即可。
      换句话说，必须要有MaxSize参数设定！
@@ -6,6 +6,111 @@ iushTODO:
 !+ MaxStackSize directive 设定数据栈的大小。 要修改结构，才能放入,只有在Program和DLL(Package)中才会存在。
     Syntax    {$MaxStackSize  Size[KB|MB] }
     注意：必须放在Program|Unit之后
+
+2007-4-22 14:22
+* [Bug] 执行 Console.Write 语句出错，IO错误，发现是因为调用write过程的时候会从原来的ESP的某个位置取数据，俺用新的ESP代替了，所以数据错误，不过以前怎么不会出现该错误呢？
+  临时解决办法是恢复Delphi的堆栈，不过最好还是找到Delphi到底在堆栈中存了些啥，然后我如法炮制。
+  哈，找到真正的错误原因了，ESP指针地址不对，必须是8的倍数，但是现在却是单数，不是基于指针对其的，造成RET指令工作不正常。
+  修改 AppDomain.iReset 以及 设置 ParameterStackSize, 和 ReturnStackSize属性的那里的：
+  with FGlobalOptions do
+  begin
+    Integer(_SP) := Integer(ParamStackBase) + ParamStackSize * SizeOf(tsInt);
+    Integer(_RP) := Integer(ReturnStackBase) + ReturnStackSize * SizeOf(Pointer);
+  end;
+
+* [Bug] Memory Leak, 当加载其它的模块的时候出现！发现是 TCustomTurboModule.RequireModule函数里面的问题：
+  //Result := GTurboModuleManager.Require(aModuleName, TTurboModuleClass(ClassType), GlobalOptions, True); 
+  修改成了固定建立一般模块类：TCustomTurboModule
+  TTurboModuleClass(ClassType)： 这样创建的模块是AppDomain！！因此出现内存泄露！
+  一般的模块没有 GlobalOptions 参数的，因此在里面做了赋值，但是对于AppDomain ，则有自己的 GlobalOptions并且里面有堆栈内存建立！！
+
+
+2007-4-20 20:25
+* [TFCC] compiler 编译通过。
+!* 需要修改 tsrun 使用新的 TurboAppDomain类来做！！
+   因为新的方式已经将 memModule 和执行器分开了，通过AppDomain来管理内存模块和执行器！
+
+
+2007-4-19 8:17
+!+ uTurboCompilerConsts.pas
+  将 uTurboConsts.pas 中编译器有关的常量的从中分离开。
+* 已经将绝大部分的函数和字段放入到了 TCocoRGrammar 中，除了 ProcessGrammarComment.
+
+
+2007-4-14 11:40
+~ 首先还是简化处理，将需要在 TCocoRGrammar 公用的方法直接放在 CocoBase.pas 中以后再独立一个Class.
+  冻结本版本的开发需求，不再增加新的功能，所有这一切只是为了收尾。方便后面的各种语言的开发了。
+
+
+2007-4-7
+~ 必须将基类共有的方法放入CocoBase.pas 的 TCocoRGrammar 类中！
+  或者将共有的字段，方法全部放入一个辅助类（或Object）中。
+  还有一个方法，修改 TCocoRGrammar 的派生类，让它从俺想的类中派生:
+    TCocoRGrammar = Class(TTurboBaseGrammar)
+* TCocoRGrammar Class [CocoBase.pas]
+  + procedure PrintStr(S : String); //write string to compiler console or output.
+  + procedure PrintStrLn(S : String);
++ [uTurboCompilerUtils.pas]
+  + TTurboCompilerHelper = object
+      //收集每一个编译器都需要的参数，方法
+
+2007-3-24 8:05
+~ 推理机实例驱动规则集
+    规则集是类：将所有的规则放入
+    推理机实例：保存的是当前推理的事实集，每一个推理机实例有一个独立的推理的事实集。
+  例如：
+    同一时间，甲说，张山今天穿的是红衣服；乙说，张山今天穿的是白衣服。
+    事实来源：  谁（甲，自己），途径（交谈，看），地点，时间
+                甲 talk to me
+    该事实的可信度(张山今天穿的是红衣服)：=甲的可信度(平均可信度)
+
+2007-3-3 21:24
+~ TTurboGlobalOptions 全局参数好比是虚拟CPU的内部重要寄存器所在位置。
+
+2007-2-21 16:35
++ TTurboPreservedDataMemory.ModuleHandle: TCustomTurboModule
+  因为 RequireModule 是在 YCustomTurboModule 的方法。
+
+6:27 2007-2-20
++ TTurboGlobalOptions.Executor
+* remove the TTurboPreservedDataMemory.Executor to the TTurboGlobalOptions.Executor
+* rename the TurboProgram to TurboAppDomain.
+* TurboModule.Reset
++ TurboModule.iReset virtual method
++ TurboAppDomain.iReset override method
+* remove some features in TurboExecutor.DoReset to TurboAppDomain.iReset
+  with FGlobalOptions do
+  begin
+    Integer(_SP) := Integer(ParamStackBase) + ParamStackSize;
+    Integer(_RP) := Integer(ReturnStackBase) + ReturnStackSize;
+  end;
+
+* TurboAppDomain.ExecutorClass set property to change the GlobalOptions.Executor
+~ Executor需要一个Memory(TurboModule)指针，如果在AppDomain下需要实现多线程的话，比较麻烦。
+
+2007-2-18
+  TTurboGlobalOptions = record  //do not use the packed.
+    States: TTurboProcessorStates;
+    LastErrorCode: TTurboProcessorErrorCode;
+    ParamStackBase: Pointer;
+    ParamStackSize: tsUInt; //bytes
+    ParamStackBottom: Pointer;
+    ReturnStackBase: Pointer;
+    ReturnStackSize: tsUInt; //bytes
+    //if halt with errHalt then the ReturnStackBottom will be the Old RSP.
+    ReturnStackBottom: Pointer;
+    PC: Pointer; //program counter: 该PC只有当运行进入前（TODO,复位的时候）和退出后才会被设置。只是临时保存。
+    SP: Pointer; //the Parameter Stack(or data stack) Pointer, 同上，临时保存
+    RP: Pointer; //return stack pointer(TOS). 同上，临时保存
+    //{:  放到系统单元库中？ 好处是移植自举，缺点是速度变慢吧。
+    ErrorAddr: Pointer;
+    ErrorProc: Pointer;
+    AssertErrorProc: Pointer;
+    //The built-in I/O routines use InOutResult to store the value that
+    //the next call to the IOResult standard function will return.
+    IOResult: tsInt;
+    //}
+  end;
 
 2007-2-7
 !* 将SP,PC,Executor 等指针移动到 GlobalOptions. 将执行引擎彻底解藕。

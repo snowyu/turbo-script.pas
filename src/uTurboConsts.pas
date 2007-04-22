@@ -13,8 +13,8 @@ const
   cFORTHHeaderMagicId = 'TURBO4TH';
   cFORTHHeaderMagicIdLen = 8; 
   //cFORTHMagicWordSize = SizeOf(cFORTHHeaderMagicWord);
-  cDefaultReturnStackSize = 127;
-  cDefaultParamStackSize = 127; 
+  cDefaultReturnStackSize = 1024; //the bytes is 1024 * SizeOf(Pointer)
+  cDefaultParamStackSize = 1024; 
   cDefaultFreeMemSize = 1024 * 8; //the Free Memory 8kb
   cDefaultDataMemSize = 1024;
   cMAXTIBCount = 1024;
@@ -42,6 +42,7 @@ resourcestring
   rsFileNotFoundError = 'Fatal: File not found:';
   rsWordNotFoundError = 'Fatal: Word not found:';
   rsTurboScriptNoMemError = 'Error: No The turbo Memory assigned to the executor engine.';
+  rsTurboScriptNoGlobalOptionsError = 'Error: No The turbo Global Options assigned to the executor engine.';
 
 type
   PTsInt = ^ tsInt;

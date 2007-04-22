@@ -10,7 +10,7 @@ program tsrun;
 {$APPTYPE CONSOLE}
 
 uses
-  //FastMM4,
+  FastMM4,
   Windows,  SysUtils, Classes
   , uTurboPE
   , uTurboConsts
@@ -42,13 +42,13 @@ const
 
 procedure TMyInterpreter.DoPrintChar(aChar: Char);
 begin
-	 write(aChar);
+	 Write(aChar);
+   //System.Write('1');
 end;
 
 procedure TMyInterpreter.DoPrintString(const aStr: String);
 begin
-	 //writeLN('DOSting:');
-	 write(aStr);
+	 Write(aStr);
 end;
 
 const
@@ -65,8 +65,7 @@ type
 const
   cStackMaxSize = 1024 * 10;
 var
-  GGlobalOptions: TTurboGlobalOptions;
-  GTurboExecutor: TMyInterpreter;
+  GTurboAppDomain: TTurboAppDomain;
   p: Pointer;
   CFA: Integer;
   tBegin, tEnd: Int64;
@@ -124,53 +123,34 @@ end;
 procedure ExecuteScript;
 begin
   c := 0;
-    GTurboExecutor := TMyInterpreter.Create;
+    GTurboAppDomain := TTurboAppDomain.Create;
     try
-      GTurboExecutor.GlobalOptions := @GGlobalOptions;
-      with GGlobalOptions do
+      GTurboAppDomain.ExecutorClass := TMyInterpreter;
+      with GTurboAppDomain do
       begin
-        ParamStackSize := cStackMaxSize;
-      //GTurboExecutor.ParameterStackSize := cStackMaxSize;
-        GetMem(p, cStackMaxSize);
-        ParamStackBase := p;
-      //GTurboExecutor.ParameterStack := p;
-      //GTurboExecutor.ReturnStackSize := cStackMaxSize;
-        GetMem(p, cStackMaxSize);
-      //GTurboExecutor.ReturnStack := p;
-        ReturnStackBase := p;
-        ReturnStackSize := cStackMaxSize;
-      end;
-      //GTurboExecutor.InitExecution;
-      with GTurboExecutor do
-      begin
-        //CFA := UsedMemory;
-        //IsLoaded := True;
         if (eoShowDebugInfo in vExeOptions) and not (eoInternalRun in vExeOptions) then
-        begin 
+        begin
           writeln(aFileName + ' loading...');
           writeln('');
         end;
         LoadFromStream(vStream);
         FreeAndNil(vStream);
-        //Reset;
-        CFA := InitializeProc;
-        //AddIntToMem(Integer(inMULUnsignedInt));
         QueryPerformanceCounter(tBegin);
-        ExecuteCFA(CFA);
+        Execute();
         QueryPerformanceCounter(tEnd);
         c := c + tEnd - tBegin;
         lastErr := LastErrorCode;
-        LastAddr := tsInt(GGlobalOptions.ErrorAddr);// - tsInt(Memory);
+        LastAddr := tsInt(GlobalOptions.ErrorAddr);// - tsInt(Memory);
 
-        Integer(P) := SP;
-        if (eoShowDebugInfo in vExeOptions) and (Integer(P) < (Integer(ParameterStack)+cStackMaxSize-SizeOf(Integer)))  then
+        P := Executor.SP;
+        if (eoShowDebugInfo in vExeOptions) and (Integer(P) < (Integer(ParameterStack) + ParameterStackSize * SizeOf(tsInt) - SizeOf(tsInt)))  then
         begin
         WriteLn('');
         WriteLn('______________________________');
         WriteLn('The ParameterStack Data :');
         i := 0;
         //Write('':2);
-        while Integer(P) < (Integer(ParameterStack)+cStackMaxSize-SizeOf(Integer)) do
+        while Integer(P) < (Integer(ParameterStack) + ParameterStackSize * SizeOf(tsInt) - SizeOf(tsInt)) do
         begin
           r := PInteger(P)^;
           Inc(Integer(P), SizeOf(Integer));
@@ -185,14 +165,14 @@ begin
         WriteLn('');
         end;
 
-        Integer(P) := RP;
-        if (eoShowDebugInfo in vExeOptions) and (Integer(P) < (Integer(ReturnStack)+cStackMaxSize)) then
+        P := Executor.RP;
+        if (eoShowDebugInfo in vExeOptions) and (Integer(P) < (Integer(ReturnStack)+ReturnStackSize * SizeOf(Pointer) )) then
         begin
         WriteLn('______________________________');
         WriteLn('The ReturnStack Data :');
         i := 0;
         //Write('  ');
-        while Integer(P) < (Integer(ReturnStack)+cStackMaxSize) do
+        while Integer(P) < (Integer(ReturnStack)+ReturnStackSize * SizeOf(Pointer)) do
         begin
           r := PInteger(P)^;
           Inc(Integer(P), SizeOf(Integer));
@@ -208,11 +188,7 @@ begin
         end;
       end;
     finally
-        FreeMem(GTurboExecutor.ParameterStack);
-        //ParameterStack := nil;
-        FreeMem(GTurboExecutor.ReturnStack);
-        //ReturnStack := nil;
-      FreeAndNil(GTurboExecutor);
+      FreeAndNil(GTurboAppDomain);
     end;
 end;
 
