@@ -108,18 +108,11 @@ begin
   {$else}
   asm
   {$endif}
-  {  PUSH EAX
-    PUSH EDX
-    CALL TCustomTurboModule.ExecuteCFA
-    POP  EDX
-    POP  EAX
-  }
     MOV  Self.FOldESP, ESP
     MOV  Self.FOldEBP, EBP
     MOV  Self.FOldESI, ESI
     MOV  Self.FOldEDI, EDI
     MOV  Self.FOldEBX, EBX
-    MOV  ESP, Self.FRP //return stack pointer: RP
     //PUSHAD
     //PUSH EAX
     //PUSH [EAX].FMemory
@@ -132,7 +125,10 @@ begin
     ADD  ESI, aCFA
     //BTS  EDX, psRunning
     //MOV  [EDI].TPreservedCodeMemory.States, DL
-    MOV  EBP, [EAX].FSP //SP the data stack pointer.
+    //MOV  EBP, [EAX].FSP //SP the data stack pointer.
+    MOV  EBP, [EDI].TTurboPreservedDataMemory.GlobalOptions
+    MOV  ESP, [EBP].TTurboGlobalOptions._RP //return stack pointer: RP
+    MOV  EBP, [EBP].TTurboGlobalOptions._SP
     XOR  EBX, EBX //clear the TOS
     //MOV  EDX, EAX
     //STD  //the EDI will be decremented.
@@ -155,10 +151,12 @@ begin
     //POP EAX
     //POP EAX
     //POP EAX
-    MOV  EAX, [EDI].TTurboPreservedDataMemory.Executor
-    MOV  [EAX].TTurboX86Interpreter.FRP, ESP
-    MOV  [EAX].TTurboX86Interpreter.FSP, EBP
-    MOV  [EAX].TTurboX86Interpreter.FPC, ESI
+    //MOV  EAX, [EDI].TTurboPreservedDataMemory.Executor
+    MOV  [EAX].TTurboGlobalOptions._RP, ESP
+    MOV  [EAX].TTurboGlobalOptions._SP, EBP
+    MOV  [EAX].TTurboGlobalOptions._PC, ESI
+
+    MOV  EAX, [EAX].TTurboGlobalOptions.Executor
 
     MOV  ESP, [EAX].TTurboX86Interpreter.FOldESP
     MOV  EBP, [EAX].TTurboX86Interpreter.FOldEBP
@@ -395,7 +393,7 @@ asm
   MOV  ECX, [EAX].TTurboModuleRefInfo.Handle
   TEST ECX, ECX //CMP ECX, 0
   JZ   @@RequireModule
-  MOV  EDI, [ECX].TTurboExecutorAccess.FDataMemory
+  MOV  EDI, [ECX].TTurboMemoryModuleAccess.FDataMemory
   JMP  @@exit
 
 @@RequireModule: //find and load the module into the memory.
@@ -406,9 +404,10 @@ asm
   
   //MOV  EDX, EAX
   MOV  EDX, [EAX].TTurboMetaInfoAccess.FName
-  MOV  EAX, [EDI].TTurboPreservedDataMemory.Executor
+  MOV  EAX, [EDI].TTurboPreservedDataMemory.ModuleHandle
+  //xMOV  EAX, [EAX].TTurboGlobalOptions.Executor
   //function TCustomTruboExecutor.GetModuleMemoryAddr(aModuleIndex: Integer): Pointer;
-  CALL TCustomTurboExecutor.RequireModule
+  CALL TTurboMemoryModuleAccess.RequireModule
   POP EBP
   POP ESI
   POP EBX
@@ -421,7 +420,7 @@ asm
   //Copy CPU States to the New Module Memory.
   //MOV EDI, [ESP] //restore the old Module MemoryBase in TOS
   //MOV  CL, [EDI].TPreservedCodeMemory.States
-  MOV  EDI, [EAX].TTurboExecutorAccess.FDataMemory
+  MOV  EDI, [EAX].TTurboMemoryModuleAccess.FDataMemory
   //MOV  [EDI].TPreservedCodeMemory.States, CL
   JMP @@Exit
 
@@ -446,8 +445,14 @@ procedure _DoAssert;
 asm
   MOV  EDX, [EBP]  //EDX <- the second Stack TOp
   ADD  EDX, EDI 
-  MOV  EAX, [EDI].TTurboPreservedDataMemory.Executor
+  MOV  EAX, [EDI].TTurboPreservedDataMemory.GlobalOptions
+  //store the current ESP
+  MOV  [EAX].TTurboGlobalOptions._RP, ESP
+  MOV  EAX, [EAX].TTurboGlobalOptions.Executor
 
+  //restore the Delphi system ESP
+  MOV  ESP, [EAX].TTurboX86Interpreter.FOldESP
+  
   PUSH EDI
   PUSH EBX
   PUSH ESI
@@ -458,6 +463,10 @@ asm
   POP  ESI
   POP  EBX
   POP  EDI
+
+  //restore the TurboScript system ESP
+  MOV  EAX, [EDI].TTurboPreservedDataMemory.GlobalOptions
+  MOV  ESP, [EAX].TTurboGlobalOptions._RP 
 
    INC  EBP
    INC  EBP
@@ -830,21 +839,38 @@ end;
 procedure vEmitChar;
 asm
   MOV  DL, BL  //DL <- TOS
-  XCHG ESP, EBP
-  POP  EBX
-  XCHG ESP, EBP
-  MOV  EAX, [EDI].TTurboPreservedDataMemory.Executor
+  //move the top in stack to EAX 
+  MOV  EBX, [EBP] 
+  //Increment the data stack pointer.
+  ADD  EBP, Type(tsInt)
 
+  MOV  ECX, [EDI].TTurboPreservedDataMemory.GlobalOptions
+  MOV  EAX, [ECX].TTurboGlobalOptions.Executor
+
+{  //store the current ESP
+  MOV  [ECX].TTurboGlobalOptions._RP, ESP
+  //restore the Delphi system ESP
+  MOV  ESP, [EAX].TTurboX86Interpreter.FOldESP
+}
   PUSH EDI
   PUSH EBX
   PUSH ESI
   PUSH EBP
+
+  //MOV  EBP, [EAX].TTurboX86Interpreter.FOldEBP 
+
   MOV  ESI, [EAX]
   CALL DWORD PTR [ESI + VMTOFFSET TTurboX86Interpreter.DoPrintChar]
+
   POP  EBP
   POP  ESI
   POP  EBX
   POP  EDI
+
+{  //restore the TurboScript system ESP
+  MOV  ECX, [EDI].TTurboPreservedDataMemory.GlobalOptions
+  MOV  ESP, [ECX].TTurboGlobalOptions._RP 
+}
   JMP  iVMNext
 end;
 
@@ -856,7 +882,14 @@ asm
   XCHG ESP, EBP
   POP  EBX
   XCHG ESP, EBP
-  MOV  EAX, [EDI].TTurboPreservedDataMemory.Executor
+  MOV  EAX, [EDI].TTurboPreservedDataMemory.GlobalOptions
+  //store the current ESP
+  //MOV  [EAX].TTurboGlobalOptions._RP, ESP
+
+  MOV  EAX, [EAX].TTurboGlobalOptions.Executor
+
+  //restore the Delphi system ESP
+  //MOV  ESP, [EAX].TTurboX86Interpreter.FOldESP
 
   PUSH EDI
   PUSH EBX
@@ -868,6 +901,11 @@ asm
   POP  ESI
   POP  EBX
   POP  EDI
+
+{  //restore the TurboScript system ESP
+  MOV  EAX, [EDI].TTurboPreservedDataMemory.GlobalOptions
+  MOV  ESP, [EAX].TTurboGlobalOptions._RP 
+}
   JMP  iVMNext
 end;
 
@@ -885,8 +923,15 @@ asm
   INC  EBP
   INC  EBP
   INC  EBP
-  MOV  EAX, [EDI].TTurboPreservedDataMemory.Executor
 
+  MOV  ECX, [EDI].TTurboPreservedDataMemory.GlobalOptions
+  MOV  EAX, [ECX].TTurboGlobalOptions.Executor
+
+{  //store the current ESP
+  MOV  [ECX].TTurboGlobalOptions._RP, ESP
+  //restore the Delphi system ESP
+  MOV  ESP, [EAX].TTurboX86Interpreter.FOldESP
+}
   PUSH EDI
   PUSH EBX
   PUSH ESI
@@ -897,7 +942,12 @@ asm
   POP  ESI
   POP  EBX
   POP  EDI
-@Skip:
+
+{  //restore the TurboScript system ESP
+  MOV  ECX, [EDI].TTurboPreservedDataMemory.GlobalOptions
+  MOV  ESP, [ECX].TTurboGlobalOptions._RP 
+}
+//@Skip:
   JMP  iVMNext
 end;
 
@@ -920,9 +970,21 @@ end;
 //(int64Addr --)
 procedure vStoreTickCount;
 asm
+{  MOV  EAX, [EDI].TTurboPreservedDataMemory.GlobalOptions
+  //store the current ESP
+  MOV  [EAX].TTurboGlobalOptions._RP, ESP
+  MOV  EAX, [EAX].TTurboGlobalOptions.Executor
+  //restore the Delphi system ESP
+  MOV  ESP, [EAX].TTurboX86Interpreter.FOldESP
+}
   ADD  EBX, EDI
   PUSH EBX
   CALL QueryPerformanceCounter
+
+{  //restore the TurboScript system ESP
+  MOV  EAX, [EDI].TTurboPreservedDataMemory.GlobalOptions
+  MOV  ESP, [EAX].TTurboGlobalOptions._RP 
+}
   XCHG ESP, EBP
   POP  EBX
   XCHG ESP, EBP

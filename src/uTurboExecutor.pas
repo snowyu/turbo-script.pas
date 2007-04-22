@@ -55,6 +55,15 @@ type
   );
   //TTurboSimpleTypes = array [TTurboSimpleTypeKind] of PMeType;
 
+
+  //PTurboPreservedCodeMemory = ^ TTurboPreservedCodeMemory;
+  PTurboPreservedDataMemory = ^ TTurboPreservedDataMemory;
+  PTurboGlobalOptions = ^TTurboGlobalOptions;
+
+  TCustomTurboPEFormat = class;
+  TCustomTurboModule = class;
+  TCustomTurboExecutor = class;
+  TTurboAppDomain = class;
   TTurboGlobalOptions = record  //do not use the packed.
     States: TTurboProcessorStates;
     LastErrorCode: TTurboProcessorErrorCode;
@@ -65,6 +74,10 @@ type
     ReturnStackSize: Integer; //bytes
     //if halt with errHalt then the ReturnStackBottom will be the Old RSP.   
     ReturnStackBottom: Pointer;
+    _PC: Pointer; //program counter: 该PC只有当运行进入前（TODO,复位的时候）和退出后才会被设置。只是临时保存。
+    _SP: Pointer; //the Parameter Stack(or data stack) Pointer, 同上，临时保存
+    _RP: Pointer; //return stack pointer(TOS). 同上，临时保存
+    Executor: TCustomTurboExecutor;
     //{:  放到系统单元库中？ 好处是移植自举，缺点是速度变慢吧。
     ErrorAddr: Pointer;
     ErrorProc: Pointer; 
@@ -75,15 +88,6 @@ type
     //}
   end;
 
-
-  //PTurboPreservedCodeMemory = ^ TTurboPreservedCodeMemory;
-  PTurboPreservedDataMemory = ^ TTurboPreservedDataMemory;
-  PTurboGlobalOptions = ^TTurboGlobalOptions;
-
-  TCustomTurboPEFormat = class;
-  TCustomTurboModule = class;
-  TCustomTurboExecutor = class;
-  TTurboProgram = class;
   TTurboModuleClass = class of TCustomTurboModule;
   TTurboExecutorClass = class of TCustomTurboExecutor;
   TTurboPrintCharEvent = procedure(Sender: TCustomTurboExecutor; aChar: Char) of object;
@@ -120,6 +124,8 @@ type
   没有执行机构/
 
   Load the script into memory
+
+  the TCustomTurboModule is the compiled script in the memory.
   }
   TCustomTurboModule = class(TCustomTurboObject)
   private
@@ -167,6 +173,8 @@ type
     function GetUsedMemory: tsInt;
     procedure Grow(const aSize: Integer = 0);
     procedure GrowData(const aSize: Integer = 0);
+    {: reset the stack pointers. }
+    procedure iReset; virtual;
     procedure LoadUsedModules;
     procedure SendUnloadNotification;
     procedure SetDataMemorySize(Value: tsInt);
@@ -408,14 +416,20 @@ type
   TCustomTurboExecutor = class(TCustomTurboObject)
   private
     FOnPrintString: TTurboPrintStringEvent;
+    function GetGlobalOptions: PTurboGlobalOptions;
+    function GetOptions: TTurboScriptOptions;
+    function GetPC: Pointer;
+    function GetRP: Pointer;
+    function GetSP: Pointer;
+    procedure SetGlobalOptions(Value: PTurboGlobalOptions);
     procedure SetMemory(const Value: TCustomTurboModule);
+    procedure SetOptions(Value: TTurboScriptOptions);
+    procedure SetPC(Value: Pointer);
+    procedure SetRP(Value: Pointer);
+    procedure SetSP(Value: Pointer);
   protected
     FMemory: TCustomTurboModule;
     FOnPrintChar: TTurboPrintCharEvent;
-    FPC: Integer;
-    FRP: Integer;
-    {: the Parameter Stack(or data stack) Pointer }
-    FSP: Integer;
     procedure DoPrintChar(aChar: Char); virtual;
     procedure DoPrintShortString(const aStr: ShortString);
     procedure DoPrintString(const aStr: String); virtual;
@@ -442,6 +456,7 @@ type
             const aCallStyle: TTurboCallStyle): Integer;
     {: Init before the Execution. }
     procedure InitExecution; virtual;
+    function IsGlobalOptionsExists: Boolean;
     procedure SetStatus(Value: TTurboProcessorStates);
   public
     {: : Run the CFA word. }
@@ -469,14 +484,17 @@ type
     }
     function ExecuteWordEntry(const aWord: PTurboMethodEntry): Integer;
     procedure Stop;
+    property GlobalOptions: PTurboGlobalOptions read GetGlobalOptions write
+            SetGlobalOptions;
     property Memory: TCustomTurboModule read FMemory write SetMemory;
+    property Options: TTurboScriptOptions read GetOptions write SetOptions;
     {: : program counter. }
     { Description
     program counter, which contains the address 
     in memory of the instruction that is the next 
     to be executed. 
     }
-    property PC: Integer read FPC write FPC;
+    property PC: Pointer read GetPC write SetPC;
     {: : return stack pointer(TOS). }
     { Description
     stack pointer, a register that points to the area 
@@ -484,9 +502,9 @@ type
 
     the RP0-StackSize <= the stack memory < RP0.
     }
-    property RP: Integer read FRP write FRP;
+    property RP: Pointer read GetRP write SetRP;
     {: the Parameter Stack(or data stack) Pointer }
-    property SP: Integer read FSP write FSP;
+    property SP: Pointer read GetSP write SetSP;
     {: the current status of the script. }
     { Description
     the Memory is related address when the status is in the psConpiling
@@ -499,16 +517,23 @@ type
             FOnPrintString;
   end;
 
-  TTurboProgram = class(TCustomTurboModule)
+  { Description
+  The TTurboAppDomain is derived from the TCustomTurboModule.
+  The TTurboAppDomain should be a Main Application Module too.
+
+  allocate the memory to return stack and param stack.
+  }
+  TTurboAppDomain = class(TCustomTurboModule)
   private
     FExecutorClass: TTurboExecutorClass;
     function GetExecutor: TCustomTurboExecutor;
+    procedure SetExecutorClass(Value: TTurboExecutorClass);
     procedure SetParameterStackSize(const Value: Integer);
     procedure SetReturnStackSize(const Value: Integer);
   protected
     FExecutor: TCustomTurboExecutor;
     FGlobalOptions: TTurboGlobalOptions;
-    property Executor: TCustomTurboExecutor read GetExecutor;
+    procedure iReset; override;
   public
     { Description
     为了在多个 executor 中管理共享数据栈＆返回栈以及运行参数。
@@ -516,13 +541,12 @@ type
     constructor Create(const aOwner: TCustomTurboModule = nil; aVisibility:
             TTurboVisibility = fvPublished); override;
     destructor Destroy; override;
-    {: the turbo script program class }
     { Description
-    allocate the memory to return stack and param stack.
     }
     procedure Execute(aTimeOut : Integer = 0);
+    property Executor: TCustomTurboExecutor read GetExecutor;
     property ExecutorClass: TTurboExecutorClass read FExecutorClass write
-            FExecutorClass;
+            SetExecutorClass;
     property ParameterStackSize: Integer read GetParameterStackSize write
             SetParameterStackSize;
     {: : Return Stack Size }
@@ -559,7 +583,9 @@ type
   TTurboPreservedDataMemory = packed record
     Code: Pointer; //need relocate addr. point to the FMemory
     GlobalOptions: PTurboGlobalOptions;
-    Executor: TCustomTurboExecutor;
+    //Executor: TCustomTurboExecutor; //put to the GlobalOptions
+    //在执行器解耦后，可以放到全局参数中，表示该App使用的执行器单件。
+    ModuleHandle: TCustomTurboModule;
 
     UsedMemory: tsInt;//实际使用的大小
     MemorySize: tsInt;//分配代码区的大小
@@ -1118,6 +1144,23 @@ begin
   DataMemorySize := DataMemorySize + I;
 end;
 
+procedure TCustomTurboModule.iReset;
+begin
+  //PPreservedCodeMemory(FMemory).ParamStackBase := FParameterStack;
+  //PPreservedCodeMemory(FMemory).ParamStackSize := FParameterStackSize;
+
+  with PTurboPreservedDataMemory(FDataMemory)^ do
+  begin
+    //SP := Integer(GlobalOptions.ParamStackBase) + GlobalOptions.ParamStackSize;
+    //RP := Integer(GlobalOptions.ReturnStackBase) + GlobalOptions.ReturnStackSize;
+    GlobalOptions.LastErrorCode := errNone;
+    Code := FMemory;
+    ModuleHandle := Self;
+    //Executor := Self;
+    //GlobalOptions.States := []; //不是你的东西就别动！！
+  end;
+end;
+
 procedure TCustomTurboModule.Load;
 begin
   if not IsLoaded and Assigned(FAccessor) then
@@ -1261,7 +1304,10 @@ end;
 function TCustomTurboModule.RequireModule(const aModuleName: PChar):
         TCustomTurboModule;
 begin
-  Result := GTurboModuleManager.Require(aModuleName, TTurboModuleClass(ClassType), GlobalOptions, True);
+  //Bug here: this should make the AppDomain module, and memory leak here!!!
+  //Result := GTurboModuleManager.Require(aModuleName, TTurboModuleClass(ClassType), GlobalOptions, True);
+  //now, the requiered module is always the TCustomTurboModule
+  Result := GTurboModuleManager.Require(aModuleName, TCustomTurboModule, GlobalOptions, True);
 
   if Assigned(Result) then
   begin
@@ -1272,18 +1318,7 @@ end;
 
 procedure TCustomTurboModule.Reset;
 begin
-  //PPreservedCodeMemory(FMemory).ParamStackBase := FParameterStack;
-  //PPreservedCodeMemory(FMemory).ParamStackSize := FParameterStackSize;
-
-  with PTurboPreservedDataMemory(FDataMemory)^ do
-  begin
-    //SP := Integer(GlobalOptions.ParamStackBase) + GlobalOptions.ParamStackSize;
-    //RP := Integer(GlobalOptions.ReturnStackBase) + GlobalOptions.ReturnStackSize;
-    GlobalOptions.LastErrorCode := errNone;
-    Code := FMemory;
-    //Executor := Self;
-    //GlobalOptions.States := []; //不是你的东西就别动！！
-  end;
+  iReset;
   if Assigned(FOnReset) then FOnReset(Self);
 end;
 
@@ -1580,12 +1615,15 @@ end;
 
 procedure TCustomTurboExecutor.DoReset(Sender: TObject);
 begin
-  with PTurboPreservedDataMemory(FMemory.FDataMemory)^ do
+  //put into the TurboAppDomain now.
+  {if IsGlobalOptionsExists then
+  with PTurboPreservedDataMemory(FMemory.FDataMemory).GlobalOptions^ do
   begin
-    SP := Integer(GlobalOptions.ParamStackBase) + GlobalOptions.ParamStackSize;
-    RP := Integer(GlobalOptions.ReturnStackBase) + GlobalOptions.ReturnStackSize;
+    Integer(_SP) := Integer(ParamStackBase) + ParamStackSize;
+    Integer(_RP) := Integer(ReturnStackBase) + ReturnStackSize;
     Executor := Self;
   end;
+  //}
 end;
 
 function TCustomTurboExecutor.ExecuteCFA(const aCFA: Integer): Integer;
@@ -1631,6 +1669,47 @@ end;
 procedure TCustomTurboExecutor.FinalizeExecution;
 begin
   //Apply the SP to TProgram.SP.
+end;
+
+function TCustomTurboExecutor.GetGlobalOptions: PTurboGlobalOptions;
+begin
+  if Assigned(FMemory) then
+    Result := PTurboPreservedDataMemory(FMemory.FDataMemory).GlobalOptions
+  else
+    Raise ETurboScriptError.Create(rsTurboScriptNoMemError);
+end;
+
+function TCustomTurboExecutor.GetOptions: TTurboScriptOptions;
+begin
+  if Assigned(FMemory) then
+    Result := PTurboPreservedDataMemory(FMemory.FDataMemory).ModuleOptions
+  else
+    //Result := [];
+    Raise ETurboScriptError.Create(rsTurboScriptNoMemError);
+end;
+
+function TCustomTurboExecutor.GetPC: Pointer;
+begin
+  if IsGlobalOptionsExists then
+    Result := PTurboPreservedDataMemory(FMemory.FDataMemory).GlobalOptions._PC
+  else
+    Result := nil;
+end;
+
+function TCustomTurboExecutor.GetRP: Pointer;
+begin
+  if IsGlobalOptionsExists then
+    Result := PTurboPreservedDataMemory(FMemory.FDataMemory).GlobalOptions._RP
+  else
+    Result := nil;
+end;
+
+function TCustomTurboExecutor.GetSP: Pointer;
+begin
+  if IsGlobalOptionsExists then
+    Result := PTurboPreservedDataMemory(FMemory.FDataMemory).GlobalOptions._SP
+  else
+    Result := nil;
 end;
 
 function TCustomTurboExecutor.GetStatus: TTurboProcessorStates;
@@ -1714,6 +1793,27 @@ begin
   //Include(PTurboPreservedDataMemory(FDataMemory).GlobalOptions.States, psRunning);
 end;
 
+function TCustomTurboExecutor.IsGlobalOptionsExists: Boolean;
+begin
+  Result := Assigned(FMemory);
+  if not Result then
+    Raise ETurboScriptError.Create(rsTurboScriptNoMemError);
+
+  if Result then
+    Result := Assigned(PTurboPreservedDataMemory(FMemory.DataMemory).GlobalOptions);
+
+  if not Result then
+    Raise ETurboScriptError.Create(rsTurboScriptNoGlobalOptionsError);
+end;
+
+procedure TCustomTurboExecutor.SetGlobalOptions(Value: PTurboGlobalOptions);
+begin
+  if Assigned(FMemory) then
+    PTurboPreservedDataMemory(FMemory.FDataMemory).GlobalOptions := Value
+  else
+    Raise ETurboScriptError.Create(rsTurboScriptNoMemError);
+end;
+
 procedure TCustomTurboExecutor.SetMemory(const Value: TCustomTurboModule);
 begin
   if (Value <> FMemory) then
@@ -1727,6 +1827,30 @@ begin
         FMemory.OnReset := DoReset;
     end;
   end;
+end;
+
+procedure TCustomTurboExecutor.SetOptions(Value: TTurboScriptOptions);
+begin
+  if Assigned(FMemory) then
+    PTurboPreservedDataMemory(FMemory.FDataMemory).ModuleOptions := Value;
+end;
+
+procedure TCustomTurboExecutor.SetPC(Value: Pointer);
+begin
+  if IsGlobalOptionsExists then
+    PTurboPreservedDataMemory(FMemory.FDataMemory).GlobalOptions._PC := Value;
+end;
+
+procedure TCustomTurboExecutor.SetRP(Value: Pointer);
+begin
+  if IsGlobalOptionsExists then
+    PTurboPreservedDataMemory(FMemory.FDataMemory).GlobalOptions._RP := Value;
+end;
+
+procedure TCustomTurboExecutor.SetSP(Value: Pointer);
+begin
+  if IsGlobalOptionsExists then
+    PTurboPreservedDataMemory(FMemory.FDataMemory).GlobalOptions._SP := Value;
 end;
 
 procedure TCustomTurboExecutor.SetStatus(Value: TTurboProcessorStates);
@@ -1744,9 +1868,9 @@ begin
 end;
 
 {
-******************************** TTurboProgram *********************************
+******************************* TTurboAppDomain ********************************
 }
-constructor TTurboProgram.Create(const aOwner: TCustomTurboModule = nil;
+constructor TTurboAppDomain.Create(const aOwner: TCustomTurboModule = nil;
         aVisibility: TTurboVisibility = fvPublished);
 begin
   inherited Create(aOwner, aVisibility);
@@ -1755,7 +1879,7 @@ begin
   ReturnStackSize := cDefaultReturnStackSize;
 end;
 
-destructor TTurboProgram.Destroy;
+destructor TTurboAppDomain.Destroy;
 begin
   FreeMem(ReturnStack);
   ReturnStack := nil;
@@ -1765,38 +1889,72 @@ begin
   inherited Destroy;
 end;
 
-procedure TTurboProgram.Execute(aTimeOut : Integer = 0);
+procedure TTurboAppDomain.Execute(aTimeOut : Integer = 0);
 begin
+  if Assigned(Executor) then
+  begin
+    if FGlobalOptions.States * [psRunning, psStepping] <> [] then
+      Raise ETurboScriptError.Create(rsTurboScriptAlreayRunningError);
+    FExecutor.ExecuteCFA(InitializeProc);
+  end;
 end;
 
-function TTurboProgram.GetExecutor: TCustomTurboExecutor;
+function TTurboAppDomain.GetExecutor: TCustomTurboExecutor;
 begin
   if not Assigned(FExecutor) then
   begin
     FExecutor := ExecutorClass.Create;//(Self, fvPrivate);
     FExecutor.Memory := Self;
+    FGlobalOptions.Executor := FExecutor;
   end;
   Result := FExecutor;
 end;
 
-procedure TTurboProgram.SetParameterStackSize(const Value: Integer);
+procedure TTurboAppDomain.iReset;
+begin
+  with FGlobalOptions do
+  begin
+    Integer(_SP) := Integer(ParamStackBase) + ParamStackSize * SizeOf(tsInt);
+    Integer(_RP) := Integer(ReturnStackBase) + ReturnStackSize * SizeOf(Pointer);
+  end;
+  inherited iReset;
+end;
+
+procedure TTurboAppDomain.SetExecutorClass(Value: TTurboExecutorClass);
+begin
+  if FExecutorClass <> Value then
+  begin
+    if Assigned(FExecutor) then
+    begin
+      if FGlobalOptions.States * [psRunning, psStepping] <> [] then
+        Raise ETurboScriptError.Create(rsTurboScriptAlreayRunningError);
+      FreeAndNil(FExecutor);
+      FGlobalOptions.Executor := nil;
+    end;
+    FExecutorClass := Value;
+  end;
+end;
+
+procedure TTurboAppDomain.SetParameterStackSize(const Value: Integer);
 begin
   if not (psRunning in FGlobalOptions.States) and (ParameterStackSize <> Value) then
   begin
-    ParameterStackSize := Value;
-    ReallocMem(FGlobalOptions.ParamStackBase, (Value+1)*SizeOf(Pointer));
+    FGlobalOptions.ParamStackSize := Value;
+    ReallocMem(FGlobalOptions.ParamStackBase, (Value+1)*SizeOf(tsInt));
+    with FGlobalOptions do
+      Integer(_SP) := Integer(ParamStackBase) + Value * SizeOf(tsInt);
     //if FSP > FParameterStackSize then FSP := FParameterStackSize;
   end;
 end;
 
-procedure TTurboProgram.SetReturnStackSize(const Value: Integer);
+procedure TTurboAppDomain.SetReturnStackSize(const Value: Integer);
 begin
   if not (psRunning in FGlobalOptions.States) and (ReturnStackSize <> Value) then
   begin
-    ReturnStackSize := Value;
-    //p := ReturnStack;
+    FGlobalOptions.ReturnStackSize := Value;
     ReallocMem(FGlobalOptions.ReturnStackBase, (Value+1)*SizeOf(Pointer));
-    //ReturnStack := p;
+    with FGlobalOptions do
+      Integer(_RP) := Integer(ReturnStackBase) + Value*SizeOf(Pointer);
     //if FSP > FParameterStackSize then FSP := FParameterStackSize;
   end;
 end;
