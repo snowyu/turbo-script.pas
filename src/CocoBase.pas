@@ -6,7 +6,15 @@ unit CocoBase;
 interface
 
 uses
-  Classes, SysUtils;
+  Classes, SysUtils
+  , uStrUtils
+  , uTurboConsts
+  , uTurboMetaInfo
+  , uTurboExecutor
+  , uTurboAccessor
+  , uTurboModuleFileAccessor
+  , uTurboCompilerUtils
+  ;
 
 const
   setsize = 16; { sets are stored in 16 bits }
@@ -24,6 +32,25 @@ const
   chTab = #9;
   chEOL = chCR + chLF;  { End of line characters for Microsoft Windows }
   chLineSeparator = chCR;
+
+Const
+  cMaxMemorySize = 64 * 1024;
+  cLabelRedeclarationError = 300;
+  cWordNameIsNilDeclarationError = 301;
+  cUnknownWordError = 302;
+  cVarRedeclarationError = 303;
+  cConstRedeclarationError = 304;
+  cRedeclarationError = 305;
+  cDLLModuleMissError = 306;
+  cFileNotFoundError  = 307;
+  cWordNotFoundError  = 308;
+  cStrToIntCovnertError = 309;
+  cInvalidOptionError = 400;
+  cInvalidOptionParamError = 401;
+  cMessageCompilerOption = 500;
+
+Const
+  cReqAlignMemTypes = [ttkUWord, ttkSWord, ttkULong, ttkSLong, ttkPointer, ttkString, ttkLString, ttkInt64, ttkQWord];
 
 type
   ECocoBookmark = class(Exception);
@@ -216,7 +243,67 @@ type
     function GetCharacterCount: integer;
   protected
     fCurrentInputSymbol : integer; // current input symbol
+  
+  protected
+    //Common language turbo-compiler properties.
+    FTurboGlobalOptions: TTurboGlobalOptions;
+    FInitProcCFA: Integer;
+    //正在定义的Word,如果存在 
+    FDefinedWordEntry: PTurboMethodEntry;
+    FLastWordCfa: Integer;
+    FModule: TCustomTurboModule;
 
+    FLabels: array of TTurboLabelDeclarationRec;
+    FConsts: array of TTurboSimpleConst;
+    FVars: array of TTurboSimpleVar;
+    FWords: array of TTurboSimpleWord;
+    FUsedModules: array of TTurboSimpleModule;
+
+  protected
+    procedure Init;
+    procedure Final;
+    function  DefineWordBegin(var aWord: TTurboSimpleWord): Boolean;
+    procedure DefineWordEnd();
+    procedure PushString(const aStr: string);
+    procedure PushStringSeqToStack(const aStr: string);
+    procedure PushInt32(const aStr: string);overload;
+    procedure PushInt32(const aInt: tsInt);overload;
+    //case the aValue type push the aValue to CodeMem
+    procedure PushWordParam(const aValue: string);
+    // Add Identifier CFA address into the memory. 
+    function AddIdentifierCFA(const aName: String; const aParams: TStringList): Boolean;
+    // AddWordCFA address into the memory. 
+    function AddWordCFA(aName: String; const aParams: TStringList): Boolean;
+    // Add Const address into the memory. 
+    function AddConstCFA(const aName: String): Boolean;
+    // Add Var address into the memory. 
+    function AddVarCFA(const aName: String): Boolean;
+  
+    function DefineLabel(const aName: string; const aWordName: string =''): Integer;
+    //if find retrun label index else -1
+    function FindLabel(const aName: string; const aWordName: string =''): Integer;
+    //if not find then add new label, return label index else raise error.
+    function DefineLabelEx(const aName: string; const aWordName: string =''): Integer;
+    function  DefineConst(const aValue: TTurboSimpleConst): Integer;
+    //if not find then add new , return index else raise error.
+    function  DefineConstEx(const aValue: TTurboSimpleConst): Integer;
+    function FindConst(const aName: String): Integer;
+    function GetConstValueRec(const aTypeKind: TTurboSimpleTypeKind; const aName: string): TTurboValueRec;
+  
+    //if not find then add new , return index else raise error.
+    function DefineVar(const aValue: TTurboSimpleVar): Integer;
+    function FindVar(const aName: String): Integer;
+  
+    //try find module if not then Generate.
+    procedure GenerateModuleEntryForWord(var aWord: TTurboSimpleWord);
+    function FindModule(const aName: String; aModuleType: TTurboModuleType): Integer;
+    function  AddUsedModule(const aName: String; aModuleType: TTurboModuleType): Integer;
+    function FindWord(const aName: String): Integer;
+    
+    //make sure the indentifier is unique else it will raise the error..
+    function IsUniqueIdentifier(const aName: String): Boolean;
+
+  protected
     function Bookmark : string; virtual;
     procedure GotoBookmark(aBookmark : string); virtual;
     function GetSuccessful : boolean; virtual;
@@ -231,6 +318,10 @@ type
     procedure StoreError(const nr : integer; const Symbol : TSymbolPosition;
       const Data : string; const ErrorType : integer);
     function CurrentBufferPosition : integer;
+
+    //added by riceball
+    procedure PrintStr(S : String); //write string to compiler console or output.
+    procedure PrintStrLn(S : String);//write string to compiler console or output with line feed.
 
     procedure DoAfterParse; virtual;
     procedure DoBeforeParse; virtual;
@@ -257,6 +348,10 @@ type
     property OnFailure : TFailureEvent read FOnFailure write FOnFailure;
     property OnStatusUpdate : TStatusUpdateProc read FOnStatusUpdate write SetOnStatusUpdate;
     property OnSuccess : TNotifyEvent read FOnSuccess write FOnSuccess;
+
+  public
+    FileName: string;
+
   public
     constructor Create(AOwner : TComponent); override;
     destructor Destroy; override;
@@ -567,6 +662,8 @@ begin
   fClearSourceStream := true;
   fListStream := TMemoryStream.Create;
   fErrorList := TList.Create;
+  FModule := TCustomTurboModule.Create;
+  FModule.GlobalOptions := @FTurboGlobalOptions;
 end; {Create}
 
 destructor TCocoRGrammar.Destroy;
@@ -575,6 +672,7 @@ begin
   fListStream.Free;
   ClearErrors;
   fErrorList.Free;
+  FreeAndNil(FModule);
   inherited;
 end; {Destroy}
 
@@ -1004,6 +1102,599 @@ begin
   Result := StringReplace(Result, '<', '&lt;', [rfReplaceAll, rfIgnoreCase]);
   Result := StringReplace(Result, '>', '&gt;', [rfReplaceAll, rfIgnoreCase]);
 end; {FixXmlStr}
+
+{ TCocoRGrammar }
+//write string to compiler console or output.
+procedure TCocoRGrammar.PrintStr(S : String);
+begin
+  ListStream.WriteBuffer(S[1],length(S));
+end;
+
+//write string to compiler console or output with line feed.
+procedure TCocoRGrammar.PrintStrLn(S : String);
+begin
+  PrintStr(s+#13#10); 
+end;
+
+function TCocoRGrammar.DefineWordBegin(var aWord: TTurboSimpleWord): Boolean;
+var
+  i: Integer;
+begin
+  //WriteLn('DefineWordBegin:',aWord.Name);
+  //FindVar('');
+  Result := IsUniqueIdentifier(aWord.Name);
+  if Result then
+  begin
+    //writeln('FModule.UsedDataSize=',InttoHex(FModule.UsedDataSize,4));
+    FModule.AlignData;
+    //writeln('FModule.UsedDataSize=',InttoHex(FModule.UsedDataSize,4));
+    Integer(FDefinedWordEntry) := Integer(FModule.DataMemory) + FModule.UsedDataSize;
+    FModule.AllocDataSpace(SizeOf(TTurboMethodEntry));
+    FDefinedWordEntry.Prior := FModule.LastWordEntry;
+    //FModule.AddIntToData(tsInt(FModule.LastWordEntry));
+    //FModule.AllocDataSpace(SizeOf(TTurboWordOptions));
+    //FModule.AllocDataSpace(SizeOf(LongWord)); //the ParamFieldLength
+    //FModule.AllocDataSpace(SizeOf(Integer)); //the CFA
+    if aWord.Options.Visibility >= fvProtected then
+    begin
+      FDefinedWordEntry.Word.Name := Pointer(FModule.UsedDataSize);
+      //FModule.AddByteToData(Length(aWord.Name));
+      FModule.AddBufferToData(aWord.Name[1], Length(aWord.Name));
+      FModule.AddByteToData(0);
+    end
+    else
+    begin
+      //FModule.AddByteToData(0);
+      FDefinedWordEntry.Word.Name := nil;
+    end;
+    FLastWordCfa := FModule.UsedMemory;
+    FDefinedWordEntry.Word.CFA := FLastWordCfa;
+    aWord.CFA := FLastWordCfa;
+    FDefinedWordEntry.Word.Visibility := aWord.Options.Visibility;
+    FDefinedWordEntry.Word.CallStyle := aWord.Options.CallStyle;
+    FDefinedWordEntry.Word.CodeFieldStyle := aWord.Options.CodeFieldStyle;
+
+    i := Length(FWords);
+    SetLength(FWords, i+1);
+    FWords[i] := aWord;
+  end
+  //else FLastWordCfa := 0;
+end;
+
+procedure TCocoRGrammar.DefineWordEnd();
+var
+  vPrior: PTurboMethodEntry;
+begin
+  if FDefinedWordEntry.Word.Visibility >= fvProtected then
+    FModule.AddOpToMem(opExitFar)
+  else
+    FModule.AddOpToMem(opExit);
+  FDefinedWordEntry.Word.ParamFieldLength := FModule.UsedMemory - FLastWordCfa + 1;
+  FWords[Length(FWords)-1].ParamFieldLength := FDefinedWordEntry.Word.ParamFieldLength;
+
+  //vPrior := FModule.LastWordEntry;
+  FModule.LastWordEntry := Pointer(Integer(FDefinedWordEntry) - Integer(FModule.DataMemory));
+  //writeln('dWerdE.Last:',tsInt(FModule.LastWordEntry));
+  //FDefinedWordEntry.Prior := vPrior;
+end;
+
+function TCocoRGrammar.AddIdentifierCFA(const aName: string; const aParams: TStringList): Boolean;
+begin
+  if not Assigned(aParams) then
+  begin
+    Result := AddConstCFA(aName);
+    if Result then exit;
+
+    Result := AddVarCFA(aName);
+    if Result then exit;
+  end;
+
+  Result := AddWordCFA(aName, aParams);
+  if Result then exit;
+
+  //writeln('cUnknownWordError:',aName);
+  SynError(cUnknownWordError, aName);
+end;
+
+function TCocoRGrammar.AddConstCFA(const aName: String): Boolean;
+var
+  p: Pointer;
+  i : Integer;
+begin
+  i := FindConst(aName);
+  Result := i >= 0;
+  if Result  then
+    with FConsts[i] do
+    begin
+      if Size <= SizeOf(Integer) then
+      begin
+        //FModule.AddOpToMem(opPushInt);
+        //Size := SizeOf(Integer);
+        Case Size of
+          SizeOf(Byte): FModule.AddOpToMem(opPushByte);
+          SizeOf(Word): FModule.AddOpToMem(opPushWord);
+          //SizeOf(tsInt): FModule.AddOpToMem(opPushInt);
+          //SizeOf(Int64): FModule.AddOpToMem(opPushInt64);
+          else 
+          begin
+            FModule.AddOpToMem(opPushInt);
+            Size := SizeOf(tsInt);
+          end;
+        end;//case
+      end
+      else
+        FModule.AddOpToMem(opPushInt64);
+      Integer(p) := Integer(FModule.Memory) + FModule.UsedMemory;
+      FModule.AllocSpace(Size);
+      AssignValueTo(p);
+    end
+end;
+
+function TCocoRGrammar.AddVarCFA(const aName: String): Boolean;
+var
+  i: Integer;
+begin
+  i := FindVar(aName);
+  Result := i >= 0;
+  if Result then
+    with FVars[i] do
+    begin
+      FModule.AddOpToMem(opPushInt);
+      FModule.AddIntToMem(Addr);
+    end
+end;
+
+procedure TCocoRGrammar.PushWordParam(const aValue: string);
+begin
+  if aValue = '' then exit;
+  if (Length(aValue) >= 2) and (aValue[1] = '''') then
+  begin
+    // it's a string
+    PushString(aValue);
+  end
+  else if StrIsInteger(aValue) then
+  begin
+    PushInt32(aValue);
+  end
+  else //暂时不支持内嵌参数的word
+    AddIdentifierCFA(aValue, nil);
+end;
+
+function TCocoRGrammar.AddWordCFA(aName: string; const aParams: TStringList): Boolean;
+var
+  i: Integer;
+begin
+  Result := False;
+  i := FindWord(aName);
+  if i >= 0 then with FWords[i] do
+  begin
+    if Assigned(aParams) then
+    begin
+      //push the parameters
+      for i := aParams.Count - 1 downto 0 do
+      begin
+        PushWordParam(aParams[i]);
+      end;
+    end;
+    case Options.CodeFieldStyle of
+      cfsFunction:
+      begin
+        if Options.Visibility < fvProtected then
+        begin
+          FModule.AddOpToMem(opEnter);
+          FModule.AddIntToMem(CFA);
+        end
+        else
+        begin
+          FModule.AddOpToMem(opEnterFar);
+          FModule.AddIntToMem(0);
+          FModule.AddIntToMem(CFA);
+        end;
+        Result := True;
+      end;
+      cfsExternalFunction:
+      begin
+        case Options.CallStyle of
+          csForth:
+          begin
+            if Assigned(Module) then
+            begin
+              if ExternalOptions.Name <> '' then aName := ExternalOptions.Name;
+              i := Module.GetWordCFA(aName);
+              if i <> -1 then
+              begin
+                FModule.AddOpToMem(opCallFar);
+                //writeln(aName, '.ModEntry:',Integer(FUsedModules[ModuleIndex].Entry));
+                //point to the TurboModuleInfo
+                FModule.AddIntToMem(Integer(FUsedModules[ModuleIndex].Entry)+SizeOf(Pointer)-Integer(FModule.DataMemory));
+                FModule.AddIntToMem(i);
+                //writeln(aName, '.CFA:',i);
+                Result := True;
+              end
+              else
+                SynError(cWordNotFoundError, '"'+ aName + '" CFA not in ' + FUsedModules[ModuleIndex].Name);
+            end
+            else
+              SynError(cWordNotFoundError, '"'+ aName + '" not in ' + FUsedModules[ModuleIndex].Name);
+          end;
+        end; //case
+      end;
+    end;//case
+  end;
+end;
+
+function TCocoRGrammar.IsUniqueIdentifier(const aName: String): Boolean;
+begin
+  //writeln('IsUniqueIdentifier:', aName);
+  Result := FindConst(aName) < 0;
+  //writeln('C:',Result);
+  if Result then
+    Result := FindVar(aName)< 0;
+  //writeln('V:',Result);
+  if Result then
+    Result := FindWord(aName) < 0;
+  //writeln('W:',Result);
+  if not Result then
+  begin
+    writeln('RedeclarationError:',aName);
+    SynError(cRedeclarationError);
+  end;
+end;
+
+function TCocoRGrammar.GetConstValueRec(const aTypeKind: TTurboSimpleTypeKind; const aName: String): TTurboValueRec;
+var
+  i: Integer;
+begin
+  for i := 0 to Length(FConsts) do 
+    with FConsts[i] do
+    if (aName = Name) and (aTypeKind = TypeKind) then
+    begin
+      Result := Value;
+      exit;
+    end;
+  SynError(cUnknownWordError, aName);
+end;
+
+function TCocoRGrammar.DefineLabel(const aName: string; const aWordName: string): Integer;
+begin
+    Result := Length(FLabels);
+    SetLength(FLabels, Result+1);
+    with FLabels[Result] do
+    begin
+      Name := aName;
+      WordName := aWordName;
+      Addr := FModule.UsedMemory;
+    end;
+end;
+
+function TCocoRGrammar.DefineLabelEx(const aName: string; const aWordName: string): Integer;
+begin
+  Result := FindLabel(aName, aWordName);
+  if Result = -1 then
+  begin
+    Result := DefineLabel(aName, aWordName);
+  end
+  else 
+    SynError(cLabelRedeclarationError);
+
+end;
+
+function TCocoRGrammar.DefineConstEx(const aValue: TTurboSimpleConst): Integer;
+begin
+  //WriteLn('ConstDefine:', aValue.Name);
+  Result := FindConst(aValue.Name);
+  if Result = -1 then
+  begin
+    Result := DefineConst(aValue);
+  end
+  else 
+    SynError(cConstRedeclarationError);
+end;
+
+function TCocoRGrammar.DefineConst(const aValue: TTurboSimpleConst): Integer;
+begin
+  Result := Length(FConsts);
+  SetLength(FConsts, Result+1);
+  FConsts[Result] := aValue;
+  with FConsts[Result] do
+  begin
+    //Name := aValue.Name;
+    SaveString(FModule); //if this is string 
+  end;
+end;
+
+function TCocoRGrammar.FindConst(const aName: String): Integer;
+begin
+  for Result := 0 to Length(FConsts)-1 do
+  begin
+    //WriteLn(aName,'=', FConsts[Result].Name);
+    if aName = FConsts[Result].Name then exit;
+  end;
+  Result := -1;
+end;
+
+function TCocoRGrammar.FindVar(const aName: String): Integer;
+begin
+  for Result := 0 to Length(FVars)-1 do
+  begin
+    //if aName = 'Add' then 
+    //WriteLn(Result, ':FV:',FVars[Result].Name);
+    if aName = FVars[Result].Name then exit;
+  end;
+  Result := -1;
+end;
+
+function TCocoRGrammar.DefineVar(const aValue: TTurboSimpleVar): Integer;
+var
+  vVaraibleEntry: PTurboVariableEntry;
+  vValue: Pointer;
+  //vTypeSize: Integer;
+begin
+  //在前面已经判断了是不是名称重复：
+  Result := Length(FVars);
+  SetLength(FVars, Result+1);
+  FVars[Result] := aValue;
+  with FVars[Result] do
+  begin
+    //WriteLn(Result, ':DefineVar:',Name);
+    //Name := aValue.Name; //保证让其ref增加
+    //FModule.AligData;
+    //vTypeSize := GetSimpleTurboTypeSize(aValue.TypeKind);
+    //Size := vTypeSize;
+    //WriteLn(Name,'.Visibility=', Integer(Visibility));
+    //WriteLn(Name,'.Size=', Size);
+
+    if Visibility >= fvProtected then
+    begin
+      //FModule.AligData;
+      Integer(vVaraibleEntry) := Integer(FModule.DataMemory) + FModule.UsedDataSize;
+      FModule.AllocDataSpace(SizeOf(TTurboVariableEntry));
+      vVaraibleEntry.Prior := FModule.LastVariableEntry;
+      vVaraibleEntry.Variable.Size := Size;
+      vVaraibleEntry.Variable.Addr := nil;
+      vVaraibleEntry.Variable.TypeInfo := nil;
+      //FModule.AddIntToData(Integer(FModule.LastVariableEntry));
+      //FModule.AddIntToData(Size);
+      //FModule.AddIntToData(0); //preserved.for addr.
+      //FModule.AddIntToData(0); //preserved.for TypeInfo.
+    end;
+  
+    if (TypeKind in cReqAlignMemTypes) then FModule.AlignData;
+    Addr := FModule.UsedDataSize;
+    if Visibility >= fvProtected then
+    begin
+      Integer(vVaraibleEntry.Variable.Addr) := Addr;
+      FModule.LastVariableEntry := Pointer(Integer(vVaraibleEntry) - Integer(FModule.DataMemory));
+    end;
+    Integer(vValue) := Integer(FModule.DataMemory)  + Addr;
+    FModule.AllocDataSpace(Size);
+    if ValueStr <> '' then
+    begin
+      SaveString(FModule); //if this is string 
+      AssignValueTo(vValue);
+    end;
+
+      if Visibility >= fvPublished then
+      begin
+        vVaraibleEntry.Variable.Name := Pointer(FModule.UsedDataSize);
+        //fill the variable name 
+        //FModule.AddByteToData(Length(Name));
+        FModule.AddBufferToData(Name[1], Length(Name));
+        FModule.AddByteToData(0);
+      end
+      else if Visibility >= fvProtected then
+      begin
+        //no name
+        //FModule.AddByteToData(0);
+        vVaraibleEntry.Variable.Name := nil;
+      end;
+  end;
+
+  //SetLength(FVars, Length(FVars) + 1);
+  //FindVar('');
+end;
+
+function TCocoRGrammar.FindWord(const aName: String): Integer;
+begin
+  for Result := 0 to Length(FWords)-1 do
+  begin
+    if AnsiSameText(aName, FWords[Result].Name) then exit;
+  end;
+  Result := -1;
+end;
+
+procedure TCocoRGrammar.GenerateModuleEntryForWord(var aWord: TTurboSimpleWord);
+var
+  i: Integer;
+begin
+  if aWord.ModuleName <> '' then
+  begin
+    i := FindModule(aWord.ModuleName, aWord.ModuleType);
+    //WriteLn('GenerateModuleEntryForWord:', aWord.ModuleName);
+    if i < 0 then i := AddUsedModule(aWord.ModuleName, aWord.ModuleType);
+    if i >= 0 then
+    begin
+      aWord.ExternalOptions.ModuleRef := Pointer(Integer(FUsedModules[i].Entry) + SizeOf(Pointer));
+      aWord.ModuleIndex := i;
+      aWord.Module := FUsedModules[i].Module;
+    end;
+  end
+  else with aWord.ExternalOptions do 
+  begin
+    if FModule.LastModuleRefEntry <> nil then
+    begin
+      ModuleRef := Pointer(Integer(FModule.LastModuleRefEntry) + SizeOf(Pointer));
+    end
+    else 
+      SynError(cDLLModuleMissError, aWord.Name);
+  end;
+end;
+
+function  TCocoRGrammar.AddUsedModule(const aName: String; aModuleType: TTurboModuleType): Integer;
+var
+  vModule: TCustomTurboModule;
+begin
+  //WriteLn('AddUsedModule:', aName);
+  Result := -1;
+  if aModuleType = mtLib then
+  begin
+    vModule := FModule.RequireModule(PChar(aName));
+    if vModule = nil then
+    begin
+      SynError(cFileNotFoundError, aName);
+      exit;
+    end;
+  end;
+  Result := Length(FUsedModules);
+  SetLength(FUsedModules, Result+1);
+  with FUsedModules[Result] do
+  begin
+    Name := aName;
+    ModuleType := aModuleType;
+    if aModuleType = mtLib then Module := vModule else Module := nil;
+    with FModule do 
+    begin
+      Integer(Entry) := Integer(DataMemory) + UsedDataSize; //the offset address.
+      AllocDataSpace(SizeOf(TTurboModuleRefEntry));
+      Entry.Prior := LastModuleRefEntry;
+      Entry.Module.ModuleType := aModuleType;
+      Entry.Module.Revision := vModule.ModuleVersion;
+      Entry.Module.BuildDate := vModule.ModuleDate;
+      //AddIntToData(tsInt(LastModuleRefEntry));
+      //AddByteToData(Byte(aModuleType));
+      //AddIntToData(0); //preserved for Module: Pointer
+      //AllocDataSpace(SizeOf(LongWord)); //Revision
+      //AllocDataSpace(SizeOf(TTimeStamp)); //BuildDate
+      Entry.Module.Name := Pointer(UsedDataSize);
+      //AddByteToData(Length(aName));
+      if Length(aName) > 0 then
+        AddBufferToData(aName[1], Length(aName));
+      AddByteToData(0);
+      LastModuleRefEntry := Pointer(tsInt(Entry) - Integer(DataMemory));
+    end;
+  end;
+end;
+
+function TCocoRGrammar.FindLabel(const aName: string; const aWordName: string): Integer;
+begin
+  for Result := 0 to length(FLabels) -1 do
+  begin
+    if (aName = FLabels[Result].Name) and (aWordName = FLabels[Result].WordName) then
+    begin
+      exit;
+    end;
+  end;
+  Result := -1;
+end;
+
+function TCocoRGrammar.FindModule(const aName: String; aModuleType: TTurboModuleType): Integer;
+begin
+  for Result := 0 to Length(FUsedModules)-1 do
+  begin
+    if AnsiSameText(aName, FUsedModules[Result].Name) and (aModuleType = FUsedModules[Result].ModuleType) then exit;
+  end;
+  Result := -1;
+end;
+
+procedure TCocoRGrammar.PushInt32(const aInt: tsInt);
+begin
+  FModule.AddOpToMem(opPushInt);
+  FModule.AddIntToMem(aInt);
+end;
+
+procedure TCocoRGrammar.PushInt32(const aStr: string);
+begin
+  try
+    PushInt32(StrToInt(aStr));
+  except
+    SynError(cStrToIntCovnertError, aStr);
+  end;
+end;
+
+procedure TCocoRGrammar.PushString(const aStr: string);
+var
+  vConst: TTurboSimpleConst;
+  p: Pointer;
+begin
+  if vConst.AssignValue(aStr) then
+  begin
+    vConst.SaveString(FModule); //if this is string 
+    FModule.AddOpToMem(opPushInt);
+    Integer(p) := Integer(FModule.Memory) + FModule.UsedMemory;
+    FModule.AllocSpace(SizeOf(Pointer));
+    vConst.AssignValueTo(p);
+  end
+  else
+    SynError(cConstRedeclarationError, 'Invalid String:'+ aStr);
+end;
+
+procedure TCocoRGrammar.PushStringSeqToStack(const aStr: string);
+var
+  s: string;
+  i: Integer;
+begin
+  s := AnsiDequotedStr(aStr, '''');
+  for i := length(s) downto 1 do
+  begin
+    FModule.AddOpToMem(opPushInt);
+    FModule.AddIntToMem(Ord(s[i])); 
+  end;
+end;
+
+procedure TCocoRGrammar.Init;
+begin
+  with FModule do
+  begin
+    ClearMemory;
+    if MemorySize < cMaxMemorySize then
+      MemorySize := cMaxMemorySize;
+    Status := [psCompiling];
+  end;
+  SetLength(FLabels, 0);
+  SetLength(FConsts, 0);
+  SetLength(FVars, 0);
+  SetLength(FWords, 0);
+  SetLength(FUsedModules, 0);
+  //writeln('SourceFileName=', SourceFileName);
+  FileName := ExtractFileBaseName(SourceFileName) + cTurboCompiledProgramFileExt;
+  //writeln('FileName=', FileName);
+end;
+
+procedure TCocoRGrammar.Final;
+var
+  vStream: TFileStream;
+begin
+  //writeln('Final');
+  if ErrorList.Count = 0 then
+  begin
+   //writeln('No error');
+    //PrintStrLn('The Result: '+FloatToStr(fResult));
+    if FileName <> '' then
+    begin
+      FModule.IsLoaded := True;
+      //writeln('InitProcCFA=', FInitProcCFA+SizeOf(TTurboModuleStreamHeader));
+      with PTurboPreservedDataMemory(FModule.DataMemory)^ do
+      begin
+        Integer(InitializeProc) := FInitProcCFA;
+      end;
+      if LowerCase(ExtractFileExt(FileName)) <> cTurboCompiledProgramFileExt then
+        FileName := ChangeFileExt(FileName, cTurboCompiledProgramFileExt);
+      vStream := TFileStream.Create(FileName, fmCreate);
+      try
+        writeln('saving to ' + FileName);
+        FModule.SaveToStream(vStream);
+      finally
+        vStream.Free;
+      end;
+    end;
+  end;
+  FModule.ClearMemory;
+  SetLength(FLabels, 0);
+  SetLength(FConsts, 0);
+  SetLength(FVars, 0);
+  SetLength(FWords, 0);
+  SetLength(FUsedModules, 0);
+end;
 
 end.
 
