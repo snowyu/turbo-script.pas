@@ -8,7 +8,7 @@ TODO:
     注意：必须放在Program|Unit之后
 
 2007-4-23 9:42
-+ CVS Tag: build_1_0_0_0
++ CVS Tag: Build_1_0_0_0
 
 2007-4-22 14:22
 * [Bug] 执行 Console.Write 语句出错，IO错误，发现是因为调用write过程的时候会从原来的ESP的某个位置取数据，俺用新的ESP代替了，所以数据错误，不过以前怎么不会出现该错误呢？
