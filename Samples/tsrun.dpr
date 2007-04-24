@@ -16,11 +16,11 @@ uses
   , uTurboConsts
   , uTurboExecutor
   , uTurboModuleFileAccessor
-  , TurboInterpreter
+  , TurboX86Interpreter
   ;
 
 type
-  TMyInterpreter = Class(TTurboX86Interpreter)
+  TConsoleInterpreter = Class(TTurboX86Interpreter)
   protected
     procedure DoPrintChar(aChar: Char); override;
     procedure DoPrintString(const aStr: String); override;
@@ -40,13 +40,13 @@ const
     , 'Assertion Failed'
   );
 
-procedure TMyInterpreter.DoPrintChar(aChar: Char);
+procedure TConsoleInterpreter.DoPrintChar(aChar: Char);
 begin
 	 Write(aChar);
    //System.Write('1');
 end;
 
-procedure TMyInterpreter.DoPrintString(const aStr: String);
+procedure TConsoleInterpreter.DoPrintString(const aStr: String);
 begin
 	 Write(aStr);
 end;
@@ -125,7 +125,7 @@ begin
   c := 0;
     GTurboAppDomain := TTurboAppDomain.Create;
     try
-      GTurboAppDomain.ExecutorClass := TMyInterpreter;
+      GTurboAppDomain.ExecutorClass := TConsoleInterpreter;
       with GTurboAppDomain do
       begin
         if (eoShowDebugInfo in vExeOptions) and not (eoInternalRun in vExeOptions) then

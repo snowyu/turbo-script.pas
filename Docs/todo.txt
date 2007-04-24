@@ -7,6 +7,9 @@ TODO:
     Syntax    {$MaxStackSize  Size[KB|MB] }
     注意：必须放在Program|Unit之后
 
+2007-4-24 8:40
+* rename TurboInterpreter.pas to TurboX86Interpreter.pas
+
 2007-4-23 9:42
 + CVS Tag: Build_1_0_0_0
 
