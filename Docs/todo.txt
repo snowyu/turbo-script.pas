@@ -9,6 +9,11 @@ TODO:
 
 2007-4-24 8:40
 * rename TurboInterpreter.pas to TurboX86Interpreter.pas
+~  再现有结构条件下的并发执行多个AppDomain：
+  1. 各个线程之间AppDomain完全独立，将 加载管理器 放入 AppDomain，这样每个 AppDomain 装入的模块完全独立互不影响。
+  2. 现在的模块内存映像的结构是，每一个模块数据区中都有一个保存 GlobalOptions 的指针：
+     1. 可以去掉该指针，也就是不放在这里
+     2. 在执行远程（外部模块）调用前，先判断是否该外部模块正在执行，如果空闲则设置执行标志为真 和 GlobalOptions 指针。
 
 2007-4-23 9:42
 + CVS Tag: Build_1_0_0_0
