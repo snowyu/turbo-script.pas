@@ -43,7 +43,7 @@ type //in uTurboScriptConsts
      LastVarEntry: Pointer; //有名字的变量链表
   end;
 }
-unit TurboInterpreter;
+unit TurboX86Interpreter;
 
 interface
 
