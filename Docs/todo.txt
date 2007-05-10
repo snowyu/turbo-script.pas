@@ -7,13 +7,54 @@ TODO:
     Syntax    {$MaxStackSize  Size[KB|MB] }
     注意：必须放在Program|Unit之后
 
+2007-5-10 15:04
+~ 修改提炼 TCustomTurboModule 然后作为TurboScript类机构
+  各个类在内存的存放同于 TCustomTurboModule， 并且同样放在 TurboAccessor 中受到管理。
+  思考：当新建类实例:
+    ClassPointer: TCustomTurboModule
+    Records: ....
+  如果 TCustomTurboModule 被Free，那么这些类实例怎么办？
+
+* [Bug] CustomExecutor.LoadUsedModules
+  when address is not resolved the module.name is related address.
+* 从 TCustomTurboModule 类中取缔 GlobalOptions 指针。GlobalOptions 放在两个地方; AppDomain 
+   Executor 增加GlobalOptions指针指向AppDomain的 GlobalOptions.
+* [X86Interpreter] 增加使用 ECX 保存 GlobalOptions ！
+  近过程调用速度提升一倍！超越汇编过程调用速度!
+
+* [Bug] tsrun.dpr memory leak found when type: tstrun -d
+
+2007-5-2 18:04
+~ 发现 FreePascal也有 {$MINENUMSIZE 4} 参数，不过它默认是4，而delphi默认为1.
+
+2007-4-29 17:33
+* IsAddrResolved 将其放入 数据区的保留内存！
+   TTurboModuleFlag = (tfAddrResolved, tfInited);
+   TTurboModuleFlags = set of TTurboModuleFlag; //tsInt,最好把所有的set都扩成32位。 {$MINENUMSIZE 4} 找到了 freePascal {$PACKENUM 1} ,哈，它也可以使用 {$MINENUMSIZE 4}。
+* TTurboAppDomain.iReset 中判定是否是在编译态，从而决定是否设置 IsAddrResolved 为真。
+
+2007-4-28 21:15
+* TCustomTurboModule
+    + ResolveAddress method //convert the addr from related to absolute.(internal method)
+    + UnResolveAddress method //convert the addr from absolute to related(internal method)
+将移动到AppDomain后，模块加载是否需要 Resolve address 应该从来判断?
+需要记住的是加载后是没有 Resolve 的。
+
 2007-4-24 8:40
+!* 准备从 TCustomTurboModule 类中取缔 GlobalOptions 指针。GlobalOptions 可以放在两个地方; AppDomain or Executor.
+  * remove the Status property to AppDomain
+    + ResolveAddress method //convert the addr from related to absolute.(internal method)
+    + UnResolveAddress method //convert the addr from absolute to related(internal method)
+    + property IsAddrResolved read FIsAddrResolved write SetIsAddrResolved;
+
 * rename TurboInterpreter.pas to TurboX86Interpreter.pas
 ~  再现有结构条件下的并发执行多个AppDomain：
   1. 各个线程之间AppDomain完全独立，将 加载管理器 放入 AppDomain，这样每个 AppDomain 装入的模块完全独立互不影响。
   2. 现在的模块内存映像的结构是，每一个模块数据区中都有一个保存 GlobalOptions 的指针：
      1. 可以去掉该指针，也就是不放在这里
      2. 在执行远程（外部模块）调用前，先判断是否该外部模块正在执行，如果空闲则设置执行标志为真 和 GlobalOptions 指针。
+
+我觉得最好的选择就是从模块的数据区中取缔 GlobalOptions 指针。
 
 2007-4-23 9:42
 + CVS Tag: Build_1_0_0_0

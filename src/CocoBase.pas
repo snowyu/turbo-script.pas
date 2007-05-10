@@ -663,7 +663,7 @@ begin
   fListStream := TMemoryStream.Create;
   fErrorList := TList.Create;
   FModule := TCustomTurboModule.Create;
-  FModule.GlobalOptions := @FTurboGlobalOptions;
+  //FModule.GlobalOptions := @FTurboGlobalOptions;
 end; {Create}
 
 destructor TCocoRGrammar.Destroy;
@@ -1648,7 +1648,7 @@ begin
     ClearMemory;
     if MemorySize < cMaxMemorySize then
       MemorySize := cMaxMemorySize;
-    Status := [psCompiling];
+    //IsAddrResolved := False;
   end;
   SetLength(FLabels, 0);
   SetLength(FConsts, 0);

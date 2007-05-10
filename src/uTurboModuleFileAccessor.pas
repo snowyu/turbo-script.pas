@@ -21,8 +21,8 @@ type
     FIncludeDirs: TStringList;
     function GetModuleFileName(aModuleName: String): string;
     function iRequire(const aModuleName: string; const aModuleClass:
-            TTurboModuleClass; const aGlobal: PTurboGlobalOptions; const
-            IsLoaded: Boolean): TCustomTurboModule; override;
+            TTurboModuleClass; const IsLoaded: Boolean): TCustomTurboModule;
+            override;
     {: trim invalid includes paths. }
     procedure TrimInvalidPaths;
   public
@@ -121,8 +121,8 @@ begin
 end;
 
 function TTurboModuleFileAccessor.iRequire(const aModuleName: string; const
-        aModuleClass: TTurboModuleClass; const aGlobal: PTurboGlobalOptions;
-        const IsLoaded: Boolean): TCustomTurboModule;
+        aModuleClass: TTurboModuleClass; const IsLoaded: Boolean):
+        TCustomTurboModule;
 var
   vStream: TStream;
   vFileName: string;
@@ -133,7 +133,6 @@ begin
   try
     Result := aModuleClass.Create;
     Result.Name := aModuleName;
-    Result.GlobalOptions := aGlobal;
     if IsLoaded then
     begin
       vStream := TFileStream.Create(vFileName, fmOpenRead);
