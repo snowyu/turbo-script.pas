@@ -31,6 +31,7 @@
   {$R- No Range checking}
   {$Z1 MIN ENUM SIZE}
   {$T- Typed Address Off}
+  {$MINENUMSIZE 1}
 
 {$IFDEF BCB}
   {$OBJEXPORTALL ON}
