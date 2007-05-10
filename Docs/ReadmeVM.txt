@@ -33,6 +33,7 @@
 抽象层: 
   执行引擎核心：uTurboExecutor.pas(include abstract executor, TurboProgram classes)
     模块内存镜像类： TCustomTurboModule
+      存放的是VM指令和相关Meta数据。
     执行引擎抽象类： TCustomTurboExecutor
     AppDomain类： TTurboProgram 一个程序就是一个AppDomain.
   加载器： uTurboAccessor.pas (抽象的模块加载器，以及加载器的管理器)
@@ -47,7 +48,7 @@ JIT Translator 即时翻译模块：由执行器调用，将VM及时翻译成本族语言直接执行。
 执行器中只包括Codes, ImportModules(自己提供给脚本使用的以及通过LoadLibrary装入的), Resource, 其它信息(ImportTable)只在PEFormat中存在。
 
 TurboInterpreter_S: Pure Pascal 实现，暂缓
-TurboInterpreter: 基于x86指令优化。核心指令汇编实现，寄存器采用x86的寄存器，对应关系如下：
+TurboX86Interpreter: 基于x86指令优化。核心指令汇编实现，寄存器采用x86的寄存器，对应关系如下：
 ESP: 返回堆栈指针.记住压入减少，弹出增加地址。
 EBP: 数据栈指针，基址指针放在内存某个单元中。所以EBP总是指向次栈顶。
 EBX: 为数据栈栈顶。 
