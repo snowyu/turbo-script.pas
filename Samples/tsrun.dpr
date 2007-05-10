@@ -84,6 +84,7 @@ var
 
 procedure Help;
 begin
+  Writeln(Copyright);
   Writeln('');
   Write('Usage:   ', ExtractFileName(ParamStr(0)));
   if not (eoInternalRun in vExeOptions) then
@@ -195,8 +196,6 @@ end;
 begin
 	QueryPerformanceFrequency(CountFreq);
 	vStream := nil;
-  if eoShowDebugInfo in vExeOptions then
-    Writeln(Copyright);
   for i := 1 to ParamCount do
   begin
   	s := ParamStr(i);
@@ -208,6 +207,7 @@ begin
     else 
       aFileName := Trim(s);
   end;
+  s := ''; //free string
 
   if eoShowHelp in vExeOptions then
   begin
@@ -236,6 +236,10 @@ begin
     end;
     vStream := TFileStream.Create(aFileName, fmOpenRead);
   end;
+
+  if eoShowDebugInfo in vExeOptions then
+    Writeln(Copyright);
+
   try
     ExecuteScript();
   finally
