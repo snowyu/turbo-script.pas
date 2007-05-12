@@ -7,6 +7,58 @@ TODO:
     Syntax    {$MaxStackSize  Size[KB|MB] }
     注意：必须放在Program|Unit之后
 
+2007-5-12 7:57
++ pure pascal interpreter: TurboInterpreter.pas
+  其实目前来说初始化并不太重要！
+  重要的是能在脚本内调用Delphi的函数！
+  基本测试通过，只测试了涉及test1.tf, test2.tf脚本的。
+
+* [Bug] the ModuleName is not saved to the file.
+  考虑是否需要 TurboModule.FName field 保存 ModuleName(重复)
+!* [Bug] ModuleParent is not set or convert to related or absolute address!
+2007-5-11 7:06
+* [AppDomain] AppDomain.Create(aMemory: TCustomTruboModule = nil);
+  if aMemory is not nil then the AppDomain will create one and maintain it.
+  这样，可建立单独AppDomain 初始化某个模块而不影响主AppDomain。
+  不过我觉得，还是在VM指令里弄比较好！
+
+!* [Bug] Need resolve the address for the loaded module!
+  how to decide whether resolve the address of the moudle, after load the module?
+  1. 执行前判定
+     执行cctor初始化模块前
+  2. 加载后根据谁加载的，就和谁的状态一致(只要不人为更改模块的 IsAddrResolved 属性值，就没有问题)。
+     IsAddrResolved 应该作为内部属性，而且运行后就不能改变！
+!+ 执行cctor初始化模块和cdtor解构释放模块
+   初始化cctor(Type Initializer): 执行时  规定不能在其中调用父类的cctor，只能是负责处理自己的！
+     当处于按需加载的情况下初始化模块
+       加载的时候？
+     当处于预先加载的情况下初始化模块
+       LoadUsedModules？
+   cdtor(FInit): 停止运行前或释放模块内存前【可以暂时不忙的】
+!+ 将过程参数信息放入MetaInfo，
+  !+ 调用Delphi内部过程,外部DLL过程
+  !+ uTurboSystemModule.pas
+     系统模块,全部由Delphi的函数组成。
+  
+!+ 在基础上构造 MeBrainScript
+  按照我的想法，那么一个模块变成了一个动作放于数据库中了。
+  属性，字段也是全部保存在数据库中。而模块变量则变成了动作的本地局部变量！
+  可能俺的 MeBrainScript 就是这样:
+  Action /文/学/记/日@编辑()[: Integer]
+    'Class /文/学/记/日/   'Owner
+    '局部变量
+    Var i: Integer;
+  End Action
+  自举引导模块(也是Action)：
+  Action /SYS@Main
+  End Action
+  还有窗体，事件的处理？
+  动作可以有表现（窗体），也可以没有！
+  如果有的话，放在哪里？
+  在用一个blob用于存放窗体？窗体就用dfm格式。
+  然后如何能在脚本中访问窗体的控件？以及联系事件到脚本里面的。
+
+
 2007-5-10 15:04
 ~ 修改提炼 TCustomTurboModule 然后作为TurboScript类机构
   各个类在内存的存放同于 TCustomTurboModule， 并且同样放在 TurboAccessor 中受到管理。
@@ -20,12 +72,21 @@ TODO:
 * 从 TCustomTurboModule 类中取缔 GlobalOptions 指针。GlobalOptions 放在两个地方; AppDomain 
    Executor 增加GlobalOptions指针指向AppDomain的 GlobalOptions.
 * [X86Interpreter] 增加使用 ECX 保存 GlobalOptions ！
-  近过程调用速度提升一倍！超越汇编过程调用速度!
+  近过程调用速度提升
 
 * [Bug] tsrun.dpr memory leak found when type: tstrun -d
 
 2007-5-2 18:04
 ~ 发现 FreePascal也有 {$MINENUMSIZE 4} 参数，不过它默认是4，而delphi默认为1.
+  这个控制的是枚举类型！！不是集合类型！！
+  集合类型 FPC 支持两种，< 32个元素的用 一个DWord实现，> 32个元素的用8个Dword实现。
+  而Delphi则是 <8 的用byte, <16用word, <32 用dword.
+  为了保持兼容性，最好不要在FPC使用集合类型！
+!* [Bug] [FPC]
+   ParamList.DelimitedText := Trim(Copy(vOptionName, j, Length(vOptionName)-j));
+   当 {$Message 'dsfsdfaf GOOD!'}
+   被分作两行，最后一行为 "!" 多了一个！而如果这样 {$Message 'dsfsdfaf GOOD!!'}则没有问题！！
+
 
 2007-4-29 17:33
 * IsAddrResolved 将其放入 数据区的保留内存！

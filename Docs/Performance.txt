@@ -87,6 +87,8 @@ TurboScript½âÊÍÆ÷ÔòÓÖÊÇÓÃ¸ß¶ÈÓÅ»¯µÄx86Ç¶Èë»ã±àÐ´µÄ£¬ÕâÊÇTurboScript½âÊÍÆ÷ÔËÐÐ¸ßÐ
 </code>
  
 ½á¹ûÔËÐÐÊ±¼ä£º87£»ÊÇx86Ö´ÐÐËÙ¶ÈµÄ62%£»¿ÕºÄÎª38%
+×îÐÂ½á¹ûÊÇ: 83£»
+PurePascalEngineÔËÐÐÊ±¼ä: 153
 
 
 == ×Ó¹ý³Ìµ÷ÓÃµÄËÙ¶È±ÈÆ´ ==
@@ -152,7 +154,8 @@ count = iAdd(count, 300)
 //--¼ÆÊ±½áÊø
 </code>
 ½á¹ûÔËÐÐÊ±¼ä£º169£»ÊÇx86Ö´ÐÐËÙ¶ÈµÄ75%£»¿ÕºÄÎª25%
-×îÐÂ½á¹ûÊÇ: 83£»ÊÇx86Ö´ÐÐËÙ¶ÈµÄ151%£»¿ÕºÄÎª0%
+×îÐÂ½á¹ûÊÇ: 164£»ÊÇx86Ö´ÐÐËÙ¶ÈµÄ76%£»¿ÕºÄÎª24%
+PurePascalEngineÔËÐÐÊ±¼ä: 310
 
 === TurboScript ×Ó¹ý³ÌÄ£¿éÖ®¼äµÄVM DLLÔ¶µ÷ÓÃÐ§ÂÊ ===
 <code>
@@ -171,6 +174,7 @@ count = iAdd(count, 300)
 ²»ÆôÓÃ°´Ðè¼ÓÔØ¼¼Êõ£¬¶øÊÇÔ¤ÏÈ¼ÓÔØÄ£¿é£º
 ½á¹ûÔËÐÐÊ±¼ä£º202  <Èç¹û²»Ê¹ÓÃCache¹¦ÄÜÃ¿´Î¶¼Òª²éÕÒËù»¨Ê±¼ä£º1790>
 ×îÐÂ½á¹ûÊÇ: 191
+PurePascalEngineÔËÐÐÊ±¼ä: 423(Ô¤ÏÈ¼ÓÔØ)
 
 == ÍøÕ¾ ==
  * Lua: http://www.lua.org

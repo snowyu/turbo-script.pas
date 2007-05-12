@@ -75,14 +75,14 @@ begin
         if j > 0 then
         begin
           inc(j);
-          ParamList.DelimitedText := Copy(vOptionName, j, Length(vOptionName)-j);
+          ParamList.DelimitedText := Trim(Copy(vOptionName, j, Length(vOptionName)-j));
           Dec(j);
           Delete(vOptionName, j, MaxInt);
         end;
           if (Length(vOptionName) > 0) then
           begin
             vEnabled := cosDefault;
-            writeln('ApplyCompilerOption:',vOptionName);
+            writeln('ApplyCompilerOption:',vOptionName, ', options:"', ParamList.Count, '"');
             if vOptionName[Length(vOptionName)] = '+' then 
             begin
               vEnabled := cosEnable;
@@ -255,7 +255,7 @@ PRODUCTIONS
     ( "PROGRAM"                                        (. FModule.ModuleType := mtProgram; .)
       |"UNIT"                                          (. FModule.ModuleType := mtLib; .) 
     )
-    Identifier                                         (. FModule.Name := LexString; .)
+    Identifier                                         (. SaveModuleName(LexString); .)
     [DeclarationBlock]  
     "BEGIN"                                            (. FInitProcCFA := FModule.UsedMemory;  .)
     ASMStatementBlock

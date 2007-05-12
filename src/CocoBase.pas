@@ -1,6 +1,8 @@
 unit CocoBase;
 {Base components for Coco/R for Delphi grammars for use with version 1.3}
 
+{$I TurboScript.inc}
+
 {$DEFINE REMOVE_DEPRECATED}
 
 interface
@@ -262,6 +264,7 @@ type
   protected
     procedure Init;
     procedure Final;
+    procedure SaveModuleName(const aName: string);
     function  DefineWordBegin(var aWord: TTurboSimpleWord): Boolean;
     procedure DefineWordEnd();
     procedure PushString(const aStr: string);
@@ -663,6 +666,7 @@ begin
   fListStream := TMemoryStream.Create;
   fErrorList := TList.Create;
   FModule := TCustomTurboModule.Create;
+  FModule.ModuleDate := DateTimeToTimeStamp(Date);
   //FModule.GlobalOptions := @FTurboGlobalOptions;
 end; {Create}
 
@@ -1639,6 +1643,20 @@ begin
     FModule.AddOpToMem(opPushInt);
     FModule.AddIntToMem(Ord(s[i])); 
   end;
+end;
+
+procedure TCocoRGrammar.SaveModuleName(const aName: string);
+begin
+  FModule.Name := aName;
+  with FModule do 
+    if aName <> '' then
+    begin
+      PTurboPreservedDataMemory(DataMemory).ModuleName := Pointer(UsedDataSize);
+      AddBufferToData(aName[1], Length(aName));
+      AddByteToData(0);
+    end
+    else
+      PTurboPreservedDataMemory(DataMemory).ModuleName := nil;
 end;
 
 procedure TCocoRGrammar.Init;

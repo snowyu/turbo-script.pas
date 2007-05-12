@@ -280,8 +280,9 @@ FieldList
 MethodList
 virtual .ctor  : 实例构造器方法
 virtual .dtor  : 实例Destructor方法
-static .cctor : 类构造器（Constructor）方法
-static .cdtor : 类Destructor方法
+static .cctor : 类构造器（Constructor）方法 (在 CLR中是作为 Type Initializer出现)
+                规定不能在其中调用父类的cctor，只能是负责处理自己的！
+static .cdtor : 类Destructor方法(由于在CLR中 cctor 只是为了对静态字段进行赋值，所以并没有 cdtor方法)
 
 在什么时候执行cctor方法？
 1. 在第一次访问该类型的任何成员(方法或字段)的时候，执行
@@ -299,6 +300,7 @@ This means that calling a static method on a beforefieldinit type does not guara
 
 [BeforeFieldInit is the real differentiating factor between static constructors and Type Initializers, people often get confused with static constructors and Type Initializers]
 
+The C# Compiler sets the beforefieldinit attribute for all types that lack an explicit type initializer method.
 
 === 基本类型 ===
 系统内定的类型：

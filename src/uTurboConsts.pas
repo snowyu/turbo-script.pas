@@ -46,6 +46,7 @@ resourcestring
 
 type
   PTsInt = ^ tsInt;
+  PTsUInt= ^ tsUInt;
   tsInt  = LongInt;
   tsUInt = LongWord; 
   tsPointer = Pointer;
@@ -250,6 +251,8 @@ type
      , psHaltError
   );
   TTurboProcessorStates = set of TTurboProcessorState;
+
+  PTurboProcessorErrorCode = ^ TTurboProcessorErrorCode;
   {
     @param errOutMem 代码区内存无可用的空间
     @param errOutOfMetaData MetaData区已无可用的空间
