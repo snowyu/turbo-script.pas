@@ -7,6 +7,9 @@
 }
 program tsrun;
 
+{$I TurboScript.inc}
+{$DEFINE PUREPASCAL}
+
 {$APPTYPE CONSOLE}
 
 uses
@@ -16,11 +19,15 @@ uses
   , uTurboConsts
   , uTurboExecutor
   , uTurboModuleFileAccessor
+  {$IFDEF PUREPASCAL}
+  , TurboInterpreter
+  {$ELSE}
   , TurboX86Interpreter
+  {$ENDIF}
   ;
 
 type
-  TConsoleInterpreter = Class(TTurboX86Interpreter)
+  TConsoleInterpreter = Class({$IFDEF PUREPASCAL}TTurboInterpreter{$ELSE}TTurboX86Interpreter{$ENDIF})
   protected
     procedure DoPrintChar(aChar: Char); override;
     procedure DoPrintString(const aStr: String); override;
@@ -134,7 +141,7 @@ begin
           writeln(aFileName + ' loading...');
           writeln('');
         end;
-        LoadFromStream(vStream);
+        Memory.LoadFromStream(vStream);
         FreeAndNil(vStream);
         QueryPerformanceCounter(tBegin);
         Execute();
@@ -144,14 +151,14 @@ begin
         LastAddr := tsInt(GlobalOptions.ErrorAddr);// - tsInt(Memory);
 
         P := Executor.SP;
-        if (eoShowDebugInfo in vExeOptions) and (Integer(P) < (Integer(ParameterStack) + ParameterStackSize * SizeOf(tsInt) - SizeOf(tsInt)))  then
+        if (eoShowDebugInfo in vExeOptions) and (Integer(P) < GlobalOptions.ParamStackBottom)  then
         begin
         WriteLn('');
         WriteLn('______________________________');
         WriteLn('The ParameterStack Data :');
         i := 0;
         //Write('':2);
-        while Integer(P) < (Integer(ParameterStack) + ParameterStackSize * SizeOf(tsInt) - SizeOf(tsInt)) do
+        while Integer(P) < GlobalOptions.ParamStackBottom do
         begin
           r := PInteger(P)^;
           Inc(Integer(P), SizeOf(Integer));
@@ -167,13 +174,13 @@ begin
         end;
 
         P := Executor.RP;
-        if (eoShowDebugInfo in vExeOptions) and (Integer(P) < (Integer(ReturnStack)+ReturnStackSize * SizeOf(Pointer) )) then
+        if (eoShowDebugInfo in vExeOptions) and (Integer(P) < GlobalOptions.ReturnStackBottom) then
         begin
         WriteLn('______________________________');
         WriteLn('The ReturnStack Data :');
         i := 0;
         //Write('  ');
-        while Integer(P) < (Integer(ReturnStack)+ReturnStackSize * SizeOf(Pointer)) do
+        while Integer(P) < GlobalOptions.ReturnStackBottom do
         begin
           r := PInteger(P)^;
           Inc(Integer(P), SizeOf(Integer));
@@ -256,7 +263,7 @@ begin
   if eoShowDebugInfo in vExeOptions then 
   begin
     WriteLn('');
-    writeln('ScriptExecTime(',c,'):',c/CountFreq*1000, ' (ms)');
+    writeln('ScriptExecTime(',c,'):',c/CountFreq*1000*1000 :8:4, ' (us)');
   end;
   aFileName := '';
   s := '';
