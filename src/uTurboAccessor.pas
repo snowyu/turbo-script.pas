@@ -81,10 +81,16 @@ type
   public
     constructor Create;
     destructor Destroy; override;
+    {: Inserts a new module at the end of the Modules list. if already exists
+            then return -1 else return the index. }
+    function Add(const aModule: TCustomTurboModule): Integer;
     {: Clear and Free all Modules. }
     procedure Clear;
     {: Return the Module Count }
     function Count: Integer;
+    {: Returns the index of the first occurrence in the list of a specified
+            module name. }
+    function IndexOf(const aModuleName: String): Integer;
     function RegisterAccessor(const AccessorClass: TTurboModuleAccessorClass;
             const IsDefault: Boolean = False): Boolean;
     {: if find then create and return the module Executor else return nil. }
@@ -166,6 +172,19 @@ begin
   inherited Destroy;
 end;
 
+function TTurboModuleManager.Add(const aModule: TCustomTurboModule): Integer;
+begin
+  Result := IndexOf(aModule.Name);
+  if Result = -1 then
+  begin
+    Result := FModules.Add(aModule);
+    if Result >= 0 then
+      aModule.FreeNotification(DoBeforeTheModuleFree);
+  end
+  else //already exists.
+    Result := -1;
+end;
+
 procedure TTurboModuleManager.Clear;
 begin
   while FModules.Count > 0 do
@@ -185,6 +204,18 @@ end;
 function TTurboModuleManager.GetItems(Index: Integer): TCustomTurboModule;
 begin
   Result := TCustomTurboModule(FModules[Index]);
+end;
+
+function TTurboModuleManager.IndexOf(const aModuleName: String): Integer;
+begin
+  for Result := 0 to FModules.Count - 1 do
+  begin
+    if TCustomTurboModule(FModules[Result]).Name = aModuleName then
+    begin
+      Exit;
+    end;
+  end;
+  Result := -1;
 end;
 
 function TTurboModuleManager.iRequire(const aModuleName: string; const
