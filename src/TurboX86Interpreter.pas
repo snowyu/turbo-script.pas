@@ -7,11 +7,9 @@ ESP: 返回堆栈指针.记住压入减少，弹出增加地址。
 EBP: 数据栈指针，基址指针放在内存某个单元中。所以EBP总是指向次栈顶。
 EBX: 为数据栈栈顶。 
 ESI: 指向当前指令地址
-EDX: 状态寄存器(
-仅当条件编译指令：TurboScript_FullSpeed开启时使用，否则为临时寄存器)
-TTurboForthProcessorStates, 为了能控制停止,状态寄存器放于保留内存中了。
 EAX: W Register 临时寄存器
-ECX:  临时寄存器
+EDX: 临时寄存器
+ECX:  指向GlobalOptions
 
 EDI: FDataMemory基址
 
@@ -120,15 +118,17 @@ begin
     MOV  EDI, [EDI].TTurboMemoryModuleAccess.FDataMemory
     //PUSH [EAX].FParameterStack
 
+    //Move the GlobalOptions to ECX
+    MOV  ECX, Self.FGlobalOptions
+    //move the currrent script VM code address to PC.
     MOV  ESI, [EAX].FMemory  //ESI: IP
     MOV  ESI, [ESI].TTurboMemoryModuleAccess.FMemory  //ESI: IP
     ADD  ESI, aCFA
     //BTS  EDX, psRunning
     //MOV  [EDI].TPreservedCodeMemory.States, DL
     //MOV  EBP, [EAX].FSP //SP the data stack pointer.
-    MOV  EBP, [EDI].TTurboPreservedDataMemory.GlobalOptions
-    MOV  ESP, [EBP].TTurboGlobalOptions._RP //return stack pointer: RP
-    MOV  EBP, [EBP].TTurboGlobalOptions._SP
+    MOV  ESP, [ECX].TTurboGlobalOptions._RP //return stack pointer: RP
+    MOV  EBP, [ECX].TTurboGlobalOptions._SP
     XOR  EBX, EBX //clear the TOS
     //MOV  EDX, EAX
     //STD  //the EDI will be decremented.
@@ -136,15 +136,16 @@ begin
     //PUSH @@ReturnAdr
     CALL  iVMInit
   @@ReturnAdr:
-    MOV  EAX, [EDI].TTurboPreservedDataMemory.GlobalOptions
-    CMP  EBP, [EAX].TTurboGlobalOptions.ParamStackBottom
+    //MOV  EAX, [EDI].TTurboPreservedDataMemory.GlobalOptions
+    CMP  EBP, [ECX].TTurboGlobalOptions.ParamStackBottom
   //  CMP  EBP, [EDI].TPreservedCodeMemory.ParamStackBottom
     JE   @@skipStoreTOS
     //数据总是指向栈顶
-    //数据栈中，栈底的数据是无意义的。
     XCHG ESP, EBP
     PUSH EBX
     XCHG ESP, EBP
+    //数据栈中，栈底的数据是无意义的。Skip
+    SUB  [ECX].TTurboGlobalOptions.ParamStackBottom, TYPE(tsInt)
   @@skipStoreTOS:
 
     //MOV [ESI]
@@ -152,11 +153,11 @@ begin
     //POP EAX
     //POP EAX
     //MOV  EAX, [EDI].TTurboPreservedDataMemory.Executor
-    MOV  [EAX].TTurboGlobalOptions._RP, ESP
-    MOV  [EAX].TTurboGlobalOptions._SP, EBP
-    MOV  [EAX].TTurboGlobalOptions._PC, ESI
+    MOV  [ECX].TTurboGlobalOptions._RP, ESP
+    MOV  [ECX].TTurboGlobalOptions._SP, EBP
+    MOV  [ECX].TTurboGlobalOptions._PC, ESI
 
-    MOV  EAX, [EAX].TTurboGlobalOptions.Executor
+    MOV  EAX, [ECX].TTurboGlobalOptions.Executor
 
     MOV  ESP, [EAX].TTurboX86Interpreter.FOldESP
     MOV  EBP, [EAX].TTurboX86Interpreter.FOldEBP
@@ -172,10 +173,8 @@ end;
   
 procedure iVMInit;
 asm
-  MOV  EAX, [EDI].TTurboPreservedDataMemory.GlobalOptions
- 
-  MOV  [EAX].TTurboGlobalOptions.ReturnStackBottom, ESP
-  MOV  [EAX].TTurboGlobalOptions.ParamStackBottom, EBP
+  MOV  [ECX].TTurboGlobalOptions.ReturnStackBottom, ESP
+  MOV  [ECX].TTurboGlobalOptions.ParamStackBottom, EBP
   //LEA  ECX, GTurboCoreWords
   //MOV  DL, [EDI].TPreservedCodeMemory.States
   JMP  iVMNext
@@ -184,8 +183,7 @@ end;
 //the interpreter core here:
 procedure iVMNext;
 asm
-  MOV  EAX, [EDI].TTurboPreservedDataMemory.GlobalOptions
-  MOV  DL, [EAX].TTurboGlobalOptions.States
+  MOV  DL, [ECX].TTurboGlobalOptions.States
 
   //TODO: BT is a 486 directive.
   BT EDX, psRunning //cTurboScriptIsRunningBit
@@ -202,8 +200,8 @@ asm
   //CMP  EAX, cMaxTurboVMInstructionCount
   //JAE   @@IsUserWord
 @@IsVMCode:
-  MOV  ECX, OFFSET GTurboCoreWords
-  MOV  EAX, [ECX+EAX*Type(tsInt)]
+  MOV  EDX, OFFSET GTurboCoreWords
+  MOV  EAX, [EDX+EAX*Type(tsInt)]
   TEST EAX, EAX
   //CMP  EAX, 0
   JZ   @@BadOpError
@@ -286,7 +284,6 @@ asm
   MOV [EDI].TPreservedCodeMemory.States, DL
   JMP iVMNext
 }
-  MOV  ECX, [EDI].TTurboPreservedDataMemory.GlobalOptions
   MOV  [ECX].TTurboGlobalOptions.LastErrorCode, ErrorCode  
   //cmpare the ESP and ReturnStackBottom, it should be equ.
   CMP  ESP, [ECX].TTurboGlobalOptions.ReturnStackBottom
@@ -324,7 +321,6 @@ end;
 
 procedure _iVMErrorAt(ErrorCode: tsInt; ErrorAddr: Pointer);
 asm
-  MOV  ECX, [EDI].TTurboPreservedDataMemory.GlobalOptions
   MOV  [ECX].TTurboGlobalOptions.ErrorAddr, ErrorAddr
   JMP  _iVMHalt
 end;
@@ -390,15 +386,16 @@ asm
   TEST EAX, EAX //CMP EAX, 0
   JZ  @@DoLocalEnterFar
   ADD  EAX, EDI //PTurboModuleRefInfo real addr
-  MOV  ECX, [EAX].TTurboModuleRefInfo.Handle
-  TEST ECX, ECX //CMP ECX, 0
+  MOV  EDX, [EAX].TTurboModuleRefInfo.Handle
+  TEST EDX, EDX //CMP ECX, 0
   JZ   @@RequireModule
-  MOV  EDI, [ECX].TTurboMemoryModuleAccess.FDataMemory
+  MOV  EDI, [EDX].TTurboMemoryModuleAccess.FDataMemory
   JMP  @@exit
 
 @@RequireModule: //find and load the module into the memory.
   PUSH EAX  //keep the PTurboModuleInfo 
   PUSH EBX
+  PUSH ECX
   PUSH ESI
   PUSH EBP
   
@@ -410,13 +407,14 @@ asm
   CALL TTurboMemoryModuleAccess.RequireModule
   POP EBP
   POP ESI
+  POP ECX
   POP EBX
-  POP ECX  //restore the PTurboModuleInfo
+  POP EDX  //restore the PTurboModuleInfo
 
   TEST  EAX, EAX
   JZ   @@NotFoundError
 
-  MOV [ECX].TTurboModuleRefInfo.Handle, EAX
+  MOV [EDX].TTurboModuleRefInfo.Handle, EAX
   //Copy CPU States to the New Module Memory.
   //MOV EDI, [ESP] //restore the old Module MemoryBase in TOS
   //MOV  CL, [EDI].TPreservedCodeMemory.States
@@ -445,10 +443,9 @@ procedure _DoAssert;
 asm
   MOV  EDX, [EBP]  //EDX <- the second Stack TOp
   ADD  EDX, EDI 
-  MOV  EAX, [EDI].TTurboPreservedDataMemory.GlobalOptions
   //store the current ESP
-  MOV  [EAX].TTurboGlobalOptions._RP, ESP
-  MOV  EAX, [EAX].TTurboGlobalOptions.Executor
+  MOV  [ECX].TTurboGlobalOptions._RP, ESP
+  MOV  EAX, [ECX].TTurboGlobalOptions.Executor
 
   //restore the Delphi system ESP
   MOV  ESP, [EAX].TTurboX86Interpreter.FOldESP
@@ -465,8 +462,7 @@ asm
   POP  EDI
 
   //restore the TurboScript system ESP
-  MOV  EAX, [EDI].TTurboPreservedDataMemory.GlobalOptions
-  MOV  ESP, [EAX].TTurboGlobalOptions._RP 
+  MOV  ESP, [ECX].TTurboGlobalOptions._RP 
 
    INC  EBP
    INC  EBP
@@ -705,8 +701,8 @@ asm
   //EBX is TOS
   MOV EAX, EBX
   XOR EBX, EBX
-  MOV ECX, EDI
-  MOV BL, [ECX+EAX]
+  MOV EDX, EDI
+  MOV BL, [EDX+EAX]
   JMP  iVMNext
 end;
 
@@ -715,8 +711,8 @@ asm
   //EBX is TOS
   MOV EAX, EBX
   XOR EBX, EBX
-  MOV ECX, EDI
-  MOV BX, [ECX+EAX]
+  MOV EDX, EDI
+  MOV BX, [EDX+EAX]
   JMP  iVMNext
 end;
 
@@ -750,8 +746,7 @@ asm
   INC EBP
   MOV EBX, [EBP]
   //check whether is stackbottom
-  MOV EAX, [EDI].TTurboPreservedDataMemory.GlobalOptions
-  CMP EBP, [EAX].TTurboGlobalOptions.ParamStackBase
+  CMP EBP, [ECX].TTurboGlobalOptions.ParamStackBase
   JLE @@exit //already is bottom then exit.
   INC EBP 
   INC EBP 
@@ -779,8 +774,7 @@ asm
   INC EBP
   MOV EBX, [EBP]
   //check whether is stackbottom
-  MOV EAX, [EDI].TTurboPreservedDataMemory.GlobalOptions
-  CMP EBP, [EAX].TTurboGlobalOptions.ParamStackBase
+  CMP EBP, [ECX].TTurboGlobalOptions.ParamStackBase
   JLE @@exit //already is bottom then exit.
   INC EBP 
   INC EBP 
@@ -801,8 +795,7 @@ asm
   INC EBP
   MOV EBX, [EBP]
   //check whether is stackbottom
-  MOV EAX, [EDI].TTurboPreservedDataMemory.GlobalOptions
-  CMP EBP, [EAX].TTurboGlobalOptions.ParamStackBase
+  CMP EBP, [ECX].TTurboGlobalOptions.ParamStackBase
   JLE @@exit //already is bottom then exit.
   INC EBP 
   INC EBP 
@@ -823,8 +816,7 @@ asm
   INC EBP
   MOV EBX, [EBP]
   //check whether is stackbottom
-  MOV EAX, [EDI].TTurboPreservedDataMemory.GlobalOptions
-  CMP EBP, [EAX].TTurboGlobalOptions.ParamStackBase
+  CMP EBP, [ECX].TTurboGlobalOptions.ParamStackBase
   JLE @@exit //already is bottom then exit.
   INC EBP 
   INC EBP 
@@ -844,7 +836,6 @@ asm
   //Increment the data stack pointer.
   ADD  EBP, Type(tsInt)
 
-  MOV  ECX, [EDI].TTurboPreservedDataMemory.GlobalOptions
   MOV  EAX, [ECX].TTurboGlobalOptions.Executor
 
 {  //store the current ESP
@@ -856,19 +847,20 @@ asm
   PUSH EBX
   PUSH ESI
   PUSH EBP
+  PUSH ECX
 
   //MOV  EBP, [EAX].TTurboX86Interpreter.FOldEBP 
 
   MOV  ESI, [EAX]
   CALL DWORD PTR [ESI + VMTOFFSET TTurboX86Interpreter.DoPrintChar]
 
+  POP  ECX
   POP  EBP
   POP  ESI
   POP  EBX
   POP  EDI
 
 {  //restore the TurboScript system ESP
-  MOV  ECX, [EDI].TTurboPreservedDataMemory.GlobalOptions
   MOV  ESP, [ECX].TTurboGlobalOptions._RP 
 }
   JMP  iVMNext
@@ -882,11 +874,10 @@ asm
   XCHG ESP, EBP
   POP  EBX
   XCHG ESP, EBP
-  MOV  EAX, [EDI].TTurboPreservedDataMemory.GlobalOptions
   //store the current ESP
   //MOV  [EAX].TTurboGlobalOptions._RP, ESP
 
-  MOV  EAX, [EAX].TTurboGlobalOptions.Executor
+  MOV  EAX, [ECX].TTurboGlobalOptions.Executor
 
   //restore the Delphi system ESP
   //MOV  ESP, [EAX].TTurboX86Interpreter.FOldESP
@@ -895,8 +886,10 @@ asm
   PUSH EBX
   PUSH ESI
   PUSH EBP
+  PUSH ECX
   //MOV  ESI, [EAX]
   CALL TTurboX86Interpreter.DoPrintShortString
+  POP  ECX
   POP  EBP
   POP  ESI
   POP  EBX
@@ -924,7 +917,6 @@ asm
   INC  EBP
   INC  EBP
 
-  MOV  ECX, [EDI].TTurboPreservedDataMemory.GlobalOptions
   MOV  EAX, [ECX].TTurboGlobalOptions.Executor
 
 {  //store the current ESP
@@ -936,15 +928,16 @@ asm
   PUSH EBX
   PUSH ESI
   PUSH EBP
+  PUSH ECX
   MOV  ESI, [EAX]  //ESI <--- VMT For VMT Lookup.
   CALL DWORD PTR [ESI + VMTOFFSET TTurboX86Interpreter.DoPrintString]
+  POP  ECX
   POP  EBP
   POP  ESI
   POP  EBX
   POP  EDI
 
 {  //restore the TurboScript system ESP
-  MOV  ECX, [EDI].TTurboPreservedDataMemory.GlobalOptions
   MOV  ESP, [ECX].TTurboGlobalOptions._RP 
 }
 //@Skip:
@@ -954,16 +947,20 @@ end;
 //(-- int64)
 procedure vGetTickCount;
 asm
+  PUSH ECX //backup
   XCHG ESP, EBP
   PUSH EBX
+  //preserved the int64 space to store
   PUSH 0
   PUSH 0
   XCHG ESP, EBP
-  PUSH EBP
+  PUSH EBP  //push the address to store the tickCount
   CALL QueryPerformanceCounter
   XCHG ESP, EBP
   POP  EBX
   XCHG ESP, EBP
+
+  POP  ECX //restore
   JMP  iVMNext
 end;
 
@@ -978,16 +975,18 @@ asm
   MOV  ESP, [EAX].TTurboX86Interpreter.FOldESP
 }
   ADD  EBX, EDI
-  PUSH EBX
+  PUSH ECX //backup ECX
+  PUSH EBX  //push the int64-address to store the tickCount
   CALL QueryPerformanceCounter
 
 {  //restore the TurboScript system ESP
-  MOV  EAX, [EDI].TTurboPreservedDataMemory.GlobalOptions
-  MOV  ESP, [EAX].TTurboGlobalOptions._RP 
+  MOV  ESP, [ECX].TTurboGlobalOptions._RP 
 }
+  //drop the top-stack: int64 address
   XCHG ESP, EBP
-  POP  EBX
+  POP  EBX  
   XCHG ESP, EBP
+  POP  ECX //restore ECX
   JMP  iVMNext
 end;
 
