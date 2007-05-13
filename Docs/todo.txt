@@ -8,8 +8,39 @@ TODO:
     注意：必须放在Program|Unit之后
 !* [Bug] 堆栈存放的最小单位数据是tsPointer，所以量度应该以tsPointer为准。
   需要查找堆栈有关的操作修改之！
+!* [Bug] ModuleParent is not set or convert to related or absolute address!
+!+ [DUnit] 自动化测试单元
+  + 测试 TurboModule
+  + 测试 加载
+  + 测试 AppDomain
+  + 测试 执行
 
 2007-5-13 7:52
+!+ 脚本调用Delphi函数过程
+  !+ 存放过程类型到MetaInfo
+     可以挂在其上：LastTypeInfoEntry，也可以不！
+     + 设定内部类型MetaInfo
+        区分内部类型MetaInfo的Id和自定义类型的！
+        自定义类型肯定是放在 LastTypeInfoEntry 上，因此是指针；而内部类型则是id。
+        只要能保证指针地址> Max(内部Id)，则就可以区分了。
+          
+  !+ TTurboInternalFunctionList 需要增加一个 Delphi内部函数列表，用来保存过程地址和过程类型信息。
+     这个列表是直接放在AppDomain或Executor上？还是作为一种库的形式挂接！
+     不用这么麻烦吧，直接放上好了，要扩充的话，也可以在 TTurboInternalFunctionList.RegisterFunction 的形式加嘛。
+* [uTurboAccessor] TTurboModuleManager
+  + function Add(const aModule: TCustomTurboModule): Integer;
+  + function IndexOf(const aModuleName: String): Integer;
+
+* [Bug] Need resolve the address for the loaded module!
+  * 修改成了在模块内调用RequireModule加载进来的 IsAddrResolved 赋值成与自己一样。
+  * AppDomain.DoModuleReset中，当 not (psCompiling in States) 的时候设置为 IsAddrResolved := True.
+  这样能够基本解决地址问题，但是如果某个模块手动修改了IsAddrResolved，嘿嘿！！
+* [Bug] AppDomain的模块没有纳入 GTurboModuleManager 管理。
+  * AppDomain.DoModuleReset中 将模块添加到 GTurboModuleManager。
+* [TurboModuleFileAccessor]注意文件名称必须完全等于定义的模块名称！！
+  如果不一样那么文件名称（不含扩展名）将作为模块名称！(see ModuleFileAccessor)
+  在DB系统中也会遇到这个问题！可以同样处理，难怪以前没有在流中保存模块名称，看样子是想以外面为准。
+
 * [Bug] [FPC] 将于文件存放有关的数据结构中的集合类型全部改之成为能确定其大小的类型，如:Byte！
   * tfcc 编译测试基本通过！
   * tsrun PurePascal FPC版本编译测试通过！
@@ -24,6 +55,10 @@ TODO:
 !* [Bug] 堆栈存放的最小单位数据是tsPointer，所以量度应该以tsPointer为准。
   需要查找堆栈有关的操作修改之！
 
+~ [CVS] rename file，实质上并不会改动cvs仓库中的文件名，只是在本地cvs隐藏目录中添加了一个rename文件，记载改变的文件名
+  因此改名后，在次提交一个改名前一样的文件名，那么在cvs仓库中，会变成 xxxxx_1.pas.v，来区分
+  因为我不懂错误的删除了文件，丢掉了一个版本的变化！呜呜！！
+
 2007-5-12 7:57
 + pure pascal interpreter: TurboInterpreter.pas
   其实目前来说初始化并不太重要！
@@ -33,6 +68,7 @@ TODO:
 * [Bug] the ModuleName is not saved to the file.
   考虑是否需要 TurboModule.FName field 保存 ModuleName(重复)
 !* [Bug] ModuleParent is not set or convert to related or absolute address!
+
 2007-5-11 7:06
 * [AppDomain] AppDomain.Create(aMemory: TCustomTruboModule = nil);
   if aMemory is not nil then the AppDomain will create one and maintain it.
