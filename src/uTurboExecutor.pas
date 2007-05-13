@@ -1300,6 +1300,7 @@ begin
   begin
     Result.UnloadNotification(NotifyModuleUnloaded);
     FreeNotification(Result.NotifyModuleFree);
+    Result.IsAddrResolved := IsAddrResolved;
   end
 end;
 
@@ -1883,6 +1884,8 @@ begin
   end;
   if not (psCompiling in States) then
     FMemory.IsAddrResolved := True;
+
+  GTurboModuleManager.Add(FMemory);
 end;
 
 procedure TTurboAppDomain.Execute(aTimeOut : Integer = 0);
