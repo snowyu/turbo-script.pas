@@ -82,7 +82,11 @@ var
   vInstruction: TTurboVMInstruction; //the instruction.
   vProc: TTurboInstructionProc;
 begin
-  While (psRunning in FGlobalOptions.States) do
+  {$IFDEF FPC}
+  While (psRunning in TTurboProcessorStates(LongWord(FGlobalOptions.States))) do
+  {$ELSE Borland}
+  While (psRunning in TTurboProcessorStates(FGlobalOptions.States)) do
+  {$ENDIF}
   begin
     vInstruction := PTurboVMInstruction(FGlobalOptions._PC)^;
     Inc(FGlobalOptions._PC);
@@ -107,7 +111,7 @@ begin
   //the new PC:
   p := p + Integer(FGlobalOptions._Mem.Code);
   //Push the current PC to return stack.
-  Dec(FGlobalOptions._RP, SizeOf(tsInt));
+  Dec(FGlobalOptions._RP, SizeOf(tsPointer));
   PtsInt(FGlobalOptions._RP)^ := FGlobalOptions._PC; 
 
   //Update the new PC
@@ -141,19 +145,40 @@ begin
 end;
 
 procedure _iVMHalt(const FGlobalOptions: PTurboGlobalOptions; ErrorCode: TTurboProcessorErrorCode);
+{$IFDEF FPC}
+var
+  vStates: TTurboProcessorStates;
+{$ENDIF}
 begin
   with FGlobalOptions^ do
   begin 
     LastErrorCode := ErrorCode;
-    Exclude(States, psRunning);
-    Include(States, psHalt);
+    {$IFDEF FPC}
+    vStates := TTurboProcessorStates(LongWord(States)); 
+    Exclude(vStates, psRunning);
+    Include(vStates, psHalt);
+    {$ELSE Borland}
+    Exclude(TTurboProcessorStates(States), psRunning);
+    Include(TTurboProcessorStates(States), psHalt);
+    {$ENDIF}
     //cmpare the RP and ReturnStackBottom, it should be equ.
     if _RP <> ReturnStackBottom then //not same so halt error
     begin
-      Include(States, psHaltError);
+      {$IFDEF FPC}
+      Include(vStates, psHaltError);
+      {$ELSE Borland}
+      Include(TTurboProcessorStates(States), psHaltError);
+      {$ENDIF}
     end
     else  
-      Exclude(States, psHaltError);
+      {$IFDEF FPC}
+      Exclude(vStates, psHaltError);
+      {$ELSE Borland}
+      Exclude(TTurboProcessorStates(States), psHaltError);
+      {$ENDIF}
+    {$IFDEF FPC}
+    States := Byte(LongWord(vStates)); 
+    {$ENDIF}
   end;
 end;
 

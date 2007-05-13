@@ -64,8 +64,8 @@ type
   TCustomTurboModule = class;
   TCustomTurboExecutor = class;
   TTurboAppDomain = class;
-  TTurboGlobalOptions = record  //do not use the packed.
-    States: TTurboProcessorStates;
+  TTurboGlobalOptions = object  //do not use the packed.
+    States: Byte; //TTurboProcessorStates; modified by FPC
     LastErrorCode: TTurboProcessorErrorCode;
     ParamStackBase: Pointer;
     ParamStackSize: Integer; //bytes
@@ -85,8 +85,10 @@ type
     AssertErrorProc: Pointer;
     //The built-in I/O routines use InOutResult to store the value that 
     //the next call to the IOResult standard function will return.
-    IOResult: tsInt;  
-    //}
+    IOResult: tsInt;
+    function GetIsRunning(): Boolean;
+    procedure SetIsRunning(const Value: Boolean);
+    property IsRunning: Boolean read GetIsRunning write SetIsRunning;   
   end;
 
   TTurboModuleClass = class of TCustomTurboModule;
@@ -497,10 +499,10 @@ type
     function GetLastErrorCode: TTurboProcessorErrorCode;
     function GetParameterStack: Pointer;
     function GetReturnStack: Pointer;
-    function GetStatus: TTurboProcessorStates;
+    function GetStates: TTurboProcessorStates;
     procedure SetParameterStack(Value: Pointer);
     procedure SetReturnStack(Value: Pointer);
-    procedure SetStatus(Value: TTurboProcessorStates);
+    procedure SetStates(Value: TTurboProcessorStates);
   public
     { Description
     为了在多个 executor 中管理共享数据栈＆返回栈以及运行参数。
@@ -542,7 +544,7 @@ type
     the Memory is related address when the status is in the psConpiling
     until the status is not in the psConpiling.
     }
-    property Status: TTurboProcessorStates read GetStatus write SetStatus;
+    property States: TTurboProcessorStates read GetStates write SetStates;
   end;
 
 
@@ -574,7 +576,7 @@ type
   TTurboPreservedDataMemory = packed record
     Code: Pointer; //need relocate addr. point to the FMemory
     //GlobalOptions: PTurboGlobalOptions; //ready move to AppDomain
-    Flags: TTurboModuleFlags;
+    Flags: Byte; //TTurboModuleFlags; modified for FPC
     //Executor: TCustomTurboExecutor; //put to the GlobalOptions
     //在执行器解耦后，可以放到全局参数中，表示该App使用的执行器单件。
     ModuleHandle: TCustomTurboModule;
@@ -585,7 +587,7 @@ type
     DataSize: tsInt; 
 
     ModuleType: TTurboModuleType;
-    ModuleOptions: TTurboScriptOptions;
+    ModuleOptions: LongWord; //TTurboScriptOptions; for FPC
     ModuleName: PChar;
     //if Module is Class then the ModuleParent is classParent
     //in LastModuleEntry 链表中
@@ -637,6 +639,44 @@ uses
 
 const
   cCurrentModuleFileForamtVersionNo = 1; 
+
+function TTurboGlobalOptions.GetIsRunning(): Boolean;
+begin
+  {$IFDEF FPC}
+  Result := TTurboProcessorStates(LongWord(States)) * [psRunning, psStepping] <> [] ;
+  {$ELSE Borland}
+  Result := TTurboProcessorStates(States) * [psRunning, psStepping] <> [] ;
+  {$ENDIF}
+end;
+
+procedure TTurboGlobalOptions.SetIsRunning(const Value: Boolean);
+{$IFDEF FPC}
+var
+  vStates: TTurboProcessorStates;
+{$ENDIF}
+
+begin
+  {$IFDEF FPC}
+  vStates := TTurboProcessorStates(LongWord(States));
+  {$ENDIF}
+
+  if Value then
+    {$IFDEF FPC}
+    Include(vStates, psRunning)
+    {$ELSE Borland}
+    Include(TTurboProcessorStates(States), psRunning)
+    {$ENDIF}
+  else
+    {$IFDEF FPC}
+    Exclude(vStates, psRunning);
+    {$ELSE Borland}
+    Exclude(TTurboProcessorStates(States), psRunning);
+    {$ENDIF}
+
+  {$IFDEF FPC}
+  States := Byte(LongWord(vStates));
+  {$ENDIF}
+end;
   
 {
 ****************************** TCustomTurboModule ******************************
@@ -830,7 +870,7 @@ begin
       Code := FMemory;
       DataSize := vPreserved;
       UsedDataSize := SizeOf(TTurboPreservedDataMemory);//SizeOf(tsInt); //preserved the first integer
-      ModuleOptions := [soAssertSupport];
+      TTurboScriptOptions(ModuleOptions) := [soAssertSupport];
 
       InitializeProc := nil;
       FinalizeProc := nil;
@@ -988,7 +1028,11 @@ end;
 
 function TCustomTurboModule.GetIsAddrResolved: Boolean;
 begin
-  Result := tfAddrResolved in PTurboPreservedDataMemory(FDataMemory).Flags;
+  {$IFDEF FPC}
+  Result := tfAddrResolved in TTurboModuleFlags(LongWord(PTurboPreservedDataMemory(FDataMemory).Flags));
+  {$ELSE Borland}
+  Result := tfAddrResolved in TTurboModuleFlags(PTurboPreservedDataMemory(FDataMemory).Flags);
+  {$ENDIF}
 end;
 
 function TCustomTurboModule.GetLastModuleRefEntry: PTurboModuleRefEntry;
@@ -1023,7 +1067,7 @@ end;
 
 function TCustomTurboModule.GetOptions: TTurboScriptOptions;
 begin
-  Result := PTurboPreservedDataMemory(FDataMemory).ModuleOptions;
+  Result := TTurboScriptOptions(PTurboPreservedDataMemory(FDataMemory).ModuleOptions);
 end;
 
 function TCustomTurboModule.GetRoot: TCustomTurboModule;
@@ -1300,8 +1344,12 @@ begin
   with PTurboPreservedDataMemory(FDataMemory)^ do
   begin
     //backup the data in the Memory
-    vFlags := Flags;
-    Flags := [];
+    {$IFDEF FPC}
+    vFlags := TTurboModuleFlags(LongWord(Flags));
+    {$ELSE Borland}
+    vFlags := TTurboModuleFlags(Flags);
+    {$ENDIF}
+    Flags := 0;
     Code := nil;
     {vParameterStack := ParameterStack;
     vReturnStack := ReturnStack;
@@ -1324,7 +1372,11 @@ begin
     //aStream.WriteBuffer(FDataMemory^, UsedDataSize);
   with PTurboPreservedDataMemory(FDataMemory)^ do
   begin
-    Flags := vFlags;
+    {$IFDEF FPC}
+    Flags := Byte(LongWord(vFlags));
+    {$ELSE Borland}
+    Flags := Byte(vFlags);
+    {$ENDIF}
     Code := FMemory;
   {  ParameterStack := vParameterStack;
     ReturnStack := vReturnStack;
@@ -1374,7 +1426,12 @@ procedure TCustomTurboModule.SetIsAddrResolved(const Value: Boolean);
 var
   vFlags: TTurboModuleFlags;
 begin
-  vFlags := PTurboPreservedDataMemory(FDataMemory).Flags;
+  {$IFDEF FPC}
+  vFlags := TTurboModuleFlags(LongWord(PTurboPreservedDataMemory(FDataMemory).Flags));
+  {$ELSE Borland}
+  vFlags := TTurboModuleFlags(PTurboPreservedDataMemory(FDataMemory).Flags);
+  {$ENDIF}
+
   if (tfAddrResolved in vFlags) <> Value then
   begin
     if Value then
@@ -1387,7 +1444,11 @@ begin
       UnResolveAddress;
       Exclude(vFlags, tfAddrResolved);
     end;
-    PTurboPreservedDataMemory(FDataMemory).Flags := vFlags;
+    {$IFDEF FPC}
+    PTurboPreservedDataMemory(FDataMemory).Flags := Byte(LongWord(vFlags));
+    {$ELSE Borland}
+    PTurboPreservedDataMemory(FDataMemory).Flags := Byte(vFlags);
+    {$ENDIF}
   end;
 end;
 
@@ -1442,7 +1503,7 @@ end;
 
 procedure TCustomTurboModule.SetOptions(Value: TTurboScriptOptions);
 begin
-  PTurboPreservedDataMemory(FDataMemory).ModuleOptions := Value;
+  PTurboPreservedDataMemory(FDataMemory).ModuleOptions := LongWord(Value);
 end;
 
 procedure TCustomTurboModule.SetOwner(const Value: TCustomTurboModule);
@@ -1602,7 +1663,7 @@ end;
 function TCustomTurboExecutor.GetOptions: TTurboScriptOptions;
 begin
   if Assigned(FMemory) then
-    Result := PTurboPreservedDataMemory(FMemory.FDataMemory).ModuleOptions
+    Result := TTurboScriptOptions(PTurboPreservedDataMemory(FMemory.FDataMemory).ModuleOptions)
   else
     //Result := [];
     Raise ETurboScriptError.Create(rsTurboScriptNoMemError);
@@ -1635,7 +1696,11 @@ end;
 function TCustomTurboExecutor.GetStates: TTurboProcessorStates;
 begin
   if Assigned(FGlobalOptions) then
-    Result := FGlobalOptions.States
+    {$IFDEF FPC}
+    Result := TTurboProcessorStates(LongWord(FGlobalOptions.States))
+    {$ELSE Borland}
+    Result := TTurboProcessorStates(FGlobalOptions.States)
+    {$ENDIF}
   else
     Result := [];
 end;
@@ -1683,11 +1748,12 @@ begin
   if not Assigned(FGlobalOptions) then
     Raise ETurboScriptError.Create(rsTurboScriptNoGlobalOptionsError);
 
-  if (psRunning in FGlobalOptions.States) then
+  if (FGlobalOptions.IsRunning) then
     raise ETurboScriptError.CreateRes(@rsTurboScriptAlreayRunningError);
 
 
-  FGlobalOptions.States := FGlobalOptions.States + [psRunning];
+  FGlobalOptions.IsRunning := True;
+  //TTurboProcessorStates(FGlobalOptions.States) := TTurboProcessorStates(FGlobalOptions.States) + [psRunning];
   FMemory.IsAddrResolved := True;
   //Include(PTurboPreservedDataMemory(FDataMemory).GlobalOptions.States, psRunning);
 end;
@@ -1740,7 +1806,7 @@ end;
 procedure TCustomTurboExecutor.SetOptions(Value: TTurboScriptOptions);
 begin
   if Assigned(FMemory) then
-    PTurboPreservedDataMemory(FMemory.FDataMemory).ModuleOptions := Value;
+    PTurboPreservedDataMemory(FMemory.FDataMemory).ModuleOptions := LongWord(Value);
 end;
 
 procedure TCustomTurboExecutor.SetPC(Value: Pointer);
@@ -1766,13 +1832,17 @@ var
   vChanged: Boolean;
 begin
   if Assigned(FGlobalOptions) then
-    FGlobalOptions.States := Value;
+    {$IFDEF FPC}
+    FGlobalOptions.States := Byte(LongWord(Value));
+    {$ELSE Borland}
+    FGlobalOptions.States := Byte(Value);
+    {$ENDIF}
 end;
 
 procedure TCustomTurboExecutor.Stop;
 begin
   if Assigned(FGlobalOptions) then
-    FGlobalOptions.States := FGlobalOptions.States - [psRunning];
+    FGlobalOptions.IsRunning := False;
 end;
 
 {
@@ -1810,19 +1880,31 @@ begin
     Integer(_SP) := Integer(ParamStackBase) + ParamStackSize * SizeOf(tsInt);
     Integer(_RP) := Integer(ReturnStackBase) + ReturnStackSize * SizeOf(Pointer);
     LastErrorCode := errNone;
-    if not (psCompiling in States) then
-      FMemory.IsAddrResolved := True;
   end;
+  if not (psCompiling in States) then
+    FMemory.IsAddrResolved := True;
 end;
 
 procedure TTurboAppDomain.Execute(aTimeOut : Integer = 0);
+
+  {$IFDEF FPC}
+  var
+    vFlags: TTurboModuleFlags;
+  {$ENDIF}
+
 begin
   if Assigned(Executor) then
   begin
-    if FGlobalOptions.States * [psRunning, psStepping] <> [] then
+    if States * [psRunning, psStepping] <> [] then
       Raise ETurboScriptError.Create(rsTurboScriptAlreayRunningError);
     //IsAddrResolved := True; //done in executor
-    Include(PTurboPreservedDataMemory(FMemory.FDataMemory).Flags, tfInited);
+    {$IFDEF FPC}
+    vFlags := TTurboModuleFlags(LongWord(PTurboPreservedDataMemory(FMemory.FDataMemory).Flags));
+    Include(vFlags, tfInited);
+    PTurboPreservedDataMemory(FMemory.FDataMemory).Flags := Byte(LongWord(vFlags));
+    {$ELSE Borland}
+    Include(TTurboModuleFlags(PTurboPreservedDataMemory(FMemory.FDataMemory).Flags), tfInited);
+    {$ENDIF}
     FExecutor.ExecuteCFA(FMemory.InitializeProc);
   end;
 end;
@@ -1864,9 +1946,13 @@ begin
   Result := FGlobalOptions.ReturnStackSize;
 end;
 
-function TTurboAppDomain.GetStatus: TTurboProcessorStates;
+function TTurboAppDomain.GetStates: TTurboProcessorStates;
 begin
-  Result := FGlobalOptions.States;
+  {$IFDEF FPC}
+  Result := TTurboProcessorStates(LongWord(FGlobalOptions.States));
+  {$ELSE Borland}
+  Result := TTurboProcessorStates(FGlobalOptions.States);
+  {$ENDIF}
 end;
 
 procedure TTurboAppDomain.SetExecutorClass(Value: TTurboExecutorClass);
@@ -1875,7 +1961,7 @@ begin
   begin
     if Assigned(FExecutor) then
     begin
-      if FGlobalOptions.States * [psRunning, psStepping] <> [] then
+      if FGlobalOptions.IsRunning then
         Raise ETurboScriptError.Create(rsTurboScriptAlreayRunningError);
       FreeAndNil(FExecutor);
       FGlobalOptions.Executor := nil;
@@ -1891,7 +1977,7 @@ end;
 
 procedure TTurboAppDomain.SetParameterStackSize(const Value: Integer);
 begin
-  if not (psRunning in FGlobalOptions.States) and (ParameterStackSize <> Value) then
+  if not FGlobalOptions.IsRunning and (ParameterStackSize <> Value) then
   begin
     FGlobalOptions.ParamStackSize := Value;
     ReallocMem(FGlobalOptions.ParamStackBase, (Value+1)*SizeOf(tsInt));
@@ -1908,7 +1994,7 @@ end;
 
 procedure TTurboAppDomain.SetReturnStackSize(const Value: Integer);
 begin
-  if not (psRunning in FGlobalOptions.States) and (ReturnStackSize <> Value) then
+  if not FGlobalOptions.IsRunning and (ReturnStackSize <> Value) then
   begin
     FGlobalOptions.ReturnStackSize := Value;
     ReallocMem(FGlobalOptions.ReturnStackBase, (Value+1)*SizeOf(Pointer));
@@ -1918,14 +2004,24 @@ begin
   end;
 end;
 
-procedure TTurboAppDomain.SetStatus(Value: TTurboProcessorStates);
+procedure TTurboAppDomain.SetStates(Value: TTurboProcessorStates);
 var
   vChanged: Boolean;
 begin
-  if (Value <> FGlobalOptions.States) then
+  with FGlobalOptions do
+  {$IFDEF FPC}
+  if (Value <> TTurboProcessorStates(LongWord(States))) then
+  {$ELSE Borland}
+  if (Value <> TTurboProcessorStates(States)) then
+  {$ENDIF}
   begin
-    vChanged := psCompiling in (Value * FGlobalOptions.States);
-    FGlobalOptions.States := Value;
+  {$IFDEF FPC}
+    vChanged := psCompiling in (Value * TTurboProcessorStates(LongWord(States)));
+    States := Byte(LongWord(Value));
+  {$ELSE Borland}
+    vChanged := psCompiling in (Value * TTurboProcessorStates(States));
+    TTurboProcessorStates(States) := Value;
+  {$ENDIF}
     if vChanged then
     begin
       if psCompiling in Value then

@@ -49,7 +49,7 @@ type
   PTsUInt= ^ tsUInt;
   tsInt  = LongInt;
   tsUInt = LongWord; 
-  tsPointer = Pointer;
+  tsPointer = Pointer; //the min unit for stack.
   PTsIntArray = ^tsIntArray; 
   tsIntArray = array [0..(High(tsInt) div 8)] of tsInt;
 
@@ -66,10 +66,21 @@ type
     @param soTypeSafety the module is TypeSafety. all the indentities own the TypeInfo.
                         当模块有这个参数的时候，编译器将强制把所有标识符的的类型信息编入内存。
   }
+  //## the set is LongWord in Delphi
   TTurboScriptOption = (soOptimize, soLoadOnDemand 
     , soBindingRuntime, soBindingCompileTime
-    , soTypeSafety
-    , soAssertSupport
+    , soTypeSafety, soAssertSupport
+    , soPreserved1
+    , soPreserved2
+    , soPreserved3
+    , soPreserved4
+    , soPreserved5
+    , soPreserved6
+    , soPreserved7
+    , soPreserved8
+    , soPreserved9
+    , soPreserved10
+    , soPreserved11
   );
   TTurboScriptOptions = set of TTurboScriptOption;
 

@@ -6,6 +6,23 @@ TODO:
 !+ MaxStackSize directive 设定数据栈的大小。 要修改结构，才能放入,只有在Program和DLL(Package)中才会存在。
     Syntax    {$MaxStackSize  Size[KB|MB] }
     注意：必须放在Program|Unit之后
+!* [Bug] 堆栈存放的最小单位数据是tsPointer，所以量度应该以tsPointer为准。
+  需要查找堆栈有关的操作修改之！
+
+2007-5-13 7:52
+* [Bug] [FPC] 将于文件存放有关的数据结构中的集合类型全部改之成为能确定其大小的类型，如:Byte！
+  * tfcc 编译测试基本通过！
+  * tsrun PurePascal FPC版本编译测试通过！
+  经验：如果数据的字节大小不一致，就不能直接cast类型！不过可以这样：
+    {$IFDEF FPC}
+    Result := TTurboProcessorStates(LongWord(FGlobalOptions.States))
+    {$ELSE Borland}
+    Result := TTurboProcessorStates(FGlobalOptions.States)
+    {$ENDIF}
+* TTurboScriptOptions is LongWord now. i added some preserved enum values.
+
+!* [Bug] 堆栈存放的最小单位数据是tsPointer，所以量度应该以tsPointer为准。
+  需要查找堆栈有关的操作修改之！
 
 2007-5-12 7:57
 + pure pascal interpreter: TurboInterpreter.pas

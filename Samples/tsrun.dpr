@@ -13,7 +13,9 @@ program tsrun;
 {$APPTYPE CONSOLE}
 
 uses
+  {$IFNDEF FPC}
   FastMM4,
+  {$ENDIF}
   Windows,  SysUtils, Classes
   , uTurboPE
   , uTurboConsts
@@ -59,7 +61,7 @@ begin
 end;
 
 const
-  Copyright = 'Turbo Script command line intercepter 1.0'#13#10'    Copyright(c) by Riceball<riceballl@hotmail.com>';
+  Copyright = 'Turbo Script command line intercepter 1.0'{$IFDEF FPC}+'(FPC Edit)'+{$ENDIF}#13#10'    Copyright(c) by Riceball<riceballl@hotmail.com>';
   cScriptResType = 'SCRIPT';
   cScriptResName = 'MAIN';
 
