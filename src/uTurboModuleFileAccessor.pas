@@ -1,3 +1,7 @@
+{ Description
+Note: the file name must be the same as the module name!!
+if not same then treat the file base name as the module name.
+}
 unit uTurboModuleFileAccessor;
 
 interface
@@ -132,7 +136,6 @@ begin
   if vFileName <> '' then
   try
     Result := aModuleClass.Create;
-    Result.Name := aModuleName;
     if IsLoaded then
     begin
       vStream := TFileStream.Create(vFileName, fmOpenRead);
@@ -142,6 +145,8 @@ begin
       finally
         vStream.Free;
       end;
+      //treat the file base name as the module name.
+      Result.Name := aModuleName;
     end;
   except
     FreeAndNil(Result);
