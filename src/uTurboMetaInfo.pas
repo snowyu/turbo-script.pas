@@ -82,7 +82,6 @@ type
     //if it csForth then it is the CFA.
     ProcAddr: Pointer; 
     ModuleRef: PTurboModuleRefInfo;
-    //if it csForth then it is Module instance else it is ProcTypeInfo offset addr.
     ProcTypeEntry: Pointer; 
     //-1 means non-index visits.
     Index: tsInt;  
