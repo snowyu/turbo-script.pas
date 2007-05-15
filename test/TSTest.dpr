@@ -34,15 +34,17 @@
 }
 program TSTest;
 
-{$DEFINE MemCheck}
+{$DEFINE FASTMM}
 
 uses
-  {$IFDEF MemCheck}
-  {$D+,L+,W+,Y+,YD,Q+,T+}
-  //CnMemProf,
+{$IFDEF FASTMM}    // From Project | Options | Directories/Conditionals
+  {$IFNDEF VER180}
+    ($IFNDEF CLR}
+      FastMM4,
+    {$ENDIF}
   {$ENDIF}
-  //uCatchExcept,
-  //ExceptionLog,
+{$ENDIF}
+
   {$IFDEF MSWINDOWS}
   Windows,
   {$ENDIF}
@@ -55,7 +57,7 @@ uses
   GUITestRunner,
 {$ENDIF}
   TextTestRunner
-  , uTurboVMTest
+  , uTurboModuleTest
   ;
 
 { NOTE:
