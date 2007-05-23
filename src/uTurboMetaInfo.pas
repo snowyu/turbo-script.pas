@@ -20,10 +20,10 @@ type
   PTurboMetaInfo       = ^ TTurboMetaInfo;
   PTurboModuleRefInfo  = ^ TTurboModuleRefInfo;
   PTurboTypeInfo       = ^ TTurboTypeInfo;
-  PTurboOrdinalType    = ^ TTurboOrdinalType; 
-  PTurboSetType        = ^ TTurboSetType; 
 
-  PTurboVariableEntry = ^ TTurboVariableEntry;
+  //PTurboVariableEntry = ^ TTurboVariableEntry;
+  PTurboStaticFieldEntry = ^ TTurboStaticFieldEntry;
+  PTurboStaticFieldInfo = ^ TTurboStaticFieldInfo;
   PTurboModuleRefEntry = ^ TTurboModuleRefEntry;
   PTurboMethodEntry = ^ TTurboMethodEntry;
   PTurboTypeInfoEntry = ^ TTurboTypeInfoEntry;
@@ -45,31 +45,19 @@ type
     , tmkStatement //new statement structrue.
     , tmkModule
   );
-  //the basis TypeKind
-  //定义最基本的类型. 所有的用户扩展类型，全部都是由下面的基本类型派生的！！
-  TTurboTypeKind = (ttkUnknown
-    , ttkOrdinal, ttkSet
-    , ttkInt64
-    , ttkSequence
-    , ttkArray
-    , ttkRecord
-  );
 
   //the abstract MetaInfo 
   TTurboMetaInfo = object
   protected
     //如果使用VMT我可以把该字段作为指向VMT的指针！当装入后
+    //not used yet
     FMetaKind: TTurboMetaKind;
-    FIsExternal: Boolean;
     //Priority not used yet.
     FPriority: TTurboPriority;
     FVisibility: TTurboVisibility;
     FParamFieldLength: tsUInt; 
     FName: PChar;  
   public
-    //this is an external define.
-    //准备废弃: 所有引用的放入模块中。
-    property IsExternal: Boolean read FIsExternal write FIsExternal;
     property MetaKind: TTurboMetaKind read FMetaKind write FMetaKind;
     property Name: PChar read FName write FName;
     property ParamFieldLength: tsUInt read FParamFieldLength write FParamFieldLength;
@@ -80,7 +68,7 @@ type
   //cfsHostFunction, cfsDLLFunction
   TTurboExteralMethodOptions = packed record
     //if it csForth then it is the CFA.
-    ProcAddr: Pointer; 
+    //ProcAddr: Pointer; in TTurboExteralMethod.MethodAddr 
     ModuleRef: PTurboModuleRefInfo;
     ProcTypeEntry: Pointer; 
     //-1 means non-index visits.
@@ -90,13 +78,20 @@ type
   end;
 
   TTurboMethodInfo = object(TTurboMetaInfo)
+  protected
+    //FIsExternal: Boolean;
   public
-    //RVA the offset address of the code-memory.
-    CFA: tsInt;
+    //RVA the offset address of the code-memory. CFA
+    //if isExternal then the really ProcAddr assigned for speedup. 
+    MethodAddr: tsInt;
     CallStyle: TTurboCallStyle;
     CodeFieldStyle: TTurboCodeFieldStyle;
     //ExternalWordOptions: TTurboExteralWordOptions;
     function GetExternalOptionsAddr: PTurboExteralMethodOptions; 
+
+    //this is an external define: Host or DLL functions.
+    //property IsExternal: Boolean read FIsExternal write FIsExternal;
+    function IsExternal: Boolean;
   end;
   //this for external word only
   TTurboMethodInfoEx = object(TTurboMethodInfo)
@@ -113,10 +108,9 @@ type
     //Value: ....
   end;
 
-  PTurboStaticFieldEntry = ^ TTurboStaticFieldEntry;
   TTurboStaticFieldEntry = packed record
     Prior: PTurboStaticFieldEntry; //前一个, 0 means 为最前面。
-    Field: TTurboStaticFieldInfo;
+    Variable: TTurboStaticFieldInfo;
   end;
 { //the Future Version supports
   PTurboStaticFieldList = ^TTurboStaticFieldList; 
@@ -157,91 +151,31 @@ type
 
   TTurboTypeInfo = object(TTurboMetaInfo)
   public
-    TypeKind: TTurboTypeKind;
+    //TurboType: TTurboType;
+    
   end;
 
-  TTurboCustomOrdinalType = object(TTurboTypeInfo)
-  public
-    {
-     @param otSByte: Signed byte
-     @param otUByte: Unsigned byte
-     @param otSWord: Signed word
-     @param otUWord: Unsigned word
-     @param otSLong: Signed longword
-     @param otULong: Unsigned longword
-    }
-    OrdType: TOrdType;
-  public
-  end;
 
-  {: the abstract common Ordinal type info object. }
-  {Ordinal: tkInteger, tkChar, tkEnumeration, tkWChar}
-  TTurboOrdinalType = object(TTurboCustomOrdinalType)
-  protected
-    FMinValue: tsInt;
-    FMaxValue: tsInt;
-  public
-    Property MinValue: tsInt read FMinValue write FMinValue;
-    Property MaxValue: tsInt read FMaxValue write FMaxValue;
-  end; 
-
-  TTurboSetType = object(TTurboCustomOrdinalType)
-  public
-    //指向该集合是由什么Ordinal类型构成的。
-    CompType: PTurboOrdinalType;
-  end; 
-
-  {: the Enumeration type info object. }
-  TTurboEnumerationType = Object(TTurboOrdinalType)
-  protected
-    FBaseType: PTurboTypeInfo;
-    {NameList: array[0..Count-1] of packed ShortString;
-      Packed ShortString
-      ...(Count)
-      Packed ShortString
-    }
-    FNameList: Pointer;
-    //if ValueList is nil then the index No. of nameList is the value.
-    {ValueList: array[0..Count-1] of Integer.
-      Integer
-      ...(Count)
-      Integer
-    }
-    FValueList: Pointer;
-  private 
-    function GetEnumIndex(const aName: string): Integer;
-  protected
-    function GetEnumValue(const aName: string): Integer;
-    function GetEnumName(Value: tsInt): PShortString;
-  public
-    //return the elemnet count
-    function Count: Integer; //=FMaxValue - FMinValue + 1
-  public
-    Property BaseType: PTurboTypeInfo read FBaseType write FBaseType;
-    Property EnumName[Index: tsInt]: PShortString read GetEnumName;
-    Property EnumValue[const aName: string]: Integer read GetEnumValue;
-  end; 
-
-  TTurboVariableInfo = object(TTurboMetaInfo)
+{  TTurboVariableInfo = object(TTurboMetaInfo)
   public
     Size: tsInt;
     Addr: Pointer; //offset address of the FMemory.
     TypeInfo: PTurboTypeInfo; //TODO: relocate it.
     //Value: ....
   end;
-
+}
   //For type-cast the Mem
   TTurboMethodEntry = packed record
     Prior: PTurboMethodEntry; //前一个单词 0 means 为最前面。
     Word: TTurboMethodInfo;
   end;
 
-  TTurboVariableEntry = packed record
+{  TTurboVariableEntry = packed record
     Prior: PTurboVariableEntry;
     Variable: TTurboVariableInfo; 
     //Value: ....
   end;
-  
+}  
   //the import module for uses.
   TTurboModuleRefEntry = packed record
     Prior: PTurboModuleRefEntry; //nil means no more
@@ -266,6 +200,11 @@ type
 implementation
 
 { TTurboMethodInfo }
+function TTurboMethodInfo.IsExternal: Boolean;
+begin
+  Result := CallStyle <> csForth; 
+end;
+
 function TTurboMethodInfo.GetExternalOptionsAddr: PTurboExteralMethodOptions; 
 begin
   if IsExternal then
@@ -276,68 +215,6 @@ begin
     Result := nil;
 end;
 
-{ TTurboEnumerationType }
-function TTurboEnumerationType.Count: Integer;
-begin
-  Result := FMaxValue - FMinValue + 1;
-end;
-
-function TTurboEnumerationType.GetEnumIndex(const aName: string): Integer;
-var
-  P: PShortString;
-begin
-  P := FNameList;
-  For Result := FMinValue to FMaxValue do
-  begin
-    if aName = P^ then
-    begin
-      exit;
-    end;
-    Inc(Integer(P), Length(P^) + 1);
-  end;
-  Result := -1;
-end;
-
-function TTurboEnumerationType.GetEnumValue(const aName: string): Integer;
-begin
-  Result := GetEnumIndex(aName);
-  if (Result <> -1) and (FValueList <> nil) then
-   begin
-      Result := PTsIntArray(FValueList)^[Result-FMinValue]; 
-   end;
-end;
-
-function TTurboEnumerationType.GetEnumName(Value: tsInt): PShortString;
-var
-  I: tsInt;
-  vIndex: tsInt;
-  P: PShortString;
-begin
-  Result := nil;
-  vIndex := Value;
-  if FValueList <> nil then
-  begin
-    vIndex := -1;
-    Pointer(P) := FValueList; 
-    for I := 0 to FMaxValue - FMinValue do
-    begin
-      if PTsIntArray(P)^[I] = Value then
-      begin 
-        vIndex := I;
-        break;
-      end;
-    end;
-    if vIndex = -1 then exit;
-  end;
-
-  P := FNameList;
-  while vIndex <> 0 do
-  begin
-    Inc(Integer(P), Length(P^) + 1);
-    Dec(vIndex);
-  end;
-  Result := P;
-end;
 
 
 end.
