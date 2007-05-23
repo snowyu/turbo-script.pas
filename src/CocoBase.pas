@@ -1152,7 +1152,7 @@ begin
       FDefinedWordEntry.Word.Name := nil;
     end;
     FLastWordCfa := FModule.UsedMemory;
-    FDefinedWordEntry.Word.CFA := FLastWordCfa;
+    FDefinedWordEntry.Word.MethodAddr := FLastWordCfa;
     aWord.CFA := FLastWordCfa;
     FDefinedWordEntry.Word.Visibility := aWord.Options.Visibility;
     FDefinedWordEntry.Word.CallStyle := aWord.Options.CallStyle;
@@ -1430,7 +1430,7 @@ end;
 
 function TCocoRGrammar.DefineVar(const aValue: TTurboSimpleVar): Integer;
 var
-  vVaraibleEntry: PTurboVariableEntry;
+  vVaraibleEntry: PTurboStaticFieldEntry;
   vValue: Pointer;
   //vTypeSize: Integer;
 begin
@@ -1452,7 +1452,7 @@ begin
     begin
       //FModule.AligData;
       Integer(vVaraibleEntry) := Integer(FModule.DataMemory) + FModule.UsedDataSize;
-      FModule.AllocDataSpace(SizeOf(TTurboVariableEntry));
+      FModule.AllocDataSpace(SizeOf(TTurboStaticFieldEntry));
       vVaraibleEntry.Prior := FModule.LastVariableEntry;
       vVaraibleEntry.Variable.Size := Size;
       vVaraibleEntry.Variable.Addr := nil;

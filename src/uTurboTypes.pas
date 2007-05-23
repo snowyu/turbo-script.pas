@@ -26,28 +26,11 @@ type
   {: manage the PMeTypes in the list.}
   TTurboRegisteredTypes = object(TMeTypes)
   protected
-    //容器，来保存类型与对应于在流中的偏移量 (PMeType(Items[i]) : FStreamOffsetList[i])
-    FStreamOffsetList: array of Int64;
-  protected
-    function DoOnSaveType(const aStream: TStream; const aType: PMeType): Boolean;
-    function DoOnLoadType(const aStream: TStream; var aType: PMeType): Boolean;
-    function FindTypeOfOffset(const Offset: Integer): PMeType;
+    function DoOnSaveType(const aStream: TStream; const aType: PMeType): Boolean; virtual; //override
+    function DoOnLoadType(const aStream: TStream; var aType: PMeType): Boolean; virtual; //override
   public
     destructor Destroy; virtual; //override
-    procedure LoadFromStream(const aStream: TStream);
-    procedure SaveToStream(const aStream: TStream);
   end;
-
-  PTurboVariable = ^ TTurboVariable;
-  TTurboVariable = Object(TMeDynamicObject)
-  protected
-    FDataType: PMeType;
-    FValue: TMeVarRec;
-  public
-    property Value: TMeVarRec read FValue write FValue;
-    property DataType: PMeType read FDataType write FDataType;
-  end;
-
 
 implementation
 
@@ -57,27 +40,11 @@ uses
 
 destructor TTurboRegisteredTypes.Destroy;
 begin
-  SetLength(FStreamOffsetList, 0);
   inherited;
-end;
-function TTurboRegisteredTypes.FindTypeOfOffset(const Offset: Integer): PMeType;
-var
-  i: Integer;
-begin
-  for i := 0 to Count -1 do
-  begin
-    if FStreamOffsetList[i] = Offset then
-    begin
-      Result := Items[i];
-      exit;
-    end;
-  end;
-  Result := nil;
 end;
 
 function TTurboRegisteredTypes.DoOnSaveType(const aStream: TStream; const aType: PMeType): Boolean;
 var
-  i: Integer;
   j: Int64;
 begin
   if Assigned(aType) then
@@ -87,83 +54,43 @@ begin
     begin
       //the internal type
       inc(j);
-      aStream.WriteBuffer(j, SizeOf(j))
+      aStream.WriteBuffer(j, SizeOf(j));
+      Result := True;
+      Exit;
     end
-    else
-    begin
-      i := IndexOf(aType);
-      if i >= 0 then
-      begin
-        aStream.WriteBuffer(FStreamOffsetList[i], SizeOf(Int64))
-      end
-      else
-        Raise Exception.Create('DoOnSaveType: not found such MeType!');
-    end;
   end
-  else
-  begin
-    j := 0;
-    aStream.WriteBuffer(j, SizeOf(j))
-  end;
-  Result := True;
+  Result := inherited DoOnSaveType(aStream, aType);
 end;
 
 function TTurboRegisteredTypes.DoOnLoadType(const aStream: TStream; var aType: PMeType): Boolean;
 var
-  i: Int64;
+  i, j: Int64;
 begin
-  aStream.ReadBuffer(i, SizeOf(i))
+  {TODO: 如果类型在其它单元呢？可以考虑使用负数，如果是负数那么则是引用类型（引用其它单元的）！
+    需要建立一个 LastTypeInfoRefEntry
+  } 
+  j := aStream.Position;
+  aStream.ReadBuffer(i, SizeOf(i));
   if i < GRegisteredTypes.Count then
   begin
     //the internal type
-    if i=0 then
+    if i = 0 then
       aType := nil
-    else
-      aType := GRegisteredTypes.Items[i-1];
-  end
-  else
-  begin
-    aType := FindTypeOfOffset(i);
-    i := IndexOf(aType);
-    if not Assigned(aType) then
-      Raise Exception.Create('DoOnLoadType: not found such MeType!');
+    else if i > 0 then
+      aType := GRegisteredTypes.Items[i-1]
+    else  //i < 0 the external type
+      ;
+    Result :=True;
+    Exit;
   end;
-  Result := True;
-end;
 
-procedure TTurboRegisteredTypes.LoadFromStream(const aStream: TStream);
-var
-  i: Integer;
-begin
-  if TCustomTurboModule(FOwner) is TCustomTurboModule then
-  begin
-    SetLength(FStreamOffsetList, Count);
-    for i := 0 to Count - 1 do
-    begin
-      vOffsetList[i]:= aStream.Position;
-      PMeType(Items[i]).LoadFromStream(aStream, DoOnLoadType);
-    end;
-  end;
+  //restore the Position.
+  aStream.Position := j;
+  Result := inherited DoOnLoadType(aStream, aType);
 end;
-
-procedure TTurboRegisteredTypes.SaveToStream(const aStream: TStream);
-var
-  i: Integer;
-begin
-  if TCustomTurboModule(FOwner) is TCustomTurboModule then
-  begin
-    SetLength(FStreamOffsetList, Count);
-    for i := 0 to Count - 1 do
-    begin
-      vOffsetList[i]:= aStream.Position;
-      PMeType(Items[i]).SaveToStream(aStream, DoOnSaveType);
-    end;
-  end;
-end;
-
 
 initialization
-  //SetMeVirtualMethod(TypeOf(TMeType), ovtVmtParent, TypeOf(TMeDynamicObject));
+  SetMeVirtualMethod(TypeOf(TTurboRegisteredTypes), ovtVmtParent, TypeOf(TMeTypes));
 
 
 finalization

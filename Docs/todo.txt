@@ -9,11 +9,94 @@ TODO:
 !* [Bug] 堆栈存放的最小单位数据是tsPointer，所以量度应该以tsPointer为准。
   需要查找堆栈有关的操作修改之！
 !* [Bug] ModuleParent is not set or convert to related or absolute address!
-!+ [DUnit] 自动化测试单元
-  + 测试 TurboModule
-  + 测试 加载
-  + 测试 AppDomain
-  + 测试 执行
+
+2007-5-20 6:23
++ TCustomTurboModule.Types: 用户声明的类型!
+  而 GRegisteredTypes 中则是系统定义的类型.
+
+  鉴于Types没有采用直接Cast模块内存，所以保存于流(模块)中的Types，是不必直接装入模块内存镜像的！
+  可以考虑放在流的最后或最前！这将加载镜像不必装入，只需执行Types.LoadFromStream.
+  LastTypeInfoEntry.MeType 保存到流中的时候是 TurbpTypes中的序号(从1开始，0保留为nil)，加载后才改为真实的PMeType地址！
+  所有的LastTypeInfoEntry上的类型为用户自定义类型！！
+  发现没有考虑在其它单元的类型如何保存？
+
+  CallExternal PMethodInfoEntry
+
+2007-5-18 8:09
+~ IsExternal 放在公用的Info中不必要，浪费！
+  LastModuleRefInfoEntry 本来就是外部引用！
+  LastMethodInfoEntry 需要，其实也可以不必要，只要判定CallStyle,不是csForth的，就是外部函数！而外部csForth俺在编译器对所有>= protected 的函数直接采用 CallFar的了！！
+  LastVariableInfoEntry 不必要，如果是外部模块的变量，则直接压PushFar (pModuleRefEntry, VarOffsetAddr)
+  LastTypeInfoEntry: 需要.
+
+- TTurboMetaInfo.IsExternal
+* TTurboMethodInfo
+  * rename CFA to MethodAddr
+  + function IsExternal: Boolean; //Result := CallStyle <> csForth
+- TTurboExteralMethodOptions.ProcAddr
+
+* TurboTypes: 首先是改，将所有的类型改作不依赖TypInfo!
+  TMeSetType = Object(TMeCustomOrdinalType)
+  protected
+    FCompType: PMeType;
+    //FCompType 这个FCompType 无法存入流阿！
+    //应该是一个偏移量，但是首先必须要找到lastTypeInfoEntry中的地址。
+    //也许在 TMeRegisteredTypes 上也该加一个Owner.
+    或者我应该派生自己的 TTurboRegisteredTypes = Class(uMeProcType.TMeTypes)，然后在加上自己的流保存功能！！
+    这样就可以完全不动MeType类！
+~ 规定在MeType中的类型名称为相对名称，不包括父名！
+~ GRegisteredTypes 作为内部默认类型，以其序号为标识！
+!+ TCustomTurboModule.Types: TTurboRegisteredTypes
+  当LastTypeInfoEntry 加载到 Types，的时候，需要留意IsAddrResolved的状态！
+  记住是 uses uMeProcType 这个！！
+
+2007-5-17 11:04
+* 问题，对于TurboType中的 Name，如果作为ShortString则怕不够长，而作为PChar类型则需要ResolveAddr,反正这么多resolveaddr了，也不缺这一个.
+  如果作为 ShortString 那么类型不作为全名，只不过这样将固定占用256字节。
+  算了，还是就用PChar.
+* 所有的类型信息必须全部挂上LastTypeInfoEntry，这样俺好填VMT地址。
+  规定基本类型，基本类型是无需定义即可使用的:
+  const
+    //以顺序号作为Id号！ 当模块里面的PTurboType 偏移地址小于 MaxBaseTypeCount，为基本类型。
+    TTurboBaseTypes : array [0..MaxBaseTypeCount - 1] of PMeType; 
+脑袋晕了，直接将TypInfo注入到Module内存中就行了，管它这么多干嘛啊！！然后装载的时候在将它们装入即可啊！！
+好吧，如何将类型存呢？通过SaveToStream.
+RegisterTypeFromStream();
+
+
+2007-5-16 10:32
+* 参考 uMeTypes 实现 TTurboTypeInfo。
+  * TTurboTypeInfo 有的是编译时刻需要的信息，如 Visibility ！ 对于纯TypeInfo来说显得有点冗余。不过可以不管，现目前将就。
+  + uTurboType.pas 独立，只关注于类型信息！
+      uTurboMetaInfo.pas 将引用包裹 TurboType 信息，主要是针对模块一级！
+  + uTurboProcType.pas
+
+2007-5-15 9:51
++ [DUNIT] 搭建 自动化测试单元 测试框架
+  uTurboModuleTest
+  uTurboAccessorTest
+  uTurboAppDomainTest
+  uTurboExecutorTest
+  uTurboCompilerTest
+
+2007-5-14 16:23
+~ 现目前只想实现Delphi有关的类型，一切为了调用！
+
+* [Bug] CustomTurboModule.ClearMemory not reset the Flags to 0.
+
+~ [DUnit]CustomTurboModule
+  FMemory: (Code Memory)
+    属性: Memory, MemorySize, UsedMemory
+    Access Methods:
+      AddBufferToMem, AddByteToMem, AddIntToMem, AlignMem, AllocSpace, AddOpToMem
+  
+  FDataMemory:
+    属性： DataMemorySize, DataMemory, UsedDataSize
+    访问 DataMemory 的方法 
+    测试：每次执行访问方法后，都要看UsedDataSize等属性是否正常。
+    Access Methods:
+      AddBufferToData, AddByteToData, AddIntToData, AlignData, AllocDataSpace
+    测试 MetaInfo 
 
 2007-5-13 7:52
 !+ 脚本调用Delphi函数过程

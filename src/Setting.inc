@@ -8,8 +8,6 @@
 {------------------------------------------------------------------------------}
 { Please change this to suit your needs                                        }
 {------------------------------------------------------------------------------}
-{.$define Debug}
-{.$DEFINE PUREPASCAL}
 
 {------------------------------------------------------------------------------}
 { Common compiler defines                                                      }
@@ -30,9 +28,11 @@
   {$P+ Open string parameters}
   {$J+ Writeable typed constants}
   {$R- No Range checking}
-  {$Z1 MIN ENUM SIZE}
   {$T- Typed Address Off}
-  {$MINENUMSIZE 1}
+  {.$Z1 MIN ENUM SIZE = $MINENUMSIZE 1}
+  {$MINENUMSIZE 1}  {$DEFINE ByteEnum} {$DEFINE WordEnum}
+  //{$MINENUMSIZE 2}  {$DEFINE WordEnum}
+  //{$MINENUMSIZE 4}  
 
 {$IFDEF BCB}
   {$OBJEXPORTALL ON}

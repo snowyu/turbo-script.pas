@@ -8,7 +8,6 @@
 program tsrun;
 
 {$I TurboScript.inc}
-{$DEFINE PUREPASCAL}
 
 {$APPTYPE CONSOLE}
 

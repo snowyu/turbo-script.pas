@@ -9,6 +9,9 @@
 { Please change this to suit your needs                                        }
 {------------------------------------------------------------------------------}
 
+{.$define Debug}
+{.$DEFINE PUREPASCAL}
+
 {$Define TurboScript_Stepping_Supports}
 {$Define TurboScript_DataStack_Overflow_Inspect} 
 {$Define TurboScript_ReturnStack_Overflow_Inspect}

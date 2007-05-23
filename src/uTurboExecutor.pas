@@ -65,6 +65,10 @@ type
   TCustomTurboExecutor = class;
   TTurboAppDomain = class;
   TTurboGlobalOptions = object  //do not use the packed.
+  private
+    function GetIsRunning(): Boolean;
+    procedure SetIsRunning(const Value: Boolean);
+  public
     States: Byte; //TTurboProcessorStates; modified by FPC
     LastErrorCode: TTurboProcessorErrorCode;
     ParamStackBase: Pointer;
@@ -86,8 +90,7 @@ type
     //The built-in I/O routines use InOutResult to store the value that 
     //the next call to the IOResult standard function will return.
     IOResult: tsInt;
-    function GetIsRunning(): Boolean;
-    procedure SetIsRunning(const Value: Boolean);
+    {: the States in [psRunning, psStepping]}
     property IsRunning: Boolean read GetIsRunning write SetIsRunning;   
   end;
 
@@ -161,7 +164,7 @@ type
     function GetDataMemorySize: tsInt;
     function GetInitializeProc: Integer;
     function GetLastTypeInfoEntry: PTurboTypeInfoEntry;
-    function GetLastVariableEntry: PTurboVariableEntry;
+    function GetLastVariableEntry: PTurboStaticFieldEntry;
     function GetLastWordEntry: PTurboMethodEntry;
     function GetMemorySize: tsInt;
     function GetModuleType: TTurboModuleType;
@@ -178,7 +181,7 @@ type
     procedure SendUnloadNotification;
     procedure SetDataMemorySize(Value: tsInt);
     procedure SetLastTypeInfoEntry(const Value: PTurboTypeInfoEntry);
-    procedure SetLastVariableEntry(const Value: PTurboVariableEntry);
+    procedure SetLastVariableEntry(const Value: PTurboStaticFieldEntry);
     procedure SetLastWordEntry(const Value: PTurboMethodEntry);
     procedure SetMemorySize(Value: tsInt);
     procedure SetModuleType(Value: TTurboModuleType);
@@ -243,7 +246,7 @@ type
     function FindTypeInfoEntry(const aName: string): PTurboTypeInfoEntry;
     function FindUnloadNotification(aProc: TNotifyEvent): Integer;
     {: nil means not found. }
-    function FindVariableEntry(const aName: string): PTurboVariableEntry;
+    function FindVariableEntry(const aName: string): PTurboStaticFieldEntry;
     {: nil means not found. }
     function FindWordEntry(const aName: string; const aCallStyle:
             TTurboCallStyle = csForth): PTurboMethodEntry;
@@ -306,8 +309,8 @@ type
             GetLastModuleRefEntry write SetLastModuleRefEntry;
     property LastTypeInfoEntry: PTurboTypeInfoEntry read GetLastTypeInfoEntry
             write SetLastTypeInfoEntry;
-    property LastVariableEntry: PTurboVariableEntry read GetLastVariableEntry
-            write SetLastVariableEntry;
+    property LastVariableEntry: PTurboStaticFieldEntry read
+            GetLastVariableEntry write SetLastVariableEntry;
     property LastWordEntry: PTurboMethodEntry read GetLastWordEntry write
             SetLastWordEntry;
     {: The Code Memory }
@@ -602,7 +605,7 @@ type
     //有名字的函数链表，指向最后一个函数入口。
     LastWordEntry: PTurboMethodEntry;
     //有名字的变量链表
-    LastVariableEntry: PTurboVariableEntry;
+    LastVariableEntry: PTurboStaticFieldEntry;
     //RTTI TypeInfo 链表
     LastTypeInfoEntry: PTurboTypeInfoEntry;
     //VMT: TTurboVirtualMethodTable; 实际上可以将 LastWordEntry 看做VMT! 暂时不管 
@@ -867,6 +870,7 @@ begin
     begin
       MemorySize := cDefaultDataMemSize;
       UsedMemory := 0;
+      Flags := 0;
       Code := FMemory;
       DataSize := vPreserved;
       UsedDataSize := SizeOf(TTurboPreservedDataMemory);//SizeOf(tsInt); //preserved the first integer
@@ -955,7 +959,7 @@ begin
 end;
 
 function TCustomTurboModule.FindVariableEntry(const aName: string):
-        PTurboVariableEntry;
+        PTurboStaticFieldEntry;
 var
   vName: PChar;
 begin
@@ -1045,7 +1049,7 @@ begin
   Result := PTurboPreservedDataMemory(FDataMemory).LastTypeInfoEntry;
 end;
 
-function TCustomTurboModule.GetLastVariableEntry: PTurboVariableEntry;
+function TCustomTurboModule.GetLastVariableEntry: PTurboStaticFieldEntry;
 begin
   Result := PTurboPreservedDataMemory(FDataMemory).LastVariableEntry;
 end;
@@ -1096,7 +1100,7 @@ begin
   Result := Integer(FindWordEntry(aWord));
   if Result <> 0 then
   begin
-    Result := PTurboMethodEntry(Result).Word.CFA;
+    Result := PTurboMethodEntry(Result).Word.MethodAddr;
   end
   else
     Result := -1;
@@ -1465,7 +1469,7 @@ begin
 end;
 
 procedure TCustomTurboModule.SetLastVariableEntry(const Value:
-        PTurboVariableEntry);
+        PTurboStaticFieldEntry);
 begin
   PTurboPreservedDataMemory(FDataMemory).LastVariableEntry := Value;
 end;
@@ -1646,7 +1650,7 @@ begin
 
   if (aWord.Word.CallStyle = csForth) and (aWord.Word.Visibility <= fvPrivate) then
   begin
-    Result := iExecuteCFA(aWord.Word.CFA);
+    Result := iExecuteCFA(aWord.Word.MethodAddr);
   end
   //else begin //external word
     //  Result := iExecuteExternalWord(PTurboExteralWordCFA(aWord.CFA+Integer(FMemory))
@@ -2081,9 +2085,10 @@ begin
   end;
 end;
 
-procedure TurboConvertVarEntryRelatedToAbsolute(Mem: Pointer; var aEntry: PTurboVariableEntry);
+procedure TurboConvertVarEntryRelatedToAbsolute(Mem: Pointer; var aEntry:
+        PTurboStaticFieldEntry);
 var
-  vEntry: PTurboVariableEntry;
+  vEntry: PTurboStaticFieldEntry;
 begin
   if Assigned(aEntry) then
   begin
@@ -2141,10 +2146,11 @@ begin
     end;
 end;
 
-procedure TurboConvertVarEntryAbsoluteToRelated(Mem: Pointer; var aEntry: PTurboVariableEntry);
+procedure TurboConvertVarEntryAbsoluteToRelated(Mem: Pointer; var aEntry:
+        PTurboStaticFieldEntry);
 var
-  vEntry: PTurboVariableEntry;
-  P: PTurboVariableEntry;
+  vEntry: PTurboStaticFieldEntry;
+  P: PTurboStaticFieldEntry;
 begin
     if Assigned(aEntry) then
       Integer(aEntry) := Integer(aEntry) - Integer(Mem);

@@ -123,7 +123,7 @@ procedure _DoVMEnter(const FGlobalOptions: PTurboGlobalOptions; aCFA: tsInt);
 begin
   aCFA := aCFA + Integer(FGlobalOptions._Mem.Code);
   //Push the current PC to return stack.
-  Dec(FGlobalOptions._RP, SizeOf(tsInt));
+  Dec(FGlobalOptions._RP, SizeOf(tsPointer));
   PtsInt(FGlobalOptions._RP)^ := FGlobalOptions._PC; 
 
   //Update the new PC
@@ -191,9 +191,9 @@ begin
   with FGlobalOptions^ do
   begin
     vErrAddr := PPointer(_SP)^;
-    Inc(_SP, SizeOf(vErrAddr));
+    Inc(_SP, SizeOf(tsPointer));
     vErrCode := PtsInt(_SP)^;
-    Inc(_SP, SizeOf(vErrCode));
+    Inc(_SP, SizeOf(tsPointer));
   end;
   _iVMErrorAt(FGlobalOptions, vErrCode, vErrAddr);
 end;
@@ -211,7 +211,7 @@ var
   vErrAddr: Pointer;
 begin
   vErrCode := PtsInt(FGlobalOptions._SP)^;
-  Inc(FGlobalOptions._SP, SizeOf(vErrAddr));
+  Inc(FGlobalOptions._SP, SizeOf(tsPointer));
   vErrAddr := PPointer(FGlobalOptions._RP)^;
 
   _iVMErrorAt(FGlobalOptions, vErrCode, vErrAddr);
@@ -220,15 +220,15 @@ end;
 procedure iVMExit(const FGlobalOptions: PTurboGlobalOptions);
 begin
   FGlobalOptions._PC := PtsInt(FGlobalOptions._RP)^;
-  Inc(FGlobalOptions._RP, SizeOf(Pointer));
+  Inc(FGlobalOptions._RP, SizeOf(tsPointer));
 end;
 
 procedure iVMExitFar(const FGlobalOptions: PTurboGlobalOptions);
 begin
   FGlobalOptions._PC := PtsInt(FGlobalOptions._RP)^;
-  Inc(FGlobalOptions._RP, SizeOf(Pointer));
+  Inc(FGlobalOptions._RP, SizeOf(tsPointer));
   FGlobalOptions._Mem := PPointer(FGlobalOptions._RP)^;
-  Inc(FGlobalOptions._RP, SizeOf(Pointer));
+  Inc(FGlobalOptions._RP, SizeOf(tsPointer));
 end;
 
 //save the old MemoryBase, pass the CPUStates to the new MemoryBase.
@@ -238,7 +238,7 @@ var
   p: Pointer;
 begin
   //Push the current MemoryBase to return stack.
-  Dec(FGlobalOptions._RP, SizeOf(Pointer));
+  Dec(FGlobalOptions._RP, SizeOf(tsPointer));
   PPointer(FGlobalOptions._RP)^ := FGlobalOptions._Mem;
   p := PPointer(FGlobalOptions._PC)^;
   Inc(FGlobalOptions._PC, SizeOf(p));
@@ -254,7 +254,7 @@ begin
   Integer(p) := Integer(p) + Integer(FGlobalOptions._Mem.Code); 
 
   //push the current IP.
-  Dec(FGlobalOptions._RP, SizeOf(Pointer));
+  Dec(FGlobalOptions._RP, SizeOf(tsPointer));
   PtsInt(FGlobalOptions._RP)^ := FGlobalOptions._PC;
   FGlobalOptions._PC := tsInt(p);
 end;
@@ -270,7 +270,7 @@ var
   p: Pointer;
 begin
   //Push the current MemoryBase to return stack.
-  Dec(FGlobalOptions._RP, SizeOf(Pointer));
+  Dec(FGlobalOptions._RP, SizeOf(tsPointer));
   PPointer(FGlobalOptions._RP)^ := FGlobalOptions._Mem;
 
   vModuleRefInfo := PPointer(FGlobalOptions._PC)^;
@@ -289,7 +289,7 @@ begin
       begin
         //@@NotFoundError
         //POP  current MemoryBase
-        Inc(FGlobalOptions._RP, SizeOf(Pointer));
+        Inc(FGlobalOptions._RP, SizeOf(tsPointer));
         _iVMHalt(FGlobalOptions, errModuleNotFound);
         Exit;
       end;
@@ -313,9 +313,9 @@ var
   vIsAssertionSuccessful: tsInt; //LongBool
 begin
   vIsAssertionSuccessful := PtsInt(FGlobalOptions._SP)^;
-  Inc(FGlobalOptions._SP, SizeOf(vIsAssertionSuccessful));
+  Inc(FGlobalOptions._SP, SizeOf(tsPointer));
   vMsg := PPointer(FGlobalOptions._SP)^;
-  Inc(FGlobalOptions._SP, SizeOf(vMsg));
+  Inc(FGlobalOptions._SP, SizeOf(tsPointer));
   if vIsAssertionSuccessful = 0 then
   begin 
     //Assertion failed:
@@ -329,18 +329,18 @@ end;
 procedure iVMExecute(const FGlobalOptions: PTurboGlobalOptions);
 begin
   //push the current IP.
-  Dec(FGlobalOptions._RP, SizeOf(tsInt));
+  Dec(FGlobalOptions._RP, SizeOf(tsPointer));
   PtsInt(FGlobalOptions._RP)^ := FGlobalOptions._PC;
   //set the new IP 
   FGlobalOptions._PC := PtsInt(FGlobalOptions._SP)^ + tsInt(FGlobalOptions._Mem.Code);
-  Inc(FGlobalOptions._SP, SizeOf(tsInt));  
+  Inc(FGlobalOptions._SP, SizeOf(tsPointer));  
 end;
 
 //this is a Push Integer(立即操作数) directive
 //(-- int8)
 procedure iVMPushInt(const FGlobalOptions: PTurboGlobalOptions);
 begin
-  Dec(FGlobalOptions._SP, SizeOf(tsInt));
+  Dec(FGlobalOptions._SP, SizeOf(tsPointer));
   PtsInt(FGlobalOptions._SP)^ := PtsInt(FGlobalOptions._PC)^;
   Inc(FGlobalOptions._PC, SizeOf(tsInt));
 end;
@@ -348,7 +348,7 @@ end;
 //this is a Push Byte(立即操作数) directive
 procedure iVMPushByte(const FGlobalOptions: PTurboGlobalOptions);
 begin
-  Dec(FGlobalOptions._SP, SizeOf(tsInt));
+  Dec(FGlobalOptions._SP, SizeOf(tsPointer));
   PtsInt(FGlobalOptions._SP)^ := PByte(FGlobalOptions._PC)^;
   Inc(FGlobalOptions._PC, SizeOf(Byte));
 end;
@@ -356,14 +356,14 @@ end;
 //this is a Push Word(立即操作数) directive
 procedure iVMPushWord(const FGlobalOptions: PTurboGlobalOptions);
 begin
-  Dec(FGlobalOptions._SP, SizeOf(tsInt));
+  Dec(FGlobalOptions._SP, SizeOf(tsPointer));
   PtsInt(FGlobalOptions._SP)^ := PWord(FGlobalOptions._PC)^;
   Inc(FGlobalOptions._PC, SizeOf(Word));
 end;
 
 procedure iVMDropInt(const FGlobalOptions: PTurboGlobalOptions);
 begin
-  Inc(FGlobalOptions._SP, SizeOf(tsInt));
+  Inc(FGlobalOptions._SP, SizeOf(tsPointer));
 end;
 
 procedure iVMPushInt64(const FGlobalOptions: PTurboGlobalOptions);
