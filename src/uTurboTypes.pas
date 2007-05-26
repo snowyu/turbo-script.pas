@@ -24,10 +24,18 @@ uses
 
 type
   {: manage the PMeTypes in the list.}
+  {
+    TypeId: Int64 for the type in stream!
+      TypeId = 0                                        means nill. [impl in the TMeRegisteredTypes]
+      TypeId >= 1 and TypeId <= GRegisteredTypes.Count  means the Index(+1) of the GRegisteredTypes.
+      TypeId > GRegisteredTypes.Count                   means the offset of the stream. [impl in the TMeRegisteredTypes]
+      TypeId < 0                                        means this external reference type!
+      
+  }
   TTurboRegisteredTypes = object(TMeTypes)
   protected
-    function DoOnSaveType(const aStream: TStream; const aType: PMeType): Boolean; virtual; //override
-    function DoOnLoadType(const aStream: TStream; var aType: PMeType): Boolean; virtual; //override
+    function GetTypeByTypeId(const aTypeId: Int64): PMeType; virtual; {override}
+    function GetTypeIdByType(const aType: PMeType): Int64; virtual;   {override}
   public
     destructor Destroy; virtual; //override
   end;
@@ -43,50 +51,37 @@ begin
   inherited;
 end;
 
-function TTurboRegisteredTypes.DoOnSaveType(const aStream: TStream; const aType: PMeType): Boolean;
-var
-  j: Int64;
+
+function TTurboRegisteredTypes.GetTypeIdByType(const aType: PMeType): Int64;
 begin
   if Assigned(aType) then
   begin
-    j := GRegisteredTypes.IndexOf(aType);
-    if j >= 0 then
+    Result := GRegisteredTypes.IndexOf(aType);
+    if Result >= 0 then
     begin
       //the internal type
-      inc(j);
-      aStream.WriteBuffer(j, SizeOf(j));
-      Result := True;
+      Inc(Result);
       Exit;
-    end
-  end
-  Result := inherited DoOnSaveType(aStream, aType);
+    end;
+  end;
+  Result := inherited GetTypeIdByType(aType);
 end;
 
-function TTurboRegisteredTypes.DoOnLoadType(const aStream: TStream; var aType: PMeType): Boolean;
-var
-  i, j: Int64;
+function TTurboRegisteredTypes.GetTypeByTypeId(const aTypeId: Int64): PMeType;
 begin
-  {TODO: 如果类型在其它单元呢？可以考虑使用负数，如果是负数那么则是引用类型（引用其它单元的）！
-    需要建立一个 LastTypeInfoRefEntry
-  } 
-  j := aStream.Position;
-  aStream.ReadBuffer(i, SizeOf(i));
-  if i < GRegisteredTypes.Count then
+  if aTypeId <= GRegisteredTypes.Count then
   begin
     //the internal type
-    if i = 0 then
-      aType := nil
-    else if i > 0 then
-      aType := GRegisteredTypes.Items[i-1]
+    if aTypeId = 0 then
+      Result := nil
+    else if aTypeId > 0 then
+      Result := GRegisteredTypes.Items[aTypeId-1]
     else  //i < 0 the external type
-      ;
-    Result :=True;
+    begin
+    end;
     Exit;
   end;
-
-  //restore the Position.
-  aStream.Position := j;
-  Result := inherited DoOnLoadType(aStream, aType);
+  Result := inherited GetTypeByTypeId(aTypeId);
 end;
 
 initialization
