@@ -23,6 +23,7 @@ uses
 
 
 type
+  PTurboRegisteredTypes = ^ TTurboRegisteredTypes;
   {: manage the PMeTypes in the list.}
   {
     TypeId: Int64 for the type in stream!
