@@ -70,8 +70,8 @@ type
   TTurboScriptOption = (soOptimize, soLoadOnDemand 
     , soBindingRuntime, soBindingCompileTime
     , soTypeSafety, soAssertSupport
-    , soPreserved1
-    , soPreserved2
+    , soShortBooleanEval
+    , soRangeChecks
     , soPreserved3
     , soPreserved4
     , soPreserved5
