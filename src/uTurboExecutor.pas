@@ -24,10 +24,12 @@ interface
 uses
   SysUtils, Classes
   , TypInfo
-  //, uMeTypes
+  , uMeObject
+  , uMeTypes
   //, uMeProcType
   , uTurboConsts
   , uTurboMetaInfo
+  , uTurboTypes
   ;
 
 type
@@ -136,6 +138,7 @@ type
   TCustomTurboModule = class(TCustomTurboObject)
   private
     FOnReset: TNotifyEvent;
+    FRegisteredTypes: PTurboRegisteredTypes;
     function GetIsAddrResolved: Boolean;
     function GetLastModuleRefEntry: PTurboModuleRefEntry;
     function GetOptions: TTurboScriptOptions;
@@ -343,6 +346,11 @@ type
     如果该模块是私有的,那么内存就是使用的父亲的内存.
     }
     property Owner: TCustomTurboModule read FOwner write SetOwner;
+    {: here are all published defined types! }
+    { Description
+    不过现在，俺不管它，所有用户定义的类型都放这里。
+    }
+    property RegisteredTypes: PTurboRegisteredTypes read FRegisteredTypes;
     property Root: TCustomTurboModule read GetRoot;
     {: 已经使用的内存 }
     { Description
@@ -699,6 +707,7 @@ begin
   FOwner := aOwner;
   FVisibility := aVisibility;
   //FOptions := [soLoadOnDemand];
+  New(FRegisteredTypes, Create);
   ClearMemory;
 end;
 
@@ -707,6 +716,7 @@ begin
   Unload;
 
   FreeAndNil(FModuleUnloadNotifies);
+  MeFreeAndNil(FRegisteredTypes);
   if not StoredInOwner then
   begin
     if ModuleType <> mtFunction then
