@@ -9,6 +9,7 @@ interface
 
 uses
   Classes, SysUtils
+  , uMeTypes
   , uStrUtils
   , uTurboConsts
   , uTurboMetaInfo
@@ -51,8 +52,8 @@ Const
   cInvalidOptionParamError = 401;
   cMessageCompilerOption = 500;
 
-Const
-  cReqAlignMemTypes = [ttkUWord, ttkSWord, ttkULong, ttkSLong, ttkPointer, ttkString, ttkLString, ttkInt64, ttkQWord];
+//Const
+  //cReqAlignMemTypes = [TypeInfo(Word), TypeInfo(SmallInt), TypeInfo(LongWord), TypeInfo(LongInt), {ttkPointer,} TypeInfo(ShortString), TypeInfo(String), TypeInfo(Int64)];
 
 type
   ECocoBookmark = class(Exception);
@@ -291,7 +292,7 @@ type
     //if not find then add new , return index else raise error.
     function  DefineConstEx(const aValue: TTurboSimpleConst): Integer;
     function FindConst(const aName: String): Integer;
-    function GetConstValueRec(const aTypeKind: TTurboSimpleTypeKind; const aName: string): TTurboValueRec;
+    function GetConstValueRec(const aTypeKind: PMeType; const aName: string): TMeVarRec;
   
     //if not find then add new , return index else raise error.
     function DefineVar(const aValue: TTurboSimpleVar): Integer;
@@ -1345,13 +1346,13 @@ begin
   end;
 end;
 
-function TCocoRGrammar.GetConstValueRec(const aTypeKind: TTurboSimpleTypeKind; const aName: String): TTurboValueRec;
+function TCocoRGrammar.GetConstValueRec(const aTypeKind: PMeType; const aName: String): TMeVarRec;
 var
   i: Integer;
 begin
   for i := 0 to Length(FConsts) do 
     with FConsts[i] do
-    if (aName = Name) and (aTypeKind = TypeKind) then
+    if (aName = Name) and (aTypeKind = TurboType) then
     begin
       Result := Value;
       exit;
@@ -1463,7 +1464,7 @@ begin
       //FModule.AddIntToData(0); //preserved.for TypeInfo.
     end;
   
-    if (TypeKind in cReqAlignMemTypes) then FModule.AlignData;
+    if IsRequiredAlignMem(TurboType) then FModule.AlignData;
     Addr := FModule.UsedDataSize;
     if Visibility >= fvProtected then
     begin
