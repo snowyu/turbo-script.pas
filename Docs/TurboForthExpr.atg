@@ -7,7 +7,7 @@ COMPILER TurboForthCompiler
 
 DELPHI
 
-USES (INTERFACE) uStrUtils, uTurboConsts, uTurboMetaInfo, uTurboExecutor, uTurboAccessor, uTurboModuleFileAccessor, uTurboCompilerUtils//, uTurboSymbols
+USES (INTERFACE) uMeTypes, uStrUtils, uTurboConsts, uTurboMetaInfo, uTurboExecutor, uTurboAccessor, uTurboModuleFileAccessor, uTurboCompilerUtils//, uTurboSymbols
 
 TYPE
 
@@ -276,8 +276,8 @@ PRODUCTIONS
   DefineConstant
     (.Var vValue: TTurboSimpleConst; .) 
     = 
-    Identifier (. vValue.Name := LexString; vValue.TypeKind := ttkUnknown; .) 
-    [":" TypeKind<vValue.TypeKind> ]
+    Identifier (. vValue.Name := LexString; vValue.TurboType := nil; .) 
+    [":" TypeKind<vValue.TurboType> ]
     "=" Value<vValue> 
     ";" (. if IsUniqueIdentifier(vValue.Name) then DefineConstEx(vValue); .) .
 
@@ -290,36 +290,36 @@ PRODUCTIONS
     (.Var vValue: TTurboSimpleVar; .)
     =  (. vValue.Visibility := fvPrivate;vValue.ValueStr := ''; .)
     [WordVsibility<vValue.Visibility>] Identifier (. vValue.Name := LexString; .)
-    ":" TypeKind<vValue.TypeKind> (.vValue.SetTypeKind(vValue.TypeKind); .)
+    ":" TypeKind<vValue.TurboType> (.vValue.SetTurboType(vValue.TurboType); .)
     ["=" Value<vValue>]
     ";" (. if IsUniqueIdentifier(vValue.Name) then DefineVar(vValue); .)
   .
 
-  TypeKind<var aType: TTurboSimpleTypeKind> 
+  TypeKind<var aType: PMeType> 
     =
     IntegerType <aType>
     |StringType <aType>
   .
 
-  IntegerType<var aSubType: TTurboSimpleTypeKind>
+  IntegerType<var aSubType: PMeType>
     =
-    "BYTE"                                            (. aSubType := ttkUByte; .)
-    |"WORD"                                           (. aSubType := ttkUWord; .)
-    |"DWORD"                                          (. aSubType := ttkULong; .)
-    |"INTEGER"                                        (. aSubType := ttkSLong; .)
-    |"QWORD"                                          (. aSubType := ttkQWord; .)
-    |"INT64"                                          (. aSubType := ttkInt64; .)
+    "BYTE"                                            (. aSubType := GetRegisteredTypeByTypeInfo(TypeInfo(Byte)); .)
+    |"WORD"                                           (. aSubType := GetRegisteredTypeByTypeInfo(TypeInfo(Word)); .)
+    |"DWORD"                                          (. aSubType := GetRegisteredTypeByTypeInfo(TypeInfo(LongWord)); .)
+    |"INTEGER"                                        (. aSubType := GetRegisteredTypeByTypeInfo(TypeInfo(Integer)); .)
+//    |"QWORD"                                          (. aSubType := ttkQWord; .)
+    |"INT64"                                          (. aSubType := GetRegisteredTypeByTypeInfo(TypeInfo(Int64)); .)
   .
-  StringType<var aSubType: TTurboSimpleTypeKind>
+  StringType<var aSubType: PMeType>
     =
-    "STRING"                                          (. aSubType := ttkLString; .)
-    |"SHORTSTRING"                                    (. aSubType := ttkString; .)
+    "STRING"                                          (. aSubType := GetRegisteredTypeByTypeInfo(TypeInfo(String)); .)
+    |"SHORTSTRING"                                    (. aSubType := GetRegisteredTypeByTypeInfo(TypeInfo(ShortString)); .)
   .
 
   Value< var aValue: TTurboSimpleConst >
     = 
-    (StringToken|IntegerToken|HexNumberToken)           (. aValue.AssignValue(LexString, aValue.TypeKind); .)
-//    |Identifier                                       (. aValue.Value := GetConstValueRec(aValue.TypeKind, LexString); .)
+    (StringToken|IntegerToken|HexNumberToken)           (. aValue.AssignValue(LexString, aValue.TurboType); .)
+//    |Identifier                                       (. aValue.Value := GetConstValueRec(aValue.TurboType, LexString); .)
   .
 
   DefineWord (. Var vSucc: Boolean; vWord: TTurboSimpleWord; .)
