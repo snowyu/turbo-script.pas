@@ -10,6 +10,19 @@ TODO:
   需要查找堆栈有关的操作修改之！
 !* [Bug] ModuleParent is not set or convert to related or absolute address!
 
+2007-5-28 14:22
+* [Compiler] use PMeType instead of the TurboTypeKind
+  - all TurboTypeKind are removed.
+
+2007-5-27 19:07
+~ [Compile Time] 类型的搜索顺序
+  本地类型: LastTypeInfoEntry
+  外部类型: LastTypeRefEntry
+  系统类型: GRegisteredTypes
+!+ [Compiler] uses clause
+  uses UnitName
+!+ [Compiler] namespace clause
+
 2007-5-20 6:23
 + TCustomTurboModule.Types: 用户声明的类型!
   而 GRegisteredTypes 中则是系统定义的类型.
