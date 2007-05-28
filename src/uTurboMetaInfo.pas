@@ -105,6 +105,17 @@ type
   public
     Size: tsInt;
     Addr: Pointer; //offset address of the FMemory.
+    {
+    in the stream(not resolved):
+    0 = nil 
+     1..GRegisteredTypes.Count = internal types
+     > GRegisteredTypes.Count = the offset of the user defined types in the module
+           PTurboTypeInfo
+     < 0 = the Abs(TypeInfo) is the offset of the external defined types in the module
+           PTurboTypeRefInfo
+    in the memory(resolved):
+           PMeType
+    }
     TypeInfo: PTurboTypeInfo; //TODO: relocate it.
     //Value: ....
   end;
@@ -152,7 +163,14 @@ type
 
   TTurboTypeInfo = object(TTurboMetaInfo)
   public
-    TurboType: Pointer;//PMeType;
+    {
+    in the stream(not resolved):
+      0: means nil.
+      it's the index+1 of the module.RegisteredTypes!
+    in the memory(resolved):
+      PMeType 
+    }
+    TurboType: tsPointer;//PMeType;
   end;
 
   TTurboTypeRefInfo = object(TTurboTypeInfo)
@@ -161,8 +179,9 @@ type
     {
       Note: 如果ModuleRef上添加了新类型，那么the TypeIndex is invalid.
       so Must check the ModuleRef.Revision and BuildDate.
+      use the TurboType!
     }
-    TypeIndex: tsInt;     
+    //TypeIndex: tsInt;     
   end;
 
 
