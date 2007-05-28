@@ -31,8 +31,8 @@ uses
   ;
 
 type
-  {: the basic simple turbo types. }
-  {
+  {##: the basic simple turbo types. }
+  {## Now use TMeTypeKind
      @param ttSByte: Signed byte
      @param ttUByte: Unsigned byte
      @param ttSWord: Signed word
@@ -44,7 +44,7 @@ type
      @param ttkWString: WideString
      @param ttkWChar: WideChar 
   }
-  TTurboSimpleTypeKind = (
+{##  TTurboSimpleTypeKind = (
     ttkUnknown, ttkSByte, ttkUByte, ttkSWord, ttkUWord
     , ttkSLong, ttkULong, ttkQWord, ttkInt64
     , ttkSingle, ttkDouble, ttkExtended, ttkComp, ttkCurr
@@ -53,7 +53,7 @@ type
     , ttkMethod, ttkProcedure, ttkInterface, ttkPointer, ttkParam
     , ttkSet, ttkEnumeration
   );
-  //TTurboSimpleTypes = array [TTurboSimpleTypeKind] of PMeType;
+  //TTurboSimpleTypes = array [TTurboSimpleTypeKind] of PMeType;}
 
 
   //PTurboPreservedCodeMemory = ^ TTurboPreservedCodeMemory;
@@ -164,6 +164,7 @@ type
     function GetDataMemorySize: tsInt;
     function GetInitializeProc: Integer;
     function GetLastTypeInfoEntry: PTurboTypeInfoEntry;
+    function GetLastTypeRefEntry: PTurboTypeRefEntry;
     function GetLastVariableEntry: PTurboStaticFieldEntry;
     function GetLastWordEntry: PTurboMethodEntry;
     function GetMemorySize: tsInt;
@@ -181,6 +182,7 @@ type
     procedure SendUnloadNotification;
     procedure SetDataMemorySize(Value: tsInt);
     procedure SetLastTypeInfoEntry(const Value: PTurboTypeInfoEntry);
+    procedure SetLastTypeRefEntry(const Value: PTurboTypeRefEntry);
     procedure SetLastVariableEntry(const Value: PTurboStaticFieldEntry);
     procedure SetLastWordEntry(const Value: PTurboMethodEntry);
     procedure SetMemorySize(Value: tsInt);
@@ -244,6 +246,8 @@ type
     function FindModuleEntry(const aName: string): PTurboModuleRefEntry;
     {: nil means not found. }
     function FindTypeInfoEntry(const aName: string): PTurboTypeInfoEntry;
+    {: nil means not found. }
+    function FindTypeRefEntry(const aName: string): PTurboTypeRefEntry;
     function FindUnloadNotification(aProc: TNotifyEvent): Integer;
     {: nil means not found. }
     function FindVariableEntry(const aName: string): PTurboStaticFieldEntry;
@@ -309,6 +313,8 @@ type
             GetLastModuleRefEntry write SetLastModuleRefEntry;
     property LastTypeInfoEntry: PTurboTypeInfoEntry read GetLastTypeInfoEntry
             write SetLastTypeInfoEntry;
+    property LastTypeRefEntry: PTurboTypeRefEntry read GetLastTypeRefEntry
+            write SetLastTypeRefEntry;
     property LastVariableEntry: PTurboStaticFieldEntry read
             GetLastVariableEntry write SetLastVariableEntry;
     property LastWordEntry: PTurboMethodEntry read GetLastWordEntry write
@@ -608,6 +614,7 @@ type
     LastVariableEntry: PTurboStaticFieldEntry;
     //RTTI TypeInfo 链表
     LastTypeInfoEntry: PTurboTypeInfoEntry;
+    LastTypeRefEntry: PTurboTypeRefEntry;
     //VMT: TTurboVirtualMethodTable; 实际上可以将 LastWordEntry 看做VMT! 暂时不管 
     //reserved: array [SizeOf() ] of byte; 
   end;
@@ -943,6 +950,33 @@ begin
   Result := nil;
 end;
 
+function TCustomTurboModule.FindTypeRefEntry(const aName: string):
+        PTurboTypeRefEntry;
+var
+  vName: PChar;
+begin
+  Result := LastTypeRefEntry;
+  while (Result <> nil) do
+  begin
+    if not IsAddrResolved then
+      Integer(Result) := Integer(FDataMemory) + Integer(Result);
+    vName := Result.TypeRef.Name;
+    if Assigned(vName) then
+    begin
+      if not IsAddrResolved then
+      begin
+        Integer(vName) := Integer(FDataMemory) + Integer(vName);
+      end;
+      if vName^ = aName then
+      begin
+        Exit;
+      end;
+    end;
+    Result := Result.Prior;
+  end;
+  Result := nil;
+end;
+
 function TCustomTurboModule.FindUnloadNotification(aProc: TNotifyEvent):
         Integer;
 var
@@ -1047,6 +1081,11 @@ end;
 function TCustomTurboModule.GetLastTypeInfoEntry: PTurboTypeInfoEntry;
 begin
   Result := PTurboPreservedDataMemory(FDataMemory).LastTypeInfoEntry;
+end;
+
+function TCustomTurboModule.GetLastTypeRefEntry: PTurboTypeRefEntry;
+begin
+  Result := PTurboPreservedDataMemory(FDataMemory).LastTypeRefEntry;
 end;
 
 function TCustomTurboModule.GetLastVariableEntry: PTurboStaticFieldEntry;
@@ -1466,6 +1505,12 @@ procedure TCustomTurboModule.SetLastTypeInfoEntry(const Value:
         PTurboTypeInfoEntry);
 begin
   PTurboPreservedDataMemory(FDataMemory).LastTypeInfoEntry := Value;
+end;
+
+procedure TCustomTurboModule.SetLastTypeRefEntry(const Value:
+        PTurboTypeRefEntry);
+begin
+  PTurboPreservedDataMemory(FDataMemory).LastTypeRefEntry := Value;
 end;
 
 procedure TCustomTurboModule.SetLastVariableEntry(const Value:
@@ -2122,6 +2167,7 @@ begin
   TurboConvertVarEntryRelatedToAbsolute(Data, Data.LastVariableEntry);  
   TurboConvertEntryRelatedToAbsolute(Data, PTurboEntry(Data.LastWordEntry));  
   TurboConvertEntryRelatedToAbsolute(Data, PTurboEntry(Data.LastModuleRefEntry));  
+  TurboConvertEntryRelatedToAbsolute(Data, PTurboEntry(Data.LastTypeRefEntry));  
 end;
 
 procedure TurboConvertEntryAbsoluteToRelated(Mem: Pointer; var aEntry: PTurboEntry);
@@ -2181,6 +2227,7 @@ begin
   if Assigned(Data.ModuleName) then
     Integer(Data.ModuleName) := Integer(Data.ModuleName) - Integer(Data); 
   TurboConvertEntryAbsoluteToRelated(Data, PTurboEntry(Data.LastWordEntry));  
+  TurboConvertEntryAbsoluteToRelated(Data, PTurboEntry(Data.LastTypeRefEntry));  
   TurboConvertEntryAbsoluteToRelated(Data, PTurboEntry(Data.LastModuleRefEntry));  
   TurboConvertVarEntryAbsoluteToRelated(Data, Data.LastVariableEntry);  
   TurboConvertEntryAbsoluteToRelated(Data, PTurboEntry(Data.LastTypeInfoEntry));  
