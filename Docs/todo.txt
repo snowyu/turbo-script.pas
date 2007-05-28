@@ -13,6 +13,15 @@ TODO:
 2007-5-28 14:22
 * [Compiler] use PMeType instead of the TurboTypeKind
   - all TurboTypeKind are removed.
++ [Compiler] uses clause
+  + [Coco] TCocoRGrammar.DefineModule
+  + [Coco] TCocoRGrammar.FindWordInUsedModules
+  * [Coco] TCocoRGrammar.AddWordCFA: now search the word in UsedModules. TODO: need more optimal!
+    现在，可以直接使用在引用的外部模块中的word了，而无需定义！
+
+eg,
+  uses UnitName;
+  uses UnitName2;
 
 2007-5-27 19:07
 ~ [Compile Time] 类型的搜索顺序

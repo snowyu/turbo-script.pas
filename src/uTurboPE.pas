@@ -466,7 +466,7 @@ type
     procedure ChangeSize(NewSize: DWord);
   public
     count: Integer;
-{$IFDEF DELPHI4_UP}
+{$IFDEF COMPILER4_UP}
     FRealCount: DWord;
     nodes: array of TNode;
 {$ELSE}
@@ -1781,7 +1781,7 @@ const
 
 procedure TResourceNode.SetSize(NewSize: DWord);
 begin
-{$IFDEF DELPHI4_UP}
+{$IFDEF COMPILER4_UP}
   FRealCount := NewSize;
   SetLength(nodes, FRealCount);
 {$ENDIF}
@@ -1793,7 +1793,7 @@ begin
 end;
 
 procedure TResourceNode.ChangeSize(NewSize: DWord);
-{$IFDEF DELPHI4_UP}
+{$IFDEF COMPILER4_UP}
 var
   IntPart, ModPart, NewCount: DWord;
 begin
