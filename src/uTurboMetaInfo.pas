@@ -27,6 +27,7 @@ type
   PTurboModuleRefEntry = ^ TTurboModuleRefEntry;
   PTurboMethodEntry = ^ TTurboMethodEntry;
   PTurboTypeInfoEntry = ^ TTurboTypeInfoEntry;
+  PTurboTypeRefEntry = ^ TTurboTypeRefEntry;
 
    { Description
        @param tfAddrResolved  the address resolved or not
@@ -151,8 +152,17 @@ type
 
   TTurboTypeInfo = object(TTurboMetaInfo)
   public
-    //TurboType: TTurboType;
-    
+    TurboType: Pointer;//PMeType;
+  end;
+
+  TTurboTypeRefInfo = object(TTurboTypeInfo)
+    ModuleRef: PTurboModuleRefInfo; //this is related addr!!
+    {the index of the Module.RegisteredTypes}
+    {
+      Note: 如果ModuleRef上添加了新类型，那么the TypeIndex is invalid.
+      so Must check the ModuleRef.Revision and BuildDate.
+    }
+    TypeIndex: tsInt;     
   end;
 
 
@@ -186,6 +196,12 @@ type
     Prior: PTurboTypeInfoEntry; //nil means no more
     TypeInfo: TTurboTypeInfo;
   end;
+
+  TTurboTypeRefEntry = packed record
+    Prior: PTurboTypeRefEntry; //nil means no more
+    TypeRef: TTurboTypeRefInfo;
+  end;
+  
 {
   TTurboVirtualMethodTable = record
     Init: Pointer; //= Initialization
