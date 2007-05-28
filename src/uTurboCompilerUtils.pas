@@ -88,6 +88,7 @@ Type
     Addr: Integer;
   end;
 
+  PTurboSimpleWord = ^ TTurboSimpleWord;
   TTurboSimpleWord = object
     Options: TTurboWordOptions;
     //the Param Field Length
