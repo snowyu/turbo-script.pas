@@ -301,9 +301,12 @@ type
     //try find module if not then Generate.
     procedure GenerateModuleEntryForWord(var aWord: TTurboSimpleWord);
     function FindModule(const aName: String; aModuleType: TTurboModuleType): Integer;
+    //if not found then add new mtLib external module.
+    function DefineModule(const aName: String): Integer;
     function  AddUsedModule(const aName: String; aModuleType: TTurboModuleType): Integer;
     function FindWord(const aName: String): Integer;
-    
+    function FindWordInUsedModules(const aName: string): PTurboSimpleWord;
+
     //make sure the indentifier is unique else it will raise the error..
     function IsUniqueIdentifier(const aName: String): Boolean;
 
@@ -1265,13 +1268,51 @@ begin
     AddIdentifierCFA(aValue, nil);
 end;
 
-function TCocoRGrammar.AddWordCFA(aName: string; const aParams: TStringList): Boolean;
+function TCocoRGrammar.FindWordInUsedModules(const aName: string): PTurboSimpleWord;
 var
   i: Integer;
 begin
+  for i := 0 to Length(FUsedModules) - 1 do
+  with FUsedModules[i] do
+  begin
+    if ModuleType = mtLib then
+    begin
+      if Assigned(Module.FindWordEntry(aName)) then
+      begin
+        New(Result);
+        Result.Name := aName;
+        Result.Options.CodeFieldStyle := cfsExternalFunction;
+        Result.ModuleType := mtLib;
+        Result.ModuleName := Name;
+        Result.Module := Module;
+        exit;
+      end;
+    end;
+  end;
+  Result := nil;
+end;
+
+function TCocoRGrammar.AddWordCFA(aName: string; const aParams: TStringList): Boolean;
+var
+  i: Integer;
+  vWord: PTurboSimpleWord;
+  v: TTurboSimpleWord;
+begin
   Result := False;
   i := FindWord(aName);
-  if i >= 0 then with FWords[i] do
+  if i >= 0 then
+    vWord := @FWords[i]
+  else begin
+    vWord := FindWordInUsedModules(aName);
+    if Assigned(vWord) then
+    begin
+      v := vWord^;
+      Dispose(vWord);
+      vWord := @v;
+    end;
+  end;
+
+  if Assigned(vWord) then with vWord^ do
   begin
     if Assigned(aParams) then
     begin
@@ -1341,7 +1382,7 @@ begin
   //writeln('W:',Result);
   if not Result then
   begin
-    writeln('RedeclarationError:',aName);
+    //writeln('RedeclarationError:',aName);
     SynError(cRedeclarationError);
   end;
 end;
@@ -1439,6 +1480,7 @@ begin
   Result := Length(FVars);
   SetLength(FVars, Result+1);
   FVars[Result] := aValue;
+  vVaraibleEntry := nil;
   with FVars[Result] do
   begin
     //WriteLn(Result, ':DefineVar:',Name);
@@ -1505,6 +1547,7 @@ begin
   begin
     if AnsiSameText(aName, FWords[Result].Name) then exit;
   end;
+
   Result := -1;
 end;
 
@@ -1535,12 +1578,22 @@ begin
   end;
 end;
 
+function TCocoRGrammar.DefineModule(const aName: String): Integer;
+begin
+  Result := FindModule(aName, mtLib);
+  if Result >= 0 then
+    SynError(cRedeclarationError, aName)
+  else
+    Result := AddUsedModule(aName, mtLib);
+end;
+
 function  TCocoRGrammar.AddUsedModule(const aName: String; aModuleType: TTurboModuleType): Integer;
 var
   vModule: TCustomTurboModule;
 begin
   //WriteLn('AddUsedModule:', aName);
   Result := -1;
+  vModule := nil;
   if aModuleType = mtLib then
   begin
     vModule := FModule.RequireModule(PChar(aName));

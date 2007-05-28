@@ -256,11 +256,18 @@ PRODUCTIONS
       |"UNIT"                                          (. FModule.ModuleType := mtLib; .) 
     )
     Identifier                                         (. SaveModuleName(LexString); .)
+    [UseModulesBlock]
     [DeclarationBlock]  
     "BEGIN"                                            (. FInitProcCFA := FModule.UsedMemory;  .)
     ASMStatementBlock
     "END."                                             (. FModule.AddOpToMem(opPushInt); FModule.AddIntToMem(0); FModule.AddOpToMem(opHalt); .)
     (. Final ; .) .
+
+   UseModulesBlock
+    =
+    UseModule {UseModule}.
+
+   UseModule = "USES" Identifier (. DefineModule(LexString); .) ";" .
 
    DeclarationBlock 
     = 
