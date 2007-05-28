@@ -6,6 +6,8 @@ interface
 
 uses
   SysUtils, Classes
+  //, TypInfo
+  , uMeTypes
   , uTurboConsts
   , uTurboMetaInfo
   , uTurboExecutor
@@ -17,36 +19,36 @@ Type
   TTurboCompilerOptionState = (cosDefault, cosEnable, cosDisable);
 
   //uTurboSymbols 还没有完全敲定，所以这些类型定义放在这里.
-  TTurboValueRec = packed record
+  {TTurboValueRec_ = packed record
     case Integer of
       0: (
-        case TTurboSimpleTypeKind of
-          //ttkUByte: (VByte: Byte);
-          ttkSByte: (VShortInt: ShortInt);
-          //ttkUWord: (VWord: Word);
-          ttkSWord: (VSmallInt: SmallInt);
-          ttkULong: (VLong: LongWord);
-          ttkSLong: (VInteger: Integer);
-          ttkSet:        (VSet: Byte);
-          ttkLString:    (VAnsiString: Pointer);
-          ttkChar:       (VChar: Char);
-          ttkWString:    (VWideString: Pointer);
-          ttkString:     (VString: PShortString);
-          ttkPointer:    (VPointer: Pointer);
-          //ttkObject:     (VMeObject: Pointer);
-          ttkClass:      (VObject: TObject);
-          ttkWChar:      (VWideChar: WideChar);
-          ttkVariant:    (VVariant: TVarData);
-          ttkInterface:  (VInterface: Pointer);
-          ttkInt64:      (VInt64: Int64);
-          ttkDynArray:   (VDynBound: Integer; VDynArray: Pointer);
-          ttkMethod:     (VCode: Pointer; VData: Pointer);
-          //ttkProcedure:  (VCode: Pointer);
-             ttkSingle: (VSingle: Single);
-             ttkDouble: (VDouble: Double);
-             ttkExtended: (VExtended: Extended);
-             ttkComp: (VComp: Comp);
-             ttkCurr: (VCurr: Currency);
+        case TMeTypeKind of
+          //mtkUByte: (VByte: Byte);
+          mtkSByte: (VShortInt: ShortInt);
+          //mtkUWord: (VWord: Word);
+          mtkSWord: (VSmallInt: SmallInt);
+          mtkULong: (VLong: LongWord);
+          mtkSLong: (VInteger: Integer);
+          mtkSet:        (VSet: Byte);
+          mtkLString:    (VAnsiString: Pointer);
+          mtkChar:       (VChar: Char);
+          mtkWString:    (VWideString: Pointer);
+          mtkString:     (VString: PShortString);
+          mtkPointer:    (VPointer: Pointer);
+          //mtkObject:     (VMeObject: Pointer);
+          mtkClass:      (VObject: TObject);
+          mtkWChar:      (VWideChar: WideChar);
+          mtkVariant:    (VVariant: TVarData);
+          mtkInterface:  (VInterface: Pointer);
+          mtkInt64:      (VInt64: Int64);
+          mtkDynArray:   (VDynBound: Integer; VDynArray: Pointer);
+          mtkMethod:     (VCode: Pointer; VData: Pointer);
+          //mtkProcedure:  (VCode: Pointer);
+             mtkSingle: (VSingle: Single);
+             mtkDouble: (VDouble: Double);
+             mtkExtended: (VExtended: Extended);
+             mtkComp: (VComp: Comp);
+             mtkCurr: (VCurr: Currency);
       );
       1: (VBytes: array [0..15] of byte);
       2: (VWords: array [0..7] of word);
@@ -56,7 +58,7 @@ Type
       6: (VWord: word);
       7: (VLongword: Longword);
   end;
-
+//}
   TTurboLabelDeclarationRec = packed record
     Name: String;
     WordName: String;
@@ -67,15 +69,16 @@ Type
   TTurboSimpleConst = object
   public
     Name: ShortString;
-    TypeKind: TTurboSimpleTypeKind;
-    Value: TTurboValueRec;
+    TurboType: PMeType;
+    Value: TMeVarRec;
     ValueStr: ShortString;
     Size: Integer;
   public
-    procedure SetTypeKind(aValue: TTurboSimpleTypeKind);
+    procedure SetTurboType(const aValue: PMeType);
+    //assign value to mem!
     function AssignValueTo(const Source: Pointer): Boolean;
-    //根据aValue 如果aTypeKind is ttkUnknown 那么会自动判断其类型
-    function AssignValue(const aValue: string; aTypeKind: TTurboSimpleTypeKind = ttkUnknown): Boolean;
+    //根据aValue 如果aTypeKind is mtkUnknown 那么会自动判断其类型
+    function AssignValue(const aValue: string; aType: PMeType = nil): Boolean;
     procedure SaveString(const aModule: TCustomTurboModule);
   end;
 
@@ -108,7 +111,7 @@ Type
 
 //convert the unit string(100KB, 100MB) to int(byte).
 function UnitStrToInt(s: string): integer;
-function GetSimpleTurboTypeSize(const aTypeKind: TTurboSimpleTypeKind): Integer;
+//function GetSimpleTurboTypeSize(const aTypeKind: TMeTypeKind): Integer;
 
 implementation
 
@@ -140,104 +143,110 @@ begin
     end;
 end;
 
-function GetSimpleTurboTypeSize(const aTypeKind: TTurboSimpleTypeKind): Integer;
+{function GetSimpleTurboTypeSize(const aTypeKind: TMeTypeKind): Integer;
 begin
   case aTypeKind of
-    ttkSByte, ttkUByte, ttkChar, ttkSet: Result := SizeOf(Byte);
-    ttkSWord, ttkUWord: Result := SizeOf(Word);
-    ttkSingle: Result := SizeOf(Single);
-    ttkDouble: Result := SizeOf(Double);
-    ttkComp:  Result := SizeOf(Comp);
-    ttkExtended: Result := SizeOf(Extended);
-    ttkCurr: Result := SizeOf(Currency);
-    ttkEnumeration: Result := -1; //can not determine. <=256 elemnts is byte, <=$FFFF elemnts is word.
-    ttkQWord, ttkInt64: Result := SizeOf(Int64);
-    //ttkShortString, ttkAnsiString, ttkPointer: Result := SizeOf(Pointer); //Pointer = Integer
+    mtkSByte, mtkUByte, mtkChar, mtkSet: Result := SizeOf(Byte);
+    mtkSWord, mtkUWord: Result := SizeOf(Word);
+    mtkSingle: Result := SizeOf(Single);
+    mtkDouble: Result := SizeOf(Double);
+    mtkComp:  Result := SizeOf(Comp);
+    mtkExtended: Result := SizeOf(Extended);
+    mtkCurr: Result := SizeOf(Currency);
+    mtkEnumeration: Result := -1; //can not determine. <=256 elemnts is byte, <=$FFFF elemnts is word.
+    mtkQWord, mtkInt64: Result := SizeOf(Int64);
+    //mtkShortString, mtkAnsiString, mtkPointer: Result := SizeOf(Pointer); //Pointer = Integer
   else
     Result := SizeOf(Integer);
   end;
 end;
-
-function TTurboSimpleConst.AssignValue(const aValue: string; aTypeKind: TTurboSimpleTypeKind): Boolean;
+}
+function TTurboSimpleConst.AssignValue(const aValue: string; aType: PMeType): Boolean;
 begin
   Result := True;
   //writeln('AssignValue:', Integer(aTypeKind));
-  if (aTypeKind = ttkUnknown) and (aValue[1] = '''') then
+  if (aType = nil) and (aValue[1] = '''') then
   begin
-       aTypeKind := ttkString;
-      {
-      if Length(ValueStr) = 1 then
-        aTypeKind := ttkChar
-      else if Length(ValueStr) < 256 then
+       //aTypeKind := mtkString;
+       aType := GetRegisteredTypeByTypeInfo(TypeInfo(ShortString));
+  end
+  else if Assigned(aType) then
+  begin
+    Case aType.Kind of
+      mtkString, mtkLString: 
       begin
-        aTypeKind := ttkString;
-      end
-      else begin
-        aTypeKind := ttkLString;
-      end;}
-  end;
-  Case aTypeKind of
-    ttkString, ttkLString: 
-    begin
-      ValueStr := AnsiDequotedStr(aValue, '''');
-    end;
-    ttkChar:
-    begin
-      ValueStr := AnsiDequotedStr(aValue, '''');
-      Value.VByte := Ord(ValueStr[1]);
-    end;
-    ttkSByte, ttkUByte, ttkSWord, ttkUWord, ttkSLong, ttkULong, ttkInt64:
-    try
-      ValueStr := aValue;
-      Value.VInt64 := StrToInt64(aValue);
-    except
-      aTypeKind := ttkUnknown;
-      Result := False;
-    end
-    else //Case-Else aTypeKind
-    begin
+        ValueStr := AnsiDequotedStr(aValue, '''');
+      end;
+      mtkChar:
+      begin
+        ValueStr := AnsiDequotedStr(aValue, '''');
+        Value.VByte := Ord(ValueStr[1]);
+      end;
+      mtkInteger, mtkInt64:
+      try
+        ValueStr := aValue;
+        Value.VInt64 := StrToInt64(aValue);
+      except
+        aType := nil;
+        Result := False;
+      end;
+      mtkFloat:
+      try
+        ValueStr := aValue;
+        Value.VExtended := StrToFloat(aValue);
+      except
+        aType := nil;
+        Result := False;
+      end;
+    end; //case
+  end
+  else //try....
+  begin
       ValueStr := aValue;
       try //is Integer?
         Value.VInt64 := StrToInt64(aValue);
         if (Value.VInt64 >= Low(ShortInt)) and (Value.VInt64<=High(ShortInt)) then
-          aTypeKind := ttkSByte
+        begin
+          aType := GetRegisteredTypeByTypeInfo(TypeInfo(ShortInt));
+        end
         else if (Value.VInt64 >= Low(Byte)) and (Value.VInt64<=High(Byte)) then
-          aTypeKind := ttkUByte
+          aType := GetRegisteredTypeByTypeInfo(TypeInfo(Byte))
         else if (Value.VInt64 >= Low(SmallInt)) and (Value.VInt64<=High(SmallInt)) then
-          aTypeKind := ttkSWord
+          aType := GetRegisteredTypeByTypeInfo(TypeInfo(SmallInt))
         else if (Value.VInt64 >= Low(Word)) and (Value.VInt64<=High(Word)) then
-          aTypeKind := ttkUWord
+          aType := GetRegisteredTypeByTypeInfo(TypeInfo(Word))
         else if (Value.VInt64 >= Low(LongInt)) and (Value.VInt64<=High(LongInt)) then
-          aTypeKind := ttkSLong
+          aType := GetRegisteredTypeByTypeInfo(TypeInfo(LongInt))
         else if (Value.VInt64 >= Low(LongWord)) and (Value.VInt64<=High(LongWord)) then
-          aTypeKind := ttkULong
+          aType := GetRegisteredTypeByTypeInfo(TypeInfo(LongWord))
         else //if (Value.VInt64 >= Low(Int64)) and (Value.VInt64<=High(Int64)) then
-          aTypeKind := ttkInt64;
+          aType := GetRegisteredTypeByTypeInfo(TypeInfo(Int64))
       except
-        aTypeKind := ttkUnknown;
+        aType := nil;
         Result := False;
       end;
 
-      if aTypeKind = ttkUnknown then
+      if not Assigned(aType) then
       try //is Float?
-        Value.VDouble := StrToFloat(aValue);
-        {if (Value.VDouble >= Low(Single)) and (Value.VDouble<=High(Single)) then //can not get low..High
-          aTypeKind := ttkSingle
-        else}
-          aTypeKind := ttkDouble;
+        Value.VExtended := StrToFloat(aValue);
+        if (ABS(Value.VExtended) >= 1.5e-45) and (ABS(Value.VExtended) <= 3.4e38) then
+          aType := GetRegisteredTypeByTypeInfo(TypeInfo(Single))
+        else if (ABS(Value.VExtended) >= 5e-308) and (ABS(Value.VExtended) <= 1.7e308) then
+          aType := GetRegisteredTypeByTypeInfo(TypeInfo(Double))
+        else
+          aType := GetRegisteredTypeByTypeInfo(TypeInfo(Extended))
       except
-        aTypeKind := ttkUnknown;
+        aType := nil;
         Result := False;
       end
-    end;
-  End; //Case
+  end;
 
-  TypeKind := aTypeKind;
-  if aTypeKind <> ttkUnknown then begin
+  TurboType := aType;
+  if Assigned(aType) then begin
     Result := True;
   end;
   if Result then
-    Size := GetSimpleTurboTypeSize(TypeKind);
+    Size := GetTypeSize(TurboType);
 end;
 
 function TTurboSimpleConst.AssignValueTo(const Source: Pointer): Boolean;
@@ -246,30 +255,20 @@ begin
   //writeln('AssignValueTo:', ValueStr);
   move(Value, Source^, Size);
   //writeln(InttoHex(Value.VInteger, 4));
-  {case TypeKind of
-    ttkSLong, ttkInterface, ttkProcedure, ttkPointer, ttkString, ttkLString: PInteger(Source)^ := Value.VInteger;
-    ttkSByte: PShortInt(Source)^  := Value.VShortInt;
-    ttkUByte, ttkChar, ttkSet: PByte(Source)^ := Value.VByte;
-    ttkSWord:PSmallInt(Source)^ := Value.VSmallInt;
-    ttkUWord: PWord(Source)^ := Value.VWord;
-    ttkULong: PLongWord(Source)^ := Value.VLongword;
-    ttkQWord, ttkInt64: PInt64(Source)^:= Value.VInt64;
-    else 
-      Result := False;
-  end;//}
-  //writeln('TypeKind=', Integer(TypeKind));
+  //writeln('TurboType=', Integer(TurboType));
   //writeln('PSource=', PInteger(Source)^);
 end;
 
 procedure TTurboSimpleConst.SaveString(const aModule: TCustomTurboModule);
 begin
-    Case TypeKind of
-      ttkString: begin
+  if Assigned(TurboType) then
+    Case TurboType.Kind of
+      mtkString: begin
         Value.VInteger := aModule.UsedDataSize;
         aModule.AddByteToData(Length(ValueStr));
         aModule.AddBufferToData(ValueStr[1], Length(ValueStr));
       end;
-      ttkLString: begin
+      mtkLString: begin
         aModule.AddIntToData(-1);
         aModule.AddIntToData(Length(ValueStr));
         Value.VInteger := aModule.UsedDataSize;
@@ -279,10 +278,10 @@ begin
     end;//case
 end;
 
-procedure TTurboSimpleConst.SetTypeKind(aValue: TTurboSimpleTypeKind);
+procedure TTurboSimpleConst.SetTurboType(const aValue: PMeType);
 begin
-  TypeKind := aValue;
-  Size := GetSimpleTurboTypeSize(TypeKind);
+  TurboType := aValue;
+  Size := GetTypeSize(TurboType);
 end;
 
 
