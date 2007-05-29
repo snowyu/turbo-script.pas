@@ -10,6 +10,37 @@ TODO:
   需要查找堆栈有关的操作修改之！
 !* [Bug] ModuleParent is not set or convert to related or absolute address!
 
+2007-5-29 11:42
+~ [Compiler] 定义标识符的命名和搜索顺序！
+  规定：
+    模块（类）名称为绝对名称。编译后的文件名以模块（类）名为准。
+    而模块中定义的类型，变量，方法名，全部为相对名称。
+  本地[Self]：
+    1、常量标识符
+    2、变量标识符
+    3、方法标识符
+  外部模块[ModuleName]
+
+[TurboForthCompiler] 标识符的搜索顺序
+  没有任何前缀限制的标识符：
+  LocalConsts
+  LocalVars
+  LocalWords
+  ExternalWords
+  ExternalVars
+  ExternalConsts
+
+!* uTurboCompilerUtils 中的类型，尽量使用MetaInfo中的类型来代替
+
+鉴于Object中对于AnsiString字符串的处理存在重大bug,所以在有string类型的地方，不要直接使用赋值：
+ aObj := aOtherObj;          //直接复制的结果是字符串的引用计数并没有变！
+ Pointer(aObj.Name) := nil;  //所以先清空字符串
+ aObj.Name := aOtherObj.Name; //然后赋值。
+ 不过最好建立一个assign方法, aObj.Assign(aOtherObj) 来进行.
+
+* TurboMetaInfo use TMeDynamicObject now
+  !+ 注意如果想在其中使用虚方法，那么还必须在AddrResolved的时候填写相应的VMT地址到纪录中！
+
 2007-5-28 14:22
 * [Compiler] use PMeType instead of the TurboTypeKind
   - all TurboTypeKind are removed.
@@ -22,6 +53,14 @@ TODO:
 eg,
   uses UnitName;
   uses UnitName2;
+
+!~ [Compiler] 定义标识符的搜索顺序！
+  本地[Self]：
+    1、常量标识符
+    2、变量标识符
+    3、方法标识符
+  外部模块[ModuleName]
+    
 
 2007-5-27 19:07
 ~ [Compile Time] 类型的搜索顺序
