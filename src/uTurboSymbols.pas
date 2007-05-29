@@ -19,47 +19,6 @@ type
     misUse: ÒýÓÃ, like DLL.
   }
   TTurboModuleImportStyle = (misNone, misImport, misUse);
-
-  TTurboValueRec = packed record
-    case Integer of
-      0: (
-        case TTurboSimpleTypeKind of
-          //ttkUByte: (VByte: Byte);
-          ttkSByte: (VShortInt: ShortInt);
-          //ttkUWord: (VWord: Word);
-          ttkSWord: (VSmallInt: SmallInt);
-          ttkULong: (VLong: LongWord);
-          ttkSLong: (VInteger: Integer);
-          ttkSet:        (VSet: Byte);
-          ttkLString:    (VAnsiString: Pointer);
-          ttkChar:       (VChar: Char);
-          ttkWString:    (VWideString: Pointer);
-          ttkString:     (VString: PShortString);
-          ttkPointer:    (VPointer: Pointer);
-          //ttkObject:     (VMeObject: Pointer);
-          ttkClass:      (VObject: TObject);
-          ttkWChar:      (VWideChar: WideChar);
-          ttkVariant:    (VVariant: TVarData);
-          ttkInterface:  (VInterface: Pointer);
-          ttkInt64:      (VInt64: Int64);
-          ttkDynArray:   (VDynBound: Integer; VDynArray: Pointer);
-          ttkMethod:     (VCode: Pointer; VData: Pointer);
-          //ttkProcedure:  (VCode: Pointer);
-             ttkSingle: (VSingle: Single);
-             ttkDouble: (VDouble: Double);
-             ttkExtended: (VExtended: Extended);
-             ttkComp: (VComp: Comp);
-             ttkCurr: (VCurr: Currency);
-      );
-      1: (VBytes: array [0..15] of byte);
-      2: (VWords: array [0..7] of word);
-      3: (VDWords: array [0..3] of LongWord);
-      4: (VInt64s: array [0..1] of Int64);
-      5: (VByte: byte);
-      6: (VWord: word);
-      7: (VLongword: Longword);
-  end;
-
   
   TTurboSymbol = class;
   TTurboTypeSymbol = class;
@@ -318,26 +277,8 @@ type
 
 implementation
 
-Const
-  cReqAlignMemTypes = [ttkUWord, ttkSWord, ttkULong, ttkSLong, ttkPointer, ttkString, ttkLString, ttkInt64, ttkQWord];
-
-function GetSimpleTurboTypeSize(const aTypeKind: TTurboSimpleTypeKind): Integer;
-begin
-  case aTypeKind of
-    ttkSByte, ttkUByte, ttkChar, ttkSet: Result := SizeOf(Byte);
-    ttkSWord, ttkUWord: Result := SizeOf(Word);
-    ttkSingle: Result := SizeOf(Single);
-    ttkDouble: Result := SizeOf(Double);
-    ttkComp:  Result := SizeOf(Comp);
-    ttkExtended: Result := SizeOf(Extended);
-    ttkCurr: Result := SizeOf(Currency);
-    ttkEnumeration: Result := -1; //can not determine. <=256 elemnts is byte, <=$FFFF elemnts is word.
-    ttkQWord, ttkInt64: Result := SizeOf(Int64);
-    //ttkShortString, ttkAnsiString, ttkPointer: Result := SizeOf(Pointer); //Pointer = Integer
-  else
-    Result := SizeOf(tsInt);
-  end;
-end;
+//Const
+  //cReqAlignMemTypes = [ttkUWord, ttkSWord, ttkULong, ttkSLong, ttkPointer, ttkString, ttkLString, ttkInt64, ttkQWord];
 
 
 {
