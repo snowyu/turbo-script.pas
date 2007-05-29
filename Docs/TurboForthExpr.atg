@@ -7,7 +7,7 @@ COMPILER TurboForthCompiler
 
 DELPHI
 
-USES (INTERFACE) uMeTypes, uStrUtils, uTurboConsts, uTurboMetaInfo, uTurboExecutor, uTurboAccessor, uTurboModuleFileAccessor, uTurboCompilerUtils//, uTurboSymbols
+USES (INTERFACE) uMeObject, uMeTypes, uStrUtils, uTurboConsts, uTurboMetaInfo, uTurboExecutor, uTurboAccessor, uTurboModuleFileAccessor, uTurboCompilerUtils//, uTurboSymbols
 
 TYPE
 
@@ -281,12 +281,19 @@ PRODUCTIONS
   .
 
   DefineConstant
-    (.Var vValue: TTurboSimpleConst; .) 
-    = 
-    Identifier (. vValue.Name := LexString; vValue.TurboType := nil; .) 
-    [":" TypeKind<vValue.TurboType> ]
+    (.Var vValue: PTurboConstSymbol; vType: PMeType; .) 
+    =                      (. New(vValue, Create); 
+                            try 
+                           .)
+    Identifier              (. vValue.Name := LexString; vValue.TurboType := nil; .) 
+    [":" TypeKind<vType>    (. vValue.TurboType := vType; .) ]
     "=" Value<vValue> 
-    ";" (. if IsUniqueIdentifier(vValue.Name) then DefineConstEx(vValue); .) .
+    ";"                     (. if IsUniqueIdentifier(vValue.Name) then DefineConstEx(vValue); 
+                             finally
+                               MeFreeAndNil(vValue);
+                             end;
+                              .) 
+    .
 
   DefineVarPart
     = 
@@ -294,12 +301,18 @@ PRODUCTIONS
   .
 
   DefineVariable
-    (.Var vValue: TTurboSimpleVar; .)
-    =  (. vValue.Visibility := fvPrivate;vValue.ValueStr := ''; .)
+    (.Var vValue: PTurboVarSymbol; vType: PMeType; .)
+    =  (.   New(vValue, Create); 
+            try 
+              vValue.Visibility := fvPrivate; vValue.ValueStr := ''; .)
     [WordVsibility<vValue.Visibility>] Identifier (. vValue.Name := LexString; .)
-    ":" TypeKind<vValue.TurboType> (.vValue.SetTurboType(vValue.TurboType); .)
+    ":" TypeKind<vType> (. vValue.TurboType := vType; .)
     ["=" Value<vValue>]
-    ";" (. if IsUniqueIdentifier(vValue.Name) then DefineVar(vValue); .)
+    ";" (.   if IsUniqueIdentifier(vValue.Name) then DefineVar(vValue); 
+           finally
+             MeFreeAndNil(vValue);
+           end;
+        .)
   .
 
   TypeKind<var aType: PMeType> 
@@ -323,44 +336,50 @@ PRODUCTIONS
     |"SHORTSTRING"                                    (. aSubType := GetRegisteredTypeByTypeInfo(TypeInfo(ShortString)); .)
   .
 
-  Value< var aValue: TTurboSimpleConst >
+  Value< const aValue: PTurboConstSymbol >
     = 
     (StringToken|IntegerToken|HexNumberToken)           (. aValue.AssignValue(LexString, aValue.TurboType); .)
 //    |Identifier                                       (. aValue.Value := GetConstValueRec(aValue.TurboType, LexString); .)
   .
 
-  DefineWord (. Var vSucc: Boolean; vWord: TTurboSimpleWord; .)
+  DefineWord (. Var vSucc: Boolean; vWord: PTurboMethodSymbol; .)
     = 
-                                                                 (. vWord.Options.Visibility := fvPrivate; 
-                                                                    vWord.Options.CallStyle := csForth;
-                                                                    vWord.Options.CodeFieldStyle := cfsFunction;
+                                                                 (. New(vWord, Create);
+                                                                 try
+                                                                    vWord.Visibility := fvPrivate; 
+                                                                    vWord.CallStyle := csForth;
+                                                                    vWord.CodeFieldStyle := cfsFunction;
                                                                  .)
-    ":" [WordVsibility<vWord.Options.Visibility>] Identifier     (. vWord.Name := LexString; .)
+    ":" [WordVsibility<vWord.Visibility>] Identifier     (. vWord.Name := LexString; .)
     
     [
     ExternalWordOption<vWord>                                    (. GenerateModuleEntryForWord(vWord); .)
     ]
                                                                  (.vSucc := DefineWordBegin(vWord);  .)
     [ASMStatementBlock]
-    ";"                                                          (. if vSucc and (vWord.Options.CodeFieldStyle = cfsFunction) then DefineWordEnd(); .)
+    ";"                                                          (. if vSucc and (vWord.CodeFieldStyle = cfsFunction) then DefineWordEnd(); 
+                                                                 finally
+                                                                   MeFreeAndNil(vWord);
+                                                                 end;
+                                                                 .)
   .
-  ExternalWordOption< var aWord: TTurboSimpleWord >
-    = 
+  ExternalWordOption< const aWord: PTurboMethodSymbol >
+    =
     //the default is the LastModuleRefEntry if no the module name.
                                                             (. aWord.ModuleName := ''; 
                                                                aWord.ExternalOptions.Name := '';
                                                             .)
-    "EXTERNAL"                                              (. aWord.Options.CodeFieldStyle := cfsExternalFunction; .)
+    "EXTERNAL"                                              (. aWord.CodeFieldStyle := cfsExternalFunction; .)
     [
       StringToken                                           (.aWord.ModuleName := AnsiDequotedStr(LexString, '''');
                                                               aWord.ModuleType := mtLib; .)  //the default module Type is mtLib
       [ModuleType<aWord.ModuleType>]
     ]
     [
-      "STDCALL"                (. aWord.Options.CallStyle := csStdCall; .)
-       |"REGISTER"             (. aWord.Options.CallStyle := csRegister; .)
-       |"PASCAL"               (. aWord.Options.CallStyle := csPascal; .)
-       |"FORTH"                (. aWord.Options.CallStyle := csForth; .)
+      "STDCALL"                (. aWord.CallStyle := csStdCall; .)
+       |"REGISTER"             (. aWord.CallStyle := csRegister; .)
+       |"PASCAL"               (. aWord.CallStyle := csPascal; .)
+       |"FORTH"                (. aWord.CallStyle := csForth; .)
        ExternalWordOptionPart<aWord.ExternalOptions>
     ]
   .
