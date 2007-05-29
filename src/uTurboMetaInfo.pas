@@ -12,6 +12,7 @@ interface
 
 uses
   SysUtils, Classes
+  , uMeObject
   , TypInfo
   , uTurboConsts
   ;
@@ -48,18 +49,18 @@ type
   );
 
   //the abstract MetaInfo 
-  TTurboMetaInfo = object
+  TTurboMetaInfo = object(TMeDynamicObject)
   protected
     //如果使用VMT我可以把该字段作为指向VMT的指针！当装入后
     //not used yet
-    FMetaKind: TTurboMetaKind;
+    //FMetaKind: TTurboMetaKind;
     //Priority not used yet.
     FPriority: TTurboPriority;
     FVisibility: TTurboVisibility;
     FParamFieldLength: tsUInt; 
     FName: PChar;  
   public
-    property MetaKind: TTurboMetaKind read FMetaKind write FMetaKind;
+    //property MetaKind: TTurboMetaKind read FMetaKind write FMetaKind;
     property Name: PChar read FName write FName;
     property ParamFieldLength: tsUInt read FParamFieldLength write FParamFieldLength;
     property Visibility: TTurboVisibility read FVisibility write FVisibility;
