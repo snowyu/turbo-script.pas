@@ -1290,7 +1290,7 @@ begin
     end;
     vModule := nil;
     case vModuleRefEntry.Module.ModuleType of
-      mtLib: vModule := RequireModule(vName);
+      mtLib, mtProgram: vModule := RequireModule(vName);
     end; //case
     if Assigned(vModule) then
       vModuleRefEntry.Module.Handle := vModule;

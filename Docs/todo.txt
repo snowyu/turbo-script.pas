@@ -10,6 +10,21 @@ TODO:
   需要查找堆栈有关的操作修改之！
 !* [Bug] ModuleParent is not set or convert to related or absolute address!
 
+2007-5-30 8:34
+!* 准备将Cocobase中 TurboScript 所有特有的编译方法全部迁移到 uTurboCompilerUtils.pas 中
+  规定： ModuleSymbols 列表中的第一个 ModuleSymbol 为自己，即正在编译的模块。
+
+  在编译器上只留有 FModules: PTurboModuleSymbols
+
+放在链表上面： Visible >= fvProtected or soTypeSafety or soTypeNamed
+  保存类型信息：typed or soTypeSafety or fvPublished
+  保存名字信息： named or soTypeNamed or fvPublished
+
+* [TTurboSymbol] uTurboCompilerUtils
+ + function IsProtected(const aModule: TCustomTurboModule): Boolean;  //放在链表上面
+ + function IsTypeSafety(const aModule: TCustomTurboModule): Boolean; //保存类型信息
+ + function IsTypeNamed(const aModule: TCustomTurboModule): Boolean;  //保存名字信息
+
 2007-5-29 11:42
 ~ [Compiler] 定义标识符的命名和搜索顺序！
   规定：

@@ -213,6 +213,8 @@ IGNORE CASE
 CHARACTERS
  LETTER="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_".
  DIGIT =  "0123456789".
+ DOT = ".".
+ IDENTCHARS = LETTER + DIGIT.
  CTRL=CHR(1)..CHR(31).
  SpecialChar = "*,()%:".
  TAB=CHR(9).
@@ -224,7 +226,7 @@ CHARACTERS
  HexDigit = "0123456789ABCDEF" .
 
 TOKENS
- Identifier = LETTER {LETTER|DIGIT}.
+ Identifier = LETTER {IDENTCHARS|DOT IDENTCHARS}.
  IntegerToken = DIGIT {DIGIT} | DIGIT {DIGIT} CONTEXT ( ".." ).
  HexNumberToken = "$" HexDigit {HexDigit}.
  FloatToken = DIGIT {DIGIT} "." DIGIT {DIGIT} ["E" ["+" |"-"] DIGIT {DIGIT}].
@@ -250,10 +252,11 @@ PRODUCTIONS
   (* TurboForthCompiler = Statement {Statement}  . *)  
   TurboForthCompiler DESCRIPTION "TurboScript Assembler Compiler"
     =                                                  (. Init ; .)  
+                                                       (. FModule.ModuleType := mtLib; .)
 
 
-    ( "PROGRAM"                                        (. FModule.ModuleType := mtProgram; .)
-      |"UNIT"                                          (. FModule.ModuleType := mtLib; .) 
+    ( "PROGRAM"                                        //(. FModule.ModuleType := mtProgram; .)
+      |"UNIT"                                          //(. FModule.ModuleType := mtLib; .) 
     )
     Identifier                                         (. SaveModuleName(LexString); .)
     [UseModulesBlock]
@@ -346,20 +349,21 @@ PRODUCTIONS
     = 
                                                                  (. New(vWord, Create);
                                                                  try
+                                                                    vSucc := True;
                                                                     vWord.Visibility := fvPrivate; 
                                                                     vWord.CallStyle := csForth;
                                                                     vWord.CodeFieldStyle := cfsFunction;
                                                                  .)
     ":" [WordVsibility<vWord.Visibility>] Identifier     (. vWord.Name := LexString; .)
     
-    [
-    ExternalWordOption<vWord>                                    (. GenerateModuleEntryForWord(vWord); .)
+    [                                                            (. vSucc := False; .)
+    ExternalWordOption<vWord>                                    (. vSucc := GenerateModuleEntryForWord(vWord); .)
     ]
-                                                                 (.vSucc := DefineWordBegin(vWord);  .)
+                                                                 (.if vSucc then vSucc := DefineWordBegin(vWord);  .)
     [ASMStatementBlock]
-    ";"                                                          (. if vSucc and (vWord.CodeFieldStyle = cfsFunction) then DefineWordEnd(); 
+    ";"                                                          (. if vSucc and (vWord.CodeFieldStyle = cfsFunction) then DefineWordEnd(vWord); 
                                                                  finally
-                                                                   MeFreeAndNil(vWord);
+                                                                   if not vSucc then MeFreeAndNil(vWord);
                                                                  end;
                                                                  .)
   .

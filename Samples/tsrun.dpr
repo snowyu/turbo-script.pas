@@ -239,8 +239,12 @@ begin
     if ExtractFileExt(aFileName) = '' then aFileName := aFileName + cTurboCompiledProgramFileExt;
     if not FileExists(aFileName) then
     begin
-    	Writeln(aFileName + ' is not exists.');
-    	exit;
+      aFileName := aFileName + cTurboCompiledProgramFileExt;
+      if not FileExists(aFileName) then
+      begin
+    	  Writeln(aFileName + ' is not exists.');
+    	  exit;
+      end;
     end;
     vStream := TFileStream.Create(aFileName, fmOpenRead);
   end;
