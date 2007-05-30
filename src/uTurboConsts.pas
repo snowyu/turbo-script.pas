@@ -65,14 +65,16 @@ type
   {
     @param soTypeSafety the module is TypeSafety. all the indentities own the TypeInfo.
                         当模块有这个参数的时候，编译器将强制把所有标识符的的类型信息编入内存。
+    @param soTypeNamed  all the indentities own the published name!
+                            note: only avaible when soTypeSafety is on.
   }
   //## the set is LongWord in Delphi
   TTurboScriptOption = (soOptimize, soLoadOnDemand 
     , soBindingRuntime, soBindingCompileTime
     , soTypeSafety, soAssertSupport
+    , soTypeNamed
     , soShortBooleanEval
     , soRangeChecks
-    , soPreserved3
     , soPreserved4
     , soPreserved5
     , soPreserved6
