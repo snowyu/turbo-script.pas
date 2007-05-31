@@ -22,6 +22,9 @@ interface
 {$I TurboScript.inc}
 
 uses
+  {$IFDEF MSWINDOWS}
+  Windows,
+  {$ENDIF MSWINDOWS}
   SysUtils, Classes
   , TypInfo
   , uMeObject
@@ -255,8 +258,9 @@ type
     {: nil means not found. }
     function FindVariableEntry(const aName: string): PTurboStaticFieldEntry;
     {: nil means not found. }
-    function FindWordEntry(const aName: string; const aCallStyle:
-            TTurboCallStyle = csForth): PTurboMethodEntry;
+    function FindWordEntry(const aName: string; aCodeFieldStyle:
+            TTurboCodeFieldStyle = cfsFunction; const aCallStyle:
+            TCallingConvention = ccUnknown): PTurboMethodEntry;
     {: Get the Local forth word entry. }
     { Description
     Note: 0 means not found.
@@ -428,7 +432,7 @@ type
     相对于FMemory的偏移量。
     }
     function iExecuteExternalWord(const aWord: PTurboExteralMethodOptions;
-            const aCallStyle: TTurboCallStyle): Integer;
+            const aCallStyle: TCallingConvention): Integer;
     {: Init before the Execution. }
     procedure InitExecution; virtual;
     function IsGlobalOptionsExists: Boolean;
@@ -899,6 +903,7 @@ begin
       LastVariableEntry := nil;
       LastTypeInfoEntry := nil;
       LastModuleRefEntry := nil;
+      LastTypeRefEntry := nil;
       //States := [];
     end;
 
@@ -1029,8 +1034,9 @@ begin
   Result := nil;
 end;
 
-function TCustomTurboModule.FindWordEntry(const aName: string; const
-        aCallStyle: TTurboCallStyle = csForth): PTurboMethodEntry;
+function TCustomTurboModule.FindWordEntry(const aName: string; aCodeFieldStyle:
+        TTurboCodeFieldStyle = cfsFunction; const aCallStyle:
+        TCallingConvention = ccUnknown): PTurboMethodEntry;
 var
   vName: PChar;
 begin
@@ -1054,7 +1060,11 @@ begin
         writeln('FindWordEntry:', Integer(Result.Options.CallStyle));
         writeln('aCallStyle:', Integer(aCallStyle));
       end;//}
-      if (Result.Word.CallStyle = aCallStyle) and AnsiSameText(vName, aName) then
+      if (aCodeFieldStyle = cfsFunction) or (aCallStyle = ccUnknown) then
+      begin
+        if AnsiSameText(vName, aName) then exit;
+      end
+      else if (Result.Word.CallStyle = aCallStyle) and (Result.Word.CodeFieldStyle = aCodeFieldStyle) and AnsiSameText(vName, aName) then
       begin
         Exit;
       end;
@@ -1703,7 +1713,7 @@ function TCustomTurboExecutor.ExecuteWordEntry(const aWord: PTurboMethodEntry):
 begin
   InitExecution;
 
-  if (aWord.Word.CallStyle = csForth) and (aWord.Word.Visibility <= fvPrivate) then
+  if (aWord.Word.CallStyle = ccForth) and (aWord.Word.Visibility <= fvPrivate) then
   begin
     Result := iExecuteCFA(aWord.Word.MethodAddr);
   end
@@ -1773,7 +1783,8 @@ begin
 end;
 
 function TCustomTurboExecutor.iExecuteExternalWord(const aWord:
-        PTurboExteralMethodOptions; const aCallStyle: TTurboCallStyle): Integer;
+        PTurboExteralMethodOptions; const aCallStyle: TCallingConvention):
+        Integer;
 begin
   {case aCallStyle of
     csForth: with aWord^ do begin
