@@ -4,6 +4,9 @@ program -->MODULENAME<--;
 {$APPTYPE CONSOLE}
 
 uses
+  {$IFNDEF FPC}
+  FastMM4,
+  {$ENDIF}
   SysUtils,
   uTurboConsts,
   Cocobase,

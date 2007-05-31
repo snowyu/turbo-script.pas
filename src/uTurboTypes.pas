@@ -30,7 +30,8 @@ type
       TypeId = 0                                        means nill. [impl in the TMeRegisteredTypes]
       TypeId >= 1 and TypeId <= GRegisteredTypes.Count  means the Index(+1) of the GRegisteredTypes.
       TypeId > GRegisteredTypes.Count                   means the offset of the stream. [impl in the TMeRegisteredTypes]
-      TypeId < 0                                        means this external reference type!
+      TypeId < -1                                       means this external reference type!
+      TypeId = -1                                       means error!
       
   }
   TTurboRegisteredTypes = object(TMeTypes)
@@ -70,19 +71,15 @@ end;
 
 function TTurboRegisteredTypes.GetTypeByTypeId(const aTypeId: Int64): PMeType;
 begin
-  if aTypeId <= GRegisteredTypes.Count then
+  if (aTypeId > 0) and (aTypeId <= GRegisteredTypes.Count) then
+    Result := GRegisteredTypes.Items[aTypeId-1]
+  else if (aTypeId < -1) then  //the external type
   begin
-    //the internal type
-    if aTypeId = 0 then
-      Result := nil
-    else if aTypeId > 0 then
-      Result := GRegisteredTypes.Items[aTypeId-1]
-    else  //i < 0 the external type
-    begin
-    end;
-    Exit;
-  end;
-  Result := inherited GetTypeByTypeId(aTypeId);
+    //TODO:
+    //Result := nil;
+  end
+  else
+    Result := inherited GetTypeByTypeId(aTypeId);
 end;
 
 initialization

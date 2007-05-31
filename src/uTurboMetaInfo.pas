@@ -12,8 +12,9 @@ interface
 
 uses
   SysUtils, Classes
-  , uMeObject
   , TypInfo
+  , uMeObject
+  , uMeTypes
   , uTurboConsts
   ;
 
@@ -86,7 +87,7 @@ type
     //RVA the offset address of the code-memory. CFA
     //if isExternal then the really ProcAddr assigned for speedup. 
     MethodAddr: tsInt;
-    CallStyle: TTurboCallStyle;
+    CallStyle: TCallingConvention;
     CodeFieldStyle: TTurboCodeFieldStyle;
     //ExternalWordOptions: TTurboExteralWordOptions;
     function GetExternalOptionsAddr: PTurboExteralMethodOptions; 
@@ -238,7 +239,7 @@ implementation
 { TTurboMethodInfo }
 function TTurboMethodInfo.IsExternal: Boolean;
 begin
-  Result := CallStyle <> csForth; 
+  Result := CodeFieldStyle = cfsExternalFunction; 
 end;
 
 function TTurboMethodInfo.GetExternalOptionsAddr: PTurboExteralMethodOptions; 

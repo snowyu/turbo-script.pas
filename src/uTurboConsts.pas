@@ -7,6 +7,7 @@ interface
 
 uses
   SysUtils, Classes
+  , uMeTypes
   ;
 
 const
@@ -98,7 +99,7 @@ type
   TTurboVisibility = (fvHidden, fvPrivate, fvProtected, fvPublic, fvPublished);
   //the Forth Execution priority fpHighest means cfsImmediately
   TTurboPriority = (fpLowest, fpLower, fpLow, fpNormal, fpHigh, pfHigher, fpHighest);
-  TTurboCallStyle = (csForth, csRegister, csPascal, csCdecl, csStdCall, csFastCall);
+  //TTurboCallStyle = (csForth, csRegister, csPascal, csCdecl, csStdCall, csFastCall);
   //cfsExternalFunction is external function. see Also ExternalOptions.ModuleType
   TTurboCodeFieldStyle = (cfsFunction, cfsExternalFunction);
   TTurboWordOptions = packed record //a DWORD
@@ -107,7 +108,7 @@ type
       //this can be extent to private, protected, public, etc
       Precedence: TTurboPriority; 
       Visibility: TTurboVisibility; 
-      CallStyle: TTurboCallStyle;
+      CallStyle: TCallingConvention;
       CodeFieldStyle: TTurboCodeFieldStyle;
   end; //}
 

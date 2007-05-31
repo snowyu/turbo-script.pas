@@ -10,6 +10,18 @@ TODO:
   需要查找堆栈有关的操作修改之！
 !* [Bug] ModuleParent is not set or convert to related or absolute address!
 
+2007-5-31 9:24
+* [Cocobase] 正在编译的模块: FModuleSymbol
+!* 准备放弃模块上的 FinalProc指针，初始化和结束化动作全部编译放在InitProc指针上！
+* [Bug] TCustomTurboModule.ClearMemory not clear the LastTypeRefEntry!!
+  LastTypeRefEntry := nil;
++ [Compiler] 常量和带初值的变量赋值支持常量标识了！
+  aConst = aOtherConst;
+* [Compiler] 类型系统基本工作了！！
+  !+ 编译入内存！
+  !+ 插入到流中！
+  !+ 外部引用类型
+
 2007-5-30 8:34
 !* 准备将Cocobase中 TurboScript 所有特有的编译方法全部迁移到 uTurboCompilerUtils.pas 中
   规定： ModuleSymbols 列表中的第一个 ModuleSymbol 为自己，即正在编译的模块。

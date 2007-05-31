@@ -5,6 +5,9 @@ interface
 {$I TurboScript.inc}
 
 uses
+  {$IFDEF MSWINDOWS}
+  Windows,
+  {$ENDIF MSWINDOWS}
   SysUtils, Classes
   //, TypInfo
   , uMeObject
@@ -21,25 +24,27 @@ Type
 
   PTurboSymbols = ^ TTurboSymbols;
   PTurboModuleSymbols = ^ TTurboModuleSymbols;
+  PTurboTypeSymbols = ^ TTurboTypeSymbols;
   PTurboCustomSymbol = ^ TTurboCustomSymbol;
   PTurboSymbol = ^ TTurboSymbol;
   PTurboLabelSymbol = ^ TTurboLabelSymbol;
   PTurboConstSymbol = ^TTurboConstSymbol;
   PTurboVarSymbol = ^ TTurboVarSymbol;
   PTurboMethodSymbol = ^ TTurboMethodSymbol;
+  PTurboTypeSymbol = ^ TTurboTypeSymbol;
   PTurboModuleSymbol = ^ TTurboModuleSymbol;
 
   TTurboCustomSymbol = Object(TMeDynamicObject)
   public
     destructor Destroy; virtual; {override}
-    procedure Assign(const aObj: PTurboCustomSymbol); virtual;
+    procedure Assign(const aSymbol: PTurboCustomSymbol); virtual;
   public
     Name: String;
   end;
 
   TTurboSymbol = Object(TTurboCustomSymbol)
   public
-    procedure Assign(const aObj: PTurboCustomSymbol); virtual;
+    procedure Assign(const aSymbol: PTurboCustomSymbol); virtual;
     function IsProtected(const aModule: TCustomTurboModule): Boolean;
     function IsTypeSafety(const aModule: TCustomTurboModule): Boolean;
     function IsTypeNamed(const aModule: TCustomTurboModule): Boolean;
@@ -50,9 +55,10 @@ Type
   TTurboLabelSymbol = object(TTurboCustomSymbol)
   public
     destructor Destroy; virtual; {override}
-    procedure Assign(const aObj: PTurboCustomSymbol); virtual;
+    procedure Assign(const aSymbol: PTurboCustomSymbol); virtual;
+    procedure DeclareTo(const aModule: TCustomTurboModule);
   public
-    WordName: String;
+    Method: PTurboMethodSymbol;
     Addr: Integer;
   end;
   
@@ -64,7 +70,7 @@ Type
     FSize: tsInt;
   public
     destructor Destroy; virtual; {override}
-    procedure Assign(const aObj: PTurboCustomSymbol); virtual;
+    procedure Assign(const aSymbol: PTurboCustomSymbol); virtual;
     procedure SetTurboType(const aValue: PMeType);
     {: assign value to mem! }
     {
@@ -72,22 +78,25 @@ Type
     }
     function AssignValueTo(const Source: Pointer): Boolean;
     //根据aValue 如果aTypeKind is mtkUnknown 那么会自动判断其类型
-    function AssignValue(const aValue: string; aType: PMeType = nil; const aQuote: char = ''''): Boolean;
+    function AssignValue(const aValue: string; aType: PMeType = nil; const aQuote: char = ''''): Boolean; overload;
+    procedure AssignValue(const aConst: PTurboConstSymbol); overload;
     //if the value is string then save the string to the module's dataMemory.
     //and put the offset of the dataMemory to Value.VInteger
     procedure DeclareStringTo(const aModule: TCustomTurboModule);
     //generate the op-code push const for the constant to the aModule
     procedure PushTo(const aModule: TCustomTurboModule); virtual;
   public
+    ModuleSymbol: PTurboModuleSymbol;
     property TurboType: PMeType read FTurboType write SetTurboType;
     property Value: TMeVarRec read FValue write FValue;
     property ValueStr: string read FValueStr write FValueStr;
+    //这里的Size是指压入(PushTo)到代码区中数据大小
     property Size: tsInt read FSize write FSize;
   end;
 
   TTurboVarSymbol = object(TTurboConstSymbol)
   public
-    procedure Assign(const aObj: PTurboCustomSymbol); virtual;
+    procedure Assign(const aSymbol: PTurboCustomSymbol); virtual;
     //declare(allocate space) the variable to aModule
     procedure DeclareTo(const aModule: TCustomTurboModule);
     //generate the op-code push variable addr to the aModule
@@ -104,16 +113,17 @@ Type
     function GetLabels: PTurboSymbols;
   public
     destructor Destroy; virtual; {override}
-    procedure Assign(const aObj: PTurboCustomSymbol); virtual;
+    procedure Assign(const aSymbol: PTurboCustomSymbol); virtual;
     //generate the call op-code to the aModule
     procedure PushTo(const aModule: TCustomTurboModule); virtual; {override}
     procedure DeclareTo(const aModule: TCustomTurboModule);
     //for local method to push the opReturn instruction.
     procedure DeclareEndTo(const aModule: TCustomTurboModule);
+    function DeclareLabelTo(const aLabelName: string; const aModule: TCustomTurboModule): Integer;
     function FindLabel(const aName: string): PTurboLabelSymbol;
   public
     //Options: TTurboWordOptions;
-    CallStyle: TTurboCallStyle;
+    CallStyle: TCallingConvention;
     CodeFieldStyle: TTurboCodeFieldStyle;
     //the Param Field Length
     //该函数主体的长度 
@@ -128,14 +138,27 @@ Type
     property Labels: PTurboSymbols read GetLabels;
   end;
 
+  {: the user defined type symbol.}
+  TTurboTypeSymbol = object(TTurboSymbol)
+  protected
+  public
+    procedure Assign(const aSymbol: PTurboCustomSymbol); virtual;
+  public
+    MeType: PMeType;
+    Entry: PTurboTypeInfoEntry;
+    ModuleSymbol: PTurboModuleSymbol;
+  end;
+
   TTurboModuleSymbol = object(TTurboSymbol)
   protected
     //collects methods in the Module.
     FMethods: PTurboSymbols;
+    FTypes: PTurboTypeSymbols;
     FVars: PTurboSymbols;
     FConsts: PTurboSymbols;
     FUsedModules: PTurboModuleSymbols;
   protected
+    function GetTypes: PTurboTypeSymbols;
     function GetVars: PTurboSymbols;
     function GetConsts: PTurboSymbols;
     function GetMethods: PTurboSymbols;
@@ -143,14 +166,21 @@ Type
     function CreateLibModuleSymbol(const aName: string): PTurboModuleSymbol;
   public
     destructor Destroy; virtual; {override}
-    procedure Assign(const aObj: PTurboCustomSymbol); virtual;
-    function FindMethod(const aName: string): PTurboMethodSymbol;
-    function FindConst(const aName: string; const aType: PMeType): PTurboConstSymbol;
+    procedure Clear;
+    procedure Assign(const aSymbol: PTurboCustomSymbol); virtual;
+    function FindType(const aName: string): PMeType;
+    function FindLocalMethod(const aName: string): PTurboMethodSymbol;
+    function FindLocalConst(const aName: string; const aType: PMeType): PTurboConstSymbol;
     function AddUsedModule(const aName: String; const aModuleType: TTurboModuleType): Integer;
     procedure DeclareTo(const aModule: TCustomTurboModule);
     function IsUniqueIdentifier(const aName: String): Boolean;
     procedure PushInt32(const aStr: string);overload;
     procedure PushInt32(const aInt: tsInt);overload;
+
+    //Create a new constant
+    function NewConst(const aName: string): PTurboConstSymbol;
+    function NewVar(const aName: string): PTurboVarSymbol;
+    function NewType(const aName: string): PTurboTypeSymbol;
     //if true then apply external param to the aMethod
     function IsExternalMethod(const aMethod: PTurboMethodSymbol): Boolean;
     //当带常量的变量有动态数组，AnsiString 的时候需要在模块的程序头添加初始化过程：对变量分配内存，并将常量赋值给变量；在程序尾添加终止过程，释放变量内存，并最后加上halt指令。
@@ -160,6 +190,7 @@ Type
     Entry: PTurboModuleRefEntry;
     ModuleType: TTurboModuleType;
     Module: TCustomTurboModule;
+    property Types: PTurboTypeSymbols read GetTypes;
     property Vars: PTurboSymbols read GetVars;
     property Consts: PTurboSymbols read GetConsts;
     property Methods: PTurboSymbols read GetMethods;
@@ -193,11 +224,82 @@ Type
     property Items[Index: Integer]: PTurboModuleSymbol read GetItem; default;
   end;
 
+  TTurboTypeSymbols = object(TTurboSymbols)
+  protected
+    function GetItem(Index: Integer): PTurboTypeSymbol;
+  public
+    function IndexOf(const aType: PMeType; const aBeginIndex: Integer = 0): Integer; overload;
+    function IndexOf(const aName: string; const aBeginIndex: Integer = 0): Integer; overload;
+    function Find(const aName: string): PTurboTypeSymbol;overload;
+    function Find(const aType: PMeType): PTurboTypeSymbol;overload;
+  public
+    property Items[Index: Integer]: PTurboTypeSymbol read GetItem; default;
+  end;
+
 //convert the unit string(100KB, 100MB) to int(byte).
 function UnitStrToInt(s: string): integer;
-//function GetSimpleTurboTypeSize(const aTypeKind: TMeTypeKind): Integer;
+//Identifier = LETTER {IDENTCHARS|DOT IDENTCHARS}.
+{
+ LETTER="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_".
+ DIGIT =  "0123456789".
+ DOT = ".".
+ IDENTCHARS = LETTER + DIGIT.
+
+}
+function IsIdentifier(const aValue: string): Boolean;
 
 implementation
+
+const
+  LetterSet = ['A'..'Z', 'a'..'z', '_'];
+  DigitSet = ['0'..'9'];
+  IdentSet = LetterSet + DigitSet;
+  DotChar = '.';
+
+function IsIdentifier(const aValue: string): Boolean;
+var
+  i: Integer;
+begin
+  i := 1;
+  Result := aValue <> '';
+  if Result then
+  begin
+    {$IFDEF MBCS_SUPPORT}
+    if ByteType(aValue, i) <> mbSingleByte then
+    begin
+      Result := true;
+      inc(i);
+      while (ByteType(aValue, i) <> mbTrailByte) and (i < Length(aValue)) do inc(i);
+    end
+    else
+    {$ENDIF}
+      Result := aValue[i] in LetterSet;
+    if Result then
+    begin
+      inc(i);
+      while i <= Length(aValue) do
+      begin
+        {$IFDEF MBCS_SUPPORT}
+        if ByteType(aValue, i) <> mbSingleByte then
+        begin
+          Result := true;
+          inc(i);
+          while (ByteType(aValue, i) <> mbTrailByte) and (i < Length(aValue)) do inc(i);
+        end
+        else
+        {$ENDIF}
+        if aValue[i] = DotChar then
+        begin
+          Result := ((i+1) <= Length(aValue)) and (aValue[i+1] in IdentSet);
+        end
+        else
+          Result := aValue[i] in IdentSet;
+        if not Result then exit;
+        inc(i);
+      end;
+    end;
+  end;
+end;
 
 function UnitStrToInt(s: string): integer;
 var
@@ -234,17 +336,17 @@ begin
   Inherited;
 end;
 
-procedure TTurboCustomSymbol.Assign(const aObj: PTurboCustomSymbol);
+procedure TTurboCustomSymbol.Assign(const aSymbol: PTurboCustomSymbol);
 begin
-  if Assigned(aObj) and aObj.InheritsFrom(Self.ClassType) then
-    Name := aObj.Name;
+  if Assigned(aSymbol) and aSymbol.InheritsFrom(Self.ClassType) then
+    Name := aSymbol.Name;
 end;
 
 { TTurboSymbol }
-procedure TTurboSymbol.Assign(const aObj: PTurboCustomSymbol);
+procedure TTurboSymbol.Assign(const aSymbol: PTurboCustomSymbol);
 begin
-  if Assigned(aObj) and aObj.InheritsFrom(Self.ClassType) then
-    with PTurboSymbol(aObj)^ do
+  if Assigned(aSymbol) and aSymbol.InheritsFrom(Self.ClassType) then
+    with PTurboSymbol(aSymbol)^ do
     begin
       Self.Visibility := Visibility;
     end;
@@ -269,18 +371,25 @@ end;
 { TTurboLabelSymbol }
 destructor TTurboLabelSymbol.Destroy;
 begin
-  WordName := '';
+  //WordName := '';
   Inherited;
 end;
 
-procedure TTurboLabelSymbol.Assign(const aObj: PTurboCustomSymbol);
+procedure TTurboLabelSymbol.Assign(const aSymbol: PTurboCustomSymbol);
 begin
-  if Assigned(aObj) and aObj.InheritsFrom(Self.ClassType) then
-    with PTurboLabelSymbol(aObj)^ do
+  if Assigned(aSymbol) and aSymbol.InheritsFrom(Self.ClassType) then
+    with PTurboLabelSymbol(aSymbol)^ do
     begin
-      Self.WordName := WordName;
+      Self.Method := Method;
+      Self.Addr := Addr;
     end;
   Inherited;
+end;
+
+procedure TTurboLabelSymbol.DeclareTo(const aModule: TCustomTurboModule);
+begin
+  if Addr = 0 then
+    Addr := aModule.UsedMemory;
 end;
 
 { TTurboMethodSymbol }
@@ -297,10 +406,10 @@ begin
   Inherited;
 end;
 
-procedure TTurboMethodSymbol.Assign(const aObj: PTurboCustomSymbol);
+procedure TTurboMethodSymbol.Assign(const aSymbol: PTurboCustomSymbol);
 begin
-  if Assigned(aObj) and aObj.InheritsFrom(Self.ClassType) then
-    with PTurboMethodSymbol(aObj)^ do
+  if Assigned(aSymbol) and aSymbol.InheritsFrom(Self.ClassType) then
+    with PTurboMethodSymbol(aSymbol)^ do
     begin
       Self.ModuleSymbol := ModuleSymbol;
       Self.ModuleName := ModuleName;
@@ -321,13 +430,13 @@ var
   i: integer;
 begin
   with Labels^ do
-  for i:= 0 to Count - 1 do
   begin
-    Result := PTurboLabelSymbol(Items[i]);
-    if AnsiSameText(aName, Result.Name) then
-      exit;
+    i := IndexOf(aName);
+    if i >= 0 then
+      Result := PTurboLabelSymbol(Items[i])
+    else
+      Result := nil;
   end;
-  Result := nil;
 end;
 
 function TTurboMethodSymbol.GetLabels: PTurboSymbols;
@@ -380,6 +489,25 @@ begin
   end;
 end;
 
+function TTurboMethodSymbol.DeclareLabelTo(const aLabelName: string; const aModule: TCustomTurboModule): Integer;
+var
+  vLabel: PTurboLabelSymbol;
+begin
+  Result := Labels.IndexOf(aLabelName);
+  if Result < 0 then
+  begin
+    New(vLabel, Create);
+    Result := Labels.Add(vLabel);
+    with vLabel^ do
+    begin
+      Name := alabelName;
+      Method := @Self;
+      //Addr := aModule.UsedMemory;
+    end;
+    vLabel.DeclareTo(aModule);
+  end;
+end;
+
 procedure TTurboMethodSymbol.PushTo(const aModule: TCustomTurboModule);
 begin
     case CodeFieldStyle of
@@ -401,7 +529,7 @@ begin
       cfsExternalFunction:
       begin
         case CallStyle of
-          csForth:
+          ccForth:
           begin
             if Assigned(ModuleSymbol) and Assigned(ModuleSymbol.Module) then
             begin
@@ -444,13 +572,14 @@ begin
   MeFreeAndNil(FUsedModules);
   MeFreeAndNil(FVars);
   MeFreeAndNil(FConsts);
+  MeFreeAndNil(FTypes);
   Inherited;
 end;
 
-procedure TTurboModuleSymbol.Assign(const aObj: PTurboCustomSymbol);
+procedure TTurboModuleSymbol.Assign(const aSymbol: PTurboCustomSymbol);
 begin
-  if Assigned(aObj) and aObj.InheritsFrom(Self.ClassType) then
-    with PTurboModuleSymbol(aObj)^ do
+  if Assigned(aSymbol) and aSymbol.InheritsFrom(Self.ClassType) then
+    with PTurboModuleSymbol(aSymbol)^ do
     begin
       Self.Entry:= Entry;
       Self.ModuleType:=ModuleType;
@@ -459,11 +588,56 @@ begin
         Self.Methods.Assign(FMethods)
       else 
         MeFreeAndNil(Self.FMethods);
+
+      if Assigned(FVars) then
+        Self.Vars.Assign(FVars)
+      else 
+        MeFreeAndNil(Self.FVars);
+
+      if Assigned(FConsts) then
+        Self.Consts.Assign(FConsts)
+      else 
+        MeFreeAndNil(Self.FConsts);
+
+      if Assigned(FTypes) then
+        Self.Types.Assign(FTypes)
+      else 
+        MeFreeAndNil(Self.FTypes);
+
+      if Assigned(FUsedModules) then
+        Self.UsedModules.Assign(FUsedModules)
+      else 
+        MeFreeAndNil(Self.FUsedModules);
     end;
   Inherited;
 end;
 
-function TTurboModuleSymbol.FindConst(const aName: string; const aType: PMeType): PTurboConstSymbol;
+procedure TTurboModuleSymbol.Clear;
+begin
+  MeFreeAndNil(FMethods);
+  MeFreeAndNil(FUsedModules);
+  MeFreeAndNil(FVars);
+  MeFreeAndNil(FConsts);
+  MeFreeAndNil(FTypes);
+end;
+
+function TTurboModuleSymbol.FindType(const aName: string): PMeType;
+begin
+  //find local type:
+  Result := PMeType(Types.Find(aName));
+  if Assigned(Result) then
+    Result := PTurboTypeSymbol(Result).MeType;
+  if not Assigned(Result) then
+  begin //TODO: find external type:
+  end;
+
+  if not Assigned(Result) then
+  begin //find internal type:
+    Result := GRegisteredTypes.GetRegisteredTypeByName(aName);
+  end;
+end;
+
+function TTurboModuleSymbol.FindLocalConst(const aName: string; const aType: PMeType): PTurboConstSymbol;
 var
   i: Integer;
 begin
@@ -482,7 +656,7 @@ begin
   Result := nil;
 end;
 
-function TTurboModuleSymbol.FindMethod(const aName: string): PTurboMethodSymbol;
+function TTurboModuleSymbol.FindLocalMethod(const aName: string): PTurboMethodSymbol;
 var
   vMethodEntry: PTurboMethodEntry;
 begin
@@ -535,6 +709,15 @@ begin
   Result := FUsedModules;
 end;
 
+function TTurboModuleSymbol.GetTypes: PTurboTypeSymbols;
+begin
+  if not Assigned(FTypes) then
+  begin
+    New(FTypes, Create);
+  end;
+  Result := FTypes;
+end;
+
 function TTurboModuleSymbol.GetVars: PTurboSymbols;
 begin
   if not Assigned(FVars) then
@@ -580,7 +763,7 @@ begin
   Result := Assigned(aMethod.ModuleSymbol); 
   if Result then
   begin
-    Result := Assigned(aMethod.ModuleSymbol.FindMethod(aMethod.Name));
+    Result := Assigned(aMethod.ModuleSymbol.FindLocalMethod(aMethod.Name));
     if Result then
       aMethod.ExternalOptions.ModuleRef := Pointer(Integer(aMethod.ModuleSymbol.Entry) + SizeOf(tsPointer));
   end;
@@ -656,6 +839,45 @@ begin
     Result := Methods.IndexOf(aName) < 0;
 end;
 
+function TTurboModuleSymbol.NewConst(const aName: string): PTurboConstSymbol;
+begin
+  if  (aName = '') or (Consts.IndexOf(aName) < 0) then
+  begin
+    New(Result, Create);
+    Result.Name := aName;
+    Result.ModuleSymbol := @Self;
+    if aName <> '' then Consts.Add(Result);
+  end
+  else
+    Result := nil;
+end;
+
+function TTurboModuleSymbol.NewVar(const aName: string): PTurboVarSymbol;
+begin
+  if (aName = '') or (Vars.IndexOf(aName) < 0) then
+  begin
+    New(Result, Create);
+    Result.Name := aName;
+    Result.ModuleSymbol := @Self;
+    if aName <> '' then Vars.Add(Result);
+  end
+  else
+    Result := nil;
+end;
+
+function TTurboModuleSymbol.NewType(const aName: string): PTurboTypeSymbol;
+begin
+  if (aName = '') or (Types.IndexOf(aName) < 0) then
+  begin
+    New(Result, Create);
+    Result.Name := aName;
+    Result.ModuleSymbol := @Self;
+    if aName <> '' then Types.Add(Result);
+  end
+  else
+    Result := nil;
+end;
+
 procedure TTurboModuleSymbol.PushInt32(const aStr: string);
 begin
   PushInt32(StrToInt(aStr));
@@ -674,32 +896,52 @@ begin
   Inherited;
 end;
 
-procedure TTurboConstSymbol.Assign(const aObj: PTurboCustomSymbol);
+procedure TTurboConstSymbol.Assign(const aSymbol: PTurboCustomSymbol);
 begin
-  if Assigned(aObj) and aObj.InheritsFrom(Self.ClassType) then
-    with PTurboConstSymbol(aObj)^ do
+  if Assigned(aSymbol) and aSymbol.InheritsFrom(Self.ClassType) then
+    AssignValue(PTurboConstSymbol(aSymbol));
+  Inherited;
+end;
+
+procedure TTurboConstSymbol.AssignValue(const aConst: PTurboConstSymbol);
+begin
+  if Assigned(aConst) then
+    with aConst^ do
     begin
       Self.FValueStr := FValueStr;
       Self.FTurboType:= FTurboType;
       Self.FValue:= FValue;
       Self.FSize := FSize;
     end;
-  Inherited;
 end;
 
 function TTurboConstSymbol.AssignValue(const aValue: string; aType: PMeType; const aQuote: char): Boolean;
+var
+  i: Integer;
 begin
-  Result := True;
+  //Result := True;
   //writeln('AssignValue:', Integer(aTypeKind));
   if (aType = nil) and (aValue[1] = aQuote) then
   begin
-       if Length(aValue)-2 > 255 then
-         aType := GetRegisteredTypeByTypeInfo(TypeInfo(String))
-       else
-         aType := GetRegisteredTypeByTypeInfo(TypeInfo(ShortString));
+     if Length(aValue)-2 > 255 then
+       aType := GetRegisteredTypeByTypeInfo(TypeInfo(String))
+     else
+       aType := GetRegisteredTypeByTypeInfo(TypeInfo(ShortString));
+     ValueStr := AnsiDequotedStr(aValue, aQuote);
+     Result := true;
   end
   else if Assigned(aType) then
   begin
+    Result := Assigned(ModuleSymbol);
+    if Result then
+    begin
+      i:= Integer(ModuleSymbol.FindLocalConst(aValue, aType));
+      Result := i <> 0;
+      if Result then
+        AssignValue(PTurboConstSymbol(i));
+    end;
+
+    if not Result then
     Case aType.Kind of
       mtkString, mtkLString: 
       begin
@@ -710,6 +952,24 @@ begin
       begin
         ValueStr := AnsiDequotedStr(aValue, aQuote);
         FValue.VByte := Ord(ValueStr[1]);
+      end;
+      mtkEnumeration:
+      begin
+        with PMeEnumerationType(aType)^ do
+        begin
+          i := NameList.IndexOf(aValue);
+          Result := i >= 0;
+          if Result then
+          begin
+            ValueStr := aValue;
+            FValue.VInteger := NameList.Objects[i];
+          end;
+        end;
+      end;
+      mtkWChar:
+      begin
+        ValueStr := AnsiDequotedStr(aValue, aQuote);
+        FValue.VWideChar := WideString(ValueStr)[1];
       end;
       mtkInteger, mtkInt64:
       try
@@ -750,6 +1010,8 @@ begin
           aType := GetRegisteredTypeByTypeInfo(TypeInfo(LongWord))
         else //if (Value.VInt64 >= Low(Int64)) and (Value.VInt64<=High(Int64)) then
           aType := GetRegisteredTypeByTypeInfo(TypeInfo(Int64))
+        ;
+        Result := True;
       except
         aType := nil;
         Result := False;
@@ -764,16 +1026,31 @@ begin
           aType := GetRegisteredTypeByTypeInfo(TypeInfo(Double))
         else
           aType := GetRegisteredTypeByTypeInfo(TypeInfo(Extended))
+        ;
+        Result := True;
       except
         aType := nil;
         Result := False;
-      end
+      end;
+
+      if not Assigned(aType) and Assigned(ModuleSymbol) then
+      begin
+        i := ModuleSymbol.Consts.IndexOf(aValue);
+        Result := i >= 0;
+        if Result then
+        begin
+          ValueStr := aValue;
+          AssignValue(PTurboConstSymbol(ModuleSymbol.Consts.Items[i]));
+          aType := FTurboType;
+        end;
+      end; //}
   end;
 
-  TurboType := aType;
-  if Assigned(aType) then begin
-    Result := True;
+  if Result and not Assigned(aType) then
+  begin
+    Result := False;
   end;
+  if Result then TurboType := aType;
 end;
 
 function TTurboConstSymbol.AssignValueTo(const Source: Pointer): Boolean;
@@ -857,10 +1134,10 @@ begin
 end;
 
 { TTurboVarSymbol }
-procedure TTurboVarSymbol.Assign(const aObj: PTurboCustomSymbol);
+procedure TTurboVarSymbol.Assign(const aSymbol: PTurboCustomSymbol);
 begin
-  if Assigned(aObj) and aObj.InheritsFrom(Self.ClassType) then
-    with PTurboVarSymbol(aObj)^ do
+  if Assigned(aSymbol) and aSymbol.InheritsFrom(Self.ClassType) then
+    with PTurboVarSymbol(aSymbol)^ do
     begin
       Self.Addr := Addr;
     end;
@@ -920,6 +1197,19 @@ begin
   if Addr = 0 then DeclareTo(aModule);
   aModule.AddOpToMem(opPushInt);
   aModule.AddIntToMem(Addr);
+end;
+
+{ TTurboTypeSymbol }
+procedure TTurboTypeSymbol.Assign(const aSymbol: PTurboCustomSymbol);
+begin
+  if Assigned(aSymbol) and aSymbol.InheritsFrom(Self.ClassType) then
+    with PTurboTypeSymbol(aSymbol)^ do
+    begin
+      Self.Entry := Entry;
+      Self.MeType := MeType;
+      Self.ModuleSymbol := ModuleSymbol;
+    end;
+  Inherited;
 end;
 
 { TTurboSymbols }
@@ -1042,11 +1332,61 @@ begin
   begin
     if ModuleType = aModuleType then
     begin
-      Result := FindMethod(aName);
+      Result := FindLocalMethod(aName);
       if Assigned(Result) then exit;
     end;
   end;
   Result := nil;
+end;
+
+{ TTurboTypeSymbols }
+function TTurboTypeSymbols.GetItem(Index: Integer): PTurboTypeSymbol;
+begin
+  Result := PTurboTypeSymbol(Inherited Get(Index));
+end;
+
+function TTurboTypeSymbols.IndexOf(const aType: PMeType; const aBeginIndex: Integer = 0): Integer;
+begin
+  for Result := aBeginIndex to Count - 1 do
+  begin
+    with Items[Result]^ do
+    if aType = MeType then
+      exit;
+  end;
+  Result := -1;
+end;
+
+function TTurboTypeSymbols.IndexOf(const aName: string; const aBeginIndex: Integer = 0): Integer;
+begin
+  for Result := aBeginIndex to Count - 1 do
+  begin
+    with Items[Result]^ do
+    if AnsiSameText(aName, Name) then
+      exit;
+  end;
+  Result := -1;
+end;
+
+function TTurboTypeSymbols.Find(const aName: string): PTurboTypeSymbol;
+var
+  i: integer;
+begin
+  i := IndexOf(aName);
+  if i >= 0 then
+    Result := Items[i]
+  else 
+    Result := nil;
+end;
+
+function TTurboTypeSymbols.Find(const aType: PMeType): PTurboTypeSymbol;
+var
+  i: integer;
+begin
+  i := IndexOf(aType);
+  if i >= 0 then
+    Result := Items[i]
+  else 
+    Result := nil;
 end;
 
 initialization
@@ -1057,4 +1397,5 @@ initialization
   SetMeVirtualMethod(TypeOf(TTurboVarSymbol), ovtVmtParent, TypeOf(TTurboConstSymbol));
   SetMeVirtualMethod(TypeOf(TTurboMethodSymbol), ovtVmtParent, TypeOf(TTurboSymbol));
   SetMeVirtualMethod(TypeOf(TTurboModuleSymbol), ovtVmtParent, TypeOf(TTurboSymbol));
+  SetMeVirtualMethod(TypeOf(TTurboTypeSymbol), ovtVmtParent, TypeOf(TTurboSymbol));
 end.

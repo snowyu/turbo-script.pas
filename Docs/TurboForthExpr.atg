@@ -38,6 +38,11 @@ ERRORS
     cInvalidOptionParamError: Result := 'invalid modifiers for option "' + Data + '"';
     cStrToIntCovnertError: Result := 'Can not convert the strin to int!';
     cMessageCompilerOption: Result := Data;
+    cConstDeclarationError: Result := 'ConstDeclarationError ' + Data;
+    cVarDeclarationError: Result := 'VarDeclarationError ' + Data;
+    cMethodDeclarationError: Result := 'MethodDeclarationError ' + Data;
+    cTypeDeclarationError: Result := 'TypeDeclarationError ' + Data;
+    cLabelDeclarationError: Result := 'LabelDeclarationError ' + Data;
 
 
 PUBLISHED
@@ -251,6 +256,7 @@ PRODUCTIONS
 
   (* TurboForthCompiler = Statement {Statement}  . *)  
   TurboForthCompiler DESCRIPTION "TurboScript Assembler Compiler"
+    (. Var vMainMethod: PTurboMethodSymbol; .)
     =                                                  (. Init ; .)  
                                                        (. FModule.ModuleType := mtLib; .)
 
@@ -261,10 +267,23 @@ PRODUCTIONS
     Identifier                                         (. SaveModuleName(LexString); .)
     [UseModulesBlock]
     [DeclarationBlock]  
-    "BEGIN"                                            (. FInitProcCFA := FModule.UsedMemory;  .)
-    ASMStatementBlock
-    "END."                                             (. FModule.AddOpToMem(opPushInt); FModule.AddIntToMem(0); FModule.AddOpToMem(opHalt); .)
-    (. Final ; .) .
+    "BEGIN"                                            (. FInitProcCFA := FModule.UsedMemory; 
+                                                          New(vMainMethod, Create);
+                                                          try
+                                                            vMainMethod.Name := '._Main_';
+                                                            vMainMethod.ModuleSymbol := FModuleSymbol;
+                                                            vMainMethod.CFA := FModule.UsedMemory;
+                                                            vMainMethod.CallStyle := ccForth;
+                                                            vMainMethod.CodeFieldStyle := cfsFunction;
+                                                       .)
+    ASMStatementBlock<vMainMethod>
+    "END."                                             (.   FModule.AddOpToMem(opPushInt); FModule.AddIntToMem(0); FModule.AddOpToMem(opHalt); 
+                                                          finally
+                                                            MeFreeAndNil(vMainMethod);
+                                                          end;
+                                                       .)
+                                                       (. Final ; .) 
+    .
 
    UseModulesBlock
     =
@@ -276,7 +295,52 @@ PRODUCTIONS
     = 
     Declaration {Declaration}.
 
-  Declaration = DefineConstPart| DefineVarPart | DefineWord .
+  Declaration = DefineConstPart | DefineVarPart | DefineTypePart | DefineWord .
+
+  DefineTypePart
+    =
+    "TYPE" DefineType {DefineType} 
+  .
+  
+  DefineType
+    (.var vTypeSymbol: PTurboTypeSymbol; .)
+    =
+    Identifier                              (. vTypeSymbol := FModuleSymbol.NewType(LexString); 
+                                               if Assigned(vTypeSymbol) then 
+                                               begin 
+                                            .)
+    "="
+    (TypeKind<vTypeSymbol.MeType>|RestrictedType<vTypeSymbol.MeType>)
+    ";"                                     (. end
+                                               else
+                                                 SynError(cRedeclarationError);
+                                                 
+                                            .)
+  .
+
+  TypeId<var aType: PMeType>
+    =
+    Identifier                             (. aType := FModuleSymbol.FindType(LexString); 
+                                              if not Assigned(aType) then
+                                                SynError(cTypeDeclarationError);
+                                           .)
+  .
+  TypeKind<var aType: PMeType> 
+    =
+    TypeId<aType>
+//    |IntegerType <aType>
+//    |StringType <aType>
+  .
+
+  RestrictedType<var aType:PMeType>
+    =
+    ClassType<aType>
+  .
+
+  ClassType<var aType:PMeType>
+    =
+    "CLASS" //[ClassHeritage]
+  .
 
   DefineConstPart
     =
@@ -284,17 +348,25 @@ PRODUCTIONS
   .
 
   DefineConstant
-    (.Var vValue: PTurboConstSymbol; vType: PMeType; .) 
-    =                      (. New(vValue, Create); 
-                            try 
-                           .)
-    Identifier              (. vValue.Name := LexString; vValue.TurboType := nil; .) 
-    [":" TypeKind<vType>    (. vValue.TurboType := vType; .) ]
+    (.Var vValue: PTurboConstSymbol; vName: string; vType: PMeType; .) 
+    =
+    Identifier              (.
+                             vName := LexString;
+                             if IsUniqueIdentifier(vName) then
+                             begin
+                               vValue := FModuleSymbol.NewConst(vName);
+                               if Assigned(vValue) then
+                               begin
+                            .) 
+    [":" TypeKind<vType>    (.   vValue.TurboType := vType; .) ]
     "=" Value<vValue> 
-    ";"                     (. if IsUniqueIdentifier(vValue.Name) then DefineConstEx(vValue); 
-                             finally
-                               MeFreeAndNil(vValue);
-                             end;
+    ";"                     (.
+                               end
+                               else
+                                 SynError(cConstDeclarationError, vName);
+                             end
+                             else
+                               SynError(cConstRedeclarationError, vName);
                               .) 
     .
 
@@ -305,25 +377,31 @@ PRODUCTIONS
 
   DefineVariable
     (.Var vValue: PTurboVarSymbol; vType: PMeType; .)
-    =  (.   New(vValue, Create); 
-            try 
-              vValue.Visibility := fvPrivate; vValue.ValueStr := ''; .)
-    [WordVsibility<vValue.Visibility>] Identifier (. vValue.Name := LexString; .)
-    ":" TypeKind<vType> (. vValue.TurboType := vType; .)
+    =                                              (.
+                                                      vValue := FModuleSymbol.NewVar(''); 
+                                                      if Assigned(vValue) then
+                                                      begin
+                                                   .)
+    [WordVsibility<vValue.Visibility>] Identifier  (.   vValue.Name := LexString; .)
+    ":" TypeKind<vType>                            (.   vValue.TurboType := vType; .)
     ["=" Value<vValue>]
-    ";" (.   if IsUniqueIdentifier(vValue.Name) then DefineVar(vValue); 
-           finally
-             MeFreeAndNil(vValue);
-           end;
-        .)
+    ";"                                            (.   if IsUniqueIdentifier(vValue.Name) then
+                                                         begin
+                                                           FModuleSymbol.Vars.Add(vValue);
+                                                           if vValue.IsProtected(FModule) then vValue.DeclareTo(FModule); 
+                                                         end
+                                                         else 
+                                                         begin
+                                                           MeFreeAndNil(vValue);
+                                                           SynError(cVarDeclarationError);
+                                                         end
+                                                      end
+                                                      else
+                                                        SynError(cVarDeclarationError, 'Cannot new var!');
+                                                   .)
   .
 
-  TypeKind<var aType: PMeType> 
-    =
-    IntegerType <aType>
-    |StringType <aType>
-  .
-
+(*
   IntegerType<var aSubType: PMeType>
     =
     "BYTE"                                            (. aSubType := GetRegisteredTypeByTypeInfo(TypeInfo(Byte)); .)
@@ -338,20 +416,21 @@ PRODUCTIONS
     "STRING"                                          (. aSubType := GetRegisteredTypeByTypeInfo(TypeInfo(String)); .)
     |"SHORTSTRING"                                    (. aSubType := GetRegisteredTypeByTypeInfo(TypeInfo(ShortString)); .)
   .
+*)
 
   Value< const aValue: PTurboConstSymbol >
     = 
-    (StringToken|IntegerToken|HexNumberToken)           (. aValue.AssignValue(LexString, aValue.TurboType); .)
+    (StringToken|IntegerToken|HexNumberToken|Identifier)           (. aValue.AssignValue(LexString, aValue.TurboType); .)
 //    |Identifier                                       (. aValue.Value := GetConstValueRec(aValue.TurboType, LexString); .)
   .
 
   DefineWord (. Var vSucc: Boolean; vWord: PTurboMethodSymbol; .)
     = 
-                                                                 (. New(vWord, Create);
+                                                                 (. vSucc := True;
+                                                                    New(vWord, Create);
                                                                  try
-                                                                    vSucc := True;
                                                                     vWord.Visibility := fvPrivate; 
-                                                                    vWord.CallStyle := csForth;
+                                                                    vWord.CallStyle := ccForth;
                                                                     vWord.CodeFieldStyle := cfsFunction;
                                                                  .)
     ":" [WordVsibility<vWord.Visibility>] Identifier     (. vWord.Name := LexString; .)
@@ -360,7 +439,7 @@ PRODUCTIONS
     ExternalWordOption<vWord>                                    (. vSucc := GenerateModuleEntryForWord(vWord); .)
     ]
                                                                  (.if vSucc then vSucc := DefineWordBegin(vWord);  .)
-    [ASMStatementBlock]
+    [ASMStatementBlock<vWord>]
     ";"                                                          (. if vSucc and (vWord.CodeFieldStyle = cfsFunction) then DefineWordEnd(vWord); 
                                                                  finally
                                                                    if not vSucc then MeFreeAndNil(vWord);
@@ -380,10 +459,10 @@ PRODUCTIONS
       [ModuleType<aWord.ModuleType>]
     ]
     [
-      "STDCALL"                (. aWord.CallStyle := csStdCall; .)
-       |"REGISTER"             (. aWord.CallStyle := csRegister; .)
-       |"PASCAL"               (. aWord.CallStyle := csPascal; .)
-       |"FORTH"                (. aWord.CallStyle := csForth; .)
+      "STDCALL"                (. aWord.CallStyle := ccStdCall; .)
+       |"REGISTER"             (. aWord.CallStyle := ccRegister; .)
+       |"PASCAL"               (. aWord.CallStyle := ccPascal; .)
+       |"FORTH"                (. aWord.CallStyle := ccForth; .)
        ExternalWordOptionPart<aWord.ExternalOptions>
     ]
   .
@@ -407,14 +486,14 @@ PRODUCTIONS
     |"PUBLISHED"                                       (. aVisibility := fvPublished; .)
   .
 
-  ASMStatementBlock 
+  ASMStatementBlock< const aWord: PTurboMethodSymbol > 
     = 
-    ASMStatement {ASMStatement}
+    ASMStatement<aWord> {ASMStatement<aWord>}
     .
 
-  ASMStatement 
+  ASMStatement< const aWord: PTurboMethodSymbol > 
     = 
-    [LabelDeclaration]
+    [LabelDeclaration<aWord>]
      PushIntAsmStatement
     | PushStringAsmStatement 
     | AddIntAsmStatement
@@ -439,8 +518,9 @@ PRODUCTIONS
     | WordAsmStatement
   .
 
-  LabelDeclaration =
-    "Label" Identifier   (. DefineLabelEx(LexString); .)  .
+  LabelDeclaration< const aWord: PTurboMethodSymbol > 
+    =
+    "Label" Identifier   (. DefineLabel(LexString, aWord); .)  .
 
   PushIntAsmStatement = 
     ( IntegerToken|HexNumberToken ) (. PushInt32(LexString); .) .
