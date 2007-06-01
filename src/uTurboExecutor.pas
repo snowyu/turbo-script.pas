@@ -183,6 +183,8 @@ type
     {: reset the stack pointers. }
     procedure iReset; virtual;
     procedure LoadUsedModules;
+    {: clear all TurboType to nil for the aModuleRef }
+    procedure ResetTypeRefsBy(const aModuleRef: PTurboModuleRefInfo);
     {: convert the module memory related address to absolute. }
     procedure ResolveAddress;
     procedure SendUnloadNotification;
@@ -249,12 +251,16 @@ type
     { Description
     nil means not found.
     }
-    function FindModuleEntry(const aName: string): PTurboModuleRefEntry;
+    function FindModuleRefEntry(const aName: string): PTurboModuleRefEntry;
+    {: find used module name entry. }
+    { Description
+    nil means not found.
+    }
+    function FindModuleRefEntryBy(const aModule: Pointer): PTurboModuleRefEntry;
     {: nil means not found. }
     function FindTypeInfoEntry(const aName: string): PTurboTypeInfoEntry;
     {: nil means not found. }
     function FindTypeRefEntry(const aName: string): PTurboTypeRefEntry;
-    function FindUnloadNotification(aProc: TNotifyEvent): Integer;
     {: nil means not found. }
     function FindVariableEntry(const aName: string): PTurboStaticFieldEntry;
     {: nil means not found. }
@@ -266,6 +272,7 @@ type
     Note: 0 means not found.
     }
     function GetWordCFA(const aWord: string): Integer;
+    function IndexOfUnloadNotification(aProc: TNotifyEvent): Integer;
     {: Load the body into the memory. }
     { Description
     Note: accessor must be assigned first.
@@ -570,29 +577,6 @@ type
 
 
 
-(*
-  PTurboMethodTypeData = ^TTurboMethodTypeData;
-  TTurboMethodTypeData = packed record
-    MethodKind: TMethodKind;
-    ParamCount: Byte;
-    ParamList: array[0..1023] of Char;
-    {ParamList: array[1..ParamCount] of
-          record
-            Flags: TParamFlags;
-            TypeInfo: TTurboSimpleTypeKind or PTurboTypeInfoEntry;
-            ParamName: ShortString;
-          end;
-     if MethodKind is function then 
-       ResultType: ShortString}
-  end;
-  PTurboParamTypeData = ^TTurboParamTypeData;
-  TTurboParamTypeData = packed record
-    Flags: TParamFlags;
-    TypeInfo: tsInt;//TTurboSimpleTypeKind or PTurboTypeInfoEntry
-    ParamName: ShortString;
-  end;
-*)
-
   //the typecast for data memory area to get the parameters
   TTurboPreservedDataMemory = packed record
     Code: Pointer; //need relocate addr. point to the FMemory
@@ -643,10 +627,28 @@ type
     BuildDate: TTimeStamp;
   end;
   
+type
+  PPTurboEntry = ^ PTurboEntry;
+  PTurboEntry  = ^ TTurboEntry;
+  TTurboEntry  = packed record
+    Prior: Pointer;
+    MetaInfo: TTurboMetaInfo;
+  end;
+  TTurboEntryItemEventProc = procedure(const aEntry: PTurboEntry
+    ; const aMem: Pointer
+    ; const IsResolved: Boolean
+  );
+  
 procedure TurboConvertAddrRelatedToAbsolute(Mem: Pointer; Data:
         PTurboPreservedDataMemory);
 procedure TurboConvertAddrAbsoluteToRelated(Mem: Pointer; Data:
         PTurboPreservedDataMemory);
+
+{: walk-throughout all the entry}
+procedure ForEachTurboEntry(aEntry: PTurboEntry; const aDoOnItem:
+        TTurboEntryItemEventProc; const Mem: Pointer = nil; const IsResolved:
+        Boolean = True);
+
 //remove registered types of this module
 //procedure RemoveModuleTypes(const aModuleName: string);
 
@@ -896,6 +898,7 @@ begin
       DataSize := vPreserved;
       UsedDataSize := SizeOf(TTurboPreservedDataMemory);//SizeOf(tsInt); //preserved the first integer
       TTurboScriptOptions(ModuleOptions) := [soAssertSupport];
+      RegisteredTypes.Clear;
 
       InitializeProc := nil;
       FinalizeProc := nil;
@@ -911,7 +914,7 @@ begin
   end;
 end;
 
-function TCustomTurboModule.FindModuleEntry(const aName: string):
+function TCustomTurboModule.FindModuleRefEntry(const aName: string):
         PTurboModuleRefEntry;
 var
   vName: PChar;
@@ -933,6 +936,20 @@ begin
         Exit;
       end;
     end;
+    Result := Result.Prior;
+  end;
+  Result := nil;
+end;
+
+function TCustomTurboModule.FindModuleRefEntryBy(const aModule: Pointer):
+        PTurboModuleRefEntry;
+begin
+  Result := LastModuleRefEntry;
+  while (Result <> nil) do
+  begin
+    if not IsAddrResolved then
+      Integer(Result) := Integer(FDataMemory) + Integer(Result);
+    if Result.Module.Handle = aModule then exit;
     Result := Result.Prior;
   end;
   Result := nil;
@@ -990,21 +1007,6 @@ begin
     Result := Result.Prior;
   end;
   Result := nil;
-end;
-
-function TCustomTurboModule.FindUnloadNotification(aProc: TNotifyEvent):
-        Integer;
-var
-  ProcMethod: TMethod;
-begin
-  for Result := 0 to FModuleUnloadNotifies.Count div 2 - 1 do
-  begin
-    ProcMethod.Code := FModuleUnloadNotifies.Items[Result * 2];
-    ProcMethod.Data := FModuleUnloadNotifies.Items[Result * 2 + 1];
-    if (ProcMethod.Code = TMethod(aProc).Code) and (ProcMethod.Data = TMethod(aProc).Data) then
-      Exit;
-  end;
-  Result := -1;
 end;
 
 function TCustomTurboModule.FindVariableEntry(const aName: string):
@@ -1185,6 +1187,21 @@ begin
   DataMemorySize := DataMemorySize + I;
 end;
 
+function TCustomTurboModule.IndexOfUnloadNotification(aProc: TNotifyEvent):
+        Integer;
+var
+  ProcMethod: TMethod;
+begin
+  for Result := 0 to FModuleUnloadNotifies.Count div 2 - 1 do
+  begin
+    ProcMethod.Code := FModuleUnloadNotifies.Items[Result * 2];
+    ProcMethod.Data := FModuleUnloadNotifies.Items[Result * 2 + 1];
+    if (ProcMethod.Code = TMethod(aProc).Code) and (ProcMethod.Data = TMethod(aProc).Data) then
+      Exit;
+  end;
+  Result := -1;
+end;
+
 procedure TCustomTurboModule.iReset;
 begin
   //PPreservedCodeMemory(FMemory).ParamStackBase := FParameterStack;
@@ -1226,7 +1243,6 @@ procedure TCustomTurboModule.LoadFromStream(const aStream: TStream; Count:
         Integer = 0);
 var
   vHeader: TTurboModuleStreamHeader;
-  vOptions: Pointer;
   p: PChar;
 begin
   if Count <= 0 then
@@ -1245,12 +1261,7 @@ begin
   ModuleVersion := vHeader.Revision;
   ModuleDate := vHeader.BuildDate;
 
-  {with PTurboPreservedDataMemory(FDataMemory)^ do
-  begin
-    //backup the data in the Memory
-    vOptions := GlobalOptions;
-  end;
-  //}
+  FRegisteredTypes.LoadFromStream(aStream);
 
   UsedDataSize := SizeOf(TTurboPreservedDataMemory);
   aStream.ReadBuffer(FDataMemory^, SizeOf(TTurboPreservedDataMemory));
@@ -1321,24 +1332,19 @@ end;
 procedure TCustomTurboModule.NotifyModuleUnloaded(Sender: TObject);
 var
   vModuleRef: PTurboModuleRefEntry;
+  vTypeRef: PTurboTypeRefEntry;
 begin
   if (Sender = FOwner) and StoredInOwner then
   begin
     FIsLoaded := False;
   end;
 
-  vModuleRef := LastModuleRefEntry;
-  while (vModuleRef <> nil) do
+  vModuleRef := FindModuleRefEntryBy(Sender);
+  if Assigned(vModuleRef) then
   begin
-    if not IsAddrResolved then
-      Integer(vModuleRef) := Integer(FDataMemory) + Integer(vModuleRef);
-    if vModuleRef.Module.Handle = Sender then
-    begin
-      vModuleRef.Module.Handle := nil;
-      Exit;
-    end
-    else
-      vModuleRef := vModuleRef.Prior;
+    vModuleRef.Module.Handle := nil;
+
+    ResetTypeRefsBy(@vModuleRef.Module);
   end;
 end;
 
@@ -1346,7 +1352,7 @@ procedure TCustomTurboModule.RemoveUnloadNotification(aProc: TNotifyEvent);
 var
   I: Integer;
 begin
-  i := FindUnloadNotification(aProc);
+  i := IndexOfUnloadNotification(aProc);
   if i >= 0 then
     FModuleUnloadNotifies.Delete(i);
 end;
@@ -1371,6 +1377,24 @@ procedure TCustomTurboModule.Reset;
 begin
   iReset;
   if Assigned(FOnReset) then FOnReset(Self);
+end;
+
+procedure TCustomTurboModule.ResetTypeRefsBy(const aModuleRef:
+        PTurboModuleRefInfo);
+var
+  vEntry: PTurboTypeRefEntry;
+begin
+  vEntry := LastTypeRefEntry;
+  while (vEntry <> nil) do
+  begin
+    if not IsAddrResolved then
+      Integer(vEntry) := Integer(FDataMemory) + Integer(vEntry);
+       if Assigned(vEntry.TypeRef.TurboType)
+          and (vEntry.TypeRef.ModuleRef = aModuleRef)
+       then
+         vEntry.TypeRef.TurboType := nil;
+    vEntry := vEntry.Prior;
+  end;
 end;
 
 procedure TCustomTurboModule.ResolveAddress;
@@ -1403,7 +1427,10 @@ begin
   vHeader.Version  := cCurrentModuleFileForamtVersionNo;
   vHeader.BuildDate := ModuleDate;
   aStream.WriteBuffer(vHeader, SizeOf(TTurboModuleStreamHeader));
+
   if IsAddrResolved then TurboConvertAddrAbsoluteToRelated(FMemory, FDataMemory);
+
+  FRegisteredTypes.SaveToStream(aStream);
 
   with PTurboPreservedDataMemory(FDataMemory)^ do
   begin
@@ -1640,7 +1667,7 @@ end;
 
 procedure TCustomTurboModule.UnloadNotification(aProc: TNotifyEvent);
 begin
-  if FindUnloadNotification(aProc) < 0 then
+  if IndexOfUnloadNotification(aProc) < 0 then
   begin
     FModuleUnloadNotifies.Insert(0, Pointer(TMethod(aProc).Data));
     FModuleUnloadNotifies.Insert(0, Pointer(TMethod(aProc).Code));
@@ -1899,8 +1926,6 @@ begin
 end;
 
 procedure TCustomTurboExecutor.SetStates(Value: TTurboProcessorStates);
-var
-  vChanged: Boolean;
 begin
   if Assigned(FGlobalOptions) then
     {$IFDEF FPC}
@@ -2106,32 +2131,24 @@ begin
 end;
 
 
-type
-  PPTurboEntry = ^ PTurboEntry;
-  PTurboEntry  = ^ TTurboEntry;
-  TTurboEntry  = packed record
-    Prior: Pointer;
-    MetaInfo: TTurboMetaInfo;
-  end;
-
-{//remove registered types of this module
-procedure RemoveModuleTypes(const aModuleName: string);
-var
-  i,j: integer;
-  s: string;
+procedure ForEachTurboEntry(aEntry: PTurboEntry; const aDoOnItem:
+        TTurboEntryItemEventProc; const Mem: Pointer = nil; const IsResolved:
+        Boolean = True);
 begin
-  with GRegisteredTypes^ do
-    for i := Count - 1 downto 0 do
+  if Assigned(aEntry) and Assigned(aDoOnItem) then
+  begin
+    if not IsResolved then
+      Integer(aEntry) := Integer(aEntry) + Integer(Mem);
+    while Assigned(aEntry) do
     begin
-      s := PMeType(List^[i]).Name;
-      j := Pos('.', s) - 1;
-      if (j = Length(aModuleName)) and CompareMem(@aModuleName[1], @s[1], j) then
-      begin
-        Delete(i);
-      end;
+      aDoOnItem(aEntry, Mem, IsResolved);
+      aEntry := aEntry.Prior;
+      if Assigned(aEntry) and not IsResolved then 
+        Integer(aEntry) := Integer(aEntry) + Integer(Mem);
     end;
+  end;
 end;
-//}
+
 procedure TurboConvertEntryRelatedToAbsolute(Mem: Pointer; var aEntry: PTurboEntry);
 var
   vEntry: PTurboEntry; 
@@ -2253,6 +2270,7 @@ begin
   TurboConvertVarEntryAbsoluteToRelated(Data, Data.LastVariableEntry);  
   TurboConvertEntryAbsoluteToRelated(Data, PTurboEntry(Data.LastTypeInfoEntry));  
 end;
+
 
 {
 procedure SetupSimpleTypes;

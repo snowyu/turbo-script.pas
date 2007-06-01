@@ -10,6 +10,15 @@ TODO:
   需要查找堆栈有关的操作修改之！
 !* [Bug] ModuleParent is not set or convert to related or absolute address!
 
+2007-6-1 7:50
+TMeRegisteredTypes Stream Int64 -> LongInt
+  因为我始终将类型保存在流的前面，而且不会出现>4G的文件！
+* [Bug] TCustomTurboModule.ClearMemory not clear the RegisteredTypes!
+//* [Bug] reset used module handle to nil when module unload
+* [Bug] reset used type.turbotype handle to nil when module unload
+  + protected method ResetTypeRefsBy(const aModuleRefInfo)
++ [TCustomTurboModule] Stream: save/load the FRegisteredTypes to/from stream!
+
 2007-5-31 9:24
 * [Cocobase] 正在编译的模块: FModuleSymbol
 !* 准备放弃模块上的 FinalProc指针，初始化和结束化动作全部编译放在InitProc指针上！

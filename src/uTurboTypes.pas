@@ -36,8 +36,8 @@ type
   }
   TTurboRegisteredTypes = object(TMeTypes)
   protected
-    function GetTypeByTypeId(const aTypeId: Int64): PMeType; virtual; {override}
-    function GetTypeIdByType(const aType: PMeType): Int64; virtual;   {override}
+    function GetTypeByTypeId(const aTypeId: LongInt): PMeType; virtual; {override}
+    function GetTypeIdByType(const aType: PMeType): LongInt; virtual;   {override}
   public
     destructor Destroy; virtual; //override
   end;
@@ -54,7 +54,7 @@ begin
 end;
 
 
-function TTurboRegisteredTypes.GetTypeIdByType(const aType: PMeType): Int64;
+function TTurboRegisteredTypes.GetTypeIdByType(const aType: PMeType): LongInt;
 begin
   if Assigned(aType) then
   begin
@@ -69,7 +69,7 @@ begin
   Result := inherited GetTypeIdByType(aType);
 end;
 
-function TTurboRegisteredTypes.GetTypeByTypeId(const aTypeId: Int64): PMeType;
+function TTurboRegisteredTypes.GetTypeByTypeId(const aTypeId: LongInt): PMeType;
 begin
   if (aTypeId > 0) and (aTypeId <= GRegisteredTypes.Count) then
     Result := GRegisteredTypes.Items[aTypeId-1]

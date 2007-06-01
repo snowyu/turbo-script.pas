@@ -303,14 +303,14 @@ PRODUCTIONS
   .
   
   DefineType
-    (.var vTypeSymbol: PTurboTypeSymbol; .)
+    (.var vTypeSymbol: PTurboTypeSymbol; vType: PMeType; .)
     =
     Identifier                              (. vTypeSymbol := FModuleSymbol.NewType(LexString); 
                                                if Assigned(vTypeSymbol) then 
                                                begin 
                                             .)
     "="
-    (TypeKind<vTypeSymbol.MeType>|RestrictedType<vTypeSymbol.MeType>)
+    (TypeKind<vType>|RestrictedType<vType>)
     ";"                                     (. end
                                                else
                                                  SynError(cRedeclarationError);
@@ -424,7 +424,8 @@ PRODUCTIONS
 //    |Identifier                                       (. aValue.Value := GetConstValueRec(aValue.TurboType, LexString); .)
   .
 
-  DefineWord (. Var vSucc: Boolean; vWord: PTurboMethodSymbol; .)
+  DefineWord 
+    (. Var vSucc: Boolean; vWord: PTurboMethodSymbol; .)
     = 
                                                                  (. vSucc := True;
                                                                     New(vWord, Create);
@@ -434,6 +435,8 @@ PRODUCTIONS
                                                                     vWord.CodeFieldStyle := cfsFunction;
                                                                  .)
     ":" [WordVsibility<vWord.Visibility>] Identifier     (. vWord.Name := LexString; .)
+
+    [FormalParameters<vWord>]
     
     [                                                            (. vSucc := False; .)
     ExternalWordOption<vWord>                                    (. vSucc := GenerateModuleEntryForWord(vWord); .)
@@ -446,6 +449,16 @@ PRODUCTIONS
                                                                  end;
                                                                  .)
   .
+  FormalParameters<const aWord: PTurboMethodSymbol> = "(" [FormalParms<aWord>] ")" .
+  FormalParms<const aWord: PTurboMethodSymbol> = FormalParm<aWord> {FormalParm<aWord>} .
+  FormalParm<const aWord: PTurboMethodSymbol> = ["VAR"|"CONST"|"OUT"] Parameter<aWord> .
+  Parameter<const aWord: PTurboMethodSymbol>
+    (.var vType: PMeType;.)
+    = 
+    Identifier 
+    ":" TypeKind<vType> 
+  .
+
   ExternalWordOption< const aWord: PTurboMethodSymbol >
     =
     //the default is the LastModuleRefEntry if no the module name.

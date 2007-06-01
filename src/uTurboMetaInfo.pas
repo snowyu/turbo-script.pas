@@ -73,7 +73,6 @@ type
     //if it csForth then it is the CFA.
     //ProcAddr: Pointer; in TTurboExteralMethod.MethodAddr 
     ModuleRef: PTurboModuleRefInfo;
-    ProcTypeEntry: Pointer; 
     //-1 means non-index visits.
     Index: tsInt;  
     //packed the function name in the DLL/Host.
@@ -89,6 +88,8 @@ type
     MethodAddr: tsInt;
     CallStyle: TCallingConvention;
     CodeFieldStyle: TTurboCodeFieldStyle;
+    //本地方法其类型必然也被编入本地！
+    TypeInfo: PTurboTypeInfo; 
     //ExternalWordOptions: TTurboExteralWordOptions;
     function GetExternalOptionsAddr: PTurboExteralMethodOptions; 
 
@@ -165,25 +166,17 @@ type
 
   TTurboTypeInfo = object(TTurboMetaInfo)
   public
-    {
-    in the stream(not resolved):
-      0: means nil.
-      it's the index+1 of the module.RegisteredTypes!
-    in the memory(resolved):
-      PMeType 
-    }
-    TurboType: tsPointer;//PMeType;
+    TurboType: PMeType;
   end;
 
   TTurboTypeRefInfo = object(TTurboTypeInfo)
     ModuleRef: PTurboModuleRefInfo; //this is related addr!!
-    {the index of the Module.RegisteredTypes}
+    {the index of the ModuleRef.Module.RegisteredTypes}
     {
       Note: 如果ModuleRef上添加了新类型，那么the TypeIndex is invalid.
       so Must check the ModuleRef.Revision and BuildDate.
-      use the TurboType!
     }
-    //TypeIndex: tsInt;     
+    TypeIndex: tsInt;     
   end;
 
 

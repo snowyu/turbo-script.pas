@@ -12,6 +12,7 @@ uses
   //, TypInfo
   , uMeObject
   , uMeTypes
+  , uMeProcType
   , uTurboConsts
   , uTurboMetaInfo
   , uTurboExecutor
@@ -108,9 +109,12 @@ Type
   TTurboMethodSymbol = object(TTurboSymbol)
   protected
     FLabels: PTurboSymbols;
+    FiTypeSymbol: PTurboTypeSymbol; //internal used, when this type is not Declared!
+    FTypeSymbol: PTurboTypeSymbol;
   protected
     procedure Init;virtual; {override}
     function GetLabels: PTurboSymbols;
+    function GetTypeSymbol: PTurboTypeSymbol;
   public
     destructor Destroy; virtual; {override}
     procedure Assign(const aSymbol: PTurboCustomSymbol); virtual;
@@ -136,17 +140,29 @@ Type
     ExternalOptions: TTurboExteralMethodOptions; //Exteral Word Options
     Entry: PTurboMethodEntry;
     property Labels: PTurboSymbols read GetLabels;
+    property TypeSymbol: PTurboTypeSymbol read GetTypeSymbol;
   end;
 
   {: the user defined type symbol.}
+  {
+    类型先挂在 iType 上,等DeclareTo到模块后，设置 iType 为 nil， 在转为挂在 MeType
+    总是 MeFreeAndNil(iType)， 这样自然解决未用类型的删除问题！
+  }
   TTurboTypeSymbol = object(TTurboSymbol)
   protected
+    {: internal used type, not declare to the module.}
+    FiType: PMeType;
+    FTypeInfo: PMeType;
   public
     procedure Assign(const aSymbol: PTurboCustomSymbol); virtual;
+    procedure DeclareTo(const aModule: TCustomTurboModule);
+    function GetTypeInfo(const aClass: TMeClass = nil): PMeType;
   public
-    MeType: PMeType;
+    destructor Destroy; virtual; {override}
+  public
     Entry: PTurboTypeInfoEntry;
     ModuleSymbol: PTurboModuleSymbol;
+    //Property TypeInfo: PMeType read GetTypeInfo;
   end;
 
   TTurboModuleSymbol = object(TTurboSymbol)
@@ -402,6 +418,7 @@ end;
 destructor TTurboMethodSymbol.Destroy;
 begin
   ModuleName := '';
+  MeFreeAndNil(FiTypeSymbol);
   MeFreeAndNil(FLabels);
   Inherited;
 end;
@@ -421,6 +438,8 @@ begin
       //Self.Module:=Module;
       Self.ExternalOptions:=ExternalOptions;
       Self.Entry := Entry;
+      Self.FTypeSymbol := FTypeSymbol;
+      Self.FiTypeSymbol := FiTypeSymbol;
     end;
   Inherited;
 end;
@@ -446,6 +465,20 @@ begin
     New(FLabels, Create);
   end;
   Result := FLabels;
+end;
+
+function TTurboMethodSymbol.GetTypeSymbol: PTurboTypeSymbol;
+begin
+  if Assigned(FTypeSymbol) then
+    Result := FTypeSymbol
+  else if Assigned(FiTypeSymbol) then
+    Result := FiTypeSymbol
+  else 
+  begin
+    New(FiTypeSymbol, Create);
+    FiTypeSymbol.ModuleSymbol := ModuleSymbol;
+    Result := FiTypeSymbol;
+  end;
 end;
 
 procedure TTurboMethodSymbol.DeclareTo(const aModule: TCustomTurboModule);
@@ -626,7 +659,7 @@ begin
   //find local type:
   Result := PMeType(Types.Find(aName));
   if Assigned(Result) then
-    Result := PTurboTypeSymbol(Result).MeType;
+    Result := PTurboTypeSymbol(Result).GetTypeInfo;
   if not Assigned(Result) then
   begin //TODO: find external type:
   end;
@@ -1200,16 +1233,49 @@ begin
 end;
 
 { TTurboTypeSymbol }
+destructor TTurboTypeSymbol.Destroy;
+begin
+  MeFreeAndNil(FiType);
+  Inherited;
+end;
+
 procedure TTurboTypeSymbol.Assign(const aSymbol: PTurboCustomSymbol);
 begin
   if Assigned(aSymbol) and aSymbol.InheritsFrom(Self.ClassType) then
     with PTurboTypeSymbol(aSymbol)^ do
     begin
       Self.Entry := Entry;
-      Self.MeType := MeType;
+      Self.FTypeInfo := FTypeInfo;
+      Self.FiType := FiType;
       Self.ModuleSymbol := ModuleSymbol;
     end;
   Inherited;
+end;
+
+procedure TTurboTypeSymbol.DeclareTo(const aModule: TCustomTurboModule);
+begin
+  if Assigned(FiType) and not Assigned(FTypeInfo) then
+  begin
+    if aModule.RegisteredTypes.RegisterType(FiType) then
+    begin
+      FTypeInfo:= FiType;
+      FiType := nil;
+    end;
+  end;
+end;
+
+function TTurboTypeSymbol.GetTypeInfo(const aClass: TMeClass): PMeType;
+begin
+  if Assigned(FTypeInfo) then
+    Result := FTypeInfo
+  else if Assigned(FiType) then
+    Result := FiType
+  else if Assigned(aClass) and MeInheritsFrom(aClass, TypeOf(TMeType)) then
+  begin
+    Result := PMeType(NewMeObject(aClass));
+  end
+  else 
+    Result := nil;
 end;
 
 { TTurboSymbols }
@@ -1350,7 +1416,7 @@ begin
   for Result := aBeginIndex to Count - 1 do
   begin
     with Items[Result]^ do
-    if aType = MeType then
+    if aType = GetTypeInfo then
       exit;
   end;
   Result := -1;
