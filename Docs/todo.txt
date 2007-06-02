@@ -10,6 +10,16 @@ TODO:
   需要查找堆栈有关的操作修改之！
 !* [Bug] ModuleParent is not set or convert to related or absolute address!
 
+2007-6-2 11:08
++ [Compiler] Issue #001 当定义过程Word的时候同时定义增加定义其过程类型的定义，并增加对过程参数的定义
+  这样编译时候可以在引用过程的时候检查参数是否非法。
+!* [Common Type System] 低级语言语义 Visiblity 的改变
+  标识符的 Visibilities:
+  
+  TTurboVisibility = (tvPublic, tvNamed, tvTyped);
+  TTurboVisibilities = set of TTurboVisibility;
+
+
 2007-6-1 7:50
 TMeRegisteredTypes Stream Int64 -> LongInt
   因为我始终将类型保存在流的前面，而且不会出现>4G的文件！
