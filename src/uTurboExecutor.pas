@@ -202,7 +202,7 @@ type
     procedure UnResolveAddress;
   public
     constructor Create(const aOwner: TCustomTurboModule = nil; aVisibility:
-            TTurboVisibility = fvPublished); virtual;
+            TTurboVisibility = tvPublicVisibilty); virtual;
     destructor Destroy; override;
     {: add a integer to the free memory, and add UsedMemory }
     { Description
@@ -706,7 +706,7 @@ end;
 ****************************** TCustomTurboModule ******************************
 }
 constructor TCustomTurboModule.Create(const aOwner: TCustomTurboModule = nil;
-        aVisibility: TTurboVisibility = fvPublished);
+        aVisibility: TTurboVisibility = tvPublicVisibilty);
 begin
   inherited Create;
   FModuleUnloadNotifies := TList.Create;
@@ -1650,7 +1650,7 @@ end;
 function TCustomTurboModule.StoredInOwner: Boolean;
 begin
   Result := Assigned(Owner) and
-     ((Visibility <= fvPrivate)
+     ((Visibility = tvPrivateVisibilty)
        //or (Parent.ModuleType = mtFunction)
      );
 end;
@@ -1740,7 +1740,7 @@ function TCustomTurboExecutor.ExecuteWordEntry(const aWord: PTurboMethodEntry):
 begin
   InitExecution;
 
-  if (aWord.Word.CallStyle = ccForth) and (aWord.Word.Visibility <= fvPrivate) then
+  if (aWord.Word.CallStyle = ccForth) and (aWord.Word.Visibility = tvPrivateVisibilty) then
   begin
     Result := iExecuteCFA(aWord.Word.MethodAddr);
   end
