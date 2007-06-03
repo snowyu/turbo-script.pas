@@ -388,7 +388,7 @@ PRODUCTIONS
     ";"                                            (.   if IsUniqueIdentifier(vValue.Name) then
                                                          begin
                                                            FModuleSymbol.Vars.Add(vValue);
-                                                           if vValue.IsProtected(FModule) then vValue.DeclareTo(FModule); 
+                                                           if vValue.IsPublic(FModule) then vValue.DeclareTo(FModule); 
                                                          end
                                                          else 
                                                          begin
@@ -430,7 +430,7 @@ PRODUCTIONS
                                                                  (. vSucc := True;
                                                                     New(vWord, Create);
                                                                  try
-                                                                    vWord.Visibility := fvPrivate; 
+                                                                    vWord.Visibility := tvPrivateVisibilty; 
                                                                     vWord.CallStyle := ccForth;
                                                                     vWord.CodeFieldStyle := cfsFunction;
                                                                  .)
@@ -492,11 +492,11 @@ PRODUCTIONS
   .
   WordVsibility< var aVisibility: TTurboVisibility > 
     = 
-    "HIDDEN"                                           (. aVisibility := fvHidden; .)
-    |"PRIVATE"                                         (. aVisibility := fvPrivate; .)
-    |"PROTECTED"                                       (. aVisibility := fvProtected; .)
-    |"PUBLIC"                                          (. aVisibility := fvPublic; .)
-    |"PUBLISHED"                                       (. aVisibility := fvPublished; .)
+    |"PRIVATE"                                         (. aVisibility := tvPrivateVisibilty; .)
+    |("PUBLIC"                                         (. aVisibility := tvPublicVisibilty; .)
+      ["NAMED" (. aVisibility :=  aVisibility or tvPublicNamedVisibilty; .)]
+      ["TYPED" (. aVisibility :=  aVisibility or tvPublicTypedVisibilty; .)]
+     )
   .
 
   ASMStatementBlock< const aWord: PTurboMethodSymbol > 
