@@ -46,9 +46,9 @@ Type
   TTurboSymbol = Object(TTurboCustomSymbol)
   public
     procedure Assign(const aSymbol: PTurboCustomSymbol); virtual;
-    function IsProtected(const aModule: TCustomTurboModule): Boolean;
-    function IsTypeSafety(const aModule: TCustomTurboModule): Boolean;
-    function IsTypeNamed(const aModule: TCustomTurboModule): Boolean;
+    function IsPublic(const aModule: TCustomTurboModule): Boolean;
+    function IsTyped(const aModule: TCustomTurboModule): Boolean;
+    function IsNamed(const aModule: TCustomTurboModule): Boolean;
   public
     Visibility: TTurboVisibility;
   end;
@@ -131,7 +131,7 @@ Type
     CodeFieldStyle: TTurboCodeFieldStyle;
     //the Param Field Length
     //该函数主体的长度 
-    //ParamFieldLength: LongWord; //this is in the Entry.
+    ParamFieldLength: LongWord; //this is in the Entry.
     CFA: tsInt;//the offset address of the memory.
     ModuleName: String;  //for external word
     ModuleType: TTurboModuleType;  //for external word
@@ -369,19 +369,19 @@ begin
   Inherited;
 end;
 
-function TTurboSymbol.IsProtected(const aModule: TCustomTurboModule): Boolean;
+function TTurboSymbol.IsPublic(const aModule: TCustomTurboModule): Boolean;
 begin
-  Result := (Visibility >= fvProtected) or ([soTypeSafety, soTypeNamed] <= aModule.Options);
+  Result := ((Visibility and tvPublicVisibilty) = tvPublicVisibilty) or (([soSymbolPublic, soSymbolTyped, soSymbolNamed]*aModule.Options) <> []);
 end;
 
-function TTurboSymbol.IsTypeSafety(const aModule: TCustomTurboModule): Boolean;
+function TTurboSymbol.IsTyped(const aModule: TCustomTurboModule): Boolean;
 begin
-  Result := (Visibility >= fvPublished) or (soTypeSafety in aModule.Options);
+  Result := ((Visibility and tvPublicTypedVisibilty) = tvPublicTypedVisibilty) or (soSymbolTyped in aModule.Options);
 end;
 
-function TTurboSymbol.IsTypeNamed(const aModule: TCustomTurboModule): Boolean;
+function TTurboSymbol.IsNamed(const aModule: TCustomTurboModule): Boolean;
 begin
-  Result := (Visibility >= fvPublic) or (soTypeNamed in aModule.Options);
+  Result := ((Visibility and tvPublicNamedVisibilty) = tvPublicNamedVisibilty) or (soSymbolNamed in aModule.Options);
 end;
 
 { TTurboLabelSymbol }
@@ -432,7 +432,7 @@ begin
       Self.ModuleName := ModuleName;
       Self.CallStyle := CallStyle;
       Self.CodeFieldStyle := CodeFieldStyle;
-      //Self.ParamFieldLength := ParamFieldLength;
+      Self.ParamFieldLength := ParamFieldLength;
       Self.CFA:=CFA;
       Self.ModuleType:=ModuleType;
       //Self.Module:=Module;
@@ -483,42 +483,60 @@ end;
 
 procedure TTurboMethodSymbol.DeclareTo(const aModule: TCustomTurboModule);
 begin
-  CFA := aModule.UsedMemory;
-
-  //writeln('aModule.UsedDataSize=',InttoHex(aModule.UsedDataSize,4));
-  aModule.AlignData;
-  //writeln('aModule.UsedDataSize=',InttoHex(aModule.UsedDataSize,4));
-  Integer(Entry) := Integer(aModule.DataMemory) + aModule.UsedDataSize;
-  aModule.AllocDataSpace(SizeOf(TTurboMethodEntry));
-  Entry.Prior := aModule.LastWordEntry;
-  if Visibility >= fvProtected then
+  if not Assigned(Entry) then
   begin
-    Entry.Word.Name := Pointer(aModule.UsedDataSize);
-    //aModule.AddByteToData(Length(Name));
-    aModule.AddBufferToData(Name[1], Length(Name));
-    aModule.AddByteToData(0);
-  end
-  else
-  begin
-    //aModule.AddByteToData(0);
-    Entry.Word.Name := nil;
+    if CodeFieldStyle = cfsFunction then
+    begin
+      CFA := aModule.UsedMemory;
+    end
+    else //the external method.
+      CFA := 0;
+    if IsPublic(aModule) then
+    begin
+      //writeln('aModule.UsedDataSize=',InttoHex(aModule.UsedDataSize,4));
+      aModule.AlignData;
+      //writeln('aModule.UsedDataSize=',InttoHex(aModule.UsedDataSize,4));
+      Integer(Entry) := Integer(aModule.DataMemory) + aModule.UsedDataSize;
+      aModule.AllocDataSpace(SizeOf(TTurboMethodEntry));
+      Entry.Prior := aModule.LastWordEntry;
+      if IsNamed(aModule) then
+      begin
+        Entry.Word.Name := Pointer(aModule.UsedDataSize);
+        //aModule.AddByteToData(Length(Name));
+        aModule.AddBufferToData(Name[1], Length(Name));
+        aModule.AddByteToData(0);
+      end
+      else
+      begin
+        //aModule.AddByteToData(0);
+        Entry.Word.Name := nil;
+      end;
+      Entry.Word.MethodAddr := CFA;
+      Entry.Word.Visibility := Visibility;
+      Entry.Word.CallStyle := CallStyle;
+      Entry.Word.CodeFieldStyle := CodeFieldStyle;
+    end;
   end;
-  Entry.Word.MethodAddr := CFA;
-  Entry.Word.Visibility := Visibility;
-  Entry.Word.CallStyle := CallStyle;
-  Entry.Word.CodeFieldStyle := CodeFieldStyle;
 end;
 
 procedure TTurboMethodSymbol.DeclareEndTo(const aModule: TCustomTurboModule);
+var
+  vIsPublic: Boolean;
 begin
-  if CodeFieldStyle = cfsFunction then
+  if (CodeFieldStyle = cfsFunction) and Assigned(Entry) then
   begin
-    if Visibility >= fvProtected then
+    vIsPublic := IsPublic(aModule);
+    if vIsPublic then
       aModule.AddOpToMem(opExitFar)
     else
       aModule.AddOpToMem(opExit);
-    Entry.Word.ParamFieldLength := aModule.UsedMemory - CFA + 1;
-    aModule.LastWordEntry := Pointer(Integer(Entry) - Integer(aModule.DataMemory));
+    ParamFieldLength := aModule.UsedMemory - CFA + 1;
+
+    if vIsPublic then
+    begin
+      Entry.Word.ParamFieldLength := ParamFieldLength;
+      aModule.LastWordEntry := Pointer(Integer(Entry) - Integer(aModule.DataMemory));
+    end;
   end;
 end;
 
@@ -546,15 +564,15 @@ begin
     case CodeFieldStyle of
       cfsFunction:
       begin
-        if Visibility < fvProtected then
+        if IsPublic(aModule) then
         begin
-          aModule.AddOpToMem(opEnter);
+          aModule.AddOpToMem(opEnterFar);
+          aModule.AddIntToMem(0);
           aModule.AddIntToMem(CFA);
         end
         else
         begin
-          aModule.AddOpToMem(opEnterFar);
-          aModule.AddIntToMem(0);
+          aModule.AddOpToMem(opEnter);
           aModule.AddIntToMem(CFA);
         end;
         //Result := True;
@@ -578,18 +596,26 @@ begin
                 aModule.AddOpToMem(opCallFar);
                 //writeln(Name, '.ModEntry:',Integer(ModuleSymbol.Entry)- Integer(aModule.DataMemory));
                 //point to the TurboModuleInfo
-                //writeln(Name, '.ModRef:',Integer(ExternalOptions.ModuleRef)- Integer(aModule.DataMemory));
+                if not Assigned(ExternalOptions.ModuleRef) then
+                begin
+                  ModuleSymbol.DeclareTo(aModule);
+                  ExternalOptions.ModuleRef := Pointer(Integer(ModuleSymbol.Entry) + SizeOf(tsPointer));
+                end;
+                //writeln(Name, '.ModRef:',Integer(ExternalOptions.ModuleRef) - Integer(aModule.DataMemory));
                 aModule.AddIntToMem(Integer(ExternalOptions.ModuleRef) - Integer(aModule.DataMemory));
                 aModule.AddIntToMem(CFA);
                 //writeln(Name, '.CFA:',CFA);
                 //Result := True;
               end
-              //else
+              else
+              begin
                //writeln('cWordNotFoundError');
                 //SynError(cWordNotFoundError, '"'+ aName + '" CFA not in ' + FUsedModules.Items[ModuleIndex].Name);
+              end;
             end
             else
             begin
+              //writeln(Name, ' not assigned module!!');
               //SynError(cWordNotFoundError, '"'+ aName + '" not in ' + FUsedModules.Items[ModuleIndex].Name);
             end;
           end;
@@ -788,6 +814,7 @@ begin
     end
     else
     begin 
+      //writeln('Can not add used module:' + aMethod.ModuleName);
       //SynError(cDLLModuleMissError, 'Can not add used module:' + aWord.ModuleName);
       aMethod.ModuleSymbol := nil;
     end;
@@ -797,8 +824,12 @@ begin
   if Result then
   begin
     Result := Assigned(aMethod.ModuleSymbol.FindLocalMethod(aMethod.Name));
-    if Result then
+    if Result and Assigned(aMethod.ModuleSymbol.Entry) then
+    begin
       aMethod.ExternalOptions.ModuleRef := Pointer(Integer(aMethod.ModuleSymbol.Entry) + SizeOf(tsPointer));
+    end
+    else
+      aMethod.ExternalOptions.ModuleRef := nil;
   end;
 end;
 
@@ -1184,9 +1215,9 @@ var
   //vTypeSafety, vTypeNamed: Boolean;
 begin
   vVaraibleEntry := nil;
-  //vTypeSafety := (Visibility >= fvProtected) or (soTypeSafety in aModule.Options); 
-  //vTypeNamed := (Visibility >= fvPublished) or (soTypeNamed in aModule.Options); 
-  if IsProtected(aModule) then
+  //vTypeSafety := (Visibility >= fvProtected) or (soSymbolTyped in aModule.Options); 
+  //vTypeNamed := (Visibility >= fvPublished) or (soSymbolNamed in aModule.Options); 
+  if IsPublic(aModule) then
   begin
     //aModule.AlignData;
     Integer(vVaraibleEntry) := Integer(aModule.DataMemory) + aModule.UsedDataSize;
@@ -1201,7 +1232,7 @@ begin
   if IsRequiredAlignMem(TurboType) then aModule.AlignData;
   Addr := aModule.UsedDataSize;
 
-  if IsProtected(aModule) then
+  if IsPublic(aModule) then
   begin
     tsInt(vVaraibleEntry.Variable.Addr) := Addr;
     aModule.LastVariableEntry := Pointer(Integer(vVaraibleEntry) - Integer(aModule.DataMemory));
@@ -1215,7 +1246,7 @@ begin
     AssignValueTo(vValue);
   end;
 
-  if IsTypeNamed(aModule) then
+  if IsNamed(aModule) then
   begin
       vVaraibleEntry.Variable.Name := Pointer(aModule.UsedDataSize);
       //fill the variable name
