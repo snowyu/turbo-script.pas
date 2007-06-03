@@ -35,7 +35,7 @@ type
     class procedure InitModuleType; virtual;
   public
     constructor Create(const aOwner: TCustomTurboModule = nil; aVisibility:
-            TTurboVisibility = fvPublished); override;
+            LongWord = tvPublicVisibilty); override;
     destructor Destroy; override;
     { Description
     根据编译开关将这些列表的类编译进入Memory.
@@ -95,7 +95,7 @@ type
     class procedure InitModuleType; override;
   public
     constructor Create(const aOwner: TCustomTurboModule = nil; aVisibility:
-            TTurboVisibility = fvPublished); override;
+            LongWord = tvPublicVisibilty); override;
     destructor Destroy; override;
     {: 它的子模块列表:被 Parser 或Tree使用 }
     property Childs: TTurboModuleList read FChilds write FChilds;
@@ -140,7 +140,7 @@ implementation
 ******************************* TCustomTurboWord *******************************
 }
 constructor TCustomTurboWord.Create(const aOwner: TCustomTurboModule = nil;
-        aVisibility: TTurboVisibility = fvPublished);
+        aVisibility: LongWord = tvPublicVisibilty);
 begin
   inherited Create(aOwner, aVisibility);
   InitModuleType;
@@ -267,7 +267,7 @@ end;
 ******************************** TTTurboModule *********************************
 }
 constructor TTTurboModule.Create(const aOwner: TCustomTurboModule = nil;
-        aVisibility: TTurboVisibility = fvPublished);
+        aVisibility: LongWord = tvPublicVisibilty);
 begin
   inherited Create(aOwner, aVisibility);
   FChilds := TTurboModuleList.Create(Self);
