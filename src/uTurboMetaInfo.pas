@@ -64,7 +64,7 @@ type
     //property MetaKind: TTurboMetaKind read FMetaKind write FMetaKind;
     property Name: PChar read FName write FName;
     property ParamFieldLength: tsUInt read FParamFieldLength write FParamFieldLength;
-    property Visibility: TTurboVisibility read FVisibility write FVisibility;
+    property Visibility: LongWord read FVisibility write FVisibility;
   end;  
 
   PTurboExteralMethodOptions = ^ TTurboExteralMethodOptions;
