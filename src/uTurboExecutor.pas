@@ -9,7 +9,8 @@ off the stack, the
 processor reads the item from the top of stack, then increments the ESP register
 
 
-也可以脱离 TTurboProgam 运行，但是你必须分配参数栈＆返回栈的内存：
+也可以脱离 TTurboAppDomain
+运行，但是你必须分配参数栈＆返回栈的内存，还有GlobalOptions：
   ParameterStackSize := 4096;
   GetMem(ParameterStack, ParameterStackSize);
   ReturnStackSize := 4096;
