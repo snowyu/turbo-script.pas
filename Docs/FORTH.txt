@@ -172,8 +172,33 @@ end;
 
 
 == Type Fundamentals ==
-所有的类型都是类。
 
+对于汇编，则是混和了基本原型和类【暂未实现】！
+
+在上层高级语言那里所有的类型都是类。
+
+=== 标识符的可见范围和 MetaInfo 的控制 ===
+标识符号有以下属性，用来控制它的可见范围和MetaInfo的多寡：
+  tvPrivate: 该标识符私有，没有名字，没有类型！
+  tvPublic:该标识符将被连接到链表中【高级语言使用】
+    pmNamed: 该标识符将被连接到链表中,并被写入标识符名称
+    pmTyped: 该标识符将被连接到链表中,并且该标识符的类型也将被写入！
+  TTurboVisibility = (tvPrivate, tvPublic);
+  TTurboPublicModifier = (pmNamed, pmTyped);
+  TTurboPublicModifiers = set of TTurboPublicModifier;
+
+  [高级语言定义]：
+    ttPrivate := tvPublic
+    ttProtected:= tvPublic, pmNamed
+    ttPublic := tvPublic, pmNamed
+    ttPublished := tvPublic, pmNamed, pmTyped
+
+  准备用一个 LongWord（DWord）来存放：
+  tvPrivateVisibilty = $00000000;
+  tvPublicVisibilty  = $00000001;
+  tvPublicNamedVisibilty   = $01000000;
+  tvPublicTypedVisibilty   = $02000000;
+  
 最最基本的类：
 === Class ===
 TObject 为所有对象的基类

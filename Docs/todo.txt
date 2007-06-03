@@ -1,3 +1,5 @@
+Common Type System: CTS
+
 TODO: 
   1. 必须找到一种重新分配内存（扩充空间）的时候，基地址不变的方法【可能需要在FastMM中找】。
      可以直接使用API调用【或者类似的函数】，然后保留下最大的内存地址范围，即可。
@@ -10,14 +12,50 @@ TODO:
   需要查找堆栈有关的操作修改之！
 !* [Bug] ModuleParent is not set or convert to related or absolute address!
 
+2007-6-3 14:28
+* [Bug] issue 0000002[Done]: [TurboScript] Executor 定义外部函数后，在程序中调用该函数导致执行器严重出错！
+  when call the external function "Add". the tsrun raise fatal error!
+    : Add external 'test';  
+  if I uses test; the tsrun is ok and no any error!
+  原因：实际上是由于编译的时候没有正确填写 ExternalOptions.ModuleRef 的地址造成！该引用的ModuleSymbol没有被声明到模块中！
+  Reasoon: the ModuleSymbol is not declared to the moduleMemory. and ExternalOptions.ModuleRef is wrong!!
+* [CTS] issue 0000003[Done]: use the new identifier Visibility and scopes speciality
+  用一个 LongWord（DWord）来存放：
+  tvPrivateVisibilty = $00000000;
+  tvPublicVisibilty  = $00000001;
+  tvPublicNamedVisibilty   = $01000001;
+  tvPublicTypedVisibilty   = $02000001;
+  tvPublicNameTypedVisibilty   = $03000001;
+
 2007-6-2 11:08
 + [Compiler] Issue #001 当定义过程Word的时候同时定义增加定义其过程类型的定义，并增加对过程参数的定义
   这样编译时候可以在引用过程的时候检查参数是否非法。
 !* [Common Type System] 低级语言语义 Visiblity 的改变
   标识符的 Visibilities:
   
-  TTurboVisibility = (tvPublic, tvNamed, tvTyped);
-  TTurboVisibilities = set of TTurboVisibility;
+  tvPrivate: 该标识符私有，没有名字，没有类型！
+  tvPublic:该标识符将被连接到链表中【高级语言使用】
+    pmNamed: 该标识符将被连接到链表中,并被写入标识符名称
+    pmTyped: 该标识符将被连接到链表中,并且该标识符的类型也将被写入！
+  TTurboVisibility = (tvPrivate, tvPublic);
+  TTurboPublicModifier = (pmNamed, pmTyped);
+  TTurboPublicModifiers = set of TTurboPublicModifier;
+
+  [高级语言定义]：
+    ttPrivate: = tvPublic
+    ttProtected: = tvPublic, pmNamed
+    ttPublic: = tvPublic, pmNamed
+    ttPublished: = tvPublic, pmNamed, pmTyped
+
+  准备用一个 LongWord（DWord）来存放：
+  tvPrivateVisibilty = $00000000;
+  tvPublicVisibilty  = $00000001;
+  tvPublicNamedVisibilty   = $01000001;
+  tvPublicTypedVisibilty   = $02000001;
+  tvPublicNameTypedVisibilty   = $03000001;
+
+!* [Bug] PHP 发现从终端stdin传入的参数不能正常的utf-8话，因此中文是乱码！
+  连结cvs 和mantis php错误管理系统的时候发现！
 
 
 2007-6-1 7:50
