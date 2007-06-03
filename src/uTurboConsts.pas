@@ -64,16 +64,19 @@ type
   TTurboModuleType = (mtUnknown, mtProgram, mtLib, mtObject, mtFunction, mtHost, mtDLL);
 
   {
-    @param soTypeSafety the module is TypeSafety. all the indentities own the TypeInfo.
+    @param soSymbolPublic the module is SymbolPublic. all the indentities are linked to the module.
                         当模块有这个参数的时候，编译器将强制把所有标识符的的类型信息编入内存。
-    @param soTypeNamed  all the indentities own the published name!
-                            note: only avaible when soTypeSafety is on.
+    @param soSymbolTyped the module is TypeSafety. all the indentities are linked to the module and owned the TypeInfo.
+                        当模块有这个参数的时候，编译器将强制把所有标识符的的类型信息编入内存。
+    @param soSymbolNamed  all the indentities are linked to the module and owned the published name!
   }
   //## the set is LongWord in Delphi
   TTurboScriptOption = (soOptimize, soLoadOnDemand 
     , soBindingRuntime, soBindingCompileTime
-    , soTypeSafety, soAssertSupport
-    , soTypeNamed
+    , soAssertSupport
+    , soSymbolPublic
+    , soSymbolTyped
+    , soSymbolNamed
     , soShortBooleanEval
     , soRangeChecks
     , soPreserved4
@@ -95,14 +98,22 @@ type
     @param fvProtected Word:只能由本模块以及从该模块的子模块调用，远调用，该过程会被连接到LastWordEntry中！一般没有Name信息。
     @param fvPublic    Word:任意模块均可调用，远调用，该过程会被连接到LastWordEntry中！一般没有Name信息。
     @param fvPublished Word:任意模块均可调用，远调用，该过程会被连接到LastWordEntry中！有Name信息。
+
+  用一个 LongWord（DWord）来存放：TTurboVisibility
+  tvPrivateVisibilty = $00000000;
+  tvPublicVisibilty  = $00000001;
+  tvPublicNamedVisibilty   = $01000000;
+  tvPublicTypedVisibilty   = $02000000;
   }
-  TTurboVisibility = (fvHidden, fvPrivate, fvProtected, fvPublic, fvPublished);
+  //TTurboVisibility = (fvHidden, fvPrivate, fvProtected, fvPublic, fvPublished);
+  TTurboVisibility = LongWord;
+
   //the Forth Execution priority fpHighest means cfsImmediately
   TTurboPriority = (fpLowest, fpLower, fpLow, fpNormal, fpHigh, pfHigher, fpHighest);
   //TTurboCallStyle = (csForth, csRegister, csPascal, csCdecl, csStdCall, csFastCall);
   //cfsExternalFunction is external function. see Also ExternalOptions.ModuleType
   TTurboCodeFieldStyle = (cfsFunction, cfsExternalFunction);
-  TTurboWordOptions = packed record //a DWORD
+{  TTurboWordOptions = packed record //a DWORD
       //优先级, highest means an IMMEDIATE word
       //1=True; 0=False; Smudge bit. used to prevent FIND from finding this word
       //this can be extent to private, protected, public, etc
@@ -308,6 +319,17 @@ const
   cTurboScriptIsSteppingBit      = psStepping;
   //cTurboScriptBadInstructionBit  = [psBadInstruction];
   cMaxTurboVMInstructionCount = SizeOf(TTurboCoreWords) div SizeOf(TProcedure); //the max turbo VM code directive count
+
+  //用一个 LongWord（DWord）来存放：TTurboVisibility
+  {: 该标识符私有，没有名字，没有类型！}
+  tvPrivateVisibilty = $00000000;
+  {: 该标识符将被连接到链表中}
+  tvPublicVisibilty  = $00000001;
+  {: 该标识符将被连接到链表中,并被写入标识符名称}
+  tvPublicNamedVisibilty   = $01000001;
+  {: 该标识符将被连接到链表中,并且该标识符的类型也将被写入！}
+  tvPublicTypedVisibilty   = $02000001;
+  tvPublicNameTypedVisibilty   = $03000001;
   
 function IsInteger(const aValue: string): Boolean;
 {$IFDEF FPC}
