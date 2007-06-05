@@ -890,6 +890,7 @@ begin
     vPreserved := cDefaultDataMemSize+SizeOf(TTurboPreservedDataMemory);
     ReallocMem(FMemory, cDefaultDataMemSize);
     ReallocMem(FDataMemory, vPreserved);
+    //RegisteredTypes.Clear;
     with PTurboPreservedDataMemory(FDataMemory)^ do
     begin
       MemorySize := cDefaultDataMemSize;
@@ -899,7 +900,6 @@ begin
       DataSize := vPreserved;
       UsedDataSize := SizeOf(TTurboPreservedDataMemory);//SizeOf(tsInt); //preserved the first integer
       TTurboScriptOptions(ModuleOptions) := [soAssertSupport];
-      RegisteredTypes.Clear;
 
       InitializeProc := nil;
       FinalizeProc := nil;
@@ -1245,6 +1245,7 @@ procedure TCustomTurboModule.LoadFromStream(const aStream: TStream; Count:
 var
   vHeader: TTurboModuleStreamHeader;
   p: PChar;
+  I: Integer;
 begin
   if Count <= 0 then
   begin
@@ -1262,7 +1263,13 @@ begin
   ModuleVersion := vHeader.Revision;
   ModuleDate := vHeader.BuildDate;
 
-  FRegisteredTypes.LoadFromStream(aStream);
+  //read the FRegisteredTypes size+1 in the stream
+  aStream.ReadBuffer(I, SizeOf(I));
+  if FRegisteredTypes.Count > 0 then
+    //skip
+     aStream.Position := I
+  else
+    FRegisteredTypes.LoadFromStream(aStream);
 
   UsedDataSize := SizeOf(TTurboPreservedDataMemory);
   aStream.ReadBuffer(FDataMemory^, SizeOf(TTurboPreservedDataMemory));
@@ -1419,6 +1426,8 @@ procedure TCustomTurboModule.SaveToStream(const aStream: TStream);
 var
   vHeader: TTurboModuleStreamHeader;
   vFlags: TTurboModuleFlags;
+  I: Integer;
+  vPos: Integer;
 begin
   if not FIsLoaded then
     raise ETurboScriptError.CreateRes(@rsTurboScriptNotLoadedError);
@@ -1431,7 +1440,15 @@ begin
 
   if IsAddrResolved then TurboConvertAddrAbsoluteToRelated(FMemory, FDataMemory);
 
+  vPos := aStream.Position;
+  I := 0;
+  aStream.WriteBuffer(I, SizeOf(I));
   FRegisteredTypes.SaveToStream(aStream);
+  I := aStream.Position;
+  aStream.Position := vPos;
+  aStream.WriteBuffer(I, SizeOf(I));
+  aStream.Position := I;
+
 
   with PTurboPreservedDataMemory(FDataMemory)^ do
   begin
