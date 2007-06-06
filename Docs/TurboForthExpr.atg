@@ -7,7 +7,7 @@ COMPILER TurboForthCompiler
 
 DELPHI
 
-USES (INTERFACE) uMeObject, uMeTypes, uStrUtils, uTurboConsts, uTurboMetaInfo, uTurboExecutor, uTurboAccessor, uTurboModuleFileAccessor, uTurboCompilerUtils//, uTurboSymbols
+USES (INTERFACE) TypInfo, uMeObject, uMeTypes, uMeProcType, uStrUtils, uTurboConsts, uTurboMetaInfo, uTurboExecutor, uTurboAccessor, uTurboModuleFileAccessor, uTurboCompilerUtils//, uTurboSymbols
 
 TYPE
 
@@ -268,10 +268,8 @@ PRODUCTIONS
     [UseModulesBlock]
     [DeclarationBlock]  
     "BEGIN"                                            (. FInitProcCFA := FModule.UsedMemory; 
-                                                          New(vMainMethod, Create);
+                                                          vMainMethod := FModuleSymbol.NewMethod(cMainEntryProcName);
                                                           try
-                                                            vMainMethod.Name := '._Main_';
-                                                            vMainMethod.ModuleSymbol := FModuleSymbol;
                                                             vMainMethod.CFA := FModule.UsedMemory;
                                                             vMainMethod.CallStyle := ccForth;
                                                             vMainMethod.CodeFieldStyle := cfsFunction;
@@ -279,7 +277,7 @@ PRODUCTIONS
     ASMStatementBlock<vMainMethod>
     "END."                                             (.   FModule.AddOpToMem(opPushInt); FModule.AddIntToMem(0); FModule.AddOpToMem(opHalt); 
                                                           finally
-                                                            MeFreeAndNil(vMainMethod);
+                                                            //MeFreeAndNil(vMainMethod); //managed by FModuleSymbol.
                                                           end;
                                                        .)
                                                        (. Final ; .) 
@@ -322,7 +320,7 @@ PRODUCTIONS
     =
     Identifier                             (. aType := FModuleSymbol.FindType(LexString); 
                                               if not Assigned(aType) then
-                                                SynError(cTypeDeclarationError);
+                                                SynError(cTypeDeclarationError, LexString + ' Type can not be found');
                                            .)
   .
   TypeKind<var aType: PMeType> 
@@ -428,7 +426,7 @@ PRODUCTIONS
     (. Var vSucc: Boolean; vWord: PTurboMethodSymbol; .)
     = 
                                                                  (. vSucc := True;
-                                                                    New(vWord, Create);
+                                                                    vWord := FModuleSymbol.NewMethod('');;
                                                                  try
                                                                     vWord.Visibility := tvPrivateVisibilty; 
                                                                     vWord.CallStyle := ccForth;
@@ -450,13 +448,38 @@ PRODUCTIONS
                                                                  .)
   .
   FormalParameters<const aWord: PTurboMethodSymbol> = "(" [FormalParms<aWord>] ")" .
-  FormalParms<const aWord: PTurboMethodSymbol> = FormalParm<aWord> {FormalParm<aWord>} .
-  FormalParm<const aWord: PTurboMethodSymbol> = ["VAR"|"CONST"|"OUT"] Parameter<aWord> .
-  Parameter<const aWord: PTurboMethodSymbol>
+  FormalParms<const aWord: PTurboMethodSymbol> 
+    (. var vProcType: PMeProcType; vParamType: PMeParamType; .)
+    =                                                            (. vProcType := aWord.TypeInfo; 
+                                                                    if not Assigned(vProcType) then
+                                                                    begin
+                                                                      SynError(cMethodDeclarationError, 'Can Not Assigned Method TypeInfo!');
+                                                                      exit;
+                                                                    end;
+                                                                 .)
+    FormalParm<vProcType> {FormalParm<vProcType>} 
+  .
+
+  FormalParm<const aProcType: PMeProcType> 
+    (.var vParam: PMeParamType; .)
+    =                (. vParam := aProcType.NewParam; .)
+    [ "VAR"          (. vParam.Flags := [pfVar]; .)
+      |"CONST"       (. vParam.Flags := [pfConst]; .)
+      |"OUT"         (. vParam.Flags := [pfOut]; .)
+    ] 
+    Parameter<vParam>
+  .
+
+  Parameter<const aParam: PMeParamType>
     (.var vType: PMeType;.)
-    = 
-    Identifier 
-    ":" TypeKind<vType> 
+    =
+    Identifier               (. aParam.Name := LexString; .)
+    ":" TypeKind<vType>      (. if Assigned(vType) then  
+                                  aParam.ParamType := vType
+                                else
+                                  SynError(cMethodDeclarationError, aParam.Name + ' param type can not be found!');
+                             .)
+    
   .
 
   ExternalWordOption< const aWord: PTurboMethodSymbol >
@@ -492,7 +515,7 @@ PRODUCTIONS
   .
   WordVsibility< var aVisibility: TTurboVisibility > 
     = 
-    |"PRIVATE"                                         (. aVisibility := tvPrivateVisibilty; .)
+    "PRIVATE"                                         (. aVisibility := tvPrivateVisibilty; .)
     |("PUBLIC"                                         (. aVisibility := tvPublicVisibilty; .)
       ["NAMED" (. aVisibility :=  aVisibility or tvPublicNamedVisibilty; .)]
       ["TYPED" (. aVisibility :=  aVisibility or tvPublicTypedVisibilty; .)]
