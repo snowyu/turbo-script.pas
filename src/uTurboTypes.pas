@@ -40,6 +40,7 @@ type
     function GetTypeIdByType(const aType: PMeType): LongInt; virtual;   {override}
   public
     destructor Destroy; virtual; //override
+    function GetRegisteredTypeByName(const aName: TMeIdentityString): PMeType; virtual; {override}
   end;
 
 implementation
@@ -64,6 +65,8 @@ begin
       //the internal type
       Inc(Result);
       Exit;
+    end
+    else begin //TODO: the aType is external type?
     end;
   end;
   Result := inherited GetTypeIdByType(aType);
@@ -75,11 +78,20 @@ begin
     Result := GRegisteredTypes.Items[aTypeId-1]
   else if (aTypeId < -1) then  //the external type
   begin
-    //TODO:
+    //TODO:GetType by the external type
     //Result := nil;
   end
   else
     Result := inherited GetTypeByTypeId(aTypeId);
+end;
+
+function TTurboRegisteredTypes.GetRegisteredTypeByName(const aName: TMeIdentityString): PMeType;
+begin
+  Result := inherited GetRegisteredTypeByName(aName);
+  if not Assigned(Result) then
+  begin
+    //TODO: try to find in external types.
+  end;
 end;
 
 initialization
