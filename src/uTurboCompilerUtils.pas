@@ -33,6 +33,7 @@ Type
   PTurboVarSymbol = ^ TTurboVarSymbol;
   PTurboMethodSymbol = ^ TTurboMethodSymbol;
   PTurboTypeSymbol = ^ TTurboTypeSymbol;
+  PTurboTypeRefSymbol = ^ TTurboTypeRefSymbol;
   PTurboModuleSymbol = ^ TTurboModuleSymbol;
 
   TTurboCustomSymbol = Object(TMeDynamicObject)
@@ -51,6 +52,8 @@ Type
     function IsNamed(const aModule: TCustomTurboModule): Boolean;
   public
     Visibility: TTurboVisibility;
+    {: the ModuleSymbol owns this symbol. }
+    ModuleSymbol: PTurboModuleSymbol;
   end;
 
   TTurboLabelSymbol = object(TTurboCustomSymbol)
@@ -87,7 +90,6 @@ Type
     //generate the op-code push const for the constant to the aModule
     procedure PushTo(const aModule: TCustomTurboModule); virtual;
   public
-    ModuleSymbol: PTurboModuleSymbol;
     property TurboType: PMeType read FTurboType write SetTurboType;
     property Value: TMeVarRec read FValue write FValue;
     property ValueStr: string read FValueStr write FValueStr;
@@ -115,6 +117,7 @@ Type
     procedure Init;virtual; {override}
     function GetLabels: PTurboSymbols;
     function GetTypeSymbol: PTurboTypeSymbol;
+    function GetTypeInfo: PMeProcType;
   public
     destructor Destroy; virtual; {override}
     procedure Assign(const aSymbol: PTurboCustomSymbol); virtual;
@@ -136,11 +139,11 @@ Type
     ModuleName: String;  //for external word
     ModuleType: TTurboModuleType;  //for external word
     //Module: TCustomTurboModule; //for external forth word
-    ModuleSymbol: PTurboModuleSymbol;
     ExternalOptions: TTurboExteralMethodOptions; //Exteral Word Options
     Entry: PTurboMethodEntry;
     property Labels: PTurboSymbols read GetLabels;
     property TypeSymbol: PTurboTypeSymbol read GetTypeSymbol;
+    property TypeInfo: PMeProcType read GetTypeInfo;
   end;
 
   {: the user defined type symbol.}
@@ -161,8 +164,18 @@ Type
     destructor Destroy; virtual; {override}
   public
     Entry: PTurboTypeInfoEntry;
-    ModuleSymbol: PTurboModuleSymbol;
     //Property TypeInfo: PMeType read GetTypeInfo;
+  end;
+
+  TTurboTypeRefSymbol = object(TTurboTypeSymbol)
+  public
+    procedure Assign(const aSymbol: PTurboCustomSymbol); virtual;
+  public
+    //use the TypeSymbol's entry:
+    //Entry: PTurboTypeRefEntry;
+    //this typeRef is Declared to RefModule in fact.
+    RefModule: PTurboModuleSymbol;
+    TypeId: tsInt;
   end;
 
   TTurboModuleSymbol = object(TTurboSymbol)
@@ -170,10 +183,12 @@ Type
     //collects methods in the Module.
     FMethods: PTurboSymbols;
     FTypes: PTurboTypeSymbols;
+    FTypeRefs: PTurboTypeSymbols;
     FVars: PTurboSymbols;
     FConsts: PTurboSymbols;
     FUsedModules: PTurboModuleSymbols;
   protected
+    function GetTypeRefs: PTurboTypeSymbols;
     function GetTypes: PTurboTypeSymbols;
     function GetVars: PTurboSymbols;
     function GetConsts: PTurboSymbols;
@@ -197,6 +212,7 @@ Type
     function NewConst(const aName: string): PTurboConstSymbol;
     function NewVar(const aName: string): PTurboVarSymbol;
     function NewType(const aName: string): PTurboTypeSymbol;
+    function NewMethod(const aName: string): PTurboMethodSymbol;
     //if true then apply external param to the aMethod
     function IsExternalMethod(const aMethod: PTurboMethodSymbol): Boolean;
     //当带常量的变量有动态数组，AnsiString 的时候需要在模块的程序头添加初始化过程：对变量分配内存，并将常量赋值给变量；在程序尾添加终止过程，释放变量内存，并最后加上halt指令。
@@ -207,6 +223,7 @@ Type
     ModuleType: TTurboModuleType;
     Module: TCustomTurboModule;
     property Types: PTurboTypeSymbols read GetTypes;
+    property TypeRefs: PTurboTypeSymbols read GetTypeRefs;
     property Vars: PTurboSymbols read GetVars;
     property Consts: PTurboSymbols read GetConsts;
     property Methods: PTurboSymbols read GetMethods;
@@ -365,6 +382,7 @@ begin
     with PTurboSymbol(aSymbol)^ do
     begin
       Self.Visibility := Visibility;
+      Self.ModuleSymbol := ModuleSymbol;
     end;
   Inherited;
 end;
@@ -428,7 +446,6 @@ begin
   if Assigned(aSymbol) and aSymbol.InheritsFrom(Self.ClassType) then
     with PTurboMethodSymbol(aSymbol)^ do
     begin
-      Self.ModuleSymbol := ModuleSymbol;
       Self.ModuleName := ModuleName;
       Self.CallStyle := CallStyle;
       Self.CodeFieldStyle := CodeFieldStyle;
@@ -475,10 +492,17 @@ begin
     Result := FiTypeSymbol
   else 
   begin
+    //no Assigned, Create a one.
     New(FiTypeSymbol, Create);
     FiTypeSymbol.ModuleSymbol := ModuleSymbol;
     Result := FiTypeSymbol;
+    //Result.GetTypeInfo(TypeOf(TMeProcType));
   end;
+end;
+
+function TTurboMethodSymbol.GetTypeInfo: PMeProcType;
+begin
+  Result := PMeProcType(TypeSymbol.GetTypeInfo(TypeOf(TMeProcType)));
 end;
 
 procedure TTurboMethodSymbol.DeclareTo(const aModule: TCustomTurboModule);
@@ -627,11 +651,7 @@ end;
 { TTurboModuleSymbol }
 destructor TTurboModuleSymbol.Destroy;
 begin
-  MeFreeAndNil(FMethods);
-  MeFreeAndNil(FUsedModules);
-  MeFreeAndNil(FVars);
-  MeFreeAndNil(FConsts);
-  MeFreeAndNil(FTypes);
+  Clear;
   Inherited;
 end;
 
@@ -663,6 +683,11 @@ begin
       else 
         MeFreeAndNil(Self.FTypes);
 
+      if Assigned(FTypeRefs) then
+        Self.TypeRefs.Assign(FTypeRefs)
+      else 
+        MeFreeAndNil(Self.FTypeRefs);
+
       if Assigned(FUsedModules) then
         Self.UsedModules.Assign(FUsedModules)
       else 
@@ -678,6 +703,7 @@ begin
   MeFreeAndNil(FVars);
   MeFreeAndNil(FConsts);
   MeFreeAndNil(FTypes);
+  MeFreeAndNil(FTypeRefs);
 end;
 
 function TTurboModuleSymbol.FindType(const aName: string): PMeType;
@@ -766,6 +792,15 @@ begin
     New(FUsedModules, Create);
   end;
   Result := FUsedModules;
+end;
+
+function TTurboModuleSymbol.GetTypeRefs: PTurboTypeSymbols;
+begin
+  if not Assigned(FTypeRefs) then
+  begin
+    New(FTypeRefs, Create);
+  end;
+  Result := FTypeRefs;
 end;
 
 function TTurboModuleSymbol.GetTypes: PTurboTypeSymbols;
@@ -928,6 +963,18 @@ begin
   else
     Result := nil;
 end;
+function TTurboModuleSymbol.NewMethod(const aName: string): PTurboMethodSymbol;
+begin
+  if (aName = '') or (Methods.IndexOf(aName) < 0) then
+  begin
+    New(Result, Create);
+    Result.Name := aName;
+    Result.ModuleSymbol := @Self;
+    if aName <> '' then Methods.Add(Result);
+  end
+  else
+    Result := nil;
+end;
 
 function TTurboModuleSymbol.NewType(const aName: string): PTurboTypeSymbol;
 begin
@@ -963,8 +1010,10 @@ end;
 procedure TTurboConstSymbol.Assign(const aSymbol: PTurboCustomSymbol);
 begin
   if Assigned(aSymbol) and aSymbol.InheritsFrom(Self.ClassType) then
+  begin
     AssignValue(PTurboConstSymbol(aSymbol));
-  Inherited;
+  end;
+  Inherited; //assign the name.
 end;
 
 procedure TTurboConstSymbol.AssignValue(const aConst: PTurboConstSymbol);
@@ -1278,7 +1327,6 @@ begin
       Self.Entry := Entry;
       Self.FTypeInfo := FTypeInfo;
       Self.FiType := FiType;
-      Self.ModuleSymbol := ModuleSymbol;
     end;
   Inherited;
 end;
@@ -1304,10 +1352,25 @@ begin
   else if Assigned(aClass) and MeInheritsFrom(aClass, TypeOf(TMeType)) then
   begin
     Result := PMeType(NewMeObject(aClass));
+    if Assigned(ModuleSymbol) and Assigned(ModuleSymbol.Module) then
+      Result.Owner := ModuleSymbol.Module.RegisteredTypes;
   end
   else 
     Result := nil;
 end;
+
+{ TTurboTypeRefSymbol }
+procedure TTurboTypeRefSymbol.Assign(const aSymbol: PTurboCustomSymbol);
+begin
+  if Assigned(aSymbol) and aSymbol.InheritsFrom(Self.ClassType) then
+    with PTurboTypeRefSymbol(aSymbol)^ do
+    begin
+      Self.RefModule := RefModule;
+      Self.TypeId := TypeId;
+    end;
+  Inherited;
+end;
+
 
 { TTurboSymbols }
 destructor TTurboSymbols.Destroy;
@@ -1495,4 +1558,19 @@ initialization
   SetMeVirtualMethod(TypeOf(TTurboMethodSymbol), ovtVmtParent, TypeOf(TTurboSymbol));
   SetMeVirtualMethod(TypeOf(TTurboModuleSymbol), ovtVmtParent, TypeOf(TTurboSymbol));
   SetMeVirtualMethod(TypeOf(TTurboTypeSymbol), ovtVmtParent, TypeOf(TTurboSymbol));
+  SetMeVirtualMethod(TypeOf(TTurboTypeRefSymbol), ovtVmtParent, TypeOf(TTurboTypeSymbol));
+
+  {$IFDEF MeRTTI_SUPPORT}
+  //Make the ovtVmtClassName point to PShortString class name
+  //SetMeVirtualMethod(TypeOf(TTurboCustomSymbol), ovtVmtClassName, @cMeObjectClassName);
+  SetMeVirtualMethod(TypeOf(TTurboCustomSymbol), ovtVmtClassName, nil);
+  SetMeVirtualMethod(TypeOf(TTurboSymbol), ovtVmtClassName, nil);
+  SetMeVirtualMethod(TypeOf(TTurboLabelSymbol), ovtVmtClassName, nil);
+  SetMeVirtualMethod(TypeOf(TTurboConstSymbol), ovtVmtClassName, nil);
+  SetMeVirtualMethod(TypeOf(TTurboVarSymbol), ovtVmtClassName, nil);
+  SetMeVirtualMethod(TypeOf(TTurboMethodSymbol), ovtVmtClassName, nil);
+  SetMeVirtualMethod(TypeOf(TTurboModuleSymbol), ovtVmtClassName, nil);
+  SetMeVirtualMethod(TypeOf(TTurboTypeSymbol), ovtVmtClassName, nil);
+  SetMeVirtualMethod(TypeOf(TTurboTypeRefSymbol), ovtVmtClassName, nil);
+  {$ENDIF}
 end.
