@@ -18,6 +18,9 @@ uses
   , uTurboExecutor
   ;
 
+Const
+  //the internal Main Entry procedure name.
+  cMainEntryProcName = '._Main_';
 
 Type
   //the Compiler option state
@@ -52,8 +55,8 @@ Type
     function IsNamed(const aModule: TCustomTurboModule): Boolean;
   public
     Visibility: TTurboVisibility;
-    {: the ModuleSymbol owns this symbol. }
-    ModuleSymbol: PTurboModuleSymbol;
+    {: the OwnerSymbol owns this symbol. }
+    OwnerSymbol: PTurboModuleSymbol;
   end;
 
   TTurboLabelSymbol = object(TTurboCustomSymbol)
@@ -382,7 +385,7 @@ begin
     with PTurboSymbol(aSymbol)^ do
     begin
       Self.Visibility := Visibility;
-      Self.ModuleSymbol := ModuleSymbol;
+      Self.OwnerSymbol := OwnerSymbol;
     end;
   Inherited;
 end;
@@ -494,7 +497,7 @@ begin
   begin
     //no Assigned, Create a one.
     New(FiTypeSymbol, Create);
-    FiTypeSymbol.ModuleSymbol := ModuleSymbol;
+    FiTypeSymbol.OwnerSymbol := OwnerSymbol;
     Result := FiTypeSymbol;
     //Result.GetTypeInfo(TypeOf(TMeProcType));
   end;
@@ -606,24 +609,24 @@ begin
         case CallStyle of
           ccForth:
           begin
-            if Assigned(ModuleSymbol) and Assigned(ModuleSymbol.Module) then
+            if Assigned(OwnerSymbol) and Assigned(OwnerSymbol.Module) then
             begin
               if CFA = -1 then
               begin
                 if ExternalOptions.Name <> '' then
-                  CFA := ModuleSymbol.Module.GetWordCFA(ExternalOptions.Name)
+                  CFA := OwnerSymbol.Module.GetWordCFA(ExternalOptions.Name)
                 else
-                  CFA := ModuleSymbol.Module.GetWordCFA(Name);
+                  CFA := OwnerSymbol.Module.GetWordCFA(Name);
               end;
               if CFA <> -1 then
               begin
                 aModule.AddOpToMem(opCallFar);
-                //writeln(Name, '.ModEntry:',Integer(ModuleSymbol.Entry)- Integer(aModule.DataMemory));
+                //writeln(Name, '.ModEntry:',Integer(OwnerSymbol.Entry)- Integer(aModule.DataMemory));
                 //point to the TurboModuleInfo
                 if not Assigned(ExternalOptions.ModuleRef) then
                 begin
-                  ModuleSymbol.DeclareTo(aModule);
-                  ExternalOptions.ModuleRef := Pointer(Integer(ModuleSymbol.Entry) + SizeOf(tsPointer));
+                  OwnerSymbol.DeclareTo(aModule);
+                  ExternalOptions.ModuleRef := Pointer(Integer(OwnerSymbol.Entry) + SizeOf(tsPointer));
                 end;
                 //writeln(Name, '.ModRef:',Integer(ExternalOptions.ModuleRef) - Integer(aModule.DataMemory));
                 aModule.AddIntToMem(Integer(ExternalOptions.ModuleRef) - Integer(aModule.DataMemory));
@@ -760,7 +763,7 @@ begin
         Result.ModuleType := mtLib;
         Result.ModuleName := Name;
         //Result.Module := Module;
-        Result.ModuleSymbol := @Self;
+        Result.OwnerSymbol := @Self;
         Result.Entry := vMethodEntry;
         Methods.Add(Result);
     end;
@@ -830,12 +833,12 @@ begin
     i := UsedModules.Count -1;
     if i >= 0 then
     begin
-      aMethod.ModuleSymbol := UsedModules.Items[i];
-      aMethod.ModuleName := aMethod.ModuleSymbol.Name;
+      aMethod.OwnerSymbol := UsedModules.Items[i];
+      aMethod.ModuleName := aMethod.OwnerSymbol.Name;
     end
     else
     begin 
-      aMethod.ModuleSymbol := nil;
+      aMethod.OwnerSymbol := nil;
       //SynError(cDLLModuleMissError, aWord.Name);
     end;
   end
@@ -845,23 +848,23 @@ begin
     if i < 0 then i := AddUsedModule(aMethod.ModuleName, aMethod.ModuleType);
     if i >= 0 then
     begin
-      aMethod.ModuleSymbol := UsedModules.Items[i];
+      aMethod.OwnerSymbol := UsedModules.Items[i];
     end
     else
     begin 
       //writeln('Can not add used module:' + aMethod.ModuleName);
       //SynError(cDLLModuleMissError, 'Can not add used module:' + aWord.ModuleName);
-      aMethod.ModuleSymbol := nil;
+      aMethod.OwnerSymbol := nil;
     end;
   end;
 
-  Result := Assigned(aMethod.ModuleSymbol); 
+  Result := Assigned(aMethod.OwnerSymbol); 
   if Result then
   begin
-    Result := Assigned(aMethod.ModuleSymbol.FindLocalMethod(aMethod.Name));
-    if Result and Assigned(aMethod.ModuleSymbol.Entry) then
+    Result := Assigned(aMethod.OwnerSymbol.FindLocalMethod(aMethod.Name));
+    if Result and Assigned(aMethod.OwnerSymbol.Entry) then
     begin
-      aMethod.ExternalOptions.ModuleRef := Pointer(Integer(aMethod.ModuleSymbol.Entry) + SizeOf(tsPointer));
+      aMethod.ExternalOptions.ModuleRef := Pointer(Integer(aMethod.OwnerSymbol.Entry) + SizeOf(tsPointer));
     end
     else
       aMethod.ExternalOptions.ModuleRef := nil;
@@ -944,7 +947,7 @@ begin
   begin
     New(Result, Create);
     Result.Name := aName;
-    Result.ModuleSymbol := @Self;
+    Result.OwnerSymbol := @Self;
     if aName <> '' then Consts.Add(Result);
   end
   else
@@ -957,7 +960,7 @@ begin
   begin
     New(Result, Create);
     Result.Name := aName;
-    Result.ModuleSymbol := @Self;
+    Result.OwnerSymbol := @Self;
     if aName <> '' then Vars.Add(Result);
   end
   else
@@ -969,7 +972,7 @@ begin
   begin
     New(Result, Create);
     Result.Name := aName;
-    Result.ModuleSymbol := @Self;
+    Result.OwnerSymbol := @Self;
     if aName <> '' then Methods.Add(Result);
   end
   else
@@ -982,7 +985,7 @@ begin
   begin
     New(Result, Create);
     Result.Name := aName;
-    Result.ModuleSymbol := @Self;
+    Result.OwnerSymbol := @Self;
     if aName <> '' then Types.Add(Result);
   end
   else
@@ -1045,10 +1048,10 @@ begin
   end
   else if Assigned(aType) then
   begin
-    Result := Assigned(ModuleSymbol);
+    Result := Assigned(OwnerSymbol);
     if Result then
     begin
-      i:= Integer(ModuleSymbol.FindLocalConst(aValue, aType));
+      i:= Integer(OwnerSymbol.FindLocalConst(aValue, aType));
       Result := i <> 0;
       if Result then
         AssignValue(PTurboConstSymbol(i));
@@ -1146,14 +1149,14 @@ begin
         Result := False;
       end;
 
-      if not Assigned(aType) and Assigned(ModuleSymbol) then
+      if not Assigned(aType) and Assigned(OwnerSymbol) then
       begin
-        i := ModuleSymbol.Consts.IndexOf(aValue);
+        i := OwnerSymbol.Consts.IndexOf(aValue);
         Result := i >= 0;
         if Result then
         begin
           ValueStr := aValue;
-          AssignValue(PTurboConstSymbol(ModuleSymbol.Consts.Items[i]));
+          AssignValue(PTurboConstSymbol(OwnerSymbol.Consts.Items[i]));
           aType := FTurboType;
         end;
       end; //}
@@ -1352,8 +1355,8 @@ begin
   else if Assigned(aClass) and MeInheritsFrom(aClass, TypeOf(TMeType)) then
   begin
     Result := PMeType(NewMeObject(aClass));
-    if Assigned(ModuleSymbol) and Assigned(ModuleSymbol.Module) then
-      Result.Owner := ModuleSymbol.Module.RegisteredTypes;
+    if Assigned(OwnerSymbol) and Assigned(OwnerSymbol.Module) then
+      Result.Owner := OwnerSymbol.Module.RegisteredTypes;
   end
   else 
     Result := nil;
