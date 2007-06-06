@@ -12,6 +12,42 @@ TODO:
   需要查找堆栈有关的操作修改之！
 !* [Bug] ModuleParent is not set or convert to related or absolute address!
 
+2007-6-6 13:20
+~ TTurboModuleRefSymbol:  将其从 TTurboModuleSymbol 分离出来
+  发现无法分离，都需要！ 最后结论不分！
+
++ const cMainEntryProcName
+* rename TTurboSymbol.ModuleSymbol to OwnerSymbol
+
+2007-6-5 7:09
+* [Bug] issue #6[Done] MeType 如果以后使用模块内存管理（到了内存限制，自动释放模块内存），那么在 MeType 内，引用了外部的 MeType 类型的，将出现错误，因为模块内存被释放
+  方案：
+  1、模块内存不释放 MeType，加载后一直保存与内存中。
+     注意再次从流加载的时候必须跳过MeTypes这段！！，这需要俺将 MeTypes 的长度预先存于流中。
+  2、修改 MeType 类型：
+    为每一个引用的类型增加内部字段： FXXXTypeId: Integer，当 FXXXTypeId 不等于 0的时候表示该引用类型为外部类型。
+    为每一个引用的类型建立属性读方法： Property XXXType: PMeType read GetXXXType;
+    在 GetXXXType 方法中判断获取真实的MeType.
+  方案一简单，选择它！
+!+ 实现 JITExecutor，很简单的：
+  实现一个ivmNext与前类似，只不过不用查表，直接跳转。读取进来的就是入口地址，直接跳转即可！
+  建立派生TTurboJITModule类，增加一个代码内存: FBin: Pointer,翻译后的代码放在这里，代码为那些VM过程的执行入口地址，其它不变。
+  建立TTurboTranslator(TTurboX86Translator),将VM代码翻译为能直接执行的机器语言。
+  为何要JIT执行？意义如下：
+  1、提高执行速度
+  2、执行前检查代码的有效性和合法性，构建安全代码。
+  
+2007-6-4 13:57
+~ 编译器所作的工作：
+  分词(Scanner) ，识别词(Tokenizer)
+  然后由 Compiler 采集数据到语法树上，根据各种条件，确定哪些符号会被最终
+  编入内存。
+
+  俺觉得自然语言的翻译流程也是如此。
+  分段：每一段有若干中心点。
+  分句：每句都有一个中心点，整个句子围绕该中心点描述。
+  同时要做好对前一句中心（或本段的所有中心点）点纳入本句分析。
+
 2007-6-3 14:28
 * [Bug] issue 0000002[Done]: [TurboScript] Executor 定义外部函数后，在程序中调用该函数导致执行器严重出错！
   when call the external function "Add". the tsrun raise fatal error!

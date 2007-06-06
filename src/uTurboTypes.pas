@@ -40,6 +40,8 @@ type
     function GetTypeIdByType(const aType: PMeType): LongInt; virtual;   {override}
   public
     destructor Destroy; virtual; //override
+    function FindLocalType(const aName: TMeIdentityString): PMeType;
+    {: search local types and external types at runtime.}
     function GetRegisteredTypeByName(const aName: TMeIdentityString): PMeType; virtual; {override}
   end;
 
@@ -85,9 +87,14 @@ begin
     Result := inherited GetTypeByTypeId(aTypeId);
 end;
 
-function TTurboRegisteredTypes.GetRegisteredTypeByName(const aName: TMeIdentityString): PMeType;
+function TTurboRegisteredTypes.FindLocalType(const aName: TMeIdentityString): PMeType;
 begin
   Result := inherited GetRegisteredTypeByName(aName);
+end;
+
+function TTurboRegisteredTypes.GetRegisteredTypeByName(const aName: TMeIdentityString): PMeType;
+begin
+  Result := FindLocalType(aName);
   if not Assigned(Result) then
   begin
     //TODO: try to find in external types.

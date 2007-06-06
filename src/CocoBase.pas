@@ -1225,7 +1225,7 @@ begin
   if i >= 0 then
     vWord := PTurboMethodSymbol(FModuleSymbol.Methods.Items[i])
   else begin
-    vWord := FModuleSymbol.UsedModules.FindMethod(aName);
+    vWord := FModuleSymbol.UsedModules.FindMethodSymbol(aName);
   end;
 
   if Assigned(vWord) then //with vWord^ do

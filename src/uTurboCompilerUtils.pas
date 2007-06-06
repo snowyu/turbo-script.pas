@@ -203,8 +203,10 @@ Type
     procedure Clear;
     procedure Assign(const aSymbol: PTurboCustomSymbol); virtual;
     function FindType(const aName: string): PMeType;
-    function FindLocalMethod(const aName: string): PTurboMethodSymbol;
-    function FindLocalConst(const aName: string; const aType: PMeType): PTurboConstSymbol;
+    //function FindLocalType(const aName: string): PMeType;
+    function FindLocalTypeSymbol(const aName: string): PTurboTypeSymbol;
+    function FindLocalMethodSymbol(const aName: string): PTurboMethodSymbol;
+    function FindLocalConstSymbol(const aName: string; const aType: PMeType): PTurboConstSymbol;
     function AddUsedModule(const aName: String; const aModuleType: TTurboModuleType): Integer;
     procedure DeclareTo(const aModule: TCustomTurboModule);
     function IsUniqueIdentifier(const aName: String): Boolean;
@@ -255,7 +257,8 @@ Type
     function Find(const aName: string; const aModuleType: TTurboModuleType): PTurboModuleSymbol;overload;
     function Find(const aModule: TCustomTurboModule): PTurboModuleSymbol;overload;
     function Find(const aModuleEntry: PTurboModuleRefEntry): PTurboModuleSymbol;overload;
-    function FindMethod(const aName: string; const aModuleType: TTurboModuleType = mtLib): PTurboMethodSymbol;
+    function FindMethodSymbol(const aName: string; const aModuleType: TTurboModuleType = mtLib): PTurboMethodSymbol;
+    function FindTypeSymbol(const aName: string): PTurboTypeSymbol;
   public
     property Items[Index: Integer]: PTurboModuleSymbol read GetItem; default;
   end;
@@ -712,11 +715,14 @@ end;
 function TTurboModuleSymbol.FindType(const aName: string): PMeType;
 begin
   //find local type:
-  Result := PMeType(Types.Find(aName));
+  Result := PMeType(FindLocalTypeSymbol(aName));
   if Assigned(Result) then
     Result := PTurboTypeSymbol(Result).GetTypeInfo;
-  if not Assigned(Result) then
-  begin //TODO: find external type:
+  if not Assigned(Result) and Assigned(FUsedModules) then
+  begin // find external type:
+    Result := PMeType(FUsedModules.FindTypeSymbol(aName));
+    if Assigned(Result) then
+      Result := PTurboTypeSymbol(Result).GetTypeInfo;
   end;
 
   if not Assigned(Result) then
@@ -725,7 +731,25 @@ begin
   end;
 end;
 
-function TTurboModuleSymbol.FindLocalConst(const aName: string; const aType: PMeType): PTurboConstSymbol;
+function TTurboModuleSymbol.FindLocalTypeSymbol(const aName: string): PTurboTypeSymbol;
+Var
+  vType: PMeType;
+begin
+  //find local type:
+  Result := Types.Find(aName);
+  if not Assigned(Result) and Assigned(Module) then
+  begin //search on the module:
+    vType := Module.RegisteredTypes.FindLocalType(aName);
+    if Assigned(vType) then
+    begin
+      //add to Types cache
+      Result := NewType(aName);
+      Result.FTypeInfo := vType;
+    end;
+  end;
+end;
+
+function TTurboModuleSymbol.FindLocalConstSymbol(const aName: string; const aType: PMeType): PTurboConstSymbol;
 var
   i: Integer;
 begin
@@ -744,7 +768,7 @@ begin
   Result := nil;
 end;
 
-function TTurboModuleSymbol.FindLocalMethod(const aName: string): PTurboMethodSymbol;
+function TTurboModuleSymbol.FindLocalMethodSymbol(const aName: string): PTurboMethodSymbol;
 var
   vMethodEntry: PTurboMethodEntry;
 begin
@@ -765,7 +789,7 @@ begin
         //Result.Module := Module;
         Result.OwnerSymbol := @Self;
         Result.Entry := vMethodEntry;
-        Methods.Add(Result);
+        Methods.Add(Result); //cache this method!
     end;
   end;
 end;
@@ -861,7 +885,7 @@ begin
   Result := Assigned(aMethod.OwnerSymbol); 
   if Result then
   begin
-    Result := Assigned(aMethod.OwnerSymbol.FindLocalMethod(aMethod.Name));
+    Result := Assigned(aMethod.OwnerSymbol.FindLocalMethodSymbol(aMethod.Name));
     if Result and Assigned(aMethod.OwnerSymbol.Entry) then
     begin
       aMethod.ExternalOptions.ModuleRef := Pointer(Integer(aMethod.OwnerSymbol.Entry) + SizeOf(tsPointer));
@@ -1051,7 +1075,7 @@ begin
     Result := Assigned(OwnerSymbol);
     if Result then
     begin
-      i:= Integer(OwnerSymbol.FindLocalConst(aValue, aType));
+      i:= Integer(OwnerSymbol.FindLocalConstSymbol(aValue, aType));
       Result := i <> 0;
       if Result then
         AssignValue(PTurboConstSymbol(i));
@@ -1486,7 +1510,7 @@ begin
     Result := nil;
 end;
 
-function TTurboModuleSymbols.FindMethod(const aName: string; const aModuleType: TTurboModuleType): PTurboMethodSymbol;
+function TTurboModuleSymbols.FindMethodSymbol(const aName: string; const aModuleType: TTurboModuleType): PTurboMethodSymbol;
 var
   i: integer;
 begin
@@ -1495,9 +1519,22 @@ begin
   begin
     if ModuleType = aModuleType then
     begin
-      Result := FindLocalMethod(aName);
+      Result := FindLocalMethodSymbol(aName);
       if Assigned(Result) then exit;
     end;
+  end;
+  Result := nil;
+end;
+
+function TTurboModuleSymbols.FindTypeSymbol(const aName: string): PTurboTypeSymbol;
+var
+  i: integer;
+begin
+  for i := 0 to Count - 1 do
+  with Items[i]^ do
+  begin
+    Result := FindLocalTypeSymbol(aName);
+    if Assigned(Result) then exit;
   end;
   Result := nil;
 end;
