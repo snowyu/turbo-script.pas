@@ -12,6 +12,15 @@ TODO:
   需要查找堆栈有关的操作修改之！
 !* [Bug] ModuleParent is not set or convert to related or absolute address!
 
+2007-6-7 9:09
+!* 可以将 TTurboModuleSymbol.Entry 提出来，避免混淆. 
+  !+ 建立一个： TTurboModuleSymbol.FModuleRefEntries: PMeList 属性，收集本模块所有的 ModuleRefEntry.
+     或者考虑建立 ModuleRefSymbol： ModuleSymbol; Entry.
+!+ 在MethodSymbol上添加 UnResolvedRefList 引用列表，保存所有的调用该Method的未解决的引用地址。
+  该 UnResolvedRefList 仅当本方法为 Private的时候才被使用！
+!* 模块中的 Init, Final 两个指针必须要！！在本地过程的iVMCall中判断初始化，如果没有做初始化，则压入当前地址，先调用初始化过程！
+  而Final 则是在卸载内存的时候判断，如果已作初始化，那么就调用Final！
+
 2007-6-6 13:20
 ~ TTurboModuleRefSymbol:  将其从 TTurboModuleSymbol 分离出来
   发现无法分离，都需要！ 最后结论不分！
