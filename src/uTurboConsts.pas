@@ -227,9 +227,10 @@ type
     opTestIfFalse,//(bool -- bool) Jump if current data-stack is false, without removing value from stack
     opTestIfTrue, //(bool -- bool) Jump if current data-stack is true, without removing value from stack
     opExecute, //call(EXECUTE) the private word (CFA -- )
-    opCallFar,  //inCallFar PTurboModuleEntry(offset of Memory) cfa-addr
+    opCallFar,  //inCallFar<PTurboModuleRefInfo>(offset of Memory) cfa-addr
+    opCallExt,  ////call external function: opCallExt<PTurboMethodInfo>(offset of Memory)
     //inReturn, //= opExit
-    opSwitch, //opSwitch<n[u-int32], t1,...,tn>  t1..tn is offsets(positive or negative) address 
+    opSwitch, //opSwitch<n[uint32], t1,...,tn>  t1..tn is offsets(positive or negative) address 
               //(i -- ) i = 0..n-1   
     opWhile, //inWhile whileEnd-addr (bool -- )
     opRepeat, //inRepeat RepeatEnd-addr (bool -- )
@@ -282,12 +283,12 @@ type
     @param errOutMem 代码区内存无可用的空间
     @param errOutOfMetaData MetaData区已无可用的空间
   }
-  TTurboProcessorErrorCode = (errNone, errBadInstruction, errDizZero
+  TTurboProcessorErrorCode = (errNone, errBadInstruction, errInstructionBadParam, errDizZero
     , errModuleNotFound
     , errOutOfMem
     , errOutOfMetaData
     , errOutOfDataStack, errOutOfReturnStack
-    , errAssertionFailed 
+    , errAssertionFailed  
   );
 
   
