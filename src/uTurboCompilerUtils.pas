@@ -38,13 +38,49 @@ Type
   PTurboTypeSymbol = ^ TTurboTypeSymbol;
   PTurboTypeRefSymbol = ^ TTurboTypeRefSymbol;
   PTurboModuleSymbol = ^ TTurboModuleSymbol;
+  PTurboStatementSymbol = ^ TTurboStatementSymbol;
+  PTurboOpStatementSymbol = ^ TTurboOpStatementSymbol;
 
+  {: abstract Symbol }
   TTurboCustomSymbol = Object(TMeDynamicObject)
   public
     destructor Destroy; virtual; {override}
     procedure Assign(const aSymbol: PTurboCustomSymbol); virtual;
   public
     Name: String;
+  end;
+
+  {: abstract Statement Symbol }
+  {
+    Note: this would slow down the compiling speed.
+  }
+  TTurboStatementSymbol = Object(TTurboCustomSymbol)
+  protected
+    //to generate new VMT for it.
+    //class function ParentClassAddress: TMeClass;virtual;abstract;
+  public
+    procedure Assign(const aSymbol: PTurboCustomSymbol); virtual;
+  public
+    {: the OwnerSymbol owns this symbol. }
+    OwnerSymbol: PTurboMethodSymbol;
+  end;
+
+  {: the VM Instruction Statement Symbol. }
+  TTurboOpParamRec = packed record
+    case integer of
+      1: (i: tsInt; ii: tsInt);
+      2: (i8: Int64);
+      3: (s: single);
+      4: (d: double);
+      5: (c: Currency);
+  end;
+
+  TTurboOpStatementSymbol = Object(TTurboStatementSymbol)
+  public
+    procedure Assign(const aSymbol: PTurboCustomSymbol); virtual;
+  public
+    Instruction: TTurboVMInstruction;
+    Param: TTurboOpParamRec;
   end;
 
   TTurboSymbol = Object(TTurboCustomSymbol)
@@ -138,7 +174,7 @@ Type
     //the Param Field Length
     //该函数主体的长度 
     ParamFieldLength: LongWord; //this is in the Entry.
-    CFA: tsInt;//the offset address of the memory.
+    CFA: tsInt;//the offset address of the memory. -1 means not declare to Module.Memory
     ModuleName: String;  //for external word
     ModuleType: TTurboModuleType;  //for external word
     //Module: TCustomTurboModule; //for external forth word
@@ -513,7 +549,7 @@ end;
 
 procedure TTurboMethodSymbol.DeclareTo(const aModule: TCustomTurboModule);
 begin
-  if not Assigned(Entry) then
+  if CFA = -1 then
   begin
     if CodeFieldStyle = cfsFunction then
     begin
@@ -553,7 +589,7 @@ procedure TTurboMethodSymbol.DeclareEndTo(const aModule: TCustomTurboModule);
 var
   vIsPublic: Boolean;
 begin
-  if (CodeFieldStyle = cfsFunction) and Assigned(Entry) then
+  if (CodeFieldStyle = cfsFunction) and (CFA <> -1) then
   begin
     vIsPublic := IsPublic(aModule);
     if vIsPublic then
@@ -1398,6 +1434,28 @@ begin
   Inherited;
 end;
 
+{ TTurboStatementSymbol }
+procedure TTurboStatementSymbol.Assign(const aSymbol: PTurboCustomSymbol); 
+begin
+  if Assigned(aSymbol) and aSymbol.InheritsFrom(Self.ClassType) then
+    with PTurboStatementSymbol(aSymbol)^ do
+    begin
+      Self.OwnerSymbol := OwnerSymbol;
+    end;
+  Inherited;
+end;
+
+{ TTurboOpStatementSymbol }
+procedure TTurboOpStatementSymbol.Assign(const aSymbol: PTurboCustomSymbol); 
+begin
+  if Assigned(aSymbol) and aSymbol.InheritsFrom(Self.ClassType) then
+    with PTurboOpStatementSymbol(aSymbol)^ do
+    begin
+      Self.Instruction := Instruction;
+      Self.Param := Param;
+    end;
+  Inherited;
+end;
 
 { TTurboSymbols }
 destructor TTurboSymbols.Destroy;
@@ -1600,6 +1658,9 @@ initialization
   SetMeVirtualMethod(TypeOf(TTurboTypeSymbol), ovtVmtParent, TypeOf(TTurboSymbol));
   SetMeVirtualMethod(TypeOf(TTurboTypeRefSymbol), ovtVmtParent, TypeOf(TTurboTypeSymbol));
 
+  SetMeVirtualMethod(TypeOf(TTurboStatementSymbol), ovtVmtParent, TypeOf(TTurboCustomSymbol));
+  SetMeVirtualMethod(TypeOf(TTurboOpStatementSymbol), ovtVmtParent, TypeOf(TTurboStatementSymbol));
+
   {$IFDEF MeRTTI_SUPPORT}
   //Make the ovtVmtClassName point to PShortString class name
   //SetMeVirtualMethod(TypeOf(TTurboCustomSymbol), ovtVmtClassName, @cMeObjectClassName);
@@ -1612,5 +1673,8 @@ initialization
   SetMeVirtualMethod(TypeOf(TTurboModuleSymbol), ovtVmtClassName, nil);
   SetMeVirtualMethod(TypeOf(TTurboTypeSymbol), ovtVmtClassName, nil);
   SetMeVirtualMethod(TypeOf(TTurboTypeRefSymbol), ovtVmtClassName, nil);
+
+  SetMeVirtualMethod(TypeOf(TTurboStatementSymbol), ovtVmtClassName, nil);
+  SetMeVirtualMethod(TypeOf(TTurboOpStatementSymbol), ovtVmtClassName, nil);
   {$ENDIF}
 end.
