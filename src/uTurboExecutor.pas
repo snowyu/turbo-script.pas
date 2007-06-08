@@ -635,20 +635,14 @@ type
     Prior: Pointer;
     MetaInfo: TTurboMetaInfo;
   end;
+  //aMem 负数 表示UnResolve(AbsolutedToRelated)
   TTurboEntryItemEventProc = procedure(const aEntry: PTurboEntry
     ; const aMem: Pointer
-    ; const IsResolved: Boolean
+    //; const IsResolved: Boolean
   );
   
-procedure TurboConvertAddrRelatedToAbsolute(Mem: Pointer; Data:
-        PTurboPreservedDataMemory);
-procedure TurboConvertAddrAbsoluteToRelated(Mem: Pointer; Data:
-        PTurboPreservedDataMemory);
-
-{: walk-throughout all the entry}
-procedure ForEachTurboEntry(aEntry: PTurboEntry; const aDoOnItem:
-        TTurboEntryItemEventProc; const Mem: Pointer = nil; const IsResolved:
-        Boolean = True);
+procedure ConvertTurboMetaInfoEntryAddr(MetaData: PTurboPreservedDataMemory;
+        const IsResolved: Boolean);
 
 //remove registered types of this module
 //procedure RemoveModuleTypes(const aModuleName: string);
@@ -664,6 +658,33 @@ uses
 
 const
   cCurrentModuleFileForamtVersionNo = 1; 
+
+{: walk-throughout all the entry}
+{
+  @param aDoOnItem  the (un)resolve address item prcoedure.
+  @param Mem        the base Mem
+                     Mem < 0 means UnResolve all the addresses
+                     Mem > 0 means Resolve all the addresses
+}
+procedure ForEachTurboEntry(aEntry: PTurboEntry; const aDoOnItem:
+        TTurboEntryItemEventProc; const Mem:
+        Pointer 
+        //; const IsResolved: Boolean = True
+);
+begin
+  if Assigned(aEntry) and Assigned(aDoOnItem) then
+  begin
+    if Integer(Mem) < 0 then //restore the absoulte addr.
+      Integer(aEntry) := Integer(aEntry) - Integer(Mem);
+    while Assigned(aEntry) do
+    begin
+      aDoOnItem(aEntry, Mem);
+      aEntry := aEntry.Prior;
+      if Assigned(aEntry) and (Integer(Mem) < 0) then 
+        Integer(aEntry) := Integer(aEntry) - Integer(Mem);
+    end;
+  end;
+end;
 
 function TTurboGlobalOptions.GetIsRunning(): Boolean;
 begin
@@ -1340,7 +1361,6 @@ end;
 procedure TCustomTurboModule.NotifyModuleUnloaded(Sender: TObject);
 var
   vModuleRef: PTurboModuleRefEntry;
-  vTypeRef: PTurboTypeRefEntry;
 begin
   if (Sender = FOwner) and StoredInOwner then
   begin
@@ -1407,7 +1427,7 @@ end;
 
 procedure TCustomTurboModule.ResolveAddress;
 begin
-  TurboConvertAddrRelatedToAbsolute(FMemory, FDataMemory);
+  ConvertTurboMetaInfoEntryAddr(FDataMemory, True);
 end;
 
 procedure TCustomTurboModule.SaveToFile(const aFileName: String);
@@ -1438,7 +1458,7 @@ begin
   vHeader.BuildDate := ModuleDate;
   aStream.WriteBuffer(vHeader, SizeOf(TTurboModuleStreamHeader));
 
-  if IsAddrResolved then TurboConvertAddrAbsoluteToRelated(FMemory, FDataMemory);
+  if IsAddrResolved then UnResolveAddress;
 
   vPos := aStream.Position;
   I := 0;
@@ -1494,7 +1514,7 @@ begin
   }
   end;
 
-  if IsAddrResolved then TurboConvertAddrRelatedToAbsolute(FMemory, FDataMemory);
+  if IsAddrResolved then ResolveAddress;
 end;
 
 procedure TCustomTurboModule.SendUnloadNotification;
@@ -1694,7 +1714,8 @@ end;
 
 procedure TCustomTurboModule.UnResolveAddress;
 begin
-  TurboConvertAddrAbsoluteToRelated(FMemory, FDataMemory);
+  //TurboConvertAddrAbsoluteToRelated(FMemory, FDataMemory);
+  ConvertTurboMetaInfoEntryAddr(FDataMemory, False);
 end;
 
 {
@@ -2149,169 +2170,140 @@ begin
 end;
 
 
-procedure ForEachTurboEntry(aEntry: PTurboEntry; const aDoOnItem:
-        TTurboEntryItemEventProc; const Mem: Pointer = nil; const IsResolved:
-        Boolean = True);
+procedure DoTurboEntryItemProc(const aEntry: PTurboEntry
+    ; const aMem: Pointer
+    //; const IsResolved: Boolean
+  );
 begin
-  if Assigned(aEntry) and Assigned(aDoOnItem) then
+  with aEntry^ do
   begin
-    if not IsResolved then
-      Integer(aEntry) := Integer(aEntry) + Integer(Mem);
-    while Assigned(aEntry) do
-    begin
-      aDoOnItem(aEntry, Mem, IsResolved);
-      aEntry := aEntry.Prior;
-      if Assigned(aEntry) and not IsResolved then 
-        Integer(aEntry) := Integer(aEntry) + Integer(Mem);
-    end;
+    if Prior <> nil then
+      Integer(Prior) := Integer(Prior) + Integer(aMem);
+    if Assigned(MetaInfo.Name) then
+        MetaInfo.Name := Pointer(Integer(MetaInfo.Name) + Integer(aMem));
   end;
 end;
 
-procedure TurboConvertEntryRelatedToAbsolute(Mem: Pointer; var aEntry: PTurboEntry);
-var
-  vEntry: PTurboEntry; 
+procedure DoStaticFieldEntryItemProc(const aEntry: PTurboEntry
+    ; const aMem: Pointer
+    //; const IsResolved: Boolean
+  );
+begin
+  with PTurboStaticFieldEntry(aEntry)^ do
+  begin
+    if Prior <> nil then
+      Integer(Prior) := Integer(Prior) + Integer(aMem);
+    if Assigned(Variable.Name) then
+        Variable.Name := Pointer(Integer(Variable.Name) + Integer(aMem));
+    if Assigned(Variable.TypeInfo) then
+        Variable.TypeInfo := Pointer(Integer(Variable.TypeInfo) + Integer(aMem));  
+  end;
+end;
+
+procedure DoMethodEntryItemProc(const aEntry: PTurboEntry
+    ; const aMem: Pointer
+    //; const IsResolved: Boolean
+  );
+begin
+  with PTurboMethodEntry(aEntry)^ do
+  begin
+    if Prior <> nil then
+      Integer(Prior) := Integer(Prior) + Integer(aMem);
+    if Assigned(Word.Name) then
+        Word.Name := Pointer(Integer(Word.Name) + Integer(aMem));
+    if Word.IsExternal then
+    begin
+      with Word.GetExternalOptionsAddr^ do
+        if Assigned(ModuleRef) then
+          ModuleRef := Pointer(Integer(ModuleRef) + Integer(aMem));
+    end;  
+  end;
+end;
+
+procedure DoTypeRefEntryItemProc(const aEntry: PTurboEntry
+    ; const aMem: Pointer
+    //; const IsResolved: Boolean
+  );
+begin
+  with PTurboTypeRefEntry(aEntry)^ do
+  begin
+    if Prior <> nil then
+      Integer(Prior) := Integer(Prior) + Integer(aMem);
+    if Assigned(TypeRef.Name) then
+        TypeRef.Name := Pointer(Integer(TypeRef.Name) + Integer(aMem));
+    if Assigned(TypeRef.ModuleRef) then
+    begin
+      TypeRef.ModuleRef := Pointer(Integer(TypeRef.ModuleRef) + Integer(aMem));
+    end;  
+  end;
+end;
+
+procedure ConvertTurboEntry(const Mem: Pointer; var aEntry: PTurboEntry
+  //; const IsResolved: Boolean
+);
 begin
   if Assigned(aEntry) then
   begin
     Integer(aEntry) := Integer(aEntry) + Integer(Mem);
-    vEntry := aEntry;
-    while Assigned(vEntry) do
-    begin
-      if vEntry.Prior <> nil then
-        Integer(vEntry.Prior) := Integer(vEntry.Prior) + Integer(Mem);
-      if Assigned(vEntry.MetaInfo.Name) then
-        vEntry.MetaInfo.Name := Pointer(Integer(vEntry.MetaInfo.Name) + Integer(Mem));
-      vEntry := vEntry.Prior;   
-    end;
+    ForEachTurboEntry(aEntry, DoTurboEntryItemProc, Mem);
   end;
 end;
 
-procedure TurboConvertVarEntryRelatedToAbsolute(Mem: Pointer; var aEntry:
-        PTurboStaticFieldEntry);
-var
-  vEntry: PTurboStaticFieldEntry;
+procedure ConvertTurboStaticFieldEntry(const Mem: Pointer ; var aEntry:
+        PTurboStaticFieldEntry 
+        //; const IsResolved: Boolean
+);
 begin
   if Assigned(aEntry) then
   begin
     Integer(aEntry) := Integer(aEntry) + Integer(Mem);
-    vEntry := aEntry;
-    while Assigned(vEntry) do
-    begin
-      if vEntry.Prior <> nil then
-        Integer(vEntry.Prior) := Integer(vEntry.Prior) + Integer(Mem);
-      if Assigned(vEntry.Variable.Name) then
-        vEntry.Variable.Name := Pointer(Integer(vEntry.Variable.Name) + Integer(Mem));
-      if Assigned(vEntry.Variable.TypeInfo) then
-        vEntry.Variable.TypeInfo := Pointer(Integer(vEntry.Variable.TypeInfo) + Integer(Mem));  
-      vEntry := vEntry.Prior;   
-    end;
+    ForEachTurboEntry(PTurboEntry(aEntry), DoStaticFieldEntryItemProc, Mem);
   end;
 end;
 
-procedure TurboConvertAddrRelatedToAbsolute(Mem: Pointer; Data:
-        PTurboPreservedDataMemory);
+procedure ConvertTurboMethodEntry(const Mem: Pointer ; var aEntry:
+        PTurboMethodEntry 
+        //; const IsResolved: Boolean
+);
 begin
-  {if Assigned(Mem.InitializeProc) then
-    Inc(Integer(Mem.InitializeProc), Integer(Mem));
-  if Assigned(Mem.FinalizeProc) then
-    Inc(Integer(Mem.FinalizeProc), Integer(Mem));
-}
-  if Assigned(Data.ModuleName) then
-    Integer(Data.ModuleName) := Integer(Data.ModuleName) + Integer(Data); 
-
-  TurboConvertEntryRelatedToAbsolute(Data, PTurboEntry(Data.LastTypeInfoEntry));  
-  TurboConvertVarEntryRelatedToAbsolute(Data, Data.LastVariableEntry);  
-  TurboConvertEntryRelatedToAbsolute(Data, PTurboEntry(Data.LastWordEntry));  
-  TurboConvertEntryRelatedToAbsolute(Data, PTurboEntry(Data.LastModuleRefEntry));  
-  TurboConvertEntryRelatedToAbsolute(Data, PTurboEntry(Data.LastTypeRefEntry));  
+  if Assigned(aEntry) then
+  begin
+    Integer(aEntry) := Integer(aEntry) + Integer(Mem);
+    ForEachTurboEntry(PTurboEntry(aEntry), DoMethodEntryItemProc, Mem);
+  end;
 end;
 
-procedure TurboConvertEntryAbsoluteToRelated(Mem: Pointer; var aEntry: PTurboEntry);
+procedure ConvertTurboTypeRefEntry(const Mem: Pointer ; var aEntry:
+        PTurboTypeRefEntry 
+        //; const IsResolved: Boolean
+);
+begin
+  if Assigned(aEntry) then
+  begin
+    Integer(aEntry) := Integer(aEntry) + Integer(Mem);
+    ForEachTurboEntry(PTurboEntry(aEntry), DoTypeRefEntryItemProc, Mem);
+  end;
+end;
+
+procedure ConvertTurboMetaInfoEntryAddr(MetaData: PTurboPreservedDataMemory;
+        const IsResolved: Boolean);
 var
+  vMem: Pointer;
   vEntry: PTurboEntry;
-  P: PTurboEntry;
 begin
-    if Assigned(aEntry) then
-      Integer(aEntry) := Integer(aEntry) - Integer(Mem);
-    vEntry := aEntry;
-    while Assigned(vEntry) do
-    begin
-      p := vEntry.Prior;
-      if vEntry.Prior <> nil then
-      begin
-        Integer(vEntry.Prior) := Integer(vEntry.Prior) - Integer(Mem);
-      end;
-      if Assigned(vEntry.MetaInfo.Name) then
-        vEntry.MetaInfo.Name := Pointer(Integer(vEntry.MetaInfo.Name) - Integer(Mem));
-      //aEntry.Prior := t;
-      vEntry := P;   
-    end;
+  vMem := MetaData;
+  if not IsResolved then
+     Integer(vMem) := - Integer(vMem);
+  if Assigned(MetaData.ModuleName) then
+    Integer(MetaData.ModuleName) := Integer(MetaData.ModuleName) + Integer(vMem);
+
+  ConvertTurboEntry(vMem, PTurboEntry(MetaData.LastModuleRefEntry));  
+  ConvertTurboEntry(vMem, PTurboEntry(MetaData.LastTypeInfoEntry));  
+  ConvertTurboTypeRefEntry(vMem, MetaData.LastTypeRefEntry);  
+  ConvertTurboStaticFieldEntry(MetaData, MetaData.LastVariableEntry);  
+  ConvertTurboMethodEntry(vMem, MetaData.LastWordEntry);  
 end;
 
-procedure TurboConvertVarEntryAbsoluteToRelated(Mem: Pointer; var aEntry:
-        PTurboStaticFieldEntry);
-var
-  vEntry: PTurboStaticFieldEntry;
-  P: PTurboStaticFieldEntry;
-begin
-    if Assigned(aEntry) then
-      Integer(aEntry) := Integer(aEntry) - Integer(Mem);
-    vEntry := aEntry;
-    while Assigned(vEntry) do
-    begin
-      p := vEntry.Prior;
-      if vEntry.Prior <> nil then
-        Integer(vEntry.Prior) := Integer(vEntry.Prior) - Integer(Mem);
-      if Assigned(vEntry.Variable.Name) then
-        vEntry.Variable.Name := Pointer(Integer(vEntry.Variable.Name) - Integer(Mem));
-      if Assigned(vEntry.Variable.TypeInfo) then
-        vEntry.Variable.TypeInfo := Pointer(Integer(vEntry.Variable.TypeInfo) - Integer(Mem));
-      //aEntry.Prior := t;
-      vEntry := P;   
-    end;
-end;
-
-procedure TurboConvertAddrAbsoluteToRelated(Mem: Pointer; Data:
-        PTurboPreservedDataMemory);
-begin
-{
-  if Assigned(Mem.InitializeProc) then
-    Dec(Integer(Mem.InitializeProc), Integer(Mem));
-  if Assigned(Mem.FinalizeProc) then
-    Dec(Integer(Mem.FinalizeProc), Integer(Mem));
-}
-  if Assigned(Data.ModuleName) then
-    Integer(Data.ModuleName) := Integer(Data.ModuleName) - Integer(Data); 
-  TurboConvertEntryAbsoluteToRelated(Data, PTurboEntry(Data.LastWordEntry));  
-  TurboConvertEntryAbsoluteToRelated(Data, PTurboEntry(Data.LastTypeRefEntry));  
-  TurboConvertEntryAbsoluteToRelated(Data, PTurboEntry(Data.LastModuleRefEntry));  
-  TurboConvertVarEntryAbsoluteToRelated(Data, Data.LastVariableEntry);  
-  TurboConvertEntryAbsoluteToRelated(Data, PTurboEntry(Data.LastTypeInfoEntry));  
-end;
-
-
-{
-procedure SetupSimpleTypes;
-begin
-  SimpleTurboTypes[ttkSByte] := GetRegisteredTypeByTypeInfo(Typeinfo(Shortint));
-  SimpleTurboTypes[ttkUByte] := GetRegisteredTypeByTypeInfo(Typeinfo(Byte));
-  SimpleTurboTypes[ttkSWord] := GetRegisteredTypeByTypeInfo(Typeinfo(Smallint));
-  SimpleTurboTypes[ttkUWord] := GetRegisteredTypeByTypeInfo(Typeinfo(Word));
-  SimpleTurboTypes[ttkSLong] := GetRegisteredTypeByTypeInfo(Typeinfo(Longint));
-  SimpleTurboTypes[ttkULong] := GetRegisteredTypeByTypeInfo(Typeinfo(LongWord));
-  SimpleTurboTypes[ttkInt64] := GetRegisteredTypeByTypeInfo(Typeinfo(Int64));
-  SimpleTurboTypes[ttkSingle] := GetRegisteredTypeByTypeInfo(Typeinfo(Single));
-  SimpleTurboTypes[ttkDouble] := GetRegisteredTypeByTypeInfo(Typeinfo(Double));
-  SimpleTurboTypes[ttkExtended] := GetRegisteredTypeByTypeInfo(Typeinfo(Extended));
-  SimpleTurboTypes[ttkComp] := GetRegisteredTypeByTypeInfo(Typeinfo(Comp));
-  SimpleTurboTypes[ttkCurr] := GetRegisteredTypeByTypeInfo(Typeinfo(Currency));
-  SimpleTurboTypes[ttkString] := GetRegisteredTypeByTypeInfo(Typeinfo(Shortstring));
-  SimpleTurboTypes[ttkLString] := GetRegisteredTypeByTypeInfo(Typeinfo(AnsiString));
-  SimpleTurboTypes[ttkWString] := GetRegisteredTypeByTypeInfo(Typeinfo(WideString));
-  SimpleTurboTypes[ttkChar] := GetRegisteredTypeByTypeInfo(Typeinfo(Char));
-  SimpleTurboTypes[ttkWChar] := GetRegisteredTypeByTypeInfo(Typeinfo(WideChar));
-end;
-}
 initialization
 finalization
 end.
