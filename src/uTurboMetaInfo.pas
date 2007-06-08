@@ -27,6 +27,8 @@ type
   PTurboStaticFieldEntry = ^ TTurboStaticFieldEntry;
   PTurboStaticFieldInfo = ^ TTurboStaticFieldInfo;
   PTurboModuleRefEntry = ^ TTurboModuleRefEntry;
+  PTurboMethodInfo = ^ TTurboMethodInfo;
+  PTurboMethodInfoEx = ^ TTurboMethodInfoEx;
   PTurboMethodEntry = ^ TTurboMethodEntry;
   PTurboTypeInfoEntry = ^ TTurboTypeInfoEntry;
   PTurboTypeRefEntry = ^ TTurboTypeRefEntry;
