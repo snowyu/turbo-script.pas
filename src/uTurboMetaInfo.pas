@@ -101,7 +101,7 @@ type
   end;
   //this for external word only
   TTurboMethodInfoEx = object(TTurboMethodInfo)
-  protected
+  public
     ExternalOptions: TTurboExteralMethodOptions;
   end; 
 
