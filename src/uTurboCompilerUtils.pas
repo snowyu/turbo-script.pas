@@ -19,15 +19,44 @@ uses
   ;
 
 Const
+  cDotSeparatorSymbol = '.';
   //the internal Main Entry procedure name.
-  cMainEntryProcName = '._Main_';
+  cMainEntryProcName = '._Main';
+  cSymbolErrorOk = 0;
+  cSymbolErrorOwnerisNil = 313;
+  cSymbolErrorUnknownCallStyle = 314;
+  cSymbolErrorNoSpecifiedModule = 315;
+  cSymbolErrorNoSpecifiedMethodAddr = 316;
+  cSymbolErrorModuleRefAddedFailed = 317;
+  cSymbolErrorRegisterType = 341;
+  cSymbolErrorUnknownConstType = 311;
+
+  cSymbolErrorLabelRedeclaration = 300;
+  cSymbolErrorWordNameIsNil = 301;
+  cSymbolErrorUnknownMethod = 302;
+  cSymbolErrorVarRedeclaration = 303;
+  cSymbolErrorConstRedeclaration = 304;
+  cSymbolErrorRedeclaration = 305;
+  cSymbolErrorUnknownModule = 306;
+  cSymbolErrorFileNotFound  = 307;
+  cSymbolErrorMethodNotFound  = 308;
+  cSymbolErrorStrToIntCovnert = 309;
+  cSymbolErrorConstDeclaration = 310;
+  cSymbolErrorVarDeclaration = 320;
+  cSymbolErrorMethodDeclaration = 330;
+  cSymbolErrorTypeDeclaration = 340;
+  cSymbolErrorLabelDeclaration = 350;
+
+  cSymbolErrorInvalidOption = 400;
+  cSymbolErrorInvalidOptionParam = 401;
+  cSymbolErrorMessageCompilerOption = 500;
 
 Type
   //the Compiler option state
   TTurboCompilerOptionState = (cosDefault, cosEnable, cosDisable);
 
   PTurboSymbols = ^ TTurboSymbols;
-  PTurboModuleSymbols = ^ TTurboModuleSymbols;
+  PTurboModuleRefSymbols = ^ TTurboModuleRefSymbols;
   PTurboTypeSymbols = ^ TTurboTypeSymbols;
   PTurboCustomSymbol = ^ TTurboCustomSymbol;
   PTurboSymbol = ^ TTurboSymbol;
@@ -99,7 +128,7 @@ Type
   public
     destructor Destroy; virtual; {override}
     procedure Assign(const aSymbol: PTurboCustomSymbol); virtual;
-    procedure DeclareTo(const aModule: TCustomTurboModule);
+    function DeclareTo(const aModule: PTurboModuleSymbol): Integer;
   public
     Method: PTurboMethodSymbol;
     Addr: Integer;
@@ -127,7 +156,7 @@ Type
     //and put the offset of the dataMemory to Value.VInteger
     procedure DeclareStringTo(const aModule: TCustomTurboModule);
     //generate the op-code push const for the constant to the aModule
-    procedure PushTo(const aModule: TCustomTurboModule); virtual;
+    function PushTo(const aModule: PTurboModuleSymbol): Integer; virtual;
   public
     property TurboType: PMeType read FTurboType write SetTurboType;
     property Value: TMeVarRec read FValue write FValue;
@@ -140,9 +169,9 @@ Type
   public
     procedure Assign(const aSymbol: PTurboCustomSymbol); virtual;
     //declare(allocate space) the variable to aModule
-    procedure DeclareTo(const aModule: TCustomTurboModule);
+    function DeclareTo(const aModule: PTurboModuleSymbol): Integer;
     //generate the op-code push variable addr to the aModule
-    procedure PushTo(const aModule: TCustomTurboModule); virtual; {override}
+    function PushTo(const aModule: PTurboModuleSymbol): Integer; virtual; {override}
   public
     Addr: tsInt;
   end;
@@ -157,15 +186,16 @@ Type
     function GetLabels: PTurboSymbols;
     function GetTypeSymbol: PTurboTypeSymbol;
     function GetTypeInfo: PMeProcType;
+    function GetExternalLocalMethodAddr(): tsInt;
   public
     destructor Destroy; virtual; {override}
     procedure Assign(const aSymbol: PTurboCustomSymbol); virtual;
     //generate the call op-code to the aModule
-    procedure PushTo(const aModule: TCustomTurboModule); virtual; {override}
-    procedure DeclareTo(const aModule: TCustomTurboModule);
+    function PushTo(const aModule: PTurboModuleSymbol): Integer; virtual; {override}
+    function DeclareTo(const aModule: PTurboModuleSymbol): Integer;
     //for local method to push the opReturn instruction.
-    procedure DeclareEndTo(const aModule: TCustomTurboModule);
-    function DeclareLabelTo(const aLabelName: string; const aModule: TCustomTurboModule): Integer;
+    procedure DeclareEndTo(const aModule: PTurboModuleSymbol);
+    function DeclareLabelTo(const aLabelName: string; const aModule: PTurboModuleSymbol): Integer;
     function FindLabel(const aName: string): PTurboLabelSymbol;
   public
     //Options: TTurboWordOptions;
@@ -178,6 +208,8 @@ Type
     ModuleName: String;  //for external word
     ModuleType: TTurboModuleType;  //for external word
     //Module: TCustomTurboModule; //for external forth word
+    ModuleSymbol: PTurboModuleSymbol;//for external forth word, the word is in the ModuleSymbol
+    ExternalMethodSymbol: PTurboMethodSymbol;
     ExternalOptions: TTurboExteralMethodOptions; //Exteral Word Options
     Entry: PTurboMethodEntry;
     property Labels: PTurboSymbols read GetLabels;
@@ -197,7 +229,7 @@ Type
     FTypeInfo: PMeType;
   public
     procedure Assign(const aSymbol: PTurboCustomSymbol); virtual;
-    procedure DeclareTo(const aModule: TCustomTurboModule);
+    function DeclareTo(const aModule: PTurboModuleSymbol): Integer;
     function GetTypeInfo(const aClass: TMeClass = nil): PMeType;
   public
     destructor Destroy; virtual; {override}
@@ -225,15 +257,16 @@ Type
     FTypeRefs: PTurboTypeSymbols;
     FVars: PTurboSymbols;
     FConsts: PTurboSymbols;
-    FUsedModules: PTurboModuleSymbols;
+    FUsedModules: PTurboModuleRefSymbols;
   protected
     function GetTypeRefs: PTurboTypeSymbols;
     function GetTypes: PTurboTypeSymbols;
     function GetVars: PTurboSymbols;
     function GetConsts: PTurboSymbols;
     function GetMethods: PTurboSymbols;
-    function GetUsedModules: PTurboModuleSymbols;
+    function GetUsedModules: PTurboModuleRefSymbols;
     function CreateLibModuleSymbol(const aName: string): PTurboModuleSymbol;
+    //function GetModuleEntry(const aModule: PTurboModuleSymbol): PTurboModuleRefEntry;
   public
     destructor Destroy; virtual; {override}
     procedure Clear;
@@ -243,8 +276,12 @@ Type
     function FindLocalTypeSymbol(const aName: string): PTurboTypeSymbol;
     function FindLocalMethodSymbol(const aName: string): PTurboMethodSymbol;
     function FindLocalConstSymbol(const aName: string; const aType: PMeType): PTurboConstSymbol;
+    //find all method in all place.
+    function FindMethodSymbol(const aName: string): PTurboMethodSymbol;
     function AddUsedModule(const aName: String; const aModuleType: TTurboModuleType): Integer;
-    procedure DeclareTo(const aModule: TCustomTurboModule);
+    //将外部的TSLib方法添加到本地的Methods方法列表中，注意：没有写入内存(DeclareTo)。
+    function AddExternalLibMethod(const aMethod: PTurboMethodSymbol): PTurboMethodSymbol;
+    function DeclareTo(const aModule: PTurboModuleSymbol): Integer;
     function IsUniqueIdentifier(const aName: String): Boolean;
     procedure PushInt32(const aStr: string);overload;
     procedure PushInt32(const aInt: tsInt);overload;
@@ -255,12 +292,12 @@ Type
     function NewType(const aName: string): PTurboTypeSymbol;
     function NewMethod(const aName: string): PTurboMethodSymbol;
     //if true then apply external param to the aMethod
-    function IsExternalMethod(const aMethod: PTurboMethodSymbol): Boolean;
+    function IsExternalMethod(const aMethod: PTurboMethodSymbol): Integer;
     //当带常量的变量有动态数组，AnsiString 的时候需要在模块的程序头添加初始化过程：对变量分配内存，并将常量赋值给变量；在程序尾添加终止过程，释放变量内存，并最后加上halt指令。
     //procedure DoInitModuleProc;
     //procedure DoFinalModuleProc;
   public
-    Entry: PTurboModuleRefEntry;
+    //Entry: PTurboModuleRefEntry;
     ModuleType: TTurboModuleType;
     Module: TCustomTurboModule;
     property Types: PTurboTypeSymbols read GetTypes;
@@ -268,7 +305,7 @@ Type
     property Vars: PTurboSymbols read GetVars;
     property Consts: PTurboSymbols read GetConsts;
     property Methods: PTurboSymbols read GetMethods;
-    property UsedModules: PTurboModuleSymbols read GetUsedModules;
+    property UsedModules: PTurboModuleRefSymbols read GetUsedModules;
   end;
 
   TTurboSymbols = object(TMeList)
@@ -283,10 +320,23 @@ Type
     property Items[Index: Integer]: PTurboSymbol read GetItem; default;
   end;
 
-  TTurboModuleSymbols = object(TTurboSymbols)
+  TTurboModuleRefSymbols = object(TTurboSymbols)
+  protected
+    //the module entry list(PTurboModuleRefEntry).
+    FEntries: PMeList;
   protected
     function GetItem(Index: Integer): PTurboModuleSymbol;
+    function GetEntry(Index: Integer): PTurboModuleRefEntry;
+    procedure Init; virtual; {override}
   public
+    destructor Destroy; virtual; {override}
+    function Add(const aModuleSymbol: PTurboModuleSymbol): Integer;
+    procedure Assign(const aSrc: PTurboModuleRefSymbols);
+    procedure Delete(const Index: Integer);
+    procedure Swap(const Idx1, Idx2: Integer);
+    procedure Remove(const Value: PTurboModuleSymbol);
+    procedure Move(const CurIndex, NewIndex: Integer);
+    function IndexOf(const aModuleSymbol: PTurboModuleSymbol; const aBeginIndex: Integer = 0): Integer; overload;
     function IndexOf(const aModule: TCustomTurboModule; const aBeginIndex: Integer = 0): Integer; overload;
     function IndexOf(const aModuleEntry: PTurboModuleRefEntry; const aBeginIndex: Integer = 0): Integer; overload;
     function IndexOf(const aName: string; const aModuleType: TTurboModuleType; const aBeginIndex: Integer = 0): Integer; overload;
@@ -296,6 +346,8 @@ Type
     function FindMethodSymbol(const aName: string; const aModuleType: TTurboModuleType = mtLib): PTurboMethodSymbol;
     function FindTypeSymbol(const aName: string): PTurboTypeSymbol;
   public
+    OwnerSymbol: PTurboModuleSymbol;
+    property Entries[Index: Integer]: PTurboModuleRefEntry read GetEntry;
     property Items[Index: Integer]: PTurboModuleSymbol read GetItem; default;
   end;
 
@@ -329,7 +381,6 @@ const
   LetterSet = ['A'..'Z', 'a'..'z', '_'];
   DigitSet = ['0'..'9'];
   IdentSet = LetterSet + DigitSet;
-  DotChar = '.';
 
 function IsIdentifier(const aValue: string): Boolean;
 var
@@ -363,7 +414,7 @@ begin
         end
         else
         {$ENDIF}
-        if aValue[i] = DotChar then
+        if aValue[i] = cDotSeparatorSymbol then
         begin
           Result := ((i+1) <= Length(aValue)) and (aValue[i+1] in IdentSet);
         end
@@ -462,10 +513,15 @@ begin
   Inherited;
 end;
 
-procedure TTurboLabelSymbol.DeclareTo(const aModule: TCustomTurboModule);
+function TTurboLabelSymbol.DeclareTo(const aModule: PTurboModuleSymbol): integer;
 begin
   if Addr = 0 then
-    Addr := aModule.UsedMemory;
+  begin
+    Addr := aModule.Module.UsedMemory;
+    Result := cSymbolErrorOk;
+  end
+  else
+    Result := cSymbolErrorRedeclaration;
 end;
 
 { TTurboMethodSymbol }
@@ -492,9 +548,10 @@ begin
       Self.CallStyle := CallStyle;
       Self.CodeFieldStyle := CodeFieldStyle;
       Self.ParamFieldLength := ParamFieldLength;
-      Self.CFA:=CFA;
+      Self.CFA:= CFA;
       Self.ModuleType:=ModuleType;
-      //Self.Module:=Module;
+      Self.ModuleSymbol := ModuleSymbol;
+      Self.ExternalMethodSymbol := ExternalMethodSymbol;
       Self.ExternalOptions:=ExternalOptions;
       Self.Entry := Entry;
       Self.FTypeSymbol := FTypeSymbol;
@@ -532,7 +589,11 @@ begin
     Result := FTypeSymbol
   else if Assigned(FiTypeSymbol) then
     Result := FiTypeSymbol
-  else 
+  else if Assigned(ExternalMethodSymbol) then
+  begin
+    Result := ExternalMethodSymbol.TypeSymbol;
+  end
+  else
   begin
     //no Assigned, Create a one.
     New(FiTypeSymbol, Create);
@@ -547,30 +608,81 @@ begin
   Result := PMeProcType(TypeSymbol.GetTypeInfo(TypeOf(TMeProcType)));
 end;
 
-procedure TTurboMethodSymbol.DeclareTo(const aModule: TCustomTurboModule);
+function TTurboMethodSymbol.GetExternalLocalMethodAddr(): tsInt;
+begin
+  Result := -1;
+  if Assigned(ExternalMethodSymbol) then
+  begin
+    Result := ExternalMethodSymbol.CFA;
+  end
+  else if Assigned(ModuleSymbol) then
+  begin
+    if ExternalOptions.Name <> '' then
+      ExternalMethodSymbol := ModuleSymbol.FindLocalMethodSymbol(ExternalOptions.Name)
+    else
+      ExternalMethodSymbol := ModuleSymbol.FindLocalMethodSymbol(Name);
+    if Assigned(ExternalMethodSymbol) then
+    begin
+      Result := ExternalMethodSymbol.CFA;
+    end;
+  end;
+end;
+
+function TTurboMethodSymbol.DeclareTo(const aModule: PTurboModuleSymbol): Integer;
+var
+  p: PTurboExteralMethodOptions;
 begin
   if CFA = -1 then
   begin
+    Result := cSymbolErrorOk;
     if CodeFieldStyle = cfsFunction then
     begin
-      CFA := aModule.UsedMemory;
+      CFA := aModule.Module.UsedMemory;
     end
-    else //the external method.
-      CFA := 0;
-    if IsPublic(aModule) then
+    else 
+    begin
+      //the external method.
+      case CallStyle of
+        ccForth:
+          begin
+            CFA := GetExternalLocalMethodAddr();
+            if CFA = -1 then
+              Result := cSymbolErrorUnknownMethod;
+
+            if (Result = cSymbolErrorOk) and not Assigned(ExternalOptions.ModuleRef) then
+            begin
+              Result := ModuleSymbol.DeclareTo(aModule);
+              if Result <> cSymbolErrorOk then Exit;
+              Integer(p) := aModule.UsedModules.IndexOf(ModuleSymbol);
+              if Integer(p) >= 0 then
+              begin
+                ExternalOptions.ModuleRef := Pointer(Integer(aModule.UsedModules.Entries[Integer(p)]) + SizeOf(tsPointer));
+              end
+              else
+                Result := cSymbolErrorModuleRefAddedFailed;
+            end;
+          end;
+        ccUnknown:
+          begin
+            Result := cSymbolErrorUnknownCallStyle;
+          end;
+      end; //case
+      if Result <> cSymbolErrorOk then Exit;
+    end;
+    if IsPublic(aModule.Module) then with aModule.Module do
     begin
       //writeln('aModule.UsedDataSize=',InttoHex(aModule.UsedDataSize,4));
-      aModule.AlignData;
+      AlignData;
       //writeln('aModule.UsedDataSize=',InttoHex(aModule.UsedDataSize,4));
-      Integer(Entry) := Integer(aModule.DataMemory) + aModule.UsedDataSize;
-      aModule.AllocDataSpace(SizeOf(TTurboMethodEntry));
-      Entry.Prior := aModule.LastWordEntry;
-      if IsNamed(aModule) then
+      Integer(Entry) := Integer(DataMemory) + UsedDataSize;
+      AllocDataSpace(SizeOf(TTurboMethodEntry));
+      Entry.Prior := LastWordEntry;
+      if IsNamed(aModule.Module) then
       begin
-        Entry.Word.Name := Pointer(aModule.UsedDataSize);
-        //aModule.AddByteToData(Length(Name));
-        aModule.AddBufferToData(Name[1], Length(Name));
-        aModule.AddByteToData(0);
+        Entry.Word.Name := Pointer(UsedDataSize);
+        //PChar:
+        AddBufferToData(Self.Name[1], Length(Self.Name));
+        AddByteToData(0);
       end
       else
       begin
@@ -581,32 +693,43 @@ begin
       Entry.Word.Visibility := Visibility;
       Entry.Word.CallStyle := CallStyle;
       Entry.Word.CodeFieldStyle := CodeFieldStyle;
+      if CodeFieldStyle = cfsExternalFunction then
+      begin
+        Integer(p) := Integer(DataMemory) + UsedDataSize;
+        AllocDataSpace(SizeOf(TTurboExteralMethodOptions));
+        p^ := ExternalOptions;
+        Assert(p=Entry.Word.GetExternalOptionsAddr, 'Method.DeclareTo: ExternalOptionsAddr mismatch');
+        //if p = Entry.Word.GetExternalOptionsAddr then
+          //writeln('GetExternalOptionsAddr addr ok!!');
+      end;
     end;
-  end;
+  end
+  else
+    Result := cSymbolErrorRedeclaration;
 end;
 
-procedure TTurboMethodSymbol.DeclareEndTo(const aModule: TCustomTurboModule);
+procedure TTurboMethodSymbol.DeclareEndTo(const aModule: PTurboModuleSymbol);
 var
   vIsPublic: Boolean;
 begin
-  if (CodeFieldStyle = cfsFunction) and (CFA <> -1) then
+  if (CodeFieldStyle = cfsFunction) and (CFA <> -1) then with aModule.Module do
   begin
-    vIsPublic := IsPublic(aModule);
+    vIsPublic := IsPublic(aModule.Module);
     if vIsPublic then
-      aModule.AddOpToMem(opExitFar)
+      AddOpToMem(opExitFar)
     else
-      aModule.AddOpToMem(opExit);
-    ParamFieldLength := aModule.UsedMemory - CFA + 1;
+      AddOpToMem(opExit);
+    ParamFieldLength := UsedMemory - CFA + 1;
 
     if vIsPublic then
     begin
       Entry.Word.ParamFieldLength := ParamFieldLength;
-      aModule.LastWordEntry := Pointer(Integer(Entry) - Integer(aModule.DataMemory));
+      LastWordEntry := Pointer(Integer(Entry) - Integer(DataMemory));
     end;
   end;
 end;
 
-function TTurboMethodSymbol.DeclareLabelTo(const aLabelName: string; const aModule: TCustomTurboModule): Integer;
+function TTurboMethodSymbol.DeclareLabelTo(const aLabelName: string; const aModule: PTurboModuleSymbol): Integer;
 var
   vLabel: PTurboLabelSymbol;
 begin
@@ -625,69 +748,66 @@ begin
   end;
 end;
 
-procedure TTurboMethodSymbol.PushTo(const aModule: TCustomTurboModule);
+function TTurboMethodSymbol.PushTo(const aModule: PTurboModuleSymbol): Integer;
+var
+  vCFA: tsInt;
+  i: Integer;
 begin
-    case CodeFieldStyle of
-      cfsFunction:
+  Result := cSymbolErrorOk;
+  case CodeFieldStyle of
+    cfsFunction:
+    begin
+      if CFA = -1 then
       begin
-        if IsPublic(aModule) then
-        begin
-          aModule.AddOpToMem(opEnterFar);
-          aModule.AddIntToMem(0);
-          aModule.AddIntToMem(CFA);
-        end
-        else
-        begin
-          aModule.AddOpToMem(opEnter);
-          aModule.AddIntToMem(CFA);
-        end;
-        //Result := True;
+        Result := cSymbolErrorNoSpecifiedMethodAddr;
+        Exit;
       end;
-      cfsExternalFunction:
+      with aModule.Module do if IsPublic(aModule.Module) then
       begin
-        case CallStyle of
-          ccForth:
+        AddOpToMem(opEnterFar);
+        AddIntToMem(0);
+        AddIntToMem(CFA);
+      end
+      else
+      begin
+        AddOpToMem(opEnter);
+        AddIntToMem(CFA);
+      end;
+    end;
+    cfsExternalFunction:
+    begin
+      case CallStyle of
+        ccForth:
+        begin
+          vCFA := CFA;
+          if vCFA = -1 then
           begin
-            if Assigned(OwnerSymbol) and Assigned(OwnerSymbol.Module) then
-            begin
-              if CFA = -1 then
-              begin
-                if ExternalOptions.Name <> '' then
-                  CFA := OwnerSymbol.Module.GetWordCFA(ExternalOptions.Name)
-                else
-                  CFA := OwnerSymbol.Module.GetWordCFA(Name);
-              end;
-              if CFA <> -1 then
-              begin
-                aModule.AddOpToMem(opCallFar);
-                //writeln(Name, '.ModEntry:',Integer(OwnerSymbol.Entry)- Integer(aModule.DataMemory));
-                //point to the TurboModuleInfo
-                if not Assigned(ExternalOptions.ModuleRef) then
-                begin
-                  OwnerSymbol.DeclareTo(aModule);
-                  ExternalOptions.ModuleRef := Pointer(Integer(OwnerSymbol.Entry) + SizeOf(tsPointer));
-                end;
-                //writeln(Name, '.ModRef:',Integer(ExternalOptions.ModuleRef) - Integer(aModule.DataMemory));
-                aModule.AddIntToMem(Integer(ExternalOptions.ModuleRef) - Integer(aModule.DataMemory));
-                aModule.AddIntToMem(CFA);
-                //writeln(Name, '.CFA:',CFA);
-                //Result := True;
-              end
-              else
-              begin
-               //writeln('cWordNotFoundError');
-                //SynError(cWordNotFoundError, '"'+ aName + '" CFA not in ' + FUsedModules.Items[ModuleIndex].Name);
-              end;
-            end
-            else
-            begin
-              //writeln(Name, ' not assigned module!!');
-              //SynError(cWordNotFoundError, '"'+ aName + '" not in ' + FUsedModules.Items[ModuleIndex].Name);
-            end;
+            vCFA := GetExternalLocalMethodAddr();
           end;
-        end; //case
-      end;
-    end;//case
+          if vCFA <> -1 then
+          begin
+            aModule.Module.AddOpToMem(opCallFar);
+            //writeln(Name, '.ModEntry:',Integer(OwnerSymbol.Entry)- Integer(aModule.DataMemory));
+            //point to the TurboModuleInfo
+            //TODO: BUG ExternalOptions.ModuleRef if the DeclareTo(Module) is not same as the PushTo(Module)
+            //      the ExternalOptions.ModuleRef should put into Module too.
+            if not Assigned(ExternalOptions.ModuleRef) then
+            begin
+              ModuleSymbol.DeclareTo(aModule);
+              i := aModule.UsedModules.IndexOf(ModuleSymbol);
+              ExternalOptions.ModuleRef := Pointer(Integer(aModule.UsedModules.Entries[i]) + SizeOf(tsPointer));
+            end;
+            //writeln(Name, '.ModRef:',Integer(ExternalOptions.ModuleRef) - Integer(aModule.DataMemory));
+            aModule.Module.AddIntToMem(Integer(ExternalOptions.ModuleRef) - Integer(aModule.Module.DataMemory));
+            aModule.Module.AddIntToMem(vCFA);
+            //writeln(Name, '.CFA:',vCFA);
+          end
+          else
+            Result := cSymbolErrorUnknownMethod;
+        end;
+      end; //case
+    end;
+  end;//case
 end;
 
 { TTurboModuleSymbol }
@@ -702,7 +822,7 @@ begin
   if Assigned(aSymbol) and aSymbol.InheritsFrom(Self.ClassType) then
     with PTurboModuleSymbol(aSymbol)^ do
     begin
-      Self.Entry:= Entry;
+      //Self.Entry:= Entry;
       Self.ModuleType:=ModuleType;
       Self.Module:=Module;
       if Assigned(FMethods) then
@@ -731,9 +851,14 @@ begin
         MeFreeAndNil(Self.FTypeRefs);
 
       if Assigned(FUsedModules) then
-        Self.UsedModules.Assign(FUsedModules)
+      begin
+        Self.UsedModules.Assign(FUsedModules);
+      end
       else 
+      begin
         MeFreeAndNil(Self.FUsedModules);
+        //MeFreeAndNil(Self.FUsedModuleEntries);
+      end;
     end;
   Inherited;
 end;
@@ -742,6 +867,7 @@ procedure TTurboModuleSymbol.Clear;
 begin
   MeFreeAndNil(FMethods);
   MeFreeAndNil(FUsedModules);
+  //MeFreeAndNil(FUsedModuleEntries);
   MeFreeAndNil(FVars);
   MeFreeAndNil(FConsts);
   MeFreeAndNil(FTypes);
@@ -811,21 +937,45 @@ begin
   Result := PTurboMethodSymbol(Methods.Find(aName));
   if not Assigned(Result) and Assigned(Module) then
   begin
-    vMethodEntry := Module.FindWordEntry(aName);
+    //Integer(vMethodEntry) := Integer(Module.LastWordEntry) + Integer(Module.DataMemory);
+    //writeln('LastWordEntry:', PChar(Integer(Module.DataMemory)+Integer(vMethodEntry.Word.Name)));
+    
+    vMethodEntry := Module.FindWordEntry(aName, cfsFunction);
     if Assigned(vMethodEntry) and (vMethodEntry.Word.CodeFieldStyle = cfsFunction) then
     begin
         New(Result, Create);
         Result.Name := aName;
         Result.CFA := vMethodEntry.Word.MethodAddr;
-        Result.ExternalOptions.ModuleRef := Pointer(Integer(Entry) + SizeOf(Pointer));
+        //Result.ExternalOptions.ModuleRef := Pointer(Integer(Entry) + SizeOf(Pointer));
         Result.CallStyle := vMethodEntry.Word.CallStyle;
-        Result.CodeFieldStyle := cfsExternalFunction;
+        Result.CodeFieldStyle := vMethodEntry.Word.CodeFieldStyle;
         Result.ModuleType := mtLib;
         Result.ModuleName := Name;
+        //Result.ModuleSymbol := @Self;
         //Result.Module := Module;
         Result.OwnerSymbol := @Self;
         Result.Entry := vMethodEntry;
         Methods.Add(Result); //cache this method!
+    end;
+  end;
+end;
+
+function TTurboModuleSymbol.FindMethodSymbol(const aName: string): PTurboMethodSymbol;
+var
+  i: Integer;
+begin
+  i := Methods.IndexOf(aName);
+  if i >= 0 then
+    Result := PTurboMethodSymbol(Methods.Items[i])
+  else begin
+    Result := UsedModules.FindMethodSymbol(aName);
+    if Assigned(Result) then
+    begin
+      i := Methods.IndexOf(Result.ModuleName + cDotSeparatorSymbol + aName);
+      if i >= 0 then
+        Result := PTurboMethodSymbol(Methods.Items[i])
+      else
+        Result := AddExternalLibMethod(Result);
     end;
   end;
 end;
@@ -848,11 +998,13 @@ begin
   Result := FMethods;
 end;
 
-function TTurboModuleSymbol.GetUsedModules: PTurboModuleSymbols;
+function TTurboModuleSymbol.GetUsedModules: PTurboModuleRefSymbols;
 begin
   if not Assigned(FUsedModules) then
   begin
     New(FUsedModules, Create);
+    FUsedModules.OwnerSymbol := @Self;
+    //New(FUsedModuleEntries, Create);
   end;
   Result := FUsedModules;
 end;
@@ -884,21 +1036,29 @@ begin
   Result := FVars;
 end;
 
-function TTurboModuleSymbol.IsExternalMethod(const aMethod: PTurboMethodSymbol): Boolean;
+function TTurboModuleSymbol.IsExternalMethod(const aMethod: PTurboMethodSymbol): Integer;
 var
   i: Integer;
+  vModuleSymbol: PTurboModuleSymbol;
+  vModuleEntry: PTurboModuleRefEntry;
 begin
+  Result := cSymbolErrorOk;
+  vModuleEntry := nil;
+  //try to determine the module of the aMethod.
   if aMethod.ModuleName = '' then
   begin
     i := UsedModules.Count -1;
     if i >= 0 then
     begin
-      aMethod.OwnerSymbol := UsedModules.Items[i];
-      aMethod.ModuleName := aMethod.OwnerSymbol.Name;
+      //aMethod.ModuleSymbol := UsedModules.Items[i];
+      vModuleSymbol := UsedModules.Items[i];
+      aMethod.ModuleName := vModuleSymbol.Name;
+      vModuleEntry := UsedModules.Entries[i];
     end
     else
     begin 
-      aMethod.OwnerSymbol := nil;
+      vModuleSymbol := nil;
+      Result := cSymbolErrorNoSpecifiedModule;
       //SynError(cDLLModuleMissError, aWord.Name);
     end;
   end
@@ -908,27 +1068,57 @@ begin
     if i < 0 then i := AddUsedModule(aMethod.ModuleName, aMethod.ModuleType);
     if i >= 0 then
     begin
-      aMethod.OwnerSymbol := UsedModules.Items[i];
+      vModuleSymbol := UsedModules.Items[i];
+      vModuleEntry := UsedModules.Entries[i];
     end
     else
     begin 
       //writeln('Can not add used module:' + aMethod.ModuleName);
       //SynError(cDLLModuleMissError, 'Can not add used module:' + aWord.ModuleName);
-      aMethod.OwnerSymbol := nil;
+      vModuleSymbol := nil;
+      Result := cSymbolErrorUnknownModule;
     end;
   end;
 
-  Result := Assigned(aMethod.OwnerSymbol); 
-  if Result then
+  aMethod.ModuleSymbol := vModuleSymbol;
+  if Assigned(vModuleSymbol) then
   begin
-    Result := Assigned(aMethod.OwnerSymbol.FindLocalMethodSymbol(aMethod.Name));
-    if Result and Assigned(aMethod.OwnerSymbol.Entry) then
+    if aMethod.ExternalOptions.Name <> '' then
+      aMethod.ExternalMethodSymbol := vModuleSymbol.FindLocalMethodSymbol(aMethod.ExternalOptions.Name)
+    else
+      aMethod.ExternalMethodSymbol := vModuleSymbol.FindLocalMethodSymbol(aMethod.Name);
+
+    if not Assigned(aMethod.ExternalMethodSymbol) then
+      Result := cSymbolErrorUnknownMethod
+    else if Assigned(vModuleEntry) then
     begin
-      aMethod.ExternalOptions.ModuleRef := Pointer(Integer(aMethod.OwnerSymbol.Entry) + SizeOf(tsPointer));
+      aMethod.ExternalOptions.ModuleRef := Pointer(Integer(vModuleEntry) + SizeOf(tsPointer));
     end
     else
       aMethod.ExternalOptions.ModuleRef := nil;
+  end
+  else
+  begin
+    aMethod.ExternalMethodSymbol := nil;
+    Result := cSymbolErrorUnknownModule;
   end;
+end;
+
+function TTurboModuleSymbol.AddExternalLibMethod(const aMethod: PTurboMethodSymbol): PTurboMethodSymbol;
+begin
+  if Assigned(aMethod) then
+  begin
+    Result := NewMethod(aMethod.ModuleName + cDotSeparatorSymbol + aMethod.Name);
+    if Assigned(Result) then
+    begin
+      Result.ExternalMethodSymbol := aMethod;
+      Result.ModuleSymbol := aMethod.OwnerSymbol;
+      Result.CallStyle := aMethod.CallStyle;
+      Result.CodeFieldStyle := cfsExternalFunction;
+    end;
+  end
+  else
+    Result := nil;
 end;
 
 function TTurboModuleSymbol.AddUsedModule(const aName: String; const aModuleType: TTurboModuleType): Integer;
@@ -971,25 +1161,46 @@ begin
     Result := nil;
 end;
 
-procedure TTurboModuleSymbol.DeclareTo(const aModule: TCustomTurboModule);
+function TTurboModuleSymbol.DeclareTo(const aModule: PTurboModuleSymbol): Integer;
+var
+  i: Integer;
+  vModuleEntry: PTurboModuleRefEntry;
 begin
-  if not Assigned(Entry) then
+  Result := cSymbolErrorOk;
+  i := aModule.UsedModules.IndexOf(PTurboModuleSymbol(@Self));
+  if i < 0 then
   begin
-    Integer(Entry) := Integer(aModule.DataMemory) + aModule.UsedDataSize; //the offset address.
-    with aModule do
+    i := aModule.UsedModules.Add(@Self);
+  end;
+  if i >= 0 then
+  begin
+    vModuleEntry := aModule.UsedModules.Entries[i];
+  end
+  else
+  begin
+    Result := cSymbolErrorModuleRefAddedFailed;
+    Exit;
+  end;
+  if not Assigned(vModuleEntry) then
+  begin
+    with aModule.Module do
     begin
+      Integer(vModuleEntry) := Integer(DataMemory) + UsedDataSize; //the offset address.
       AllocDataSpace(SizeOf(TTurboModuleRefEntry));
-      Entry.Prior := LastModuleRefEntry;
-      Entry.Module.ModuleType := ModuleType;
-      Entry.Module.Revision := Module.ModuleVersion;
-      Entry.Module.BuildDate := Module.ModuleDate;
-      Entry.Module.Name := Pointer(UsedDataSize);
+      vModuleEntry.Prior := LastModuleRefEntry;
+      vModuleEntry.Module.ModuleType := ModuleType;
+      vModuleEntry.Module.Revision := Module.ModuleVersion;
+      vModuleEntry.Module.BuildDate := Module.ModuleDate;
+      vModuleEntry.Module.Name := Pointer(UsedDataSize);
       if Length(Self.Name) > 0 then
         AddBufferToData(Self.Name[1], Length(Self.Name));
       AddByteToData(0);
-      LastModuleRefEntry := Pointer(tsInt(Entry) - Integer(DataMemory));
-    end;
-  end;
+      LastModuleRefEntry := Pointer(tsInt(vModuleEntry) - Integer(DataMemory));
+    end; //with
+    aModule.UsedModules.FEntries.List^[i] := vModuleEntry;
+  end
+  else
+    Result := cSymbolErrorRedeclaration;
 end;
 
 function TTurboModuleSymbol.IsUniqueIdentifier(const aName: String): Boolean;
@@ -1258,14 +1469,14 @@ begin
     end;//case
 end;
 
-procedure TTurboConstSymbol.PushTo(const aModule: TCustomTurboModule);
+function TTurboConstSymbol.PushTo(const aModule: PTurboModuleSymbol): Integer;
 var
   p: Pointer;
 begin
   if Assigned(TurboType) then
   begin
     Case TurboType.Kind of
-      mtkLString, mtkString: if FValue.VInteger = 0 then DeclareStringTo(aModule);
+      mtkLString, mtkString: if FValue.VInteger = 0 then DeclareStringTo(aModule.Module);
       else
       begin
         if Size <= SizeOf(Integer) then
@@ -1273,23 +1484,26 @@ begin
           //aModule.AddOpToMem(opPushInt);
           //Size := SizeOf(Integer);
           Case Size of
-            SizeOf(Byte): aModule.AddOpToMem(opPushByte);
-            SizeOf(Word): aModule.AddOpToMem(opPushWord);
+            SizeOf(Byte): aModule.Module.AddOpToMem(opPushByte);
+            SizeOf(Word): aModule.Module.AddOpToMem(opPushWord);
             else 
             begin
-              aModule.AddOpToMem(opPushInt);
+              aModule.Module.AddOpToMem(opPushInt);
               Size := SizeOf(tsInt);
             end;
           end;//case
         end
         else
-          aModule.AddOpToMem(opPushInt64);
+          aModule.Module.AddOpToMem(opPushInt64);
       end;
     end;
-    Integer(p) := Integer(aModule.Memory) + aModule.UsedMemory;
-    aModule.AllocSpace(Size);
+    Integer(p) := Integer(aModule.Module.Memory) + aModule.Module.UsedMemory;
+    aModule.Module.AllocSpace(Size);
     AssignValueTo(p);
-  end;
+    Result := cSymbolErrorOk;
+  end
+  else
+    Result := cSymbolErrorUnknownConstType;
 end;
 
 procedure TTurboConstSymbol.SetTurboType(const aValue: PMeType);
@@ -1320,59 +1534,71 @@ begin
   Inherited;
 end;
 
-procedure TTurboVarSymbol.DeclareTo(const aModule: TCustomTurboModule);
+function TTurboVarSymbol.DeclareTo(const aModule: PTurboModuleSymbol): Integer;
 var
   vVaraibleEntry: PTurboStaticFieldEntry;
   vValue: Pointer;
   //vTypeSafety, vTypeNamed: Boolean;
 begin
+  if Addr <> 0 then 
+  begin
+    Result := cSymbolErrorRedeclaration;
+    exit;
+  end;
+  Result := cSymbolErrorOk;
   vVaraibleEntry := nil;
   //vTypeSafety := (Visibility >= fvProtected) or (soSymbolTyped in aModule.Options); 
   //vTypeNamed := (Visibility >= fvPublished) or (soSymbolNamed in aModule.Options); 
-  if IsPublic(aModule) then
+  if IsPublic(aModule.Module) then with aModule.Module do
   begin
     //aModule.AlignData;
-    Integer(vVaraibleEntry) := Integer(aModule.DataMemory) + aModule.UsedDataSize;
-    aModule.AllocDataSpace(SizeOf(TTurboStaticFieldEntry));
-    vVaraibleEntry.Prior := aModule.LastVariableEntry;
+    Integer(vVaraibleEntry) := Integer(DataMemory) + UsedDataSize;
+    AllocDataSpace(SizeOf(TTurboStaticFieldEntry));
+    vVaraibleEntry.Prior := LastVariableEntry;
     vVaraibleEntry.Variable.Size := Size;
     vVaraibleEntry.Variable.Addr := nil;
     vVaraibleEntry.Variable.TypeInfo := nil;
     vVaraibleEntry.Variable.Name := nil;
   end;
 
-  if IsRequiredAlignMem(TurboType) then aModule.AlignData;
-  Addr := aModule.UsedDataSize;
+  if IsRequiredAlignMem(TurboType) then aModule.Module.AlignData;
+  Addr := aModule.Module.UsedDataSize;
 
-  if IsPublic(aModule) then
+  if IsPublic(aModule.Module) then
   begin
     tsInt(vVaraibleEntry.Variable.Addr) := Addr;
-    aModule.LastVariableEntry := Pointer(Integer(vVaraibleEntry) - Integer(aModule.DataMemory));
+    aModule.Module.LastVariableEntry := Pointer(Integer(vVaraibleEntry) - Integer(aModule.Module.DataMemory));
   end;
 
-  Integer(vValue) := Integer(aModule.DataMemory)  + Addr;
-  aModule.AllocDataSpace(Size);
+  Integer(vValue) := Integer(aModule.Module.DataMemory)  + Addr;
+  aModule.Module.AllocDataSpace(Size);
   if ValueStr <> '' then //该变量有初值.
   begin
-    DeclareStringTo(aModule); //if the init value is string
+    DeclareStringTo(aModule.Module); //if the init value is string
     AssignValueTo(vValue);
   end;
 
-  if IsNamed(aModule) then
+  if IsNamed(aModule.Module) then with aModule.Module do
   begin
-      vVaraibleEntry.Variable.Name := Pointer(aModule.UsedDataSize);
+      vVaraibleEntry.Variable.Name := Pointer(UsedDataSize);
       //fill the variable name
       //aModule.AddByteToData(Length(Name));
-      aModule.AddBufferToData(Name[1], Length(Name));
-      aModule.AddByteToData(0);
+      AddBufferToData(Name[1], Length(Name));
+      AddByteToData(0);
   end;
 end;
 
-procedure TTurboVarSymbol.PushTo(const aModule: TCustomTurboModule);
+function TTurboVarSymbol.PushTo(const aModule: PTurboModuleSymbol): Integer;
 begin
-  if Addr = 0 then DeclareTo(aModule);
-  aModule.AddOpToMem(opPushInt);
-  aModule.AddIntToMem(Addr);
+  if Addr = 0 then
+  begin
+    Result := DeclareTo(aModule);
+    if Result <> cSymbolErrorOk then exit;
+  end
+  else 
+    Result := cSymbolErrorOk;
+  aModule.Module.AddOpToMem(opPushInt);
+  aModule.Module.AddIntToMem(Addr);
 end;
 
 { TTurboTypeSymbol }
@@ -1394,16 +1620,21 @@ begin
   Inherited;
 end;
 
-procedure TTurboTypeSymbol.DeclareTo(const aModule: TCustomTurboModule);
+function TTurboTypeSymbol.DeclareTo(const aModule: PTurboModuleSymbol): Integer;
 begin
   if Assigned(FiType) and not Assigned(FTypeInfo) then
   begin
-    if aModule.RegisteredTypes.RegisterType(FiType) then
+    if aModule.Module.RegisteredTypes.RegisterType(FiType) then
     begin
       FTypeInfo:= FiType;
       FiType := nil;
-    end;
-  end;
+      Result := cSymbolErrorOk;
+    end
+    else
+      Result := cSymbolErrorRegisterType;
+  end
+  else
+    Result := cSymbolErrorRedeclaration;
 end;
 
 function TTurboTypeSymbol.GetTypeInfo(const aClass: TMeClass): PMeType;
@@ -1496,13 +1727,77 @@ begin
   Result := -1;
 end;
 
-{ TTurboModuleSymbols }
-function TTurboModuleSymbols.GetItem(Index: Integer): PTurboModuleSymbol;
+{ TTurboModuleRefSymbols }
+procedure TTurboModuleRefSymbols.Init;
+begin
+  Inherited;
+  New(FEntries, Create);
+end;
+
+destructor TTurboModuleRefSymbols.Destroy; 
+begin
+  MeFreeAndNil(FEntries);
+  Inherited;
+end;
+
+procedure TTurboModuleRefSymbols.Assign(const aSrc: PTurboModuleRefSymbols);
+begin
+  if Assigned(aSrc) then
+  begin
+    Inherited Assign(aSrc);
+    FEntries.Assign(aSrc.FEntries);
+  end;
+end;
+
+function TTurboModuleRefSymbols.Add(const aModuleSymbol: PTurboModuleSymbol): Integer;
+begin
+  Result := Inherited Add(aModuleSymbol);
+  if (Result >= 0) then
+  begin
+    FEntries.Add(nil);
+  end;
+end;
+
+procedure TTurboModuleRefSymbols.Delete(const Index: Integer);
+begin
+  Inherited Delete(Index);
+  FEntries.Delete(Index);
+end;
+
+procedure TTurboModuleRefSymbols.Swap(const Idx1, Idx2: Integer);
+begin
+  Inherited Swap(Idx1, Idx2);
+  FEntries.Swap(Idx1, Idx2);
+end;
+
+procedure TTurboModuleRefSymbols.Move(const CurIndex, NewIndex: Integer);
+begin
+  Inherited Move(CurIndex, NewIndex);
+  FEntries.Move(CurIndex, NewIndex);
+end;
+
+procedure TTurboModuleRefSymbols.Remove(const Value: PTurboModuleSymbol);
+var
+  i: Integer;
+begin
+  i:= IndexOf(Value);
+  if i >= 0 then
+  begin
+    Delete(i);
+  end;
+end;
+
+function TTurboModuleRefSymbols.GetEntry(Index: Integer): PTurboModuleRefEntry;
+begin
+  Result := PTurboModuleRefEntry(FEntries.Items[Index]);
+end;
+
+function TTurboModuleRefSymbols.GetItem(Index: Integer): PTurboModuleSymbol;
 begin
   Result := PTurboModuleSymbol(Inherited Get(Index));
 end;
 
-function TTurboModuleSymbols.IndexOf(const aName: string; const aModuleType: TTurboModuleType; const aBeginIndex: Integer): Integer;
+function TTurboModuleRefSymbols.IndexOf(const aName: string; const aModuleType: TTurboModuleType; const aBeginIndex: Integer): Integer;
 begin
   for Result := aBeginIndex to Count - 1 do
   begin
@@ -1513,7 +1808,7 @@ begin
   Result := -1;
 end;
 
-function TTurboModuleSymbols.IndexOf(const aModule: TCustomTurboModule; const aBeginIndex: Integer): Integer;
+function TTurboModuleRefSymbols.IndexOf(const aModule: TCustomTurboModule; const aBeginIndex: Integer): Integer;
 begin
   for Result := aBeginIndex to Count - 1 do
   begin
@@ -1524,18 +1819,27 @@ begin
   Result := -1;
 end;
 
-function TTurboModuleSymbols.IndexOf(const aModuleEntry: PTurboModuleRefEntry; const aBeginIndex: Integer): Integer;
+function TTurboModuleRefSymbols.IndexOf(const aModuleSymbol: PTurboModuleSymbol; const aBeginIndex: Integer = 0): Integer; 
 begin
   for Result := aBeginIndex to Count - 1 do
   begin
-    with Items[Result]^ do
-    if aModuleEntry = Entry then
+    if List^[Result] = aModuleSymbol then
       exit;
   end;
   Result := -1;
 end;
 
-function TTurboModuleSymbols.Find(const aName: string; const aModuleType: TTurboModuleType): PTurboModuleSymbol;
+function TTurboModuleRefSymbols.IndexOf(const aModuleEntry: PTurboModuleRefEntry; const aBeginIndex: Integer): Integer;
+begin
+  for Result := aBeginIndex to Count - 1 do
+  begin
+    if aModuleEntry = Entries[Result] then
+      exit;
+  end;
+  Result := -1;
+end;
+
+function TTurboModuleRefSymbols.Find(const aName: string; const aModuleType: TTurboModuleType): PTurboModuleSymbol;
 var
   i: integer;
 begin
@@ -1546,7 +1850,7 @@ begin
     Result := nil;
 end;
 
-function TTurboModuleSymbols.Find(const aModule: TCustomTurboModule): PTurboModuleSymbol;
+function TTurboModuleRefSymbols.Find(const aModule: TCustomTurboModule): PTurboModuleSymbol;
 var
   i: integer;
 begin
@@ -1557,7 +1861,7 @@ begin
     Result := nil;
 end;
 
-function TTurboModuleSymbols.Find(const aModuleEntry: PTurboModuleRefEntry): PTurboModuleSymbol;
+function TTurboModuleRefSymbols.Find(const aModuleEntry: PTurboModuleRefEntry): PTurboModuleSymbol;
 var
   i: integer;
 begin
@@ -1568,7 +1872,7 @@ begin
     Result := nil;
 end;
 
-function TTurboModuleSymbols.FindMethodSymbol(const aName: string; const aModuleType: TTurboModuleType): PTurboMethodSymbol;
+function TTurboModuleRefSymbols.FindMethodSymbol(const aName: string; const aModuleType: TTurboModuleType): PTurboMethodSymbol;
 var
   i: integer;
 begin
@@ -1584,7 +1888,7 @@ begin
   Result := nil;
 end;
 
-function TTurboModuleSymbols.FindTypeSymbol(const aName: string): PTurboTypeSymbol;
+function TTurboModuleRefSymbols.FindTypeSymbol(const aName: string): PTurboTypeSymbol;
 var
   i: integer;
 begin

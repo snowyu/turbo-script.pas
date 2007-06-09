@@ -39,24 +39,6 @@ const
 
 Const
   cMaxMemorySize = 64 * 1024;
-  cLabelRedeclarationError = 300;
-  cWordNameIsNilDeclarationError = 301;
-  cUnknownWordError = 302;
-  cVarRedeclarationError = 303;
-  cConstRedeclarationError = 304;
-  cRedeclarationError = 305;
-  cDLLModuleMissError = 306;
-  cFileNotFoundError  = 307;
-  cWordNotFoundError  = 308;
-  cStrToIntCovnertError = 309;
-  cConstDeclarationError = 310;
-  cVarDeclarationError = 311;
-  cMethodDeclarationError = 312;
-  cTypeDeclarationError = 313;
-  cLabelDeclarationError = 314;
-  cInvalidOptionError = 400;
-  cInvalidOptionParamError = 401;
-  cMessageCompilerOption = 500;
 
 //Const
   //cReqAlignMemTypes = [TypeInfo(Word), TypeInfo(SmallInt), TypeInfo(LongWord), TypeInfo(LongInt), {ttkPointer,} TypeInfo(ShortString), TypeInfo(String), TypeInfo(Int64)];
@@ -273,7 +255,7 @@ type
     procedure Init;
     procedure Final;
     procedure SaveModuleName(const aName: string);
-    function  DefineWordBegin(const aWord: PTurboMethodSymbol): Boolean;
+    function  DefineWordBegin(const aWord: PTurboMethodSymbol): Integer;
     procedure DefineWordEnd(const aWord: PTurboMethodSymbol);
     procedure PushString(const aStr: string);
     procedure PushStringSeqToStack(const aStr: string);
@@ -297,13 +279,10 @@ type
   
     function FindLocalVar(const aName: String): Integer;
   
-    //try find module if not then Generate.
-    function GenerateModuleEntryForWord(const aWord: PTurboMethodSymbol): Boolean;
     function FindModule(const aName: String; aModuleType: TTurboModuleType): Integer;
     //if not found then add new mtLib external module.
     function DefineModule(const aName: String): Integer;
     function  AddUsedModule(const aName: String; aModuleType: TTurboModuleType): Integer;
-    function FindLocalWord(const aName: String): Integer;
 
     //make sure the indentifier is unique else it will raise the error..
     function IsUniqueIdentifier(const aName: String): Boolean;
@@ -1136,22 +1115,24 @@ begin
   PrintStr(s+#13#10); 
 end;
 
-function TCocoRGrammar.DefineWordBegin(const aWord: PTurboMethodSymbol): Boolean;
+function TCocoRGrammar.DefineWordBegin(const aWord: PTurboMethodSymbol): Integer;
 begin
-  Result := IsUniqueIdentifier(aWord.Name);
-  if Result then
+  if IsUniqueIdentifier(aWord.Name) then
   begin
-    aWord.DeclareTo(FModuleSymbol.Module);
+    aWord.DeclareTo(FModuleSymbol);
 
     //New(vMethodSymbol, Create);
     //vMethodSymbol.Assign(aWord);
     FModuleSymbol.Methods.Add(aWord);
-  end;
+    Result := cSymbolErrorOk;
+  end
+  else
+    Result := cSymbolErrorRedeclaration;
 end;
 
 procedure TCocoRGrammar.DefineWordEnd(const aWord: PTurboMethodSymbol);
 begin
-  aWord.DeclareEndTo(FModuleSymbol.Module);
+  aWord.DeclareEndTo(FModuleSymbol);
 end;
 
 function TCocoRGrammar.AddIdentifierCFA(const aName: string; const aParams: TStringList): Boolean;
@@ -1169,8 +1150,8 @@ begin
   Result := AddWordCFA(aName, aParams);
   if Result then exit;
 
-  //writeln('cUnknownWordError:',aName);
-  SynError(cUnknownWordError, aName);
+  //writeln('cSymbolErrorUnknownMethod:',aName);
+  SynError(cSymbolErrorUnknownMethod, aName);
 end;
 
 function TCocoRGrammar.AddConstCFA(const aName: String): Boolean;
@@ -1182,7 +1163,7 @@ begin
   if Result then
     with PTurboConstSymbol(FModuleSymbol.Consts.Items[i])^ do
     begin
-      PushTo(FModule);
+      PushTo(FModuleSymbol);
     end
 end;
 
@@ -1195,7 +1176,7 @@ begin
   if Result then
     with PTurboVarSymbol(FModuleSymbol.Vars.Items[i])^ do
     begin
-      PushTo(FModule);
+      PushTo(FModuleSymbol);
     end
 end;
 
@@ -1221,13 +1202,7 @@ var
   vWord: PTurboMethodSymbol;
 begin
   Result := False;
-  i := FindLocalWord(aName);
-  if i >= 0 then
-    vWord := PTurboMethodSymbol(FModuleSymbol.Methods.Items[i])
-  else begin
-    vWord := FModuleSymbol.UsedModules.FindMethodSymbol(aName);
-  end;
-
+  vWord := FModuleSymbol.FindMethodSymbol(aName);
   if Assigned(vWord) then //with vWord^ do
   begin
     //WriteLn('DW:', aName);
@@ -1239,7 +1214,7 @@ begin
         PushWordParam(aParams[i]);
       end;
     end;
-    vWord.PushTo(FModuleSymbol.Module);
+    vWord.PushTo(FModuleSymbol);
     Result := true;
   end;
 end;
@@ -1250,7 +1225,7 @@ begin
   if not Result then
   begin
     //writeln('RedeclarationError:',aName);
-    SynError(cRedeclarationError);
+    SynError(cSymbolErrorRedeclaration);
   end;
 end;
 
@@ -1263,7 +1238,7 @@ begin
   if Assigned(vConst) then
     Result := vConst.Value
   else
-    SynError(cUnknownWordError, aName);
+    SynError(cSymbolErrorUnknownMethod, aName);
 end;
 //}
 function TCocoRGrammar.DefineLabel(const aName: string; const aWord: PTurboMethodSymbol): Integer;
@@ -1271,10 +1246,10 @@ begin
   Result := aWord.Labels.IndexOf(aName);
   if Result = -1 then
   begin
-    Result := aWord.DeclareLabelTo(aName, FModuleSymbol.Module);
+    Result := aWord.DeclareLabelTo(aName, FModuleSymbol);
   end
   else 
-    SynError(cLabelRedeclarationError);
+    SynError(cSymbolErrorLabelRedeclaration);
 
 end;
 
@@ -1290,24 +1265,11 @@ begin
   //writeln('search var ', aName, ':', Result);
 end;
 
-function TCocoRGrammar.FindLocalWord(const aName: String): Integer;
-begin
-  //writeln(aName,' MC:', FModuleSymbol.Methods.Count);
-  Result := FModuleSymbol.Methods.IndexOf(aName);
-end;
-
-function TCocoRGrammar.GenerateModuleEntryForWord(const aWord: PTurboMethodSymbol): Boolean;
-begin
-  Result := FModuleSymbol.IsExternalMethod(aWord);
-  if not Result then
-    SynError(cWordNotFoundError, 'Can not found the word '+ aWord.Name +' in:' + aWord.ModuleName);
-end;
-
 function TCocoRGrammar.DefineModule(const aName: String): Integer;
 begin
   Result := FindModule(aName, mtLib);
   if Result >= 0 then
-    SynError(cRedeclarationError, aName)
+    SynError(cSymbolErrorRedeclaration, aName)
   else
     Result := AddUsedModule(aName, mtLib);
 end;
@@ -1320,11 +1282,11 @@ begin
   if Result >= 0 then
   begin
     vModuleSymbol := FModuleSymbol.UsedModules.Items[Result];
-    vModuleSymbol.DeclareTo(FModule);
+    vModuleSymbol.DeclareTo(FModuleSymbol);
   end
   else
   begin
-    SynError(cFileNotFoundError, aName);
+    SynError(cSymbolErrorFileNotFound, aName);
   end;
     
 end;
@@ -1344,7 +1306,7 @@ begin
   try
     FModuleSymbol.PushInt32(aStr);
   except
-    SynError(cStrToIntCovnertError, aStr);
+    SynError(cSymbolErrorStrToIntCovnert, aStr);
   end;
 end;
 
@@ -1355,10 +1317,10 @@ begin
   vConst.Create;
   if vConst.AssignValue(aStr) then
   begin
-    vConst.PushTo(FModule);
+    vConst.PushTo(FModuleSymbol);
   end
   else
-    SynError(cConstRedeclarationError, 'Invalid String:'+ aStr);
+    SynError(cSymbolErrorConstRedeclaration, 'Invalid String:'+ aStr);
 end;
 
 procedure TCocoRGrammar.PushStringSeqToStack(const aStr: string);
