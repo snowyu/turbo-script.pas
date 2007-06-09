@@ -12,6 +12,32 @@ TODO:
   需要查找堆栈有关的操作修改之！
 !* [Bug] ModuleParent is not set or convert to related or absolute address!
 
+2007-6-9 11:39
+~ MethodSymbol, MethodRefSymbol 的确混淆了，混得俺都乱了。
+  在俺的MethodList链表中既有自己的方法，又有外部方法： MethodRefSymbol。
+  
+* [TurboModuleSymbol] 大修
+  - Entry, 启用 TurboModuleRefSymbols.Entries[] 代替。
+  * rename TurboModuleSymbols to TurboModuleRefSymbols
+  + TurboModuleRefSymbols.Entries[]:PTurboModuleRefEntry, 与TurboModuleRefSymbols.Items同步。
+  + TurboModuleRefSymbols.OwnerSymbol, TurboModuleRefSymbols.Entries[]是属于该OwnerSymbol的入口
+  + function AddExternalLibMethod(const aMethod: PTurboMethodSymbol): PTurboMethodSymbol
+    如果在Methods上找不到名为： aMethod.ModuleName + cDotSeparatorSymbol + aMethod.Name 的方法，则添加该方法的外部引用到 Methods,并返回添加的结果。
+  + FindMethodSymbol, 查找内部外部的所有的方法
+    首先在Methods上找 ，找不到则去 UsedModules上找，找到则为该word添加名称前缀后，再去Methods上找有无该外部引用，如无则调用 AddExternalLibMethod，加在Methods上.
+  * 现在所有的外部的，内部的方法全部放在Methods上了
+
+* [TurboMethodSymbol]
+  + ModuleSymbol, for external method only.
+  + ExternalMethodSymbol, for external method only.
+  * GetTypeSymbol
+    如果没有类型信息，并且Assigned(ExternalMethodSymbol)，则自动返回 ExternalMethodSymbol.TypeSymbol.
+
+* remove the SymbolError constants from the Coco.pas to uTurboCompileUtils
+2007-6-8 11:48
++ instruction opCallExt; //opCallExt PTurboMethodInfo(offset of Memory)
+* [uTurboExecutor] ForEachEntry to convert MetaData Entry address.
+
 2007-6-7 9:09
 !* 可以将 TTurboModuleSymbol.Entry 提出来，避免混淆. 
   !+ 建立一个： TTurboModuleSymbol.FModuleRefEntries: PMeList 属性，收集本模块所有的 ModuleRefEntry.
@@ -20,6 +46,14 @@ TODO:
   该 UnResolvedRefList 仅当本方法为 Private的时候才被使用！
 !* 模块中的 Init, Final 两个指针必须要！！在本地过程的iVMCall中判断初始化，如果没有做初始化，则压入当前地址，先调用初始化过程！
   而Final 则是在卸载内存的时候判断，如果已作初始化，那么就调用Final！
+* [Bug] issue #14 Private Method is not work..., the RET instruction is NOT pushed.
+  * TTurboMethodSymbol.DeclareTo, DeclareEndTo 
+! + issue 0000009: execute the external method(come from host or DLL)
+  + instruction opCallExt; //opCallExt PTurboMethodInfo(offset of Memory)
+    + implement instruction in TurboInterpreter
+    + implement instruction in TurboX86Interpreter
+  * Compiler: 根据method决定调用的指令，外部方法调用必须用 opCallExt ，指令，在
+    modified in TTurboMethodSymbol.PushTo!
 
 2007-6-6 13:20
 ~ TTurboModuleRefSymbol:  将其从 TTurboModuleSymbol 分离出来

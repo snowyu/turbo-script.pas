@@ -8,6 +8,7 @@
 program tsrun;
 
 {$I TurboScript.inc}
+{$DEFINE PUREPASCAL}
 
 {$APPTYPE CONSOLE}
 
@@ -39,6 +40,7 @@ const
   (
     ''
     , 'Bad Instruction'
+    , 'Bad Instruction Param'
     , 'DizZero'
     , 'ModuleNotFound'
     , '代码区内存无可用的空间'
