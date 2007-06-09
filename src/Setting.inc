@@ -41,13 +41,14 @@
 // additional tests for debugging
 {$IFDEF DEBUG}
   {$HINTS ON; WARNINGS ON}
-  {$D+,L+,W+,Y+,Q+}
+  {$D+,L+,W+,Y+,Q+,C+} 
+  //D+:$DEBUGINFO ON; L+:$LOCALSYMBOLS ON; W+: $STACKFRAMES ON;  Y+: $REFERENCEINFO ON; Q+:$OVERFLOWCHECKS ON ;C+ : $ASSERTIONS ON
   {$IFNDEF FPC}
     {$DEFINITIONINFO ON}
   {$ENDIF}
 {$ELSE}
   {$HINTS OFF; WARNINGS OFF}
-  {$D-,L-,Y-,Q-,W-}
+  {$D-,L-,Y-,Q-,W-,C-}
   {$IFNDEF FPC}
     {$DEFINITIONINFO OFF}
     {$IMAGEBASE $00400000}
