@@ -25,25 +25,32 @@ CREATE
   InternalGrammarComment := ProcessGrammarComment;
 DESTROY
 ERRORS
-    cLabelRedeclarationError : Result := rsLabelRedeclarationSyntaxError;
-    cWordNameIsNilDeclarationError: Result := rsWordNameIsNilDeclarationError;
-    cUnknownWordError: Result := rsUnknownWordError;
-    cConstRedeclarationError : Result := rsConstRedeclarationSyntaxError;
-    cVarRedeclarationError : Result := rsVarRedeclarationSyntaxError;
-    cRedeclarationError : Result := rsRedeclarationSyntaxError;
-    cDLLModuleMissError: Result := rsDLLModuleMissSyntaxError;
-    cFileNotFoundError:  Result := rsFileNotFoundError;
-    cWordNotFoundError:  Result := rsWordNotFoundError;
-    cInvalidOptionError: Result := '"' + Data + '" is an invalid option';
-    cInvalidOptionParamError: Result := 'invalid modifiers for option "' + Data + '"';
-    cStrToIntCovnertError: Result := 'Can not convert the strin to int!';
-    cMessageCompilerOption: Result := Data;
-    cConstDeclarationError: Result := 'ConstDeclarationError ' + Data;
-    cVarDeclarationError: Result := 'VarDeclarationError ' + Data;
-    cMethodDeclarationError: Result := 'MethodDeclarationError ' + Data;
-    cTypeDeclarationError: Result := 'TypeDeclarationError ' + Data;
-    cLabelDeclarationError: Result := 'LabelDeclarationError ' + Data;
+    cSymbolErrorLabelRedeclaration : Result := rsLabelRedeclarationSyntaxError;
+    cSymbolErrorWordNameIsNil: Result := rsWordNameIsNilDeclarationError;
+    cSymbolErrorUnknownMethod: Result := rsUnknownWordError;
+    cSymbolErrorConstRedeclaration : Result := rsConstRedeclarationSyntaxError;
+    cSymbolErrorVarRedeclaration : Result := rsVarRedeclarationSyntaxError;
+    cSymbolErrorRedeclaration : Result := rsRedeclarationSyntaxError;
+    cSymbolErrorUnknownModule: Result := rsDLLModuleMissSyntaxError;
+    cSymbolErrorFileNotFound:  Result := rsFileNotFoundError;
+    cSymbolErrorMethodNotFound:  Result := rsWordNotFoundError;
+    cSymbolErrorInvalidOption: Result := '"' + Data + '" is an invalid option';
+    cSymbolErrorInvalidOptionParam: Result := 'invalid modifiers for option "' + Data + '"';
+    cSymbolErrorStrToIntCovnert: Result := 'Can not convert the strin to int!';
+    cSymbolErrorMessageCompilerOption: Result := Data;
+    cSymbolErrorConstDeclaration: Result := 'ConstDeclarationError ' + Data;
+    cSymbolErrorVarDeclaration: Result := 'VarDeclarationError ' + Data;
+    cSymbolErrorMethodDeclaration: Result := 'MethodDeclarationError ' + Data;
+    cSymbolErrorTypeDeclaration: Result := 'TypeDeclarationError ' + Data;
+    cSymbolErrorLabelDeclaration: Result := 'LabelDeclarationError ' + Data;
 
+    cSymbolErrorUnknownConstType: Result := 'UnknownConstType ' + Data;
+    cSymbolErrorRegisterType: Result := 'RegisterType Error ' + Data;
+    cSymbolErrorModuleRefAddedFailed: Result := 'Add Module Failed ' + Data;
+    cSymbolErrorNoSpecifiedMethodAddr: Result := 'NoSpecifiedMethodAddr ' + Data;
+    cSymbolErrorNoSpecifiedModule: Result := 'NoSpecifiedModule ' + Data;
+    cSymbolErrorOwnerisNil: Result := 'Owner is Nil ' + Data;
+  
 
 PUBLISHED
 
@@ -144,7 +151,7 @@ begin
   begin
     if (ParamList.Count > 1) or (ParamList.Count = 0)  then
     begin
-      SemError(cInvalidOptionParamError, aOptionName);
+      SemError(cSymbolErrorInvalidOptionParam, aOptionName);
     end
     else 
     begin
@@ -152,14 +159,14 @@ begin
       if vMsgType > 0 then
         FModule.MemorySize := vMsgType
       else
-        SemError(cInvalidOptionParamError, aOptionName);
+        SemError(cSymbolErrorInvalidOptionParam, aOptionName);
     end;
   end
   else if (aOptionName = 'MAXDATASIZE') then
   begin
     if (ParamList.Count > 1) or (ParamList.Count = 0)  then
     begin
-      SemError(cInvalidOptionParamError, aOptionName);
+      SemError(cSymbolErrorInvalidOptionParam, aOptionName);
     end
     else 
     begin
@@ -167,14 +174,14 @@ begin
       if vMsgType > 0 then
         FModule.DataMemorySize := vMsgType
       else
-        SemError(cInvalidOptionParamError, aOptionName);
+        SemError(cSymbolErrorInvalidOptionParam, aOptionName);
     end;
   end
   else if (aOptionName = 'MESSAGE') then
   begin
     if (ParamList.Count > 2) or (ParamList.Count = 0)  then
     begin
-      SemError(cInvalidOptionParamError, aOptionName);
+      SemError(cSymbolErrorInvalidOptionParam, aOptionName);
     end
     else
     begin
@@ -190,7 +197,7 @@ begin
         else if s = 'WARN' then
           vMsgType := etWarn
         else begin
-          SemError(cInvalidOptionParamError, aOptionName);
+          SemError(cSymbolErrorInvalidOptionParam, aOptionName);
           vMsgType := -1;
         end
         ;
@@ -205,12 +212,12 @@ begin
         etHint: Writeln('Hint:', s);
         etWarn: Writeln('Warn:', s);
         Else
-          ErrorMsg(cMessageCompilerOption, s, vMsgType);
+          ErrorMsg(cSymbolErrorMessageCompilerOption, s, vMsgType);
       End;
     end;
   end
   else
-    SemError(cInvalidOptionError, aOptionName);
+    SemError(cSymbolErrorInvalidOption, aOptionName);
 end;
 
 IGNORE CASE
@@ -311,7 +318,7 @@ PRODUCTIONS
     (TypeKind<vType>|RestrictedType<vType>)
     ";"                                     (. end
                                                else
-                                                 SynError(cRedeclarationError);
+                                                 SynError(cSymbolErrorRedeclaration);
                                                  
                                             .)
   .
@@ -320,7 +327,7 @@ PRODUCTIONS
     =
     Identifier                             (. aType := FModuleSymbol.FindType(LexString); 
                                               if not Assigned(aType) then
-                                                SynError(cTypeDeclarationError, LexString + ' Type can not be found');
+                                                SynError(cSymbolErrorTypeDeclaration, LexString + ' Type can not be found');
                                            .)
   .
   TypeKind<var aType: PMeType> 
@@ -361,10 +368,10 @@ PRODUCTIONS
     ";"                     (.
                                end
                                else
-                                 SynError(cConstDeclarationError, vName);
+                                 SynError(cSymbolErrorConstDeclaration, vName);
                              end
                              else
-                               SynError(cConstRedeclarationError, vName);
+                               SynError(cSymbolErrorConstRedeclaration, vName);
                               .) 
     .
 
@@ -386,16 +393,16 @@ PRODUCTIONS
     ";"                                            (.   if IsUniqueIdentifier(vValue.Name) then
                                                          begin
                                                            FModuleSymbol.Vars.Add(vValue);
-                                                           if vValue.IsPublic(FModule) then vValue.DeclareTo(FModule); 
+                                                           if vValue.IsPublic(FModule) then vValue.DeclareTo(FModuleSymbol); 
                                                          end
                                                          else 
                                                          begin
                                                            MeFreeAndNil(vValue);
-                                                           SynError(cVarDeclarationError);
+                                                           SynError(cSymbolErrorVarDeclaration);
                                                          end
                                                       end
                                                       else
-                                                        SynError(cVarDeclarationError, 'Cannot new var!');
+                                                        SynError(cSymbolErrorVarDeclaration, 'Cannot new var!');
                                                    .)
   .
 
@@ -423,9 +430,9 @@ PRODUCTIONS
   .
 
   DefineWord 
-    (. Var vSucc: Boolean; vWord: PTurboMethodSymbol; .)
+    (. Var vErrorCode: Integer; vWord: PTurboMethodSymbol; .)
     = 
-                                                                 (. vSucc := True;
+                                                                 (. vErrorCode := cSymbolErrorOk;
                                                                     vWord := FModuleSymbol.NewMethod('');;
                                                                  try
                                                                     vWord.Visibility := tvPrivateVisibilty; 
@@ -436,14 +443,24 @@ PRODUCTIONS
 
     [FormalParameters<vWord>]
     
-    [                                                            (. vSucc := False; .)
-    ExternalWordOption<vWord>                                    (. vSucc := GenerateModuleEntryForWord(vWord); .)
+    [                                                            (. vErrorCode := cSymbolErrorOk; .)
+    ExternalWordOption<vWord>                                    (. vErrorCode := FModuleSymbol.IsExternalMethod(vWord); 
+                                                                    if vErrorCode <> cSymbolErrorOk then
+                                                                    begin
+                                                                      writeln('eerrr heerrr');
+                                                                      SynError(vErrorCode, vWord.Name);
+                                                                    end;
+                                                                 .)
     ]
-                                                                 (.if vSucc then vSucc := DefineWordBegin(vWord);  .)
+                                                                 (. if vErrorCode = cSymbolErrorOk then vErrorCode := DefineWordBegin(vWord);  .)
     [ASMStatementBlock<vWord>]
-    ";"                                                          (. if vSucc and (vWord.CodeFieldStyle = cfsFunction) then DefineWordEnd(vWord); 
+    ";"                                                          (. if (vErrorCode = cSymbolErrorOk) and (vWord.CodeFieldStyle = cfsFunction) then DefineWordEnd(vWord); 
                                                                  finally
-                                                                   if not vSucc then MeFreeAndNil(vWord);
+                                                                   if vErrorCode <> cSymbolErrorOk then
+                                                                   begin
+                                                                     SynError(vErrorCode, vWord.Name);
+                                                                     MeFreeAndNil(vWord);
+                                                                   end;
                                                                  end;
                                                                  .)
   .
@@ -453,7 +470,7 @@ PRODUCTIONS
     =                                                            (. vProcType := aWord.TypeInfo; 
                                                                     if not Assigned(vProcType) then
                                                                     begin
-                                                                      SynError(cMethodDeclarationError, 'Can Not Assigned Method TypeInfo!');
+                                                                      SynError(cSymbolErrorMethodDeclaration, 'Can Not Assigned Method TypeInfo!');
                                                                       exit;
                                                                     end;
                                                                  .)
@@ -477,7 +494,7 @@ PRODUCTIONS
     ":" TypeKind<vType>      (. if Assigned(vType) then  
                                   aParam.ParamType := vType
                                 else
-                                  SynError(cMethodDeclarationError, aParam.Name + ' param type can not be found!');
+                                  SynError(cSymbolErrorMethodDeclaration, aParam.Name + ' param type can not be found!');
                              .)
     
   .
