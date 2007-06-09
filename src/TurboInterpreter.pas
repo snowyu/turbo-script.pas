@@ -11,6 +11,7 @@ interface
 uses
   Windows, //QueryPerformanceCounter
   SysUtils, Classes
+  , uMeTypes
   , uTurboConsts
   , uTurboMetaInfo
   , uTurboExecutor
@@ -102,22 +103,6 @@ begin
   end;
 end;
 
-procedure iVMEnter(const FGlobalOptions: PTurboGlobalOptions);
-var
-  p: tsInt;
-begin
-  p := PtsInt(FGlobalOptions._PC)^;
-  Inc(FGlobalOptions._PC, SizeOf(p));
-  //the new PC:
-  p := p + Integer(FGlobalOptions._Mem.Code);
-  //Push the current PC to return stack.
-  Dec(FGlobalOptions._RP, SizeOf(tsPointer));
-  PtsInt(FGlobalOptions._RP)^ := FGlobalOptions._PC; 
-
-  //Update the new PC
-  FGlobalOptions._PC := p;    
-end;
-
 //input EAX the word CFA.
 procedure _DoVMEnter(const FGlobalOptions: PTurboGlobalOptions; aCFA: tsInt);
 begin
@@ -128,6 +113,24 @@ begin
 
   //Update the new PC
   FGlobalOptions._PC := aCFA;    
+end;
+
+procedure iVMEnter(const FGlobalOptions: PTurboGlobalOptions);
+var
+  vCFA: tsInt;
+begin
+  vCFA := PtsInt(FGlobalOptions._PC)^;
+  Inc(FGlobalOptions._PC, SizeOf(vCFA));
+  _DoVMEnter(FGlobalOptions, vCFA);
+{  //the new PC:
+  p := p + Integer(FGlobalOptions._Mem.Code);
+  //Push the current PC to return stack.
+  Dec(FGlobalOptions._RP, SizeOf(tsPointer));
+  PtsInt(FGlobalOptions._RP)^ := FGlobalOptions._PC; 
+
+  //Update the new PC
+  FGlobalOptions._PC := p;
+}    
 end;
 
 //(ErrorCode -- )
@@ -247,8 +250,9 @@ begin
     //load the new MemoryBase
     FGlobalOptions._Mem := p;
   end;
+  iVMEnter(FGlobalOptions);
 
-//@@LocalEnter:
+{//@@LocalEnter:
   p := PPointer(FGlobalOptions._PC)^;
   Inc(FGlobalOptions._PC, SizeOf(p));
   Integer(p) := Integer(p) + Integer(FGlobalOptions._Mem.Code); 
@@ -257,6 +261,40 @@ begin
   Dec(FGlobalOptions._RP, SizeOf(tsPointer));
   PtsInt(FGlobalOptions._RP)^ := FGlobalOptions._PC;
   FGlobalOptions._PC := tsInt(p);
+}
+end;
+
+procedure _DoVMCallFarMemBase(const FGlobalOptions: PTurboGlobalOptions; 
+  aModuleRefInfo: PTurboModuleRefInfo);
+var
+  p: Pointer;
+begin
+  //Push the current MemoryBase to return stack.
+  Dec(FGlobalOptions._RP, SizeOf(tsPointer));
+  PPointer(FGlobalOptions._RP)^ := FGlobalOptions._Mem;
+
+  if Assigned(aModuleRefInfo) then
+  begin
+    //PTurboModuleRefInfo real addr
+    Integer(aModuleRefInfo) := Integer(aModuleRefInfo) + Integer(FGlobalOptions._Mem);
+    p := aModuleRefInfo.Handle;
+    if not Assigned(p) then
+    begin
+      //@@RequireModule
+      //find and load the module into the memory.
+      p := FGlobalOptions._Mem.ModuleHandle.RequireModule(aModuleRefInfo.Name);
+      if not Assigned(p) then
+      begin
+        //@@NotFoundError
+        //POP  current MemoryBase
+        Inc(FGlobalOptions._RP, SizeOf(tsPointer));
+        _iVMHalt(FGlobalOptions, errModuleNotFound);
+        Exit;
+      end;
+      aModuleRefInfo.Handle := p;
+    end;
+    FGlobalOptions._Mem := TTurboMemoryModuleAccess(p).FDataMemory;
+  end;
 end;
 
 //CALLFAR PTurboModuleInfo cfa-addr
@@ -267,14 +305,15 @@ end;
 procedure iVMCallFar(const FGlobalOptions: PTurboGlobalOptions);
 var
   vModuleRefInfo: PTurboModuleRefInfo;
-  p: Pointer;
 begin
-  //Push the current MemoryBase to return stack.
+  vModuleRefInfo := PPointer(FGlobalOptions._PC)^;
+  Inc(FGlobalOptions._PC, SizeOf(vModuleRefInfo));
+
+  _DoVMCallFarMemBase(FGlobalOptions, vModuleRefInfo);
+{  //Push the current MemoryBase to return stack.
   Dec(FGlobalOptions._RP, SizeOf(tsPointer));
   PPointer(FGlobalOptions._RP)^ := FGlobalOptions._Mem;
 
-  vModuleRefInfo := PPointer(FGlobalOptions._PC)^;
-  Inc(FGlobalOptions._PC, SizeOf(vModuleRefInfo));
   if Assigned(vModuleRefInfo) then
   begin
     //PTurboModuleRefInfo real addr
@@ -296,7 +335,44 @@ begin
       vModuleRefInfo.Handle := p;
     end;
     FGlobalOptions._Mem := TTurboMemoryModuleAccess(p).FDataMemory;
-    iVMEnter(FGlobalOptions);
+  end; //}
+  iVMEnter(FGlobalOptions);
+end;
+
+procedure iVMCallExt(const FGlobalOptions: PTurboGlobalOptions);
+var
+  vMethodInfo: PTurboMethodInfoEx;
+  p: tsPointer;
+begin
+  //Push the current MemoryBase to return stack.
+  //Dec(FGlobalOptions._RP, SizeOf(tsPointer));
+  //PPointer(FGlobalOptions._RP)^ := FGlobalOptions._Mem;
+
+  vMethodInfo := PPointer(FGlobalOptions._PC)^;
+  Inc(FGlobalOptions._PC, SizeOf(vMethodInfo));
+  if Assigned(vMethodInfo) then
+  begin
+    case vMethodInfo.CodeFieldStyle of
+      cfsFunction: 
+      begin
+        _DoVMEnter(FGlobalOptions, vMethodInfo.MethodAddr);
+      end;
+      cfsExternalFunction: 
+      begin
+        case vMethodInfo.CallStyle of
+          ccForth: 
+          begin
+            _DoVMCallFarMemBase(FGlobalOptions, vMethodInfo.ExternalOptions.ModuleRef);
+            _DoVMEnter(FGlobalOptions, vMethodInfo.MethodAddr);
+          end;
+        end;
+      end; 
+    end;//
+  end
+  else
+  begin
+    _iVMHalt(FGlobalOptions, errInstructionBadParam);
+    Exit;
   end;
 end;
 
