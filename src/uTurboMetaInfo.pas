@@ -11,6 +11,9 @@ interface
 {$I TurboScript.inc}
 
 uses
+  {$IFDEF MSWINDOWS}
+  Windows,
+  {$ENDIF}
   SysUtils, Classes
   , TypInfo
   , uMeObject
@@ -103,6 +106,8 @@ type
   TTurboMethodInfoEx = object(TTurboMethodInfo)
   public
     ExternalOptions: TTurboExteralMethodOptions;
+  public
+    procedure RequireDLLProcAddress;
   end; 
 
   //it's the Module Variable Info too: TTurboVariableInfo
@@ -164,6 +169,9 @@ type
     Handle: Pointer; 
     Revision: LongWord; //the module version
     BuildDate: TTimeStamp;
+  public
+    procedure RequireDLLHandle;
+    procedure FreeDLLHandle;
   end;
 
   TTurboTypeInfo = object(TTurboMetaInfo)
@@ -234,7 +242,7 @@ implementation
 { TTurboMethodInfo }
 function TTurboMethodInfo.IsExternal: Boolean;
 begin
-  Result := CodeFieldStyle = cfsExternalFunction; 
+  Result := CodeFieldStyle in cTurboExternalFunctions; 
 end;
 
 function TTurboMethodInfo.GetExternalOptionsAddr: PTurboExteralMethodOptions; 
@@ -247,6 +255,50 @@ begin
     Result := nil;
 end;
 
+{ TTurboMethodInfoEx }
+procedure TTurboMethodInfoEx.RequireDLLProcAddress;
+var
+  s: string;
+begin
+  if (MethodAddr = 0) and (CodeFieldStyle = cfsDLLFunction) then
+  begin
+    ExternalOptions.ModuleRef.RequireDLLHandle;
+    Assert(Assigned(ExternalOptions.ModuleRef.Handle), 'RequireDLLHandle failed.');
+    if ExternalOptions.Name <> '' then
+      s := ExternalOptions.Name
+    else if ExternalOptions.Index <> -1 then
+      s := ''
+    else
+      s := Name;
+    if s <> '' then
+    begin
+      Pointer(MethodAddr) := GetProcAddress(LongWord(ExternalOptions.ModuleRef.Handle)
+        , PChar(s));
+    end
+    else
+      Pointer(MethodAddr) := GetProcAddress(LongWord(ExternalOptions.ModuleRef.Handle)
+        , Pointer(ExternalOptions.Index));
+  end;
+end;
 
+procedure TTurboModuleRefInfo.RequireDLLHandle;
+begin
+  if not Assigned(Handle) and (ModuleType = mtDLL) then
+  begin
+    LongWord(Handle) := LoadLibrary(Name);
+    //if not Assigned(Handle) then
+     //error
+  end;  
+end;
+
+procedure TTurboModuleRefInfo.FreeDLLHandle;
+begin
+  if Assigned(Handle) and (ModuleType = mtDLL) then
+  begin
+    if FreeLibrary(LongWord(Handle)) then
+      Handle := nil;
+  end;
+    
+end;
 
 end.
