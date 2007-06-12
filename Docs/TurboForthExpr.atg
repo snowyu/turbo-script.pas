@@ -277,12 +277,14 @@ PRODUCTIONS
     "BEGIN"                                            (. FInitProcCFA := FModule.UsedMemory; 
                                                           vMainMethod := FModuleSymbol.NewMethod(cMainEntryProcName);
                                                           try
-                                                            vMainMethod.CFA := FModule.UsedMemory;
                                                             vMainMethod.CallStyle := ccForth;
                                                             vMainMethod.CodeFieldStyle := cfsFunction;
+                                                            //vMainMethod.CFA := FModule.UsedMemory;
+                                                            vMainMethod.DeclareTo(FModuleSymbol);
                                                        .)
     ASMStatementBlock<vMainMethod>
-    "END."                                             (.   FModule.AddOpToMem(opPushInt); FModule.AddIntToMem(0); FModule.AddOpToMem(opHalt); 
+    "END."                                             (.   vMainMethod.DeclareEndTo(FModuleSymbol);
+                                                            //FModule.AddOpToMem(opPushInt); FModule.AddIntToMem(0); FModule.AddOpToMem(opHalt); 
                                                           finally
                                                             //MeFreeAndNil(vMainMethod); //managed by FModuleSymbol.
                                                           end;
@@ -509,7 +511,13 @@ PRODUCTIONS
     [
       StringToken                                           (.aWord.ModuleName := AnsiDequotedStr(LexString, '''');
                                                               aWord.ModuleType := mtLib; .)  //the default module Type is mtLib
-      [ModuleType<aWord.ModuleType>]
+      [ModuleType<aWord.ModuleType>                        (.
+                                                              case aWord.ModuleType of
+                                                                mtDLL:  aWord.CodeFieldStyle := cfsDLLFunction;
+                                                                mtHost: aWord.CodeFieldStyle := cfsHostFunction;
+                                                              end;
+                                                            .)
+      ]
     ]
     [
       "STDCALL"                (. aWord.CallStyle := ccStdCall; .)
