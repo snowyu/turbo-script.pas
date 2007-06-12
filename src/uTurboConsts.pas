@@ -106,13 +106,22 @@ type
   tvPublicTypedVisibilty   = $02000000;
   }
   //TTurboVisibility = (fvHidden, fvPrivate, fvProtected, fvPublic, fvPublished);
+  
+  //See Also consstants: tvXXXXVisibilty
   TTurboVisibility = LongWord;
 
   //the Forth Execution priority fpHighest means cfsImmediately
   TTurboPriority = (fpLowest, fpLower, fpLow, fpNormal, fpHigh, pfHigher, fpHighest);
   //TTurboCallStyle = (csForth, csRegister, csPascal, csCdecl, csStdCall, csFastCall);
-  //cfsExternalFunction is external function. see Also ExternalOptions.ModuleType
-  TTurboCodeFieldStyle = (cfsFunction, cfsExternalFunction);
+  {: the Method Style. }
+  {
+  @param cfsFunction          It's the local Lib function.          
+  @param cfsExternalFunction  It's the external Lib function. 
+  @param cfsHostFunction      It's the external Host function.
+  @param cfsDLLFunction       It's the external DLL function.
+  see Also ExternalOptions.ModuleType
+  }
+  TTurboCodeFieldStyle = (cfsFunction, cfsExternalFunction, cfsHostFunction, cfsDLLFunction);
 {  TTurboWordOptions = packed record //a DWORD
       //优先级, highest means an IMMEDIATE word
       //1=True; 0=False; Smudge bit. used to prevent FIND from finding this word
@@ -284,7 +293,8 @@ type
     @param errOutOfMetaData MetaData区已无可用的空间
   }
   TTurboProcessorErrorCode = (errNone, errBadInstruction, errInstructionBadParam, errDizZero
-    , errModuleNotFound
+    , errModuleNotFound, errMethodNotFound, errTypeInfoNotFound
+    , errStaticFieldNotFound, errFieldNotFound
     , errOutOfMem
     , errOutOfMetaData
     , errOutOfDataStack, errOutOfReturnStack
@@ -320,6 +330,8 @@ const
   cTurboScriptIsSteppingBit      = psStepping;
   //cTurboScriptBadInstructionBit  = [psBadInstruction];
   cMaxTurboVMInstructionCount = SizeOf(TTurboCoreWords) div SizeOf(TProcedure); //the max turbo VM code directive count
+  
+  cTurboExternalFunctions = [cfsExternalFunction, cfsHostFunction, cfsDLLFunction];
 
   //用一个 LongWord（DWord）来存放：TTurboVisibility
   {: 该标识符私有，没有名字，没有类型！}
