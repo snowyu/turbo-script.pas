@@ -529,6 +529,7 @@ procedure TTurboMethodSymbol.Init;
 begin
   Inherited;
   CFA := -1;
+  ExternalOptions.Index := -1;
 end;
 
 destructor TTurboMethodSymbol.Destroy;
@@ -635,40 +636,32 @@ begin
   if CFA = -1 then
   begin
     Result := cSymbolErrorOk;
-    if CodeFieldStyle = cfsFunction then
-    begin
-      CFA := aModule.Module.UsedMemory;
-    end
-    else 
-    begin
-      //the external method.
-      case CallStyle of
-        ccForth:
-          begin
-            CFA := GetExternalLocalMethodAddr();
-            if CFA = -1 then
-              Result := cSymbolErrorUnknownMethod;
+    Case CodeFieldStyle of
+      cfsFunction:
+        begin
+          CFA := aModule.Module.UsedMemory;
+        end;
+      cfsExternalFunction: //the external forth function
+        begin
+          CFA := GetExternalLocalMethodAddr();
+          if CFA = -1 then
+            Result := cSymbolErrorUnknownMethod;
 
-            if (Result = cSymbolErrorOk) and not Assigned(ExternalOptions.ModuleRef) then
-            begin
-              Result := ModuleSymbol.DeclareTo(aModule);
-              if Result <> cSymbolErrorOk then Exit;
-              Integer(p) := aModule.UsedModules.IndexOf(ModuleSymbol);
-              if Integer(p) >= 0 then
-              begin
-                ExternalOptions.ModuleRef := Pointer(Integer(aModule.UsedModules.Entries[Integer(p)]) + SizeOf(tsPointer));
-              end
-              else
-                Result := cSymbolErrorModuleRefAddedFailed;
-            end;
-          end;
-        ccUnknown:
+          if (Result = cSymbolErrorOk) and not Assigned(ExternalOptions.ModuleRef) then
           begin
-            Result := cSymbolErrorUnknownCallStyle;
+            Result := ModuleSymbol.DeclareTo(aModule);
+            if Result <> cSymbolErrorOk then Exit;
+            Integer(p) := aModule.UsedModules.IndexOf(ModuleSymbol);
+            if Integer(p) >= 0 then
+            begin
+              ExternalOptions.ModuleRef := Pointer(Integer(aModule.UsedModules.Entries[Integer(p)]) + SizeOf(tsPointer));
+            end
+            else
+              Result := cSymbolErrorModuleRefAddedFailed;
           end;
-      end; //case
-      if Result <> cSymbolErrorOk then Exit;
-    end;
+          if Result <> cSymbolErrorOk then Exit;
+        end;
+    end; //case
     if IsPublic(aModule.Module) then with aModule.Module do
     begin
       //writeln('aModule.UsedDataSize=',InttoHex(aModule.UsedDataSize,4));
@@ -693,14 +686,12 @@ begin
       Entry.Word.Visibility := Visibility;
       Entry.Word.CallStyle := CallStyle;
       Entry.Word.CodeFieldStyle := CodeFieldStyle;
-      if CodeFieldStyle = cfsExternalFunction then
+      if Entry.Word.IsExternal then
       begin
         Integer(p) := Integer(DataMemory) + UsedDataSize;
         AllocDataSpace(SizeOf(TTurboExteralMethodOptions));
         p^ := ExternalOptions;
         Assert(p=Entry.Word.GetExternalOptionsAddr, 'Method.DeclareTo: ExternalOptionsAddr mismatch');
-        //if p = Entry.Word.GetExternalOptionsAddr then
-          //writeln('GetExternalOptionsAddr addr ok!!');
       end;
     end;
   end
@@ -715,7 +706,14 @@ begin
   if (CodeFieldStyle = cfsFunction) and (CFA <> -1) then with aModule.Module do
   begin
     vIsPublic := IsPublic(aModule.Module);
-    if vIsPublic then
+    
+    if Self.Name = cMainEntryProcName then
+    begin
+      //writeln('DeclareEndTo:',cMainEntryProcName );
+      AddOpToMem(opPushInt); AddIntToMem(0); 
+      AddOpToMem(opHalt);
+    end
+    else if vIsPublic then
       AddOpToMem(opExitFar)
     else
       AddOpToMem(opExit);
@@ -756,57 +754,52 @@ begin
   Result := cSymbolErrorOk;
   case CodeFieldStyle of
     cfsFunction:
-    begin
-      if CFA = -1 then
       begin
-        Result := cSymbolErrorNoSpecifiedMethodAddr;
-        Exit;
-      end;
-      with aModule.Module do if IsPublic(aModule.Module) then
-      begin
-        AddOpToMem(opEnterFar);
-        AddIntToMem(0);
-        AddIntToMem(CFA);
-      end
-      else
-      begin
-        AddOpToMem(opEnter);
-        AddIntToMem(CFA);
-      end;
-    end;
-    cfsExternalFunction:
-    begin
-      case CallStyle of
-        ccForth:
+        if CFA = -1 then
         begin
-          vCFA := CFA;
-          if vCFA = -1 then
-          begin
-            vCFA := GetExternalLocalMethodAddr();
-          end;
-          if vCFA <> -1 then
-          begin
-            aModule.Module.AddOpToMem(opCallFar);
-            //writeln(Name, '.ModEntry:',Integer(OwnerSymbol.Entry)- Integer(aModule.DataMemory));
-            //point to the TurboModuleInfo
-            //TODO: BUG ExternalOptions.ModuleRef if the DeclareTo(Module) is not same as the PushTo(Module)
-            //      the ExternalOptions.ModuleRef should put into Module too.
-            if not Assigned(ExternalOptions.ModuleRef) then
-            begin
-              ModuleSymbol.DeclareTo(aModule);
-              i := aModule.UsedModules.IndexOf(ModuleSymbol);
-              ExternalOptions.ModuleRef := Pointer(Integer(aModule.UsedModules.Entries[i]) + SizeOf(tsPointer));
-            end;
-            //writeln(Name, '.ModRef:',Integer(ExternalOptions.ModuleRef) - Integer(aModule.DataMemory));
-            aModule.Module.AddIntToMem(Integer(ExternalOptions.ModuleRef) - Integer(aModule.Module.DataMemory));
-            aModule.Module.AddIntToMem(vCFA);
-            //writeln(Name, '.CFA:',vCFA);
-          end
-          else
-            Result := cSymbolErrorUnknownMethod;
+          Result := cSymbolErrorNoSpecifiedMethodAddr;
+          Exit;
         end;
-      end; //case
-    end;
+        with aModule.Module do if IsPublic(aModule.Module) then
+        begin
+          AddOpToMem(opEnterFar);
+          AddIntToMem(0);
+          AddIntToMem(CFA);
+        end
+        else
+        begin
+          AddOpToMem(opEnter);
+          AddIntToMem(CFA);
+        end;
+      end;
+    cfsExternalFunction: //the external TurboScript Lib Function.
+      begin
+        vCFA := CFA;
+        if vCFA = -1 then
+        begin
+          vCFA := GetExternalLocalMethodAddr();
+        end;
+        if vCFA <> -1 then
+        begin
+          aModule.Module.AddOpToMem(opCallFar);
+          //writeln(Name, '.ModEntry:',Integer(OwnerSymbol.Entry)- Integer(aModule.DataMemory));
+          //point to the TurboModuleInfo
+          //TODO: BUG ExternalOptions.ModuleRef if the DeclareTo(Module) is not same as the PushTo(Module)
+          //      the ExternalOptions.ModuleRef should put into Module too.
+          if not Assigned(ExternalOptions.ModuleRef) then
+          begin
+            ModuleSymbol.DeclareTo(aModule);
+            i := aModule.UsedModules.IndexOf(ModuleSymbol);
+            ExternalOptions.ModuleRef := Pointer(Integer(aModule.UsedModules.Entries[i]) + SizeOf(tsPointer));
+          end;
+          //writeln(Name, '.ModRef:',Integer(ExternalOptions.ModuleRef) - Integer(aModule.DataMemory));
+          aModule.Module.AddIntToMem(Integer(ExternalOptions.ModuleRef) - Integer(aModule.Module.DataMemory));
+          aModule.Module.AddIntToMem(vCFA);
+          //writeln(Name, '.CFA:',vCFA);
+        end
+        else
+          Result := cSymbolErrorUnknownMethod;
+      end;
   end;//case
 end;
 
