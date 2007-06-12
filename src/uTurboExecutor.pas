@@ -1426,8 +1426,20 @@ begin
 end;
 
 procedure TCustomTurboModule.ResolveAddress;
+var
+  I: Integer;
+  vTypeInfoEntry: PTurboTypeRefEntry;
 begin
   ConvertTurboMetaInfoEntryAddr(FDataMemory, True);
+  vTypeInfoEntry := LastTypeInfoEntry;
+  while assigned(vTypeInfoEntry) do
+  begin
+    I := Integer(vTypeInfoEntry.TurboType);
+    Assert(I >= 0, 'vTypeInfoEntry.TurboType index Too small.');
+    Assert(I < RegisteredTypes.Count, 'vTypeInfoEntry.TurboType index Too big.');
+    vTypeInfoEntry.TurboType := RegisteredTypes.Items[I];
+    vTypeInfoEntry := vTypeInfoEntry.Prior;
+  end;
 end;
 
 procedure TCustomTurboModule.SaveToFile(const aFileName: String);
@@ -1715,6 +1727,15 @@ end;
 procedure TCustomTurboModule.UnResolveAddress;
 begin
   //TurboConvertAddrAbsoluteToRelated(FMemory, FDataMemory);
+  vTypeInfoEntry := LastTypeInfoEntry;
+  while assigned(vTypeInfoEntry) do
+  begin
+    I := RegisteredTypes.IndexOf(vTypeInfoEntry.TurboType);
+    Assert(I >= 0, 'vTypeInfoEntry.TurboType Not found in the RegisteredTypes.');
+    Integer(vTypeInfoEntry.TurboType) := I;
+    vTypeInfoEntry := vTypeInfoEntry.Prior;
+  end;
+
   ConvertTurboMetaInfoEntryAddr(FDataMemory, False);
 end;
 
@@ -2211,6 +2232,8 @@ begin
       Integer(Prior) := Integer(Prior) + Integer(aMem);
     if Assigned(Word.Name) then
         Word.Name := Pointer(Integer(Word.Name) + Integer(aMem));
+    if Assigned(Word.TypeInfo) then
+        Word.TypeInfo := Pointer(Integer(Word.TypeInfo) + Integer(aMem));  
     if Word.IsExternal then
     begin
       with Word.GetExternalOptionsAddr^ do
