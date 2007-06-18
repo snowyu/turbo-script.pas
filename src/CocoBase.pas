@@ -8,6 +8,9 @@ unit CocoBase;
 interface
 
 uses
+  {$IFDEF MSWINDOWS}
+  Windows,
+  {$ENDIF}
   Classes, SysUtils
   , uMeObject
   , uMeTypes
@@ -19,6 +22,12 @@ uses
   , uTurboModuleFileAccessor
   , uTurboCompilerUtils
   ;
+
+{$IFDEF DEBUG}
+var
+  tBegin, tEnd: Int64;
+  CountFreq: Int64;
+{$ENDIF}
 
 const
   setsize = 16; { sets are stored in 16 bits }
@@ -1354,6 +1363,9 @@ end;
 
 procedure TCocoRGrammar.Init;
 begin
+  {$IFDEF DEBUG}
+        QueryPerformanceCounter(tBegin);
+  {$ENDIF}
   with FModule do
   begin
     ClearMemory;
@@ -1374,6 +1386,9 @@ var
   vStream: TFileStream;
 begin
   //writeln('Final');
+  {$IFDEF DEBUG}
+  QueryPerformanceCounter(tEnd);
+  {$ENDIF}
   if ErrorList.Count = 0 then
   begin
    //writeln('No error');
@@ -1401,6 +1416,11 @@ begin
   FModule.ClearMemory;
   FModuleSymbol.Clear;
 end;
+
+initialization
+  {$IFDEF DEBUG}
+  QueryPerformanceFrequency(CountFreq);
+  {$ENDIF}
 
 end.
 

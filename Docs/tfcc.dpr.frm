@@ -3,9 +3,14 @@ $M"tfcc" /* the module file base name */
 program -->MODULENAME<--;
 {$APPTYPE CONSOLE}
 
+{$I TurboScript.inc}
+
 uses
   {$IFNDEF FPC}
   FastMM4,
+  {$ENDIF}
+  {$IFDEF MSWINDOWS}
+  Windows,
   {$ENDIF}
   SysUtils,
   uTurboConsts,
@@ -134,7 +139,13 @@ begin
       -->Grammar<--1.SourceFileName := GFileName;
       try
         -->Grammar<--1.Execute;
+        {$IFDEF DEBUG}
+        tEnd := tEnd - tBegin;
+        writeln('ScriptCompileTime(',tEnd,'):',tEnd/CountFreq*1000*1000 :8:4, ' (us)');
+        {$ENDIF}
       except
+        On E: Exception Do
+          Writeln('Exception:', E.Message);
       End;
     finally
       DisplayObj.Free;
