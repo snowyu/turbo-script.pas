@@ -279,6 +279,7 @@ PRODUCTIONS
                                                           try
                                                             vMainMethod.CallStyle := ccForth;
                                                             vMainMethod.CodeFieldStyle := cfsFunction;
+                                                            vMainMethod.Visibility := tvPrivateVisibilty;
                                                             //vMainMethod.CFA := FModule.UsedMemory;
                                                             vMainMethod.DeclareTo(FModuleSymbol);
                                                        .)
@@ -440,8 +441,13 @@ PRODUCTIONS
                                                                     vWord.Visibility := tvPrivateVisibilty; 
                                                                     vWord.CallStyle := ccForth;
                                                                     vWord.CodeFieldStyle := cfsFunction;
+                                                                    if not Assigned(vWord.TypeInfo) then
+                                                                    begin
+                                                                      SynError(cSymbolErrorMethodDeclaration, 'Can Not Assigned Method TypeInfo!');
+                                                                      exit;
+                                                                    end;
                                                                  .)
-    ":" [WordVsibility<vWord.Visibility>] Identifier     (. vWord.Name := LexString; .)
+    ":" [WordVsibility<vWord.Visibility>] Identifier            (. vWord.Name := LexString; .)
 
     [FormalParameters<vWord>]
     
@@ -468,7 +474,7 @@ PRODUCTIONS
   .
   FormalParameters<const aWord: PTurboMethodSymbol> = "(" [FormalParms<aWord>] ")" .
   FormalParms<const aWord: PTurboMethodSymbol> 
-    (. var vProcType: PMeProcType; vParamType: PMeParamType; .)
+    (. var vProcType: PMeProcType; .)
     =                                                            (. vProcType := aWord.TypeInfo; 
                                                                     if not Assigned(vProcType) then
                                                                     begin

@@ -11,7 +11,9 @@ interface
 uses
   Windows, //QueryPerformanceCounter
   SysUtils, Classes
+  , uMeObject
   , uMeTypes
+  , uMeProcType
   , uTurboConsts
   , uTurboMetaInfo
   , uTurboExecutor
@@ -264,11 +266,12 @@ begin
 }
 end;
 
-procedure _DoVMCallFarMemBase(const FGlobalOptions: PTurboGlobalOptions; 
-  aModuleRefInfo: PTurboModuleRefInfo);
+function _DoVMCallFarMemBase(const FGlobalOptions: PTurboGlobalOptions; 
+  aModuleRefInfo: PTurboModuleRefInfo): Boolean;
 var
   p: Pointer;
 begin
+  Result := True;
   //Push the current MemoryBase to return stack.
   Dec(FGlobalOptions._RP, SizeOf(tsPointer));
   PPointer(FGlobalOptions._RP)^ := FGlobalOptions._Mem;
@@ -289,6 +292,7 @@ begin
         //POP  current MemoryBase
         Inc(FGlobalOptions._RP, SizeOf(tsPointer));
         _iVMHalt(FGlobalOptions, errModuleNotFound);
+        Result := False;
         Exit;
       end;
       aModuleRefInfo.Handle := p;
@@ -309,40 +313,16 @@ begin
   vModuleRefInfo := PPointer(FGlobalOptions._PC)^;
   Inc(FGlobalOptions._PC, SizeOf(vModuleRefInfo));
 
-  _DoVMCallFarMemBase(FGlobalOptions, vModuleRefInfo);
-{  //Push the current MemoryBase to return stack.
-  Dec(FGlobalOptions._RP, SizeOf(tsPointer));
-  PPointer(FGlobalOptions._RP)^ := FGlobalOptions._Mem;
-
-  if Assigned(vModuleRefInfo) then
-  begin
-    //PTurboModuleRefInfo real addr
-    Integer(vModuleRefInfo) := Integer(vModuleRefInfo) + Integer(FGlobalOptions._Mem);
-    p := vModuleRefInfo.Handle;
-    if not Assigned(p) then
-    begin
-      //@@RequireModule
-      //find and load the module into the memory.
-      p := FGlobalOptions._Mem.ModuleHandle.RequireModule(vModuleRefInfo.Name);
-      if not Assigned(p) then
-      begin
-        //@@NotFoundError
-        //POP  current MemoryBase
-        Inc(FGlobalOptions._RP, SizeOf(tsPointer));
-        _iVMHalt(FGlobalOptions, errModuleNotFound);
-        Exit;
-      end;
-      vModuleRefInfo.Handle := p;
-    end;
-    FGlobalOptions._Mem := TTurboMemoryModuleAccess(p).FDataMemory;
-  end; //}
-  iVMEnter(FGlobalOptions);
+  if _DoVMCallFarMemBase(FGlobalOptions, vModuleRefInfo) then
+    iVMEnter(FGlobalOptions);
 end;
 
+{ opCallExt<PTurboMethodInfo> }
 procedure iVMCallExt(const FGlobalOptions: PTurboGlobalOptions);
 var
   vMethodInfo: PTurboMethodInfoEx;
   p: tsPointer;
+  vMeProc: PMeProcParams;
 begin
   //Push the current MemoryBase to return stack.
   //Dec(FGlobalOptions._RP, SizeOf(tsPointer));
@@ -352,21 +332,55 @@ begin
   Inc(FGlobalOptions._PC, SizeOf(vMethodInfo));
   if Assigned(vMethodInfo) then
   begin
+    Integer(vMethodInfo) := Integer(vMethodInfo) + Integer(FGlobalOptions._Mem);
     case vMethodInfo.CodeFieldStyle of
       cfsFunction: 
-      begin
-        _DoVMEnter(FGlobalOptions, vMethodInfo.MethodAddr);
-      end;
-      cfsExternalFunction: 
-      begin
-        case vMethodInfo.CallStyle of
-          ccForth: 
-          begin
-            _DoVMCallFarMemBase(FGlobalOptions, vMethodInfo.ExternalOptions.ModuleRef);
-            _DoVMEnter(FGlobalOptions, vMethodInfo.MethodAddr);
-          end;
+        begin
+          _DoVMEnter(FGlobalOptions, vMethodInfo.MethodAddr);
         end;
-      end; 
+      cfsExternalFunction: 
+        begin
+          if _DoVMCallFarMemBase(FGlobalOptions, vMethodInfo.ExternalOptions.ModuleRef) then
+            _DoVMEnter(FGlobalOptions, vMethodInfo.MethodAddr);
+        end;
+      cfsDLLFunction:
+        begin
+          if (vMethodInfo.MethodAddr = 0) then
+          begin
+            vMethodInfo.RequireDLLProcAddress;
+            if (vMethodInfo.MethodAddr = 0) then
+            begin
+              _iVMHalt(FGlobalOptions, errMethodNotFound);
+              Exit;
+            end;
+          end;
+          if not Assigned(vMethodInfo.TurboType) then
+          begin
+            _iVMHalt(FGlobalOptions, errTypeInfoNotFound);
+            Exit;
+          end;
+          New(vMeProc, Create);
+          try
+            vMeProc.ProcType := PMeProcType(vMethodInfo.TurboType);
+            vMeProc.AssignFromStack(Pointer(FGlobalOptions._SP), nil);
+            vMeProc.Execute(Pointer(vMethodInfo.MethodAddr));
+            //pop params 
+            Inc(FGlobalOptions._SP, vMeProc.ProcType.GetStackTypeSizeIn(0)); 
+            //TODO: push result here.
+            //how to allocate the string space. make a Heap?? 
+            if Assigned(vMeProc.ResultParam) then
+            begin
+              with vMeProc.ResultParam^ do 
+              if IsByRef or (DataType.ParamType.Kind in [mtkInteger, mtkChar, mtkEnumeration, mtkSet, mtkWChar]) then
+              begin
+                Dec(FGlobalOptions._SP, SizeOf(tsInt));
+                PPointer(FGlobalOptions._SP)^ := ParamValue.VPointer;   
+              end;
+            end;
+          finally
+            MeFreeAndNil(vMeProc);
+          end;
+        end; 
     end;//
   end
   else

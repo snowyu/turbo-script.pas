@@ -187,6 +187,8 @@ Type
     function GetTypeSymbol: PTurboTypeSymbol;
     function GetTypeInfo: PMeProcType;
     function GetExternalLocalMethodAddr(): tsInt;
+
+    function DeclareMethodTypeTo(const aModule: PTurboModuleSymbol): Integer;
   public
     destructor Destroy; virtual; {override}
     procedure Assign(const aSymbol: PTurboCustomSymbol); virtual;
@@ -224,18 +226,21 @@ Type
   }
   TTurboTypeSymbol = object(TTurboSymbol)
   protected
+    FIsInternal: Boolean; //if true this symbol is the GRegisteredTypes
     {: internal used type, not declare to the module.}
     FiType: PMeType;
     FTypeInfo: PMeType;
   public
     procedure Assign(const aSymbol: PTurboCustomSymbol); virtual;
     function DeclareTo(const aModule: PTurboModuleSymbol): Integer;
-    function GetTypeInfo(const aClass: TMeClass = nil): PMeType;
+    function GetTypeInfoEx(const aClass: TMeClass = nil): PMeType;
+    function GetTypeInfo(): PMeType;
   public
     destructor Destroy; virtual; {override}
   public
     Entry: PTurboTypeInfoEntry;
-    //Property TypeInfo: PMeType read GetTypeInfo;
+    Property TypeInfo: PMeType read GetTypeInfo;
+    Property IsInternal: Boolean read FIsInternal;
   end;
 
   TTurboTypeRefSymbol = object(TTurboTypeSymbol)
@@ -355,10 +360,12 @@ Type
   protected
     function GetItem(Index: Integer): PTurboTypeSymbol;
   public
+    function IndexOfSameAs(const aType: PMeType; const aBeginIndex: Integer = 0): Integer;
     function IndexOf(const aType: PMeType; const aBeginIndex: Integer = 0): Integer; overload;
     function IndexOf(const aName: string; const aBeginIndex: Integer = 0): Integer; overload;
     function Find(const aName: string): PTurboTypeSymbol;overload;
     function Find(const aType: PMeType): PTurboTypeSymbol;overload;
+    function FindSameAs(const aType: PMeType): PTurboTypeSymbol;
   public
     property Items[Index: Integer]: PTurboTypeSymbol read GetItem; default;
   end;
@@ -606,7 +613,7 @@ end;
 
 function TTurboMethodSymbol.GetTypeInfo: PMeProcType;
 begin
-  Result := PMeProcType(TypeSymbol.GetTypeInfo(TypeOf(TMeProcType)));
+  Result := PMeProcType(TypeSymbol.GetTypeInfoEx(TypeOf(TMeProcType)));
 end;
 
 function TTurboMethodSymbol.GetExternalLocalMethodAddr(): tsInt;
@@ -626,6 +633,48 @@ begin
     begin
       Result := ExternalMethodSymbol.CFA;
     end;
+  end;
+end;
+
+function TTurboMethodSymbol.DeclareMethodTypeTo(const aModule: PTurboModuleSymbol): Integer;
+var
+  vTypeSymbol: PTurboTypeSymbol;
+  i: Integer;
+begin
+  if not Assigned(FiTypeSymbol) then
+  begin
+    Result := cSymbolErrorRedeclaration;
+    Exit;
+  end;
+  vTypeSymbol := aModule.Types.FindSameAs(TypeInfo);
+  if Assigned(vTypeSymbol) then
+  begin
+    Assert(vTypeSymbol <> FiTypeSymbol, 'DeclareMethodTypeTo: vTypeSymbol = FiTypeSymbol Error');
+    MeFreeAndNil(FiTypeSymbol);
+    FTypeSymbol := vTypeSymbol;
+  end
+  else
+  begin
+    i := GRegisteredTypes.IndexOfSameAs(TypeInfo);
+    if i >= 0 then
+    begin
+      MeFreeAndNil(FiTypeSymbol.FiType);
+      FiTypeSymbol.FTypeInfo := GRegisteredTypes.Items[i];
+      FiTypeSymbol.FIsInternal := True;
+      Integer(Entry.Word.TurboType) := -i;
+    end;
+    FTypeSymbol := FiTypeSymbol;
+    FiTypeSymbol := nil;
+    aModule.Types.Add(FTypeSymbol);
+  end;
+  Result := FTypeSymbol.DeclareTo(aModule);
+  if Result = cSymbolErrorRedeclaration then
+    Result := cSymbolErrorOk;
+  if (Result = cSymbolErrorOk) and not FTypeSymbol.IsInternal then
+  begin
+    i := aModule.Module.RegisteredTypes.IndexOf(FTypeSymbol.TypeInfo);
+    if i >= 0 then Inc(i) else i := 0;
+    Integer(Entry.Word.TurboType) := i;
   end;
 end;
 
@@ -693,6 +742,12 @@ begin
         p^ := ExternalOptions;
         Assert(p=Entry.Word.GetExternalOptionsAddr, 'Method.DeclareTo: ExternalOptionsAddr mismatch');
       end;
+      if IsTyped(aModule.Module) or Entry.Word.IsExternal then
+      begin
+        DeclareMethodTypeTo(aModule);
+      end
+      else
+        Entry.Word.TurboType := nil;
     end;
   end
   else
@@ -1609,19 +1664,21 @@ begin
       Self.Entry := Entry;
       Self.FTypeInfo := FTypeInfo;
       Self.FiType := FiType;
+      Self.FIsInternal := FIsInternal;
     end;
   Inherited;
 end;
 
 function TTurboTypeSymbol.DeclareTo(const aModule: PTurboModuleSymbol): Integer;
 begin
+  Result := cSymbolErrorOk;
+  if FIsInternal then Exit;
   if Assigned(FiType) and not Assigned(FTypeInfo) then
   begin
     if aModule.Module.RegisteredTypes.RegisterType(FiType) then
     begin
       FTypeInfo:= FiType;
       FiType := nil;
-      Result := cSymbolErrorOk;
     end
     else
       Result := cSymbolErrorRegisterType;
@@ -1630,7 +1687,12 @@ begin
     Result := cSymbolErrorRedeclaration;
 end;
 
-function TTurboTypeSymbol.GetTypeInfo(const aClass: TMeClass): PMeType;
+function TTurboTypeSymbol.GetTypeInfo(): PMeType;
+begin
+  Result := GetTypeInfoEx();
+end;
+
+function TTurboTypeSymbol.GetTypeInfoEx(const aClass: TMeClass): PMeType;
 begin
   if Assigned(FTypeInfo) then
     Result := FTypeInfo
@@ -1639,6 +1701,7 @@ begin
   else if Assigned(aClass) and MeInheritsFrom(aClass, TypeOf(TMeType)) then
   begin
     Result := PMeType(NewMeObject(aClass));
+    FiType := Result;
     if Assigned(OwnerSymbol) and Assigned(OwnerSymbol.Module) then
       Result.Owner := OwnerSymbol.Module.RegisteredTypes;
   end
@@ -1920,6 +1983,27 @@ begin
       exit;
   end;
   Result := -1;
+end;
+function TTurboTypeSymbols.IndexOfSameAs(const aType: PMeType; const aBeginIndex: Integer = 0): Integer;
+begin
+  for Result := aBeginIndex to Count - 1 do
+  begin
+    with Items[Result]^ do
+    if GetTypeInfo.IsSameAs(aType) then
+      exit;
+  end;
+  Result := -1;
+end;
+
+function TTurboTypeSymbols.FindSameAs(const aType: PMeType): PTurboTypeSymbol;
+var
+  i: integer;
+begin
+  i := IndexOfSameAs(aType);
+  if i >= 0 then
+    Result := Items[i]
+  else 
+    Result := nil;
 end;
 
 function TTurboTypeSymbols.Find(const aName: string): PTurboTypeSymbol;

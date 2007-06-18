@@ -38,11 +38,15 @@ type
 const
   cRunTimeErrors : array [TTurboProcessorErrorCode] of string =
   (
-    ''
+    'None'
     , 'Bad Instruction'
     , 'Bad Instruction Param'
     , 'DizZero'
     , 'ModuleNotFound'
+    , 'MethodNotFound'
+    , 'TypeInfoNotFound'
+    , 'StaticFieldNotFound'
+    , 'FieldNotFound'
     , '代码区内存无可用的空间'
     ,'MetaData区已无可用的空间'
     , 'OutOfDataStack'

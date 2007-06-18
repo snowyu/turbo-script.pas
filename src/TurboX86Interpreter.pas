@@ -236,16 +236,6 @@ asm
 //}
 end;
 
-procedure iVMEnter;
-asm
-  LODSD
-@DoVMEnter:
-  ADD  EAX, [EDI].TTurboPreservedDataMemory.Code
-  PUSH ESI        //push the current IP.
-  MOV  ESI, EAX   //set the new IP
-  JMP iVMNext
-end;
-
 //input EAX the word CFA. 
 procedure _DoVMEnter;
 asm
@@ -253,6 +243,18 @@ asm
   PUSH ESI        //push the current IP.
   MOV  ESI, EAX   //set the new IP
   JMP iVMNext
+end;
+
+procedure iVMEnter;
+asm
+  LODSD
+@DoVMEnter:
+  //JMP  _DoVMEnter
+  ADD  EAX, [EDI].TTurboPreservedDataMemory.Code
+  PUSH ESI        //push the current IP.
+  MOV  ESI, EAX   //set the new IP
+  JMP iVMNext
+//}
 end;
 
 //(ErrorCode -- )
@@ -366,12 +368,13 @@ asm
   MOV  EDI, EAX //load the new MemoryBase
 
 @@LocalEnter:
-  //JMP iVMEnter
-  LODSD
+  JMP iVMEnter
+{  LODSD
   ADD EAX, [EDI].TTurboPreservedDataMemory.Code
   PUSH ESI        //push the current IP.
   MOV  ESI, EAX   //set the new IP
   JMP iVMNext
+//}
 end;
 
 //CALLFAR PTurboModuleInfo cfa-addr
@@ -381,8 +384,9 @@ end;
 //然后装入该函数的地址，其它就和VMEnter一样了，转去VMEnter。
 procedure iVMCallFar;
 asm
-  PUSH EDI //save the current MemoryBase.
   LODSD    //EAX= PTurboModuleInfo
+
+  PUSH EDI //save the current MemoryBase.
   TEST EAX, EAX //CMP EAX, 0
   JZ  @@DoLocalEnterFar
   ADD  EAX, EDI //PTurboModuleRefInfo real addr
@@ -437,6 +441,30 @@ asm
   PUSH ESI        //push the current IP.
   MOV  ESI, EAX   //set the new IP
   JMP iVMNext
+//}
+end;
+
+{ opCallExt<PTurboMethodInfo> }
+procedure iVMCallExt;
+asm
+  LODSD    //EAX= PTurboMethodInfo
+  TEST EAX, EAX
+  JZ   @@ParamError
+  ADD  EAX, EDI //PTurboMethodInfo real addr
+  MOV  EDX, [EAX].TTurboMethodInfo.CodeFieldStyle
+  CMP  EDX, cfsFunction
+  JNZ  @@IsExternalFunction
+@@IsLocalFunction:
+  MOV  EAX, [EAX].TTurboMethodInfo.MethodAddr
+  JMP  _DoVMEnter  
+@@IsExternalFunction:
+
+  //TODO: not fined...
+  JMP  iVMNext
+
+@@ParamError:
+  MOV  EAX, errInstructionBadParam
+  JMP  _iVMHalt
 end;
 
 procedure _DoAssert;

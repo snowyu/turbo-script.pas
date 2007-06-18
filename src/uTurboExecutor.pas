@@ -168,6 +168,7 @@ type
     }
     FTextIndex: Integer;
     FVisibility: TTurboVisibility;
+    procedure FreeDLLLibs;
     function GetDataMemorySize: tsInt;
     function GetInitializeProc: Integer;
     function GetLastTypeInfoEntry: PTurboTypeInfoEntry;
@@ -905,6 +906,7 @@ var
 begin
   if not StoredInOwner then
   begin
+    if Assigned(FDataMemory) then FreeDLLLibs;
     //vPreserved := SizeOf(TTurboPreservedDataMemory);
     //if vPreserved < Integer(High(TTurboVMInstruction)) then
         //vPreserved := Integer(High(TTurboVMInstruction));
@@ -1096,6 +1098,22 @@ begin
     Result := Result.Prior;
   end;
   Result := nil;
+end;
+
+procedure TCustomTurboModule.FreeDLLLibs;
+var
+  vModuleRefEntry: PTurboModuleRefEntry;
+begin
+  vModuleRefEntry := LastModuleRefEntry;
+  while (vModuleRefEntry <> nil) do
+  begin
+    if not IsAddrResolved then
+    begin
+      Integer(vModuleRefEntry) := Integer(FDataMemory) + Integer(vModuleRefEntry);
+    end;
+    vModuleRefEntry.Module.FreeDLLHandle;
+    vModuleRefEntry := vModuleRefEntry.Prior;
+  end;
 end;
 
 function TCustomTurboModule.GetDataMemorySize: tsInt;
@@ -1428,16 +1446,35 @@ end;
 procedure TCustomTurboModule.ResolveAddress;
 var
   I: Integer;
-  vTypeInfoEntry: PTurboTypeRefEntry;
+  vTypeInfoEntry: PTurboTypeInfoEntry;
 begin
   ConvertTurboMetaInfoEntryAddr(FDataMemory, True);
   vTypeInfoEntry := LastTypeInfoEntry;
   while assigned(vTypeInfoEntry) do
   begin
-    I := Integer(vTypeInfoEntry.TurboType);
-    Assert(I >= 0, 'vTypeInfoEntry.TurboType index Too small.');
-    Assert(I < RegisteredTypes.Count, 'vTypeInfoEntry.TurboType index Too big.');
-    vTypeInfoEntry.TurboType := RegisteredTypes.Items[I];
+    I := Integer(vTypeInfoEntry.TypeInfo.TurboType);
+    Assert(I >= 0, 'vTypeInfoEntry.TypeInfo.TurboType index Too small.');
+    Assert(I < RegisteredTypes.Count, 'vTypeInfoEntry.TypeInfo.TurboType index Too big.');
+    vTypeInfoEntry.TypeInfo.TurboType := RegisteredTypes.Items[I];
+    vTypeInfoEntry := vTypeInfoEntry.Prior;
+  end;
+
+  PTurboMethodEntry(vTypeInfoEntry) := LastWordEntry;
+  while assigned(vTypeInfoEntry) do
+  begin
+    I := Integer(PTurboMethodEntry(vTypeInfoEntry).Word.TurboType);
+    if I < 0 then
+    begin
+      I := -I;
+      Assert(I < GRegisteredTypes.Count, 'vMethodInfoEntry.TurboType index is too big for the GRegisteredTypes.');
+      PTurboMethodEntry(vTypeInfoEntry).Word.TurboType := GRegisteredTypes.Items[I];
+    end
+    else if I > 0 then
+    begin
+      Dec(I);
+      Assert(I < RegisteredTypes.Count, 'vMethodInfoEntry.TurboType index is too big for the RegisteredTypes.');
+      PTurboMethodEntry(vTypeInfoEntry).Word.TurboType := RegisteredTypes.Items[I];
+    end;
     vTypeInfoEntry := vTypeInfoEntry.Prior;
   end;
 end;
@@ -1725,16 +1762,39 @@ begin
 end;
 
 procedure TCustomTurboModule.UnResolveAddress;
+var
+  I: Integer;
+  vTypeInfoEntry: PTurboTypeInfoEntry;
 begin
   //TurboConvertAddrAbsoluteToRelated(FMemory, FDataMemory);
   vTypeInfoEntry := LastTypeInfoEntry;
   while assigned(vTypeInfoEntry) do
   begin
-    I := RegisteredTypes.IndexOf(vTypeInfoEntry.TurboType);
+    I := RegisteredTypes.IndexOf(vTypeInfoEntry.TypeInfo.TurboType);
     Assert(I >= 0, 'vTypeInfoEntry.TurboType Not found in the RegisteredTypes.');
-    Integer(vTypeInfoEntry.TurboType) := I;
+    Integer(vTypeInfoEntry.TypeInfo.TurboType) := I;
     vTypeInfoEntry := vTypeInfoEntry.Prior;
   end;
+
+  PTurboMethodEntry(vTypeInfoEntry) := LastWordEntry;
+  while assigned(vTypeInfoEntry) do
+  begin
+    if Assigned(PTurboMethodEntry(vTypeInfoEntry).Word.TurboType) then
+    begin
+      I := RegisteredTypes.IndexOf(PTurboMethodEntry(vTypeInfoEntry).Word.TurboType);
+      if I < 0 then
+      begin
+        I := GRegisteredTypes.IndexOf(PTurboMethodEntry(vTypeInfoEntry).Word.TurboType);
+        Assert(I >= 0, 'vMethodInfoEntry.TurboType Not found in the GRegisteredTypes.');
+        I := -I;
+      end
+      else
+        Inc(I);
+      Integer(PTurboMethodEntry(vTypeInfoEntry).Word.TurboType) := I;
+    end;
+    vTypeInfoEntry := vTypeInfoEntry.Prior;
+  end;
+
 
   ConvertTurboMetaInfoEntryAddr(FDataMemory, False);
 end;
@@ -2232,8 +2292,8 @@ begin
       Integer(Prior) := Integer(Prior) + Integer(aMem);
     if Assigned(Word.Name) then
         Word.Name := Pointer(Integer(Word.Name) + Integer(aMem));
-    if Assigned(Word.TypeInfo) then
-        Word.TypeInfo := Pointer(Integer(Word.TypeInfo) + Integer(aMem));  
+    //if Assigned(Word.TypeInfo) then
+        //Word.TypeInfo := Pointer(Integer(Word.TypeInfo) + Integer(aMem));  
     if Word.IsExternal then
     begin
       with Word.GetExternalOptionsAddr^ do

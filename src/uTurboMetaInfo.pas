@@ -94,7 +94,13 @@ type
     CallStyle: TCallingConvention;
     CodeFieldStyle: TTurboCodeFieldStyle;
     //本地方法其类型必然也被编入本地！
-    TypeInfo: PTurboTypeInfo; 
+    {
+    in the stream(not resolved):
+     0 = nil 
+     -1..-GRegisteredTypes.Count = internal types
+     >= 1 local user defined type index-1. 
+    }
+    TurboType: PMeType; 
     //ExternalWordOptions: TTurboExteralWordOptions;
     function GetExternalOptionsAddr: PTurboExteralMethodOptions; 
 

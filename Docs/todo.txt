@@ -12,9 +12,36 @@ TODO:
   需要查找堆栈有关的操作修改之！
 !* [Bug] ModuleParent is not set or convert to related or absolute address!
 
+2007-6-18 11:14
+!+ the string space processor.
+  在函数返回中可能是AnsiString字符串，这种字符串是动态分配的。
+
+2007-6-12 15:15
+* TurboMethodInfo: 
+  + TurboType: PMeType instead of the TypeInfo
+    in the stream(not resolved):
+     0 = nil 
+     -1..-GRegisteredTypes.Count = internal types
+     >= 1 local user defined type index-1. 
+* TurboCustomModule.ResolveAddress, UnResolveAddress
+  + Resolve/UnResolve the TurboMethodInfo.TurboType
+~ 实际上对于一般Symbol.DeclareTo的模块就应该是其OwnerSymbol,那么是否该取消DeclareTo，直接Declare呢？
+  
+
+2007-6-11
+* [TFCC] Compiler vMainMethod use the DeclareTo and DeclareEndTo now
++ [TFCC] cfsHostFunction, cfsDLLFunction for external function define.
+
+2007-6-10 9:40
+* TTurboCodeFieldStyle
+  + cfsHostFunction, cfsDLLFunction
++ constant cTurboExternalFunctions
+
 2007-6-9 11:39
 ~ MethodSymbol, MethodRefSymbol 的确混淆了，混得俺都乱了。
   在俺的MethodList链表中既有自己的方法，又有外部方法： MethodRefSymbol。
+  现在基本理清楚了，以前混淆是因为没有将隐含使用外部方法（没有显示定义）的放到MethodList上，将其它模块上的方法Symbol直接在使用（居然没出问题）！
+  现在全部大改，AddExternalLibMethod就是专门用于将其它模块的本地方法添加为自己模块的外部方法的（如果没定义）。
   
 * [TurboModuleSymbol] 大修
   - Entry, 启用 TurboModuleRefSymbols.Entries[] 代替。
@@ -34,6 +61,7 @@ TODO:
     如果没有类型信息，并且Assigned(ExternalMethodSymbol)，则自动返回 ExternalMethodSymbol.TypeSymbol.
 
 * remove the SymbolError constants from the Coco.pas to uTurboCompileUtils
+
 2007-6-8 11:48
 + instruction opCallExt; //opCallExt PTurboMethodInfo(offset of Memory)
 * [uTurboExecutor] ForEachEntry to convert MetaData Entry address.
