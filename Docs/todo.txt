@@ -13,8 +13,14 @@ TODO:
 !* [Bug] ModuleParent is not set or convert to related or absolute address!
 
 2007-6-18 11:14
-!+ the string space processor.
+!+ The TurboScript Heap Manager
+  !+ the string space processor.
   在函数返回中可能是AnsiString字符串，这种字符串是动态分配的。
+  + Maybe i should implement the method init and finit entry. 不用，只需要编译器上做手脚（MethodSymbol）
+  记录所有需要退出释放的地址，然后统一释放（其实就是减少计数器的值1，这个是由Delphi完成）
+  涉及到两个方面，1. 动态分配内存； 2. 引用计数。
+  暂时使用Delphi的堆管理。
+  管它的,现目前，俺只需要一种动态分配引用计数类型：AnsiString.
 
 2007-6-12 15:15
 * TurboMethodInfo: 

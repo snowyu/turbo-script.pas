@@ -855,6 +855,9 @@ begin
         else
           Result := cSymbolErrorUnknownMethod;
       end;
+    cfsDLLFunction:
+      begin
+      end;
   end;//case
 end;
 
