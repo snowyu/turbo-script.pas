@@ -65,6 +65,7 @@ type
   //PTurboPreservedCodeMemory = ^ TTurboPreservedCodeMemory;
   PTurboPreservedDataMemory = ^ TTurboPreservedDataMemory;
   PTurboGlobalOptions = ^TTurboGlobalOptions;
+  PRelocatedAddresses = ^TRelocatedAddresses;
 
   TCustomTurboPEFormat = class;
   TCustomTurboModule = class;
@@ -143,6 +144,7 @@ type
   private
     FOnReset: TNotifyEvent;
     FRegisteredTypes: PTurboRegisteredTypes;
+    FRelocatedDataAddresses: PRelocatedAddresses;
     function GetIsAddrResolved: Boolean;
     function GetLastModuleRefEntry: PTurboModuleRefEntry;
     function GetOptions: TTurboScriptOptions;
@@ -241,6 +243,11 @@ type
     Note: you must InitExecution first.
     }
     procedure AddOpToMem(const aOpCode: TTurboVMInstruction);
+    {: add a PChar to the free data-memory, and add UsedMemory }
+    { Description
+    Note: you must InitExecution first.
+    }
+    procedure AddPCharToData(const aValue: string);
     {: fill 0 to align the memory. }
     procedure AlignData;
     {: fill 0 to align the memory. }
@@ -364,6 +371,8 @@ type
     不过现在，俺不管它，所有用户定义的类型都放这里。
     }
     property RegisteredTypes: PTurboRegisteredTypes read FRegisteredTypes;
+    property RelocatedDataAddresses: PRelocatedAddresses read
+            FRelocatedDataAddresses;
     property Root: TCustomTurboModule read GetRoot;
     {: 已经使用的内存 }
     { Description
@@ -629,6 +638,15 @@ type
     BuildDate: TTimeStamp;
   end;
   
+  TRelocatedAddresses = object(TMeList)
+  public
+    function Add(const aValue: Integer): Integer;
+    procedure Relocate(BaseAddress: Pointer; 
+      const aRelocated: Boolean);
+    procedure LoadFromStream(const aStream: TStream);
+    procedure SaveToStream(const aStream: TStream);
+  end;
+  
 type
   PPTurboEntry = ^ PTurboEntry;
   PTurboEntry  = ^ TTurboEntry;
@@ -737,6 +755,7 @@ begin
   FVisibility := aVisibility;
   //FOptions := [soLoadOnDemand];
   New(FRegisteredTypes, Create);
+  New(FRelocatedDataAddresses, Create);
   ClearMemory;
 end;
 
@@ -746,6 +765,7 @@ begin
 
   FreeAndNil(FModuleUnloadNotifies);
   MeFreeAndNil(FRegisteredTypes);
+  MeFreeAndNil(FRelocatedDataAddresses);
   if not StoredInOwner then
   begin
     if ModuleType <> mtFunction then
@@ -860,6 +880,26 @@ begin
   end;
 end;
 
+procedure TCustomTurboModule.AddPCharToData(const aValue: string);
+var
+  p: Pointer;
+begin
+  with PTurboPreservedDataMemory(FDataMemory)^ do
+  begin
+    Integer(p) := Length(aValue)+1;
+    if (UsedDataSize+Integer(p)) > DataMemorySize then
+      GrowData(Integer(p));
+    Integer(p) := Integer(FDataMemory) + UsedDataSize;
+    if aValue <> '' then
+    begin
+      Move(aValue[1], p^, Length(aValue));
+      Inc(Integer(p), Length(aValue));
+    end;
+    PByte(p)^ := 0;
+    Inc(UsedDataSize, Length(aValue) + 1);
+  end;
+end;
+
 procedure TCustomTurboModule.AlignData;
 var
   I: Integer;
@@ -913,7 +953,8 @@ begin
     vPreserved := cDefaultDataMemSize+SizeOf(TTurboPreservedDataMemory);
     ReallocMem(FMemory, cDefaultDataMemSize);
     ReallocMem(FDataMemory, vPreserved);
-    //RegisteredTypes.Clear;
+    FRelocatedDataAddresses.Clear;
+    //RegisteredTypes.Clear; // i wish keep it in the mem even unload.
     with PTurboPreservedDataMemory(FDataMemory)^ do
     begin
       MemorySize := cDefaultDataMemSize;
@@ -1302,10 +1343,12 @@ begin
   ModuleVersion := vHeader.Revision;
   ModuleDate := vHeader.BuildDate;
 
+  FRelocatedDataAddresses.LoadFromStream(aStream);
+
   //read the FRegisteredTypes size+1 in the stream
   aStream.ReadBuffer(I, SizeOf(I));
   if FRegisteredTypes.Count > 0 then
-    //skip
+    //already loaded in mem, so skip
      aStream.Position := I
   else
     FRegisteredTypes.LoadFromStream(aStream);
@@ -1477,6 +1520,8 @@ begin
     end;
     vTypeInfoEntry := vTypeInfoEntry.Prior;
   end;
+
+  FRelocatedDataAddresses.Relocate(FDataMemory, True);
 end;
 
 procedure TCustomTurboModule.SaveToFile(const aFileName: String);
@@ -1509,6 +1554,8 @@ begin
 
   if IsAddrResolved then UnResolveAddress;
 
+  FRelocatedDataAddresses.SaveToStream(aStream);
+
   vPos := aStream.Position;
   I := 0;
   aStream.WriteBuffer(I, SizeOf(I));
@@ -1517,7 +1564,6 @@ begin
   aStream.Position := vPos;
   aStream.WriteBuffer(I, SizeOf(I));
   aStream.Position := I;
-
 
   with PTurboPreservedDataMemory(FDataMemory)^ do
   begin
@@ -1766,6 +1812,8 @@ var
   I: Integer;
   vTypeInfoEntry: PTurboTypeInfoEntry;
 begin
+  FRelocatedDataAddresses.Relocate(FDataMemory, False);
+
   //TurboConvertAddrAbsoluteToRelated(FMemory, FDataMemory);
   vTypeInfoEntry := LastTypeInfoEntry;
   while assigned(vTypeInfoEntry) do
@@ -2276,6 +2324,8 @@ begin
       Integer(Prior) := Integer(Prior) + Integer(aMem);
     if Assigned(Variable.Name) then
         Variable.Name := Pointer(Integer(Variable.Name) + Integer(aMem));
+    //if Assigned(Variable.Addr) then //because the private var is not here!!
+        //Variable.Addr := Pointer(Integer(Variable.Addr) + Integer(aMem));  
     if Assigned(Variable.TypeInfo) then
         Variable.TypeInfo := Pointer(Integer(Variable.TypeInfo) + Integer(aMem));  
   end;
@@ -2385,6 +2435,57 @@ begin
   ConvertTurboTypeRefEntry(vMem, MetaData.LastTypeRefEntry);  
   ConvertTurboStaticFieldEntry(MetaData, MetaData.LastVariableEntry);  
   ConvertTurboMethodEntry(vMem, MetaData.LastWordEntry);  
+end;
+
+procedure TRelocatedAddresses.LoadFromStream(const aStream: TStream);
+var
+  i: Integer;
+begin
+  Clear;
+  aStream.ReadBuffer(i, SizeOf(i));
+  Count := i;
+  for i := 0 to Count -1 do
+     aStream.ReadBuffer(List^[i], SizeOf(Pointer));
+end;
+
+procedure TRelocatedAddresses.SaveToStream(const aStream: TStream);
+var
+  i: Integer;
+begin
+  i := Count;
+  aStream.WriteBuffer(i, SizeOf(i));
+  for i := 0 to Count -1 do
+     aStream.WriteBuffer(List^[i], SizeOf(Pointer));
+end;
+
+procedure TRelocatedAddresses.Relocate(BaseAddress: Pointer; 
+      const aRelocated: Boolean);
+var
+  i: Integer;
+  //v: PInteger;
+begin
+  for I := 0 to Count -1 do
+  begin
+    if aRelocated then
+    begin
+      Integer(List^[I]) := Integer(List^[I]) + Integer(BaseAddress);
+      if PInteger(List^[I])^ <> 0 then
+        PInteger(List^[I])^ := PInteger(List^[I])^ + Integer(BaseAddress); 
+    end
+    else
+    begin
+      if PInteger(List^[I])^ <> 0 then
+        PInteger(List^[I])^ := PInteger(List^[I])^ - Integer(BaseAddress); 
+      Integer(List^[I]) := Integer(List^[I]) - Integer(BaseAddress);
+    end;
+  end;
+end;
+
+function TRelocatedAddresses.Add(const aValue: Integer): Integer;
+begin
+  Result := IndexOf(Pointer(aValue));
+  if Result < 0 then
+    Result := inherited Add(Pointer(aValue));
 end;
 
 initialization

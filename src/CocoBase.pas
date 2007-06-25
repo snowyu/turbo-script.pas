@@ -1183,7 +1183,7 @@ begin
   i := FindLocalVar(aName);
   Result := i >= 0;
   if Result then
-    with PTurboVarSymbol(FModuleSymbol.Vars.Items[i])^ do
+    with PTurboVarSymbol(FModuleSymbol.StaticFields.Items[i])^ do
     begin
       PushTo(FModuleSymbol);
     end
@@ -1270,7 +1270,7 @@ end;
 function TCocoRGrammar.FindLocalVar(const aName: String): Integer;
 begin
   //writeln('search var ', aName);
-  Result := FModuleSymbol.Vars.IndexOf(aName);
+  Result := FModuleSymbol.StaticFields.IndexOf(aName);
   //writeln('search var ', aName, ':', Result);
 end;
 

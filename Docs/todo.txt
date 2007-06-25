@@ -11,6 +11,66 @@ TODO:
 !* [Bug] 堆栈存放的最小单位数据是tsPointer，所以量度应该以tsPointer为准。
   需要查找堆栈有关的操作修改之！
 !* [Bug] ModuleParent is not set or convert to related or absolute address!
+~ Delphi 嵌入汇编调用System单元的内置函数如： _LStrLAsg 的时候，必须：
+  CALL SYSTEM.@LStrLAsg
+
+2007-6-25 19:41
+* TurboCustomModule.
+  + AddPCharToData(const aStr: string);
+  + RelocatedDataAddresses: 需要重定位的DataMemory中的地址列表。
+* [Compiler] TTurboMethodSymbol
+    * DeclareEndTo: + iFinalTo
+    + FinalStaticFieldsTo();  检查所有的StaticField如果存在AnsiString类型，那么就写入opLStrAsg(0, dest)
++ opLStrAsg instruction ( src dest -- )
+  assign the src string to dest.
+
+2007-6-22 8:13
+!+ Module.AddPCharToData(const aStr: string);
+!+ 后期绑定特性到 Executor.
+  后期绑定字段和方法: ["字段或方法"]();
+    没有括号的是字段，有括号的是方法.
+  + 对于后期绑定是否在编译时候进行语法检查的选项。
+
+2007-6-21 9:04
+* StaticField 中的 AnsiString类型 实质保存的是一个偏移量，必须修改为绝对地址！ 重定位。
+  不行，这样的话，如果没有Public的变量将依然是偏移量，除非将所有的变量统一为Public.
+  但是不改为绝对地址的话，俺的字符串初始化无法弄！！
+  即使这样也不会修改（重定位）变量的值啊！！必须新建一个东西（重定位表，然后重定位里面所有的地址）。
+  哎，算了，将就！！
++ RelocatedDataAddresses
+  应该是很简单的格式，就用PMeList实现。
+  目的将变量类型为字符串的初值内容（偏移地址）重定位为绝对地址。不然的话根本无法操作字符串（因为我用的是Delphi的那套）。
+  还有一个办法，就是在运行的时候为有初值的字符串变量赋值。
+  或者说在运行前做初始化动作的时候，将有初值的字符串变量改为绝对地址。算了，还是用 RelocatedDataAddresses 简单点。
+  好了，现在将 AnsiString and ShortString 的初值变量通过 RelocatedDataAddresses 改为绝对地址了。
+  也就是说 strVar @ 取来的地址是绝对地址喔！
+
+* 将就 cMainEntryProcName，将 Init and FInit的指令嵌入里面。
+  * TTurboMethodSymbol
+    //* DeclareTo: 检查所有的StaticField如果存在AnsiString类型，那么就写入初始化指令？？不用！！
+    * DeclareEndTo: + iFinalTo
+    + FinalStaticFieldsTo();  检查所有的StaticField如果存在AnsiString类型，那么就写入opLStrAsg(0, dest)
+!+ opLStrAppend instruction ( src dest -- )
+  dest = dest + src
+!+ opLStrCatN instruction ( srcN ... src2 src1 N dest -- )
+  dest = src1 + src2 + ... + srcN
+     
+~ string 类型在Delphi 内存中的表示： StrRec Str#0
+type
+  PStrRec = ^StrRec;
+  StrRec = packed record
+    refCnt: Longint;
+    length: Longint;
+  end;
+var
+  s: string; //=PChar(S), but PStrRec = Integer(S) - SizeOf(StrRec);
+
+2007-6-19 10:40
+!+ Init and Finit for module 
+  first i should implement to process the AnsiString.
+  对于StaticField(模块变量)如果是AnsiString,那么需要在初始化的时候赋值，在结束的时候Free.
+  + Delphi 有两个字符串赋值过程，一个用于全局变量的赋值(LStrAsg)，一个用于局部变量的赋值(LStrLAsg)。
++ opLStrAsg instruction ( src.ofsset dest.ofsset -- )
 
 2007-6-18 11:14
 !+ The TurboScript Heap Manager

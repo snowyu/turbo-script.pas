@@ -8,7 +8,7 @@
       * 部件细化，设计精巧，运行高效，内存占用低。
       * 耦合度低(可拆可组)
   延展：我们需要架构具有可拓展性，以适应未来可能的变化。
-    据库执行功能：the run-time script types, constants, global variables and procedures can be stored in the memory or database.
+   数据库执行功能：the run-time script types, constants, global variables and procedures can be stored in the memory or database.
   高度自由缩放性：即可作为脚本解释器，也可JIT运行，也可作为高级语言编译器。
   高速（既能够解释执行，也能够编译成机器码直接执行），小巧，高效；
   安全：运行安全稳定【可以通过完善TDD测试机制来保障】

@@ -189,6 +189,8 @@ Type
     function GetExternalLocalMethodAddr(): tsInt;
 
     function DeclareMethodTypeTo(const aModule: PTurboModuleSymbol): Integer;
+    //for MainEntryProc Only
+    procedure FinalStaticFieldsTo(const aModule: PTurboModuleSymbol);
   public
     destructor Destroy; virtual; {override}
     procedure Assign(const aSymbol: PTurboCustomSymbol); virtual;
@@ -260,17 +262,18 @@ Type
     FMethods: PTurboSymbols;
     FTypes: PTurboTypeSymbols;
     FTypeRefs: PTurboTypeSymbols;
-    FVars: PTurboSymbols;
+    FStaticFields: PTurboSymbols;
     FConsts: PTurboSymbols;
     FUsedModules: PTurboModuleRefSymbols;
   protected
     function GetTypeRefs: PTurboTypeSymbols;
     function GetTypes: PTurboTypeSymbols;
-    function GetVars: PTurboSymbols;
+    function GetStaticFields: PTurboSymbols;
     function GetConsts: PTurboSymbols;
     function GetMethods: PTurboSymbols;
     function GetUsedModules: PTurboModuleRefSymbols;
     function CreateLibModuleSymbol(const aName: string): PTurboModuleSymbol;
+    function CreateDLLModuleSymbol(const aName: string): PTurboModuleSymbol;
     //function GetModuleEntry(const aModule: PTurboModuleSymbol): PTurboModuleRefEntry;
   public
     destructor Destroy; virtual; {override}
@@ -307,7 +310,7 @@ Type
     Module: TCustomTurboModule;
     property Types: PTurboTypeSymbols read GetTypes;
     property TypeRefs: PTurboTypeSymbols read GetTypeRefs;
-    property Vars: PTurboSymbols read GetVars;
+    property StaticFields: PTurboSymbols read GetStaticFields;
     property Consts: PTurboSymbols read GetConsts;
     property Methods: PTurboSymbols read GetMethods;
     property UsedModules: PTurboModuleRefSymbols read GetUsedModules;
@@ -723,8 +726,9 @@ begin
       begin
         Entry.Word.Name := Pointer(UsedDataSize);
         //PChar:
-        AddBufferToData(Self.Name[1], Length(Self.Name));
-        AddByteToData(0);
+        AddPCharToData(Self.Name);
+        //AddBufferToData(Self.Name[1], Length(Self.Name));
+        //AddByteToData(0);
       end
       else
       begin
@@ -765,6 +769,7 @@ begin
     if Self.Name = cMainEntryProcName then
     begin
       //writeln('DeclareEndTo:',cMainEntryProcName );
+      FinalStaticFieldsTo(aModule); //for MainEntryProc ONly
       AddOpToMem(opPushInt); AddIntToMem(0); 
       AddOpToMem(opHalt);
     end
@@ -778,6 +783,33 @@ begin
     begin
       Entry.Word.ParamFieldLength := ParamFieldLength;
       LastWordEntry := Pointer(Integer(Entry) - Integer(DataMemory));
+    end;
+  end;
+end;
+
+procedure TTurboMethodSymbol.FinalStaticFieldsTo(const aModule: PTurboModuleSymbol);
+var
+  i: Integer;
+begin
+  for i := 0 to aModule.StaticFields.Count - 1 do
+  begin
+    with PTurboVarSymbol(aModule.StaticFields.Items[i])^ do
+    begin
+      if Assigned(TurboType) then
+      begin
+        case TurboType.Kind of
+          mtkLString: //clear the AnsiString(LongString)
+            begin
+              with aModule.Module do 
+              begin
+                AddOpToMem(opPushInt); AddIntToMem(0); 
+                PushTo(aModule);
+                //AddOpToMem(opFetchInt);
+                AddOpToMem(opLStrAsg);
+              end;
+            end;
+        end; //case
+      end;
     end;
   end;
 end;
@@ -857,6 +889,16 @@ begin
       end;
     cfsDLLFunction:
       begin
+          {if not Assigned(ExternalOptions.ModuleRef) then //TODO: BUG Here!!!
+          begin
+            ModuleSymbol.DeclareTo(aModule);
+            i := aModule.UsedModules.IndexOf(ModuleSymbol);
+            ExternalOptions.ModuleRef := Pointer(Integer(aModule.UsedModules.Entries[i]) + SizeOf(tsPointer));
+          end; //}
+        aModule.Module.AddOpToMem(opCallExt);
+        vCFA := Integer(@Entry.Word);
+        vCFA := vCFA - Integer(aModule.Module.DataMemory);
+        aModule.Module.AddIntToMem(vCFA);
       end;
   end;//case
 end;
@@ -881,10 +923,10 @@ begin
       else 
         MeFreeAndNil(Self.FMethods);
 
-      if Assigned(FVars) then
-        Self.Vars.Assign(FVars)
+      if Assigned(FStaticFields) then
+        Self.StaticFields.Assign(FStaticFields)
       else 
-        MeFreeAndNil(Self.FVars);
+        MeFreeAndNil(Self.FStaticFields);
 
       if Assigned(FConsts) then
         Self.Consts.Assign(FConsts)
@@ -919,7 +961,7 @@ begin
   MeFreeAndNil(FMethods);
   MeFreeAndNil(FUsedModules);
   //MeFreeAndNil(FUsedModuleEntries);
-  MeFreeAndNil(FVars);
+  MeFreeAndNil(FStaticFields);
   MeFreeAndNil(FConsts);
   MeFreeAndNil(FTypes);
   MeFreeAndNil(FTypeRefs);
@@ -986,28 +1028,33 @@ var
   vMethodEntry: PTurboMethodEntry;
 begin
   Result := PTurboMethodSymbol(Methods.Find(aName));
-  if not Assigned(Result) and Assigned(Module) then
+  if not Assigned(Result) then
   begin
-    //Integer(vMethodEntry) := Integer(Module.LastWordEntry) + Integer(Module.DataMemory);
-    //writeln('LastWordEntry:', PChar(Integer(Module.DataMemory)+Integer(vMethodEntry.Word.Name)));
-    
-    vMethodEntry := Module.FindWordEntry(aName, cfsFunction);
-    if Assigned(vMethodEntry) and (vMethodEntry.Word.CodeFieldStyle = cfsFunction) then
-    begin
-        New(Result, Create);
-        Result.Name := aName;
-        Result.CFA := vMethodEntry.Word.MethodAddr;
-        //Result.ExternalOptions.ModuleRef := Pointer(Integer(Entry) + SizeOf(Pointer));
-        Result.CallStyle := vMethodEntry.Word.CallStyle;
-        Result.CodeFieldStyle := vMethodEntry.Word.CodeFieldStyle;
-        Result.ModuleType := mtLib;
-        Result.ModuleName := Name;
-        //Result.ModuleSymbol := @Self;
-        //Result.Module := Module;
-        Result.OwnerSymbol := @Self;
-        Result.Entry := vMethodEntry;
-        Methods.Add(Result); //cache this method!
-    end;
+    case ModuleType of
+      mtLib: if Assigned(Module) then
+      begin
+        //Integer(vMethodEntry) := Integer(Module.LastWordEntry) + Integer(Module.DataMemory);
+        //writeln('LastWordEntry:', PChar(Integer(Module.DataMemory)+Integer(vMethodEntry.Word.Name)));
+        
+        vMethodEntry := Module.FindWordEntry(aName, cfsFunction);
+        if Assigned(vMethodEntry) and (vMethodEntry.Word.CodeFieldStyle = cfsFunction) then
+        begin
+            New(Result, Create);
+            Result.Name := aName;
+            Result.CFA := vMethodEntry.Word.MethodAddr;
+            //Result.ExternalOptions.ModuleRef := Pointer(Integer(Entry) + SizeOf(Pointer));
+            Result.CallStyle := vMethodEntry.Word.CallStyle;
+            Result.CodeFieldStyle := vMethodEntry.Word.CodeFieldStyle;
+            Result.ModuleType := mtLib;
+            Result.ModuleName := Name;
+            //Result.ModuleSymbol := @Self;
+            //Result.Module := Module;
+            Result.OwnerSymbol := @Self;
+            Result.Entry := vMethodEntry;
+            Methods.Add(Result); //cache this method!
+        end;
+      end;
+    end;//case
   end;
 end;
 
@@ -1078,13 +1125,13 @@ begin
   Result := FTypes;
 end;
 
-function TTurboModuleSymbol.GetVars: PTurboSymbols;
+function TTurboModuleSymbol.GetStaticFields: PTurboSymbols;
 begin
-  if not Assigned(FVars) then
+  if not Assigned(FStaticFields) then
   begin
-    New(FVars, Create);
+    New(FStaticFields, Create);
   end;
-  Result := FVars;
+  Result := FStaticFields;
 end;
 
 function TTurboModuleSymbol.IsExternalMethod(const aMethod: PTurboMethodSymbol): Integer;
@@ -1113,7 +1160,7 @@ begin
       //SynError(cDLLModuleMissError, aWord.Name);
     end;
   end
-  else
+  else //aMethod.ModuleName <> '' 
   begin
     i := UsedModules.IndexOf(aMethod.ModuleName, aMethod.ModuleType);
     if i < 0 then i := AddUsedModule(aMethod.ModuleName, aMethod.ModuleType);
@@ -1132,21 +1179,26 @@ begin
   end;
 
   aMethod.ModuleSymbol := vModuleSymbol;
+
   if Assigned(vModuleSymbol) then
   begin
-    if aMethod.ExternalOptions.Name <> '' then
-      aMethod.ExternalMethodSymbol := vModuleSymbol.FindLocalMethodSymbol(aMethod.ExternalOptions.Name)
-    else
-      aMethod.ExternalMethodSymbol := vModuleSymbol.FindLocalMethodSymbol(aMethod.Name);
-
-    if not Assigned(aMethod.ExternalMethodSymbol) then
-      Result := cSymbolErrorUnknownMethod
-    else if Assigned(vModuleEntry) then
+    if Assigned(vModuleEntry) then
     begin
       aMethod.ExternalOptions.ModuleRef := Pointer(Integer(vModuleEntry) + SizeOf(tsPointer));
     end
     else
       aMethod.ExternalOptions.ModuleRef := nil;
+
+    if aMethod.CodeFieldStyle = cfsExternalFunction then
+    begin
+      if aMethod.ExternalOptions.Name <> '' then
+        aMethod.ExternalMethodSymbol := vModuleSymbol.FindLocalMethodSymbol(aMethod.ExternalOptions.Name)
+      else
+        aMethod.ExternalMethodSymbol := vModuleSymbol.FindLocalMethodSymbol(aMethod.Name);
+      if not Assigned(aMethod.ExternalMethodSymbol) then
+        Result := cSymbolErrorUnknownMethod;
+    end;
+
   end
   else
   begin
@@ -1182,6 +1234,7 @@ begin
   begin
     case aModuleType of
       mtLib: vModuleSymbol := CreateLibModuleSymbol(aName);
+      mtDLL: vModuleSymbol := CreateDLLModuleSymbol(aName);
     end;
     if Assigned(vModuleSymbol) then
     begin
@@ -1210,6 +1263,18 @@ begin
   end
   else
     Result := nil;
+end;
+
+function TTurboModuleSymbol.CreateDLLModuleSymbol(const aName: string): PTurboModuleSymbol;
+begin
+    New(Result, Create);
+    with Result^ do
+    begin
+      Name := aName;
+      ModuleType := mtDLL;
+      Module := nil;
+    end;
+    //Integer(Result.Entry) := Integer(Module.DataMemory) + Module.UsedDataSize; //the offset address.
 end;
 
 function TTurboModuleSymbol.DeclareTo(const aModule: PTurboModuleSymbol): Integer;
@@ -1258,7 +1323,7 @@ function TTurboModuleSymbol.IsUniqueIdentifier(const aName: String): Boolean;
 begin
   Result := Consts.IndexOf(aName) < 0;
   if Result then
-    Result := Vars.IndexOf(aName)< 0;
+    Result := StaticFields.IndexOf(aName)< 0;
   if Result then
     Result := Methods.IndexOf(aName) < 0;
 end;
@@ -1278,12 +1343,12 @@ end;
 
 function TTurboModuleSymbol.NewVar(const aName: string): PTurboVarSymbol;
 begin
-  if (aName = '') or (Vars.IndexOf(aName) < 0) then
+  if (aName = '') or (StaticFields.IndexOf(aName) < 0) then
   begin
     New(Result, Create);
     Result.Name := aName;
     Result.OwnerSymbol := @Self;
-    if aName <> '' then Vars.Add(Result);
+    if aName <> '' then StaticFields.Add(Result);
   end
   else
     Result := nil;
@@ -1600,7 +1665,8 @@ begin
   vVaraibleEntry := nil;
   //vTypeSafety := (Visibility >= fvProtected) or (soSymbolTyped in aModule.Options); 
   //vTypeNamed := (Visibility >= fvPublished) or (soSymbolNamed in aModule.Options); 
-  if IsPublic(aModule.Module) then with aModule.Module do
+  if IsPublic(aModule.Module) then 
+  with aModule.Module do
   begin
     //aModule.AlignData;
     Integer(vVaraibleEntry) := Integer(DataMemory) + UsedDataSize;
@@ -1615,7 +1681,7 @@ begin
   if IsRequiredAlignMem(TurboType) then aModule.Module.AlignData;
   Addr := aModule.Module.UsedDataSize;
 
-  if IsPublic(aModule.Module) then
+  if IsPublic(aModule.Module) then //I must know the all Variables for relocate the Variable addr to absolute addr.
   begin
     tsInt(vVaraibleEntry.Variable.Addr) := Addr;
     aModule.Module.LastVariableEntry := Pointer(Integer(vVaraibleEntry) - Integer(aModule.Module.DataMemory));
@@ -1626,7 +1692,14 @@ begin
   if ValueStr <> '' then //该变量有初值.
   begin
     DeclareStringTo(aModule.Module); //if the init value is string
+    if TurboType.Kind in [mtkLString, mtkString] then
+      aModule.Module.RelocatedDataAddresses.Add(Addr);
     AssignValueTo(vValue);
+  end
+  else
+  begin
+    //clear to zero
+    FillChar(vValue^, Size, 0);
   end;
 
   if IsNamed(aModule.Module) then with aModule.Module do

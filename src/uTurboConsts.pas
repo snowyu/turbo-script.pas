@@ -221,6 +221,9 @@ type
     opABSInt, //(n -- |n|)
     opABSInt64,
     
+    {## Assignment opstructions }
+    opLStrAsg, //assignment the AnsiString (src, dest -- )
+
     {## Proc Operation opstruction: Flow Control }
     opJMP, //JUMP Absolute address(related to FMemory)
     //inJMPByte, //JMP aByteInt(shortint offset) 

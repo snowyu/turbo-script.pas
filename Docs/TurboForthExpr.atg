@@ -395,7 +395,7 @@ PRODUCTIONS
     ["=" Value<vValue>]
     ";"                                            (.   if IsUniqueIdentifier(vValue.Name) then
                                                          begin
-                                                           FModuleSymbol.Vars.Add(vValue);
+                                                           FModuleSymbol.StaticFields.Add(vValue);
                                                            if vValue.IsPublic(FModule) then vValue.DeclareTo(FModuleSymbol); 
                                                          end
                                                          else 
@@ -519,7 +519,10 @@ PRODUCTIONS
                                                               aWord.ModuleType := mtLib; .)  //the default module Type is mtLib
       [ModuleType<aWord.ModuleType>                        (.
                                                               case aWord.ModuleType of
-                                                                mtDLL:  aWord.CodeFieldStyle := cfsDLLFunction;
+                                                                mtDLL:  begin
+                                                                  aWord.CodeFieldStyle := cfsDLLFunction;
+                                                                  aWord.Visibility := tvPublicVisibilty;
+                                                                end;
                                                                 mtHost: aWord.CodeFieldStyle := cfsHostFunction;
                                                               end;
                                                             .)

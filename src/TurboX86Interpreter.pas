@@ -451,8 +451,8 @@ asm
   TEST EAX, EAX
   JZ   @@ParamError
   ADD  EAX, EDI //PTurboMethodInfo real addr
-  MOV  EDX, [EAX].TTurboMethodInfo.CodeFieldStyle
-  CMP  EDX, cfsFunction
+  MOV  DL, [EAX].TTurboMethodInfo.CodeFieldStyle
+  CMP  DL, cfsFunction
   JNZ  @@IsExternalFunction
 @@IsLocalFunction:
   MOV  EAX, [EAX].TTurboMethodInfo.MethodAddr
@@ -716,6 +716,41 @@ asm
   JMP  iVMNext
 end;
 
+//assignment the AnsiString (src, dest -- )
+procedure iVMLStrAsg;
+asm
+  MOV  EAX, EBX
+  ADD  EAX, EDI   //EAX  pointer to dest 
+  MOV  EDX, [EBP]
+  ADD  EBP, TYPE(tsInt)
+
+  PUSH EBP
+  PUSH EDI
+  PUSH ECX
+  PUSH ESI
+
+  TEST EDX, EDX
+  JZ   @@ClearStr
+  ADD  EDX, EDI
+  MOV  EDX, [EDX] //EDX  src
+
+
+{ ->    EAX     pointer to dest }
+{       EDX     source          }
+  CALL System.@LStrLAsg
+
+@@ClearStr:
+  CALL System.@LStrClr
+@@exit:
+  POP  ESI
+  POP  ECX
+  POP  EDI
+  POP  EBP
+
+  MOV  EBX, [EBP]
+  ADD  EBP, TYPE(tsInt)
+end;
+
 procedure vFetchInt;
 asm
   //EBX is TOS
@@ -898,7 +933,7 @@ end;
 procedure vEmitString;
 asm
   MOV  EDX, EBX  //EDX <- TOS
-  ADD  EDX, EDI 
+  //ADD  EDX, EDI 
   XCHG ESP, EBP
   POP  EBX
   XCHG ESP, EBP
@@ -934,7 +969,7 @@ end;
 procedure vEmitLString;
 asm
   MOV  EDX, EBX  //EDX <- TOS
-  ADD  EDX, EDI 
+  //ADD  EDX, EDI 
   //XCHG ESP, EBP
   //POP  EBX
   //XCHG ESP, EBP
@@ -1038,6 +1073,7 @@ begin
   GTurboCoreWords[opMULInt] := iVMMulInt;
   GTurboCoreWords[opAddInt64] := iVMAddInt64;
   GTurboCoreWords[opSubInt64] := iVMSubInt64;
+  GTurboCoreWords[opLStrAsg] := iVMLStrAsg;
 
   //Memory Operation Instruction with Param Stack
   GTurboCoreWords[opFetchInt] := vFetchInt;

@@ -104,6 +104,12 @@ end;
 initialization
   SetMeVirtualMethod(TypeOf(TTurboRegisteredTypes), ovtVmtParent, TypeOf(TMeTypes));
 
+  {$IFDEF MeRTTI_SUPPORT}
+  //Make the ovtVmtClassName point to PShortString class name
+  SetMeVirtualMethod(TypeOf(TTurboRegisteredTypes), ovtVmtClassName, nil);
+  {$ENDIF}
+
 
 finalization
+
 end.

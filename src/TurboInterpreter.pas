@@ -549,6 +549,34 @@ begin
   PtsInt(FGlobalOptions._SP)^ := I * PtsInt(FGlobalOptions._SP)^;
 end;
 
+//assignment the AnsiString (src, dest -- )
+procedure iVMLStrAsg(const FGlobalOptions: PTurboGlobalOptions);
+var
+  src, dest: PString; //point to string
+  //srcStr,destStr: Pointer;  //string
+begin
+  dest := PPointer(FGlobalOptions._SP)^;
+  Integer(dest) := Integer(dest) + Integer(FGlobalOptions._Mem);
+  //the value is the offset address of the string, so I need to add the _Mem
+  //Integer(destStr) := Integer(dest^) + Integer(FGlobalOptions._Mem);
+  
+  Inc(FGlobalOptions._SP, SizeOf(tsInt));
+  src := PPointer(FGlobalOptions._SP)^;
+  if Assigned(src) then
+  begin
+    Integer(src) := Integer(src) + Integer(FGlobalOptions._Mem);
+    //Integer(srcStr) := Integer(src^) + Integer(FGlobalOptions._Mem);
+    //AnsiString(destStr) := AnsiString(srcStr);
+    dest^ := src^; 
+  end
+  else 
+  begin
+    //AnsiString(destStr) := '';
+    dest^  := '';
+  end;
+  Inc(FGlobalOptions._SP, SizeOf(tsInt));
+end;
+
 //(intAddr -- int)
 procedure vFetchInt(const FGlobalOptions: PTurboGlobalOptions);
 var
@@ -664,7 +692,7 @@ var
 begin
   p := PPointer(FGlobalOptions._SP)^;
   Inc(FGlobalOptions._SP, SizeOf(p));
-  Integer(p) := Integer(p) + Integer(FGlobalOptions._Mem); 
+  //Integer(p) := Integer(p) + Integer(FGlobalOptions._Mem); 
   TTurboExecutorAccess(FGlobalOptions.Executor).DoPrintShortString(p^);
 end;
 
@@ -675,7 +703,7 @@ var
 begin
   p := PPointer(FGlobalOptions._SP)^;
   Inc(FGlobalOptions._SP, SizeOf(pointer));
-  Integer(p) := Integer(p) + Integer(FGlobalOptions._Mem); 
+  //Integer(p) := Integer(p) + Integer(FGlobalOptions._Mem); 
   TTurboExecutorAccess(FGlobalOptions.Executor).DoPrintString(AnsiString(p));
 end;
 
@@ -695,6 +723,7 @@ var
   p: PInt64;
 begin
   p := PPointer(FGlobalOptions._SP)^;
+  //convert the related addr to absolute addr
   Integer(p) := Integer(p) + Integer(FGlobalOptions._Mem);
   Inc(FGlobalOptions._SP, SizeOf(Pointer));
   QueryPerformanceCounter(P^);
@@ -720,6 +749,7 @@ begin
   GTurboCoreWords[opMULInt] := iVMMulInt;
   GTurboCoreWords[opAddInt64] := iVMAddInt64;
   GTurboCoreWords[opSubInt64] := iVMSubInt64;
+  GTurboCoreWords[opLStrAsg] := iVMLStrAsg;
 
   //Memory Operation Instruction with Param Stack
   GTurboCoreWords[opFetchInt] := vFetchInt;
