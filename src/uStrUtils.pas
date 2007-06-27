@@ -1,5 +1,7 @@
 unit uStrUtils;
 
+{$I Setting.inc}
+  
 interface
 
 uses
@@ -9,8 +11,19 @@ uses
   Classes, SysUtils;
 
 type
+  EStringError = Exception;
   //only result = true to continue.
   TOnDoFileEvent = function (const aFileName: string): Boolean;
+
+resourcestring
+  RsBlankSearchString       = 'Search string cannot be blank';
+  RsInvalidEmptyStringItem  = 'String list passed to StringsToMultiSz cannot contain empty strings.';
+  RsNumericConstantTooLarge = 'Numeric constant too large.';
+  RsFormatException         = 'Format exception';
+  RsDotNetFormatNullFormat  = 'Format string is null';
+  RsArgumentIsNull          = 'Argument %d is null';
+  RsDotNetFormatArgumentNotSupported = 'Argument type of %d is not supported';
+  RsArgumentOutOfRange      = 'Argument out of range';
 
 const
   {$IFDEF MSWINDOWS}
@@ -134,6 +147,9 @@ procedure StrToStrings(S, Sep: string; const List: TStrings; const AllowEmptyStr
 
 function StrFind(const Substr, S: string; const Index: Integer = 1): Integer;
 function StrSearch(const Substr, S: string; const Index: Integer = 1): Integer;
+//StrMatches: *, ? matches
+function StrMatches(const Substr, S: AnsiString; const Index: Integer = 1): Boolean;
+function LeftPos(const SubStr, S: string): Integer;
 
 // String Extraction
 function StrAfter(const SubStr, S: string): string;
@@ -269,6 +285,22 @@ begin
   end;
 end;
 {$ENDIF}
+
+function LeftPos(const SubStr, S: string): Integer;
+begin
+  Result := Length(S) - Length(SubStr);
+  while Result > 0 do
+  begin
+    {$IFDEF MBCS_SUPPORT}
+    if ByteType(s, Result) <> mbSingleByte then
+      while (ByteType(s, Result) <> mbLeadByte) and (Result>1) do
+        Dec(Result); 
+    {$ENDIF}
+    if PChar(s[Result]) = PChar(SubStr) then exit;
+    Result := Result - Length(SubStr); 
+  end;
+  Result := -1;
+end;
 
 function StrToken(var S: string; Separator: Char): string;
 var
@@ -880,11 +912,119 @@ begin
   {$ENDIF CLR}
 end;
 
+function StrMatches(const Substr, S: AnsiString; const Index: Integer): Boolean;
+var
+  StringPtr: PAnsiChar;
+  PatternPtr: PAnsiChar;
+  StringRes: PAnsiChar;
+  PatternRes: PAnsiChar;
+begin
+  if SubStr = '' then
+    raise EStringError.CreateRes(@RsBlankSearchString);
+
+  Result := SubStr = '*';
+
+  if Result or (S = '') then
+    Exit;
+
+  if (Index <= 0) or (Index > Length(S)) then
+    raise EStringError.CreateRes(@RsArgumentOutOfRange);
+
+  StringPtr := PAnsiChar(@S[Index]);
+  PatternPtr := PAnsiChar(SubStr);
+  StringRes := nil;
+  PatternRes := nil;
+
+  repeat
+    repeat
+      case PatternPtr^ of
+        #0:
+          begin
+            Result := StringPtr^ = #0;
+            if Result or (StringRes = nil) or (PatternRes = nil) then
+              Exit;
+
+            StringPtr := StringRes;
+            PatternPtr := PatternRes;
+            Break;
+          end;
+        '*':
+          begin
+            Inc(PatternPtr);
+            PatternRes := PatternPtr;
+            Break;
+          end;
+        '?':
+          begin
+            if StringPtr^ = #0 then
+              Exit;
+            Inc(StringPtr);
+            Inc(PatternPtr);
+          end;
+        else
+          begin
+            if StringPtr^ = #0 then
+              Exit;
+            if StringPtr^ <> PatternPtr^ then
+            begin
+              if (StringRes = nil) or (PatternRes = nil) then
+                Exit;
+              StringPtr := StringRes;
+              PatternPtr := PatternRes;
+              Break;
+            end
+            else
+            begin
+              Inc(StringPtr);
+              Inc(PatternPtr);
+            end;
+          end;
+      end;
+    until False;
+
+    repeat
+      case PatternPtr^ of
+        #0:
+          begin
+            Result := True;
+            Exit;
+          end;
+        '*':
+          begin
+            Inc(PatternPtr);
+            PatternRes := PatternPtr;
+          end;
+        '?':
+          begin
+            if StringPtr^ = #0 then
+              Exit;
+            Inc(StringPtr);
+            Inc(PatternPtr);
+          end;
+        else
+          begin
+            repeat
+              if StringPtr^ = #0 then
+                Exit;
+              if StringPtr^ = PatternPtr^ then
+                Break;
+              Inc(StringPtr);
+            until False;
+            Inc(StringPtr);
+            StringRes := StringPtr;
+            Inc(PatternPtr);
+            Break;
+          end;
+      end;
+    until False;
+  until False;
+end;
+
 function ExtractFileBaseName(const aFileName: string): string;
 var
   i: integer;
 begin
-  i := AnsiPos('.', aFileName);
+  i := LeftPos('.', aFileName);
   if i <= 0 then i := Length(aFileName);
   Result := Copy(aFileName, 1, i-1);
 end;
