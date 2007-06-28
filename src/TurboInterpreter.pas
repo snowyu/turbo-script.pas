@@ -278,8 +278,6 @@ begin
 
   if Assigned(aModuleRefInfo) then
   begin
-    //PTurboModuleRefInfo real addr
-    Integer(aModuleRefInfo) := Integer(aModuleRefInfo) + Integer(FGlobalOptions._Mem);
     p := aModuleRefInfo.Handle;
     if not Assigned(p) then
     begin
@@ -312,6 +310,9 @@ var
 begin
   vModuleRefInfo := PPointer(FGlobalOptions._PC)^;
   Inc(FGlobalOptions._PC, SizeOf(vModuleRefInfo));
+  if Assigned(vModuleRefInfo) then
+    //PTurboModuleRefInfo real addr
+    Integer(vModuleRefInfo) := Integer(vModuleRefInfo) + Integer(FGlobalOptions._Mem);
 
   if _DoVMCallFarMemBase(FGlobalOptions, vModuleRefInfo) then
     iVMEnter(FGlobalOptions);
@@ -362,7 +363,7 @@ begin
           New(vMeProc, Create);
           try
             vMeProc.ProcType := PMeProcType(vMethodInfo.TurboType);
-            vMeProc.AssignFromStack(Pointer(FGlobalOptions._SP), nil);
+            vMeProc.AssignFromStack(Pointer(FGlobalOptions._SP), nil, 0);
             vMeProc.Execute(Pointer(vMethodInfo.MethodAddr));
             //pop params 
             Inc(FGlobalOptions._SP, vMeProc.ProcType.GetStackTypeSizeIn(0)); 
@@ -739,6 +740,7 @@ begin
   GTurboCoreWords[opEnter] := iVMEnter;
   GTurboCoreWords[opExit] := iVMExit;
   GTurboCoreWords[opCallFar] := iVMCallFar;
+  GTurboCoreWords[opCallExt] := iVMCallExt;
 
   GTurboCoreWords[opEnterFar] := iVMEnterFar;
   GTurboCoreWords[opExitFar] := iVMExitFar;
