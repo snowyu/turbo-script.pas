@@ -50,6 +50,9 @@ interface
 uses
   Windows, //QueryPerformanceCounter
   SysUtils, Classes
+  , uMeObject
+  , uMeTypes
+  , uMeProcType
   , uTurboConsts
   , uTurboMetaInfo
   , uTurboExecutor
@@ -349,9 +352,6 @@ end;
 
 procedure iVMExitFar;
 asm
-  //不能这样！这样的话如果是自己调用这个函数，退出的时候就会停止
-  //另外，如果我正好这个时候发布停止，但是这里却重置了状态～～
-
   POP  ESI
   POP  EDI
 
@@ -377,19 +377,11 @@ asm
 //}
 end;
 
-//CALLFAR PTurboModuleInfo cfa-addr
-//if PTurboModuleInfo = nil means it's self, do not lookup.  
-//在返回栈中保存EDI(旧的 FMemory 基址), 
-//根据 PTurboModuleInfo 查找模块内存基址，如果找到就设置EDI成新的 FDataMemory 基址,
-//然后装入该函数的地址，其它就和VMEnter一样了，转去VMEnter。
-procedure iVMCallFar;
+procedure _iVMCallFar;
 asm
-  LODSD    //EAX= PTurboModuleInfo
-
   PUSH EDI //save the current MemoryBase.
   TEST EAX, EAX //CMP EAX, 0
   JZ  @@DoLocalEnterFar
-  ADD  EAX, EDI //PTurboModuleRefInfo real addr
   MOV  EDX, [EAX].TTurboModuleRefInfo.Handle
   TEST EDX, EDX //CMP ECX, 0
   JZ   @@RequireModule
@@ -444,6 +436,49 @@ asm
 //}
 end;
 
+//CALLFAR PTurboModuleInfo cfa-addr
+//if PTurboModuleInfo = nil means it's self, do not lookup.  
+//在返回栈中保存EDI(旧的 FMemory 基址), 
+//根据 PTurboModuleInfo 查找模块内存基址，如果找到就设置EDI成新的 FDataMemory 基址,
+//然后装入该函数的地址，其它就和VMEnter一样了，转去VMEnter。
+procedure iVMCallFar;
+asm
+  LODSD    //EAX= PTurboModuleInfo
+  TEST EAX, EAX //CMP EAX, 0
+  JZ   @@Skip
+  ADD  EAX, EDI //PTurboModuleRefInfo real addr
+@@Skip:
+  JMP  _iVMCallFar 
+end;
+
+function RunExternalFunc(const aStack: Integer; const aProcType: PMeProcType; const aProcAddr: Pointer): Integer;
+var
+  vMeProc: PMeProcParams;
+begin
+  New(vMeProc, Create);
+  try
+    Result := aStack;
+    vMeProc.ProcType := aProcType;
+    vMeProc.AssignFromStack(Pointer(Result), nil, 0);
+    vMeProc.Execute(aProcAddr);
+    //pop params 
+    Inc(Result, vMeProc.ProcType.GetStackTypeSizeIn(0)); 
+    //TODO: push result here.
+    //how to allocate the string space. make a Heap?? 
+    if Assigned(vMeProc.ResultParam) then
+    begin
+      with vMeProc.ResultParam^ do 
+      if IsByRef or (DataType.ParamType.Kind in [mtkInteger, mtkChar, mtkEnumeration, mtkSet, mtkWChar]) then
+      begin
+        Dec(Result, SizeOf(tsInt));
+        PPointer(Result)^ := ParamValue.VPointer;   
+      end;
+    end;
+  finally
+    MeFreeAndNil(vMeProc);
+  end;
+end;
+
 { opCallExt<PTurboMethodInfo> }
 procedure iVMCallExt;
 asm
@@ -452,15 +487,111 @@ asm
   JZ   @@ParamError
   ADD  EAX, EDI //PTurboMethodInfo real addr
   MOV  DL, [EAX].TTurboMethodInfo.CodeFieldStyle
-  CMP  DL, cfsFunction
-  JNZ  @@IsExternalFunction
+  CMP  DL, cfsDLLFunction
+  JZ   @@IsDLLFunction
+  CMP  DL, cfsExternalFunction
+  JZ  @@IsExternalFunction
 @@IsLocalFunction:
   MOV  EAX, [EAX].TTurboMethodInfo.MethodAddr
   JMP  _DoVMEnter  
-@@IsExternalFunction:
 
-  //TODO: not fined...
-  JMP  iVMNext
+@@IsDLLFunction:
+  MOV  EDX, [EAX].TTurboMethodInfo.MethodAddr
+  TEST EDX, EDX
+  JNZ  @@SkipRequireDLLProcAddress
+@@RequireDLLProcAddress:
+  PUSH EAX
+  PUSH EBX
+
+  PUSH EDI
+  PUSH ESI
+  PUSH EBP
+  PUSH ECX
+
+  {//TODO: WORKAROUND发现是执行 LoadLibrary 函数，会占用 ReturnStack 大量空间，当将 ReturnStack 增大到4096的时候就ok!
+   //so switch to use the Application Stack.
+   //why it NO USE AT ALL!! I DO NOT KNOW!
+  MOV  [ECX].TTurboGlobalOptions._RP, ESP
+  MOV  [ECX].TTurboGlobalOptions._SP, EBP
+  MOV  EDX, [ECX].TTurboGlobalOptions.Executor
+  MOV  ESP, [EDX].TTurboX86Interpreter.FOldESP
+  MOV  EBP, [EDX].TTurboX86Interpreter.FOldEBP
+  PUSH ECX
+//}
+  CALL TTurboMethodInfoEx.RequireDLLProcAddress
+{ //restore the script stack.
+  POP  ECX
+  MOV  ESP, [ECX].TTurboGlobalOptions._RP 
+  MOV  EBP, [ECX].TTurboGlobalOptions._SP
+//}  
+
+  POP  ECX
+  POP  EBP
+  POP  ESI
+  POP  EDI
+
+  POP  EBX
+  POP  EAX
+
+{
+  POP  ECX
+
+  MOV  ESP, [ECX].TTurboGlobalOptions._RP
+  MOV  EBP, [ECX].TTurboGlobalOptions._SP
+  MOV  ESI, [ECX].TTurboGlobalOptions._PC
+  POP  EBX
+  POP  EAX
+
+{  MOV  [EDX].TTurboX86Interpreter.FOldESP, ESP 
+  MOV  [EDX].TTurboX86Interpreter.FOldEBP, EBP
+  MOV  [EDX].TTurboX86Interpreter.FOldEBX, EBX 
+  MOV  [EDX].TTurboX86Interpreter.FOldESI, ESI 
+  MOV  [EDX].TTurboX86Interpreter.FOldEDI, EDI 
+}
+
+  MOV  EDX, [EAX].TTurboMethodInfo.MethodAddr
+  TEST EDX, EDX
+  JZ   @@MethodNotFoundError
+
+@@SkipRequireDLLProcAddress:
+  MOV  EDX, [EAX].TTurboMethodInfo.TurboType
+  TEST EDX, EDX
+  JZ   @@TypeInfoNotFoundError
+  SUB  EBP, Type(tsInt)
+  MOV  [EBP], EBX
+
+  PUSH EDI
+  //PUSH EBX
+  PUSH ESI
+  //PUSH EBP
+  PUSH ECX
+
+  MOV  ECX, [EAX].TTurboMethodInfo.MethodAddr   
+  MOV  EAX, EBP  //Stack Pointer
+  CALL RunExternalFunc
+  MOV  EBP, EAX  
+
+  POP  ECX
+  //POP  EBP
+  POP  ESI
+  //POP  EBX
+  POP  EDI
+
+  MOV  EBX, [EBP] 
+  ADD  EBP, Type(tsInt)
+
+  JMP iVMNext
+@@IsExternalFunction:
+  MOV EAX, [EAX].TTurboMethodInfoEx.ExternalOptions.ModuleRef
+  JMP  _iVMCallFar 
+
+@@TypeInfoNotFoundError:
+  MOV  EAX, errTypeInfoNotFound
+  JMP  _iVMHalt
+
+@@MethodNotFoundError:
+  MOV  EAX, errMethodNotFound
+  JMP  _iVMHalt
 
 @@ParamError:
   MOV  EAX, errInstructionBadParam
@@ -1063,6 +1194,7 @@ begin
   GTurboCoreWords[opEnter] := iVMEnter;
   GTurboCoreWords[opExit] := iVMExit;
   GTurboCoreWords[opCallFar] := iVMCallFar;
+  GTurboCoreWords[opCallExt] := iVMCallExt;
 
   GTurboCoreWords[opEnterFar] := iVMEnterFar;
   GTurboCoreWords[opExitFar] := iVMExitFar;
