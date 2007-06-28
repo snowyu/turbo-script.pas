@@ -14,6 +14,26 @@ TODO:
 ~ Delphi 嵌入汇编调用System单元的内置函数如： _LStrLAsg 的时候，必须：
   CALL SYSTEM.@LStrLAsg
 
+2007-6-27 9:30
+* [Bug] issue 34: compile the external DLL funtion fatal error!
+  Exception:Access violation at address 0045ECD0 in module 'tfcc.exe'. Read of address 0000003C
+* [Bug] issue 34: execute script with the external DLL funtion fatal error!
+  lasterr(1):Bad Instruction at address:0000
+  forget set: GTurboCoreWords[opCallExt] := iVMCallExt;
+* [Bug] the external function is not exist in LastWordEntry Link List.
++ [Feature] [Compiler] issue 36: Only public external function in LastWordEntry Link List.
+  只有Public的函数才会出现在LastWordEntry 列表中。
+  ExternalOptions.ModuleRef 的地址重定位放到RelocatedDataAddresses表中！
+  + TurboCustomModule.RelocatedDataTypes
+    所有的需要类型Id转换全放这里。
+* [Bug] issue 37: TurboInterpreter AssignFromStack Error.
++ [uTurboExecutor] TTurboRelocatedTypes to resolve the TypeId of a adress.
+* [uTurboExecutor] rename TRelocatedAddresses to TTurboRelocatedAddresses
++ [uTurboExecutor] TMeListEx
+   add the save/load stream ability to TMeList.
+*  [uTurboExecutor] DoMethodEntryItemProc
+   -  the resolved ExternalOptions.ModuleRef address is in RelocatedDataAddresses now.
+
 2007-6-25 19:41
 * TurboCustomModule.
   + AddPCharToData(const aStr: string);
