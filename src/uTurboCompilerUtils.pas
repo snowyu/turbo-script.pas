@@ -679,11 +679,14 @@ begin
     if i >= 0 then Inc(i) else i := 0;
     Integer(Entry.Word.TurboType) := i;
   end;
+  if (Result = cSymbolErrorOk) and Assigned(Entry.Word.TurboType) then
+    aModule.Module.RelocatedDataTypes.Add(Integer(@Entry.Word.TurboType) - Integer(aModule.Module.DataMemory));
 end;
 
 function TTurboMethodSymbol.DeclareTo(const aModule: PTurboModuleSymbol): Integer;
 var
   p: PTurboExteralMethodOptions;
+  vIsPublic: Boolean;
 begin
   if CFA = -1 then
   begin
@@ -713,15 +716,34 @@ begin
           end;
           if Result <> cSymbolErrorOk then Exit;
         end;
+      cfsDLLFunction:
+        begin
+          CFA := 0;
+          if not Assigned(ExternalOptions.ModuleRef) then
+          Result := ModuleSymbol.DeclareTo(aModule);
+          if Result <> cSymbolErrorOk then Exit;
+            Integer(p) := aModule.UsedModules.IndexOf(ModuleSymbol);
+            if Integer(p) >= 0 then
+            begin
+              ExternalOptions.ModuleRef := Pointer(Integer(aModule.UsedModules.Entries[Integer(p)]) + SizeOf(tsPointer));
+            end
+            else
+              Result := cSymbolErrorModuleRefAddedFailed;
+          if Result <> cSymbolErrorOk then Exit;
+        end;
     end; //case
-    if IsPublic(aModule.Module) then with aModule.Module do
+    vIsPublic := IsPublic(aModule.Module);
+    if vIsPublic or not (CodeFieldStyle in cTurboNativeFunctionTypes) then with aModule.Module do
     begin
-      //writeln('aModule.UsedDataSize=',InttoHex(aModule.UsedDataSize,4));
+      //writeln('aModule.UsedDataSize=',InttoHex(UsedDataSize,4));
       AlignData;
-      //writeln('aModule.UsedDataSize=',InttoHex(aModule.UsedDataSize,4));
+      //writeln('aModule.UsedDataSize=',InttoHex(UsedDataSize,4));
       Integer(Entry) := Integer(DataMemory) + UsedDataSize;
       AllocDataSpace(SizeOf(TTurboMethodEntry));
-      Entry.Prior := LastWordEntry;
+      if vIsPublic then
+        Entry.Prior := LastWordEntry
+      else
+        Entry.Prior := nil;
       if IsNamed(aModule.Module) then
       begin
         Entry.Word.Name := Pointer(UsedDataSize);
@@ -741,10 +763,27 @@ begin
       Entry.Word.CodeFieldStyle := CodeFieldStyle;
       if Entry.Word.IsExternal then
       begin
+        //writeln('IsExternal:', Self.Name);
         Integer(p) := Integer(DataMemory) + UsedDataSize;
         AllocDataSpace(SizeOf(TTurboExteralMethodOptions));
+        if not Assigned(Entry.Word.Name) and (ExternalOptions.Index = -1) then
+        begin
+          if CodeFieldStyle = cfsExternalFunction then
+          begin
+            //ExternalOptions.Name is shortString, but the Name is String, 万一放不下，所以对DLL可以用 ExternalOptions.Name，但是对本族的外部函数还是用这个！
+            Entry.Word.Name := Pointer(UsedDataSize);
+            //PChar:
+            AddPCharToData(Self.Name);
+          end
+          else
+            ExternalOptions.Name := Self.Name;
+        end;
         p^ := ExternalOptions;
+        Integer(p^.ModuleRef) := Integer(ExternalOptions.ModuleRef) - Integer(DataMemory);
+        RelocatedDataAddresses.Add(Integer(@p^.ModuleRef)-Integer(DataMemory));
         Assert(p=Entry.Word.GetExternalOptionsAddr, 'Method.DeclareTo: ExternalOptionsAddr mismatch');
+        if vIsPublic then
+          LastWordEntry := Pointer(Integer(Entry) - Integer(DataMemory));
       end;
       if IsTyped(aModule.Module) or Entry.Word.IsExternal then
       begin
@@ -889,12 +928,14 @@ begin
       end;
     cfsDLLFunction:
       begin
-          {if not Assigned(ExternalOptions.ModuleRef) then //TODO: BUG Here!!!
+        //if assigned(Entry) then writeln('dddddddddddddddddddddsd');
+          if not Assigned(ExternalOptions.ModuleRef) then
           begin
             ModuleSymbol.DeclareTo(aModule);
             i := aModule.UsedModules.IndexOf(ModuleSymbol);
             ExternalOptions.ModuleRef := Pointer(Integer(aModule.UsedModules.Entries[i]) + SizeOf(tsPointer));
           end; //}
+        //writeln('ModuleSymbol = nil');
         aModule.Module.AddOpToMem(opCallExt);
         vCFA := Integer(@Entry.Word);
         vCFA := vCFA - Integer(aModule.Module.DataMemory);
@@ -1304,9 +1345,20 @@ begin
       Integer(vModuleEntry) := Integer(DataMemory) + UsedDataSize; //the offset address.
       AllocDataSpace(SizeOf(TTurboModuleRefEntry));
       vModuleEntry.Prior := LastModuleRefEntry;
-      vModuleEntry.Module.ModuleType := ModuleType;
-      vModuleEntry.Module.Revision := Module.ModuleVersion;
-      vModuleEntry.Module.BuildDate := Module.ModuleDate;
+      vModuleEntry.Module.ModuleType := Self.ModuleType;
+      //writeln(Self.Name, Integer(Self.ModuleType));
+      if not (Self.ModuleType in cTurboExternalModuleTypes) then
+      begin
+        vModuleEntry.Module.Revision := Module.ModuleVersion;
+        vModuleEntry.Module.BuildDate := Module.ModuleDate;
+      end
+      else
+      begin
+        vModuleEntry.Module.Handle := nil;
+        vModuleEntry.Module.Revision := 0;
+        vModuleEntry.Module.BuildDate.Time := 0;
+        vModuleEntry.Module.BuildDate.Date := 0;
+      end;
       vModuleEntry.Module.Name := Pointer(UsedDataSize);
       if Length(Self.Name) > 0 then
         AddBufferToData(Self.Name[1], Length(Self.Name));
