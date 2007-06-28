@@ -482,7 +482,7 @@ PRODUCTIONS
                                                                       exit;
                                                                     end;
                                                                  .)
-    FormalParm<vProcType> {FormalParm<vProcType>} 
+    FormalParm<vProcType> {";" FormalParm<vProcType>} 
   .
 
   FormalParm<const aProcType: PMeProcType> 
@@ -521,7 +521,7 @@ PRODUCTIONS
                                                               case aWord.ModuleType of
                                                                 mtDLL:  begin
                                                                   aWord.CodeFieldStyle := cfsDLLFunction;
-                                                                  aWord.Visibility := tvPublicVisibilty;
+                                                                  //aWord.Visibility := tvPublicVisibilty;
                                                                 end;
                                                                 mtHost: aWord.CodeFieldStyle := cfsHostFunction;
                                                               end;
