@@ -335,6 +335,9 @@ const
   cMaxTurboVMInstructionCount = SizeOf(TTurboCoreWords) div SizeOf(TProcedure); //the max turbo VM code directive count
   
   cTurboExternalFunctions = [cfsExternalFunction, cfsHostFunction, cfsDLLFunction];
+  cTurboNativeModuleTypes = [mtProgram, mtLib, mtObject, mtFunction];
+  cTurboExternalModuleTypes = [mtHost, mtDLL];
+  cTurboNativeFunctionTypes = [cfsFunction, cfsExternalFunction];
 
   //用一个 LongWord（DWord）来存放：TTurboVisibility
   {: 该标识符私有，没有名字，没有类型！}
