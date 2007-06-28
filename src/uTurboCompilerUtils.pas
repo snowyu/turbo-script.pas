@@ -775,7 +775,7 @@ begin
             //PChar:
             AddPCharToData(Self.Name);
           end
-          else
+          else if ExternalOptions.Name = '' then
             ExternalOptions.Name := Self.Name;
         end;
         p^ := ExternalOptions;

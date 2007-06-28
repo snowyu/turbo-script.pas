@@ -276,12 +276,13 @@ begin
       s := ''
     else
       s := Name;
+
     if s <> '' then
     begin
       Pointer(MethodAddr) := GetProcAddress(LongWord(ExternalOptions.ModuleRef.Handle)
         , PChar(s));
     end
-    else
+    else if ExternalOptions.Index <> -1 then 
       Pointer(MethodAddr) := GetProcAddress(LongWord(ExternalOptions.ModuleRef.Handle)
         , Pointer(ExternalOptions.Index));
   end;
