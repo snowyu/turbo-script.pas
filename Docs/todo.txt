@@ -14,6 +14,27 @@ TODO:
 ~ Delphi 嵌入汇编调用System单元的内置函数如： _LStrLAsg 的时候，必须：
   CALL SYSTEM.@LStrLAsg
 
+2007-6-28 11:04
+!* [Compiler] TTurboMethodSymbol
+  + FMemory  仅当 CodeFieldStyle = cfsFunction 时候才分配内存
+    然后Method的代码放在 FMemory 中，当 PushTo 或是Public的才 DeclareTo
+    不准备实现将方法声明到其它模块（非Owner模块），因为指令中可能牵涉到数据区的变量。
+  * DeclareTo, 对于 cfsFunction 则首先将 FMemory 的内容复制到模块，再～～
++ [Compiler] issue 43: [TFCC] the word can define function:
+  : Word(): Byte;
+* [Bug] issue 40: TurboX86Interpreter run the external DLL function fatal error:
+  FastMM has detected an error during a FreeMem operation. The block header has been corrupted. 
+  追踪发现是释放 ReturnStack 时候出的错误。
+  经落实发现是执行LoadLibrary函数，会占用 ReturnStack 大量空间，当将 ReturnStack 增大到4096的时候就ok!
+  或者俺在调用的时候，应该切换回Delphi App的Stack.
+   俺有点不服气了，为啥我已经切换到App的Stack了，但是它还是要用我的Stack空间！！
+   不管了，将默认大小改为 cDefaultReturnStackSize = 4096;
+* [Bug] issue 41[Done]: LoadOnDemand not pre-load the DLL LIB!
+* [Bug] issue 42[Done]: [Compiler] the external DLL function "name" DO not work.
+  eg, 
+  : Add(const a: Integer; const b: Integer): Integer external 'dlltest.dll' DLL REGISTER Name 'AddCalc';
+
+
 2007-6-27 9:30
 * [Bug] issue 34: compile the external DLL funtion fatal error!
   Exception:Access violation at address 0045ECD0 in module 'tfcc.exe'. Read of address 0000003C
