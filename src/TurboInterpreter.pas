@@ -318,6 +318,33 @@ begin
     iVMEnter(FGlobalOptions);
 end;
 
+procedure RunExternalFunc(var aStack: Integer; aProcType: PMeProcType; aProcAddr: Pointer);
+var
+  vMeProc: PMeProcParams;
+begin
+  New(vMeProc, Create);
+  try
+    vMeProc.ProcType := aProcType;
+    vMeProc.AssignFromStack(Pointer(aStack), nil, 0);
+    vMeProc.Execute(aProcAddr);
+    //pop params 
+    Inc(aStack, vMeProc.ProcType.GetStackTypeSizeIn(0)); 
+    //TODO: push result here.
+    //how to allocate the string space. make a Heap?? 
+    if Assigned(vMeProc.ResultParam) then
+    begin
+      with vMeProc.ResultParam^ do 
+      if IsByRef or (DataType.ParamType.Kind in [mtkInteger, mtkChar, mtkEnumeration, mtkSet, mtkWChar]) then
+      begin
+        Dec(aStack, SizeOf(tsInt));
+        PPointer(aStack)^ := ParamValue.VPointer;   
+      end;
+    end;
+  finally
+    MeFreeAndNil(vMeProc);
+  end;
+end;
+
 { opCallExt<PTurboMethodInfo> }
 procedure iVMCallExt(const FGlobalOptions: PTurboGlobalOptions);
 var
@@ -335,15 +362,6 @@ begin
   begin
     Integer(vMethodInfo) := Integer(vMethodInfo) + Integer(FGlobalOptions._Mem);
     case vMethodInfo.CodeFieldStyle of
-      cfsFunction: 
-        begin
-          _DoVMEnter(FGlobalOptions, vMethodInfo.MethodAddr);
-        end;
-      cfsExternalFunction: 
-        begin
-          if _DoVMCallFarMemBase(FGlobalOptions, vMethodInfo.ExternalOptions.ModuleRef) then
-            _DoVMEnter(FGlobalOptions, vMethodInfo.MethodAddr);
-        end;
       cfsDLLFunction:
         begin
           if (vMethodInfo.MethodAddr = 0) then
@@ -360,29 +378,18 @@ begin
             _iVMHalt(FGlobalOptions, errTypeInfoNotFound);
             Exit;
           end;
-          New(vMeProc, Create);
-          try
-            vMeProc.ProcType := PMeProcType(vMethodInfo.TurboType);
-            vMeProc.AssignFromStack(Pointer(FGlobalOptions._SP), nil, 0);
-            vMeProc.Execute(Pointer(vMethodInfo.MethodAddr));
-            //pop params 
-            Inc(FGlobalOptions._SP, vMeProc.ProcType.GetStackTypeSizeIn(0)); 
-            //TODO: push result here.
-            //how to allocate the string space. make a Heap?? 
-            if Assigned(vMeProc.ResultParam) then
-            begin
-              with vMeProc.ResultParam^ do 
-              if IsByRef or (DataType.ParamType.Kind in [mtkInteger, mtkChar, mtkEnumeration, mtkSet, mtkWChar]) then
-              begin
-                Dec(FGlobalOptions._SP, SizeOf(tsInt));
-                PPointer(FGlobalOptions._SP)^ := ParamValue.VPointer;   
-              end;
-            end;
-          finally
-            MeFreeAndNil(vMeProc);
-          end;
+          RunExternalFunc(FGlobalOptions._SP, PMeProcType(vMethodInfo.TurboType), Pointer(vMethodInfo.MethodAddr));
         end; 
-    end;//
+      cfsExternalFunction: 
+        begin
+          if _DoVMCallFarMemBase(FGlobalOptions, vMethodInfo.ExternalOptions.ModuleRef) then
+            _DoVMEnter(FGlobalOptions, vMethodInfo.MethodAddr);
+        end;
+      cfsFunction: 
+        begin
+          _DoVMEnter(FGlobalOptions, vMethodInfo.MethodAddr);
+        end;
+    end;//case
   end
   else
   begin
