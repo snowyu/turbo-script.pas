@@ -472,7 +472,7 @@ PRODUCTIONS
                                                                  end;
                                                                  .)
   .
-  FormalParameters<const aWord: PTurboMethodSymbol> = "(" [FormalParms<aWord>] ")" .
+  FormalParameters<const aWord: PTurboMethodSymbol> = "(" [FormalParms<aWord>] ")" [":" ResultParamType<aWord.TypeInfo>].
   FormalParms<const aWord: PTurboMethodSymbol> 
     (. var vProcType: PMeProcType; .)
     =                                                            (. vProcType := aWord.TypeInfo; 
@@ -507,6 +507,21 @@ PRODUCTIONS
     
   .
 
+  ResultParamType<const aProcType: PMeProcType>
+    (.var vType: PMeType;.)
+    =                    (. aProcType.MethodKind := mkFunction; .)
+    TypeKind<vType>      (. if Assigned(vType) then  
+                            begin
+                              aProcType.ResultType := vType;
+                            end
+                            else begin
+                              SynError(cSymbolErrorMethodDeclaration, ' the result type can not be found!');
+                              exit;
+                            end;
+                         .)
+    
+  .
+
   ExternalWordOption< const aWord: PTurboMethodSymbol >
     =
     //the default is the LastModuleRefEntry if no the module name.
@@ -529,10 +544,11 @@ PRODUCTIONS
       ]
     ]
     [
-      "STDCALL"                (. aWord.CallStyle := ccStdCall; .)
+      ("STDCALL"                (. aWord.CallStyle := ccStdCall; .)
        |"REGISTER"             (. aWord.CallStyle := ccRegister; .)
        |"PASCAL"               (. aWord.CallStyle := ccPascal; .)
        |"FORTH"                (. aWord.CallStyle := ccForth; .)
+      )
        ExternalWordOptionPart<aWord.ExternalOptions>
     ]
   .
