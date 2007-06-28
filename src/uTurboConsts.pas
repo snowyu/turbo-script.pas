@@ -14,7 +14,7 @@ const
   cFORTHHeaderMagicId = 'TURBO4TH';
   cFORTHHeaderMagicIdLen = 8; 
   //cFORTHMagicWordSize = SizeOf(cFORTHHeaderMagicWord);
-  cDefaultReturnStackSize = 1024; //the bytes is 1024 * SizeOf(Pointer)
+  cDefaultReturnStackSize = 4096; //4096 the bytes is 1024 * SizeOf(Pointer)
   cDefaultParamStackSize = 1024; 
   cDefaultFreeMemSize = 1024 * 8; //the Free Memory 8kb
   cDefaultDataMemSize = 1024;
