@@ -1413,6 +1413,7 @@ var
   vName: PChar;
 begin
   vModuleRefEntry := LastModuleRefEntry;
+
   while (vModuleRefEntry <> nil) do
   begin
     vName := vModuleRefEntry.Module.Name;
@@ -1425,6 +1426,7 @@ begin
     vModule := nil;
     case vModuleRefEntry.Module.ModuleType of
       mtLib, mtProgram: vModule := RequireModule(vName);
+      mtDLL: vModuleRefEntry.Module.RequireDLLHandle;
     end; //case
     if Assigned(vModule) then
       vModuleRefEntry.Module.Handle := vModule;
