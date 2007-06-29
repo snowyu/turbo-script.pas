@@ -14,6 +14,27 @@ TODO:
 ~ Delphi 嵌入汇编调用System单元的内置函数如： _LStrLAsg 的时候，必须：
   CALL SYSTEM.@LStrLAsg
 
+2007-6-29 11:58
+~ issue 40: 今天仔细追踪了下在执行DLL函数报错的原因,原来不是LoadLib的问题，而是:
+  执行了 MessageBox 后出的问题！！而 MessageBox 主要是对 string 的处理！
+  也就是GetMem和FreeMem,我估计是用的APP的吧！！
+  所以还原堆栈应该在执行DLL函数的时候，而不是LoadLib的时候。
+  修改成如下的结果，果然，依然出错，但是，俺改回用APP堆栈，还是没有效果！！气死我了
+  我依稀记得DLL能访问主程序的ApplicationId，因此肯定是在DLLMain中做了设置的。所以在LoadLib和调用DLL函数之前都要还原APP堆栈！
+  果然当我在LoadLib和调用DLL函数的时候全部切换为APP的堆栈一切OK!
+  好了，这下绝对该没有问题了。
+  wo
+    function ShowIt: Pointer;register;
+    var
+     s: string;
+     p: Pointer;
+    begin
+      s := 'dddd';
+      p := Pointer(s);
+      Result := p;
+    end;
+  
+
 2007-6-28 11:04
 !* [Compiler] TTurboMethodSymbol
   + FMemory  仅当 CodeFieldStyle = cfsFunction 时候才分配内存
