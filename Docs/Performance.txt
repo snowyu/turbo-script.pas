@@ -176,8 +176,28 @@ PurePascalEngine(FPC)运行时间: 963
 不启用按需加载技术，而是预先加载模块：
 结果运行时间：202  <如果不使用Cache功能每次都要查找所花时间：1790>
 最新结果是: 191
-PurePascalEngine运行时间: 423(预先加载)
-PurePascalEngine(FPC)运行时间: 1517(预先加载)
+PurePascalEngine运行时间(预先加载): 423
+PurePascalEngine(FPC)运行时间(预先加载): 1517
+
+=== TurboScript 调用DLL子过程的调用效率 ===
+<code>
+//该函数在DLL文件中。
+:Add(const a: Integer; const b: Integer): Integer 
+  external 'dlltest.dll' DLL REGISTER Name 'AddCalc';
+
+//--计时开始
+300
+300 Add
+..... （总计 2017 次）
+300 Add
+//--计时结束
+</code>
+
+启用按需加载技术的结果运行时间：144584【不稳定徘徊在138322-219230】 优化后: 16648-20556
+不启用按需加载技术，而是预先加载模块： 129625(偶尔上了130000) 优化后: 7744-7954(偶尔10877)
+PurePascalEngine运行时间(预先加载): 4933-5210; LoadOnDemand: 16251-19789
+
+
 
 == 网站 ==
  * Lua: http://www.lua.org

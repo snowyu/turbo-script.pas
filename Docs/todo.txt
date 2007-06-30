@@ -21,8 +21,15 @@ TODO:
   即便是全部都使用Delphi的堆栈依然会出错！！
   在DLL函数调用前， EBX的值不是Execturor,所有没有能取得正确的APP堆栈原值。
   另外没能正确传递和返回脚本参数栈的指针。
-* [Bug] [uStrUtils] LeftPos does not work.
-* [Bug] [Compiler] the compiler Switcher ON/OFF does not work.
+* [Bug] issue 44: [uStrUtils] LeftPos does not work.
+* [Bug] issue 45: [Compiler] the compiler Switcher ON/OFF does not work.
+* [Feature] issue 46: [Performance] speedup run the dll function
+  + CustomTurboModule.MeObjects to cache the ProcInstance:PMeProcParams
+    they will be free when ClearMem.
+  启用按需加载技术的结果运行时间：144584【不稳定徘徊在138322-219230】 优化后: 16648-20556
+  不启用按需加载技术，而是预先加载模块： 129625(偶尔上了130000) 优化后: 7744-7954(偶尔10877)
+  PurePascalEngine运行时间(预先加载): 4933-5210; LoadOnDemand: 16251-19789
+  
 
 2007-6-29 11:58
 ~ issue 40: 今天仔细追踪了下在执行DLL函数报错的原因,原来不是LoadLib的问题，而是:

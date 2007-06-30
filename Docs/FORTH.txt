@@ -328,10 +328,11 @@ This means that calling a static method on a beforefieldinit type does not guara
 The C# Compiler sets the beforefieldinit attribute for all types that lack an explicit type initializer method.
 
 === 基本类型 ===
-系统内定的类型：
+系统内定的类型(native primitive type)：
 序数型（布尔，整数，枚举，字符），小数，数组(字符串)，序列，动态数组，动态序列【所谓动态就是带引用的，类似于Delphi中的】
 
-所有的类型从 TTurboType 派生，并支持操作符重载。
+Advanced type:
+所有的Advanced 类型从 TType 派生，并支持操作符重载。
 
 在编译器中需要检查是否存在 System 单元，如果存在则以系统单元中定义的类型为准（自举），否则就以内部定义的为准。
 还有当编译系统单元的时候，不得再去查找引用System单元。
