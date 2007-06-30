@@ -1413,7 +1413,7 @@ var
   vName: PChar;
 begin
   vModuleRefEntry := LastModuleRefEntry;
-
+  //if assigned(vModuleRefEntry) then writeln('loadOnDemand:', Name);
   while (vModuleRefEntry <> nil) do
   begin
     vName := vModuleRefEntry.Module.Name;

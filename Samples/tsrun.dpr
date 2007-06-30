@@ -8,7 +8,7 @@
 program tsrun;
 
 {$I TurboScript.inc}
-{$DEFINE PUREPASCAL}
+{.$DEFINE PUREPASCAL}
 
 {$APPTYPE CONSOLE}
 
@@ -17,6 +17,7 @@ uses
   FastMM4,
   {$ENDIF}
   Windows,  SysUtils, Classes
+  , uStrUtils
   , uTurboPE
   , uTurboConsts
   , uTurboExecutor
@@ -248,7 +249,7 @@ begin
       aFileName := aFileName + cTurboCompiledProgramFileExt;
       if not FileExists(aFileName) then
       begin
-    	  Writeln(aFileName + ' is not exists.');
+    	  Writeln(ExtractFileBaseName(aFileName) + ' is not exists.');
     	  exit;
       end;
     end;
