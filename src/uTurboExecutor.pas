@@ -143,12 +143,14 @@ type
   }
   TCustomTurboModule = class(TCustomTurboObject)
   private
+    FMeObjects: PMeList;
     FOnReset: TNotifyEvent;
     FRegisteredTypes: PTurboRegisteredTypes;
     FRelocatedDataAddresses: PTurboRelocatedAddresses;
     FRelocatedDataTypes: PTurboRelocatedTypes;
     function GetIsAddrResolved: Boolean;
     function GetLastModuleRefEntry: PTurboModuleRefEntry;
+    function GetMeObjects: PMeList;
     function GetOptions: TTurboScriptOptions;
     procedure SetIsAddrResolved(const Value: Boolean);
     procedure SetLastModuleRefEntry(Value: PTurboModuleRefEntry);
@@ -351,6 +353,8 @@ type
     warining: if in the running status, you may be get trouble!!
     }
     property MemorySize: tsInt read GetMemorySize write SetMemorySize;
+    {: this module used MeObjects in runtime }
+    property MeObjects: PMeList read GetMeObjects;
     { Description
     (The ModuleDate field indicates the number of calendar days since the start
     of the calendar (the number of days since 1/1/0001 plus one).)
@@ -593,11 +597,8 @@ type
 
   //the typecast for data memory area to get the parameters
   TTurboPreservedDataMemory = packed record
-    Code: Pointer; //need relocate addr. point to the FMemory
-    //GlobalOptions: PTurboGlobalOptions; //ready move to AppDomain
+    Code: Pointer; //need relocate addr. point to the FMemory(the IL Code memory)
     Flags: Byte; //TTurboModuleFlags; modified for FPC
-    //Executor: TCustomTurboExecutor; //put to the GlobalOptions
-    //在执行器解耦后，可以放到全局参数中，表示该App使用的执行器单件。
     ModuleHandle: TCustomTurboModule;
 
     UsedMemory: tsInt;//实际使用的大小
@@ -787,6 +788,7 @@ begin
   MeFreeAndNil(FRegisteredTypes);
   MeFreeAndNil(FRelocatedDataAddresses);
   MeFreeAndNil(FRelocatedDataTypes);
+  MeFreeAndNil(FMeObjects);
   if not StoredInOwner then
   begin
     if ModuleType <> mtFunction then
@@ -968,6 +970,11 @@ begin
   if not StoredInOwner then
   begin
     if Assigned(FDataMemory) then FreeDLLLibs;
+    if Assigned(FMeObjects) then
+    begin
+      FMeObjects.FreeMeObjects;
+      FMeObjects.Clear;
+    end;
     //vPreserved := SizeOf(TTurboPreservedDataMemory);
     //if vPreserved < Integer(High(TTurboVMInstruction)) then
         //vPreserved := Integer(High(TTurboVMInstruction));
@@ -983,6 +990,7 @@ begin
       UsedMemory := 0;
       Flags := 0;
       Code := FMemory;
+      ModuleHandle := Self;
       DataSize := vPreserved;
       UsedDataSize := SizeOf(TTurboPreservedDataMemory);//SizeOf(tsInt); //preserved the first integer
       TTurboScriptOptions(ModuleOptions) := [soAssertSupport];
@@ -1177,6 +1185,19 @@ begin
     vModuleRefEntry.Module.FreeDLLHandle;
     vModuleRefEntry := vModuleRefEntry.Prior;
   end;
+
+  // search the MethodEntry
+  PTurboMethodEntry(vModuleRefEntry) := LastWordEntry;
+  while assigned(vModuleRefEntry) do
+  begin
+    with PTurboMethodEntry(vModuleRefEntry).Word do
+    begin
+      if not (CodeFieldStyle in cTurboNativeFunctionTypes) then
+        MeFreeAndNil(GetExternalOptionsAddr^.ProcInstance);
+    end;
+    vModuleRefEntry := vModuleRefEntry.Prior;
+  end;
+  //}
 end;
 
 function TCustomTurboModule.GetDataMemorySize: tsInt;
@@ -1226,6 +1247,13 @@ end;
 function TCustomTurboModule.GetMemorySize: tsInt;
 begin
   Result := PTurboPreservedDataMemory(FDataMemory).MemorySize;
+end;
+
+function TCustomTurboModule.GetMeObjects: PMeList;
+begin
+  if not Assigned(FMeObjects) then
+    New(FMeObjects, Create);
+  Result := FMeObjects;
 end;
 
 function TCustomTurboModule.GetModuleType: TTurboModuleType;
@@ -1527,7 +1555,8 @@ begin
     vTypeInfoEntry := vTypeInfoEntry.Prior;
   end;
 
-  {PTurboMethodEntry(vTypeInfoEntry) := LastWordEntry;
+  {// search the MethodEntry here?
+  PTurboMethodEntry(vTypeInfoEntry) := LastWordEntry;
   while assigned(vTypeInfoEntry) do
   begin
     I := Integer(PTurboMethodEntry(vTypeInfoEntry).Word.TurboType);
@@ -1545,7 +1574,7 @@ begin
     end;
     vTypeInfoEntry := vTypeInfoEntry.Prior;
   end;
-  }
+  //}
 
   FRelocatedDataAddresses.Relocate(FDataMemory, True);
   FRelocatedDataTypes.Relocate(FDataMemory, True);
@@ -1603,14 +1632,7 @@ begin
     {$ENDIF}
     Flags := 0;
     Code := nil;
-    {vParameterStack := ParameterStack;
-    vReturnStack := ReturnStack;
-    vReturnStackSize := ReturnStackSize;
-    vParameterStackSize := ParameterStackSize;
-    ParameterStack := 0;
-    ReturnStack := 0;
-    ReturnStackSize := 0;
-    ParameterStackSize := 0;}
+    ModuleHandle := nil;
     if FMaxDataMemorySize = -1 then
       DataSize := UsedDataSize;
     if FMaxMemorySize = -1 then
@@ -1630,11 +1652,7 @@ begin
     Flags := Byte(vFlags);
     {$ENDIF}
     Code := FMemory;
-  {  ParameterStack := vParameterStack;
-    ReturnStack := vReturnStack;
-    ReturnStackSize := vReturnStackSize;
-    ParameterStackSize := vParameterStackSize;
-  }
+    ModuleHandle := Self;
   end;
 
   if IsAddrResolved then ResolveAddress;

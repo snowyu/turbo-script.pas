@@ -18,6 +18,7 @@ uses
   , TypInfo
   , uMeObject
   , uMeTypes
+  , uMeProcType
   , uTurboConsts
   ;
 
@@ -75,9 +76,8 @@ type
   PTurboExteralMethodOptions = ^ TTurboExteralMethodOptions;
   //cfsHostFunction, cfsDLLFunction
   TTurboExteralMethodOptions = packed record
-    //if it csForth then it is the CFA.
-    //ProcAddr: Pointer; in TTurboExteralMethod.MethodAddr 
     ModuleRef: PTurboModuleRefInfo;
+    ProcInstance: PMeProcParams; //for speedup the DLL/Host function.
     //-1 means non-index visits.
     Index: tsInt;  
     //packed the function name in the DLL/Host.

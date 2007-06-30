@@ -26,19 +26,38 @@ ReturnStackBase(Pointer: 返回栈基址) ReturnStackSize(Integer: 返回栈大小)
 TIBLength(Integer) ToIn(Integer) TIB(PChar: 1024) LastWordEntry(Pointer:
 用户自定义单词链入口)
 type //in uTurboScriptConsts
-  PPreservedCodeMemory = ^ TPreservedCodeMemory;
-  //the typecast for code memory area to get the parameters
-  TPreservedCodeMemory = packed record
-    Executor: TCustomTurboExecutor;
-    ParamStackBase: Pointer;
-    ParamStackSize: Integer; //bytes
-    ReturnStackBase: Pointer;
-    ReturnStackSize: Integer; //bytes
-    TIBLength: Integer; //the text buffer length
-    ToIn: Integer; //the text buffer current index
-    TIB: array [0..cMAXTIBCount-1] of char;
-    LastWordEntry: Pointer; //有名字的函数链表
-     LastVarEntry: Pointer; //有名字的变量链表
+  PTurboPreservedDataMemory = ^ TTurboPreservedDataMemory;
+  TTurboPreservedDataMemory = packed record
+    Code: Pointer; //need relocate addr. point to the FMemory(the IL Code
+    memory)
+    Flags: Byte; //TTurboModuleFlags; modified for FPC
+    ModuleHandle: TCustomTurboModule;
+
+    UsedMemory: tsInt;//实际使用的大小
+    MemorySize: tsInt;//分配代码区的大小
+    UsedDataSize: tsInt;
+    DataSize: tsInt; 
+
+    ModuleType: TTurboModuleType;
+    ModuleOptions: LongWord; //TTurboScriptOptions; for FPC
+    ModuleName: PChar;
+    //if Module is Class then the ModuleParent is classParent
+    //in LastModuleEntry 链表中
+    ModuleParent: PTurboModuleRefInfo;
+
+    //如果ModuleType是模块，那么就是装载运行该模块前执行的初始化过程，入口地址
+    //如果是函数，则是该函数的入口地址
+    InitializeProc: Pointer; //it is the offset address of the FMemory
+    FinalizeProc: Pointer; //如果是模块的话
+    //last Used(import) module entry.
+    LastModuleRefEntry: PTurboModuleRefEntry;
+    //有名字的函数链表，指向最后一个函数入口。
+    LastWordEntry: PTurboMethodEntry;
+    //有名字的变量链表
+    LastVariableEntry: PTurboStaticFieldEntry;
+    //RTTI TypeInfo 链表
+    LastTypeInfoEntry: PTurboTypeInfoEntry;
+    LastTypeRefEntry: PTurboTypeRefEntry;
   end;
 }
 unit TurboX86Interpreter;
@@ -451,32 +470,35 @@ asm
   JMP  _iVMCallFar 
 end;
 
-function RunExternalFunc(const aStack: Integer; const aProcType: PMeProcType; const aProcAddr: Pointer): Integer;
-var
-  vMeProc: PMeProcParams;
+function RunExternalFunc(var aMethod: TTurboMethodInfoEx; 
+  const aModule: TCustomTurboModule;
+  const aStack: Integer): Integer;
 begin
-  New(vMeProc, Create);
-  try
-    Result := aStack;
-    vMeProc.ProcType := aProcType;
-    vMeProc.AssignFromStack(Pointer(Result), nil, 0);
-    vMeProc.Execute(aProcAddr);
+  if not Assigned(aMethod.ExternalOptions.ProcInstance) then
+  begin
+    New(aMethod.ExternalOptions.ProcInstance, Create);
+    aMethod.ExternalOptions.ProcInstance.ProcType := PMeProcType(aMethod.TurboType);
+    aModule.MeObjects.Add(aMethod.ExternalOptions.ProcInstance);
+  end;
+  Result := aStack;
+  with aMethod.ExternalOptions.ProcInstance^ do
+  begin
+    AssignFromStack(Pointer(Result), nil, 0);
+    Execute(Pointer(aMethod.MethodAddr));
     //pop params 
-    Inc(Result, vMeProc.ProcType.GetStackTypeSizeIn(0)); 
-    //TODO: push result here.
-    //how to allocate the string space. make a Heap?? 
-    if Assigned(vMeProc.ResultParam) then
+    Inc(Result, ProcType.GetStackTypeSizeIn(0));
+  //TODO: push result here.
+  //how to allocate the string space. make a Heap?? 
+    if Assigned(ResultParam) then
     begin
-      with vMeProc.ResultParam^ do 
+      with ResultParam^ do 
       if IsByRef or (DataType.ParamType.Kind in [mtkInteger, mtkChar, mtkEnumeration, mtkSet, mtkWChar]) then
       begin
         Dec(Result, SizeOf(tsInt));
         PPointer(Result)^ := ParamValue.VPointer;   
       end;
     end;
-  finally
-    MeFreeAndNil(vMeProc);
-  end;
+  end; 
 end;
 
 { opCallExt<PTurboMethodInfo> }
@@ -559,14 +581,14 @@ asm
   //MOV  [ECX].TTurboGlobalOptions._SP, EBP
   MOV  EBX, [ECX].TTurboGlobalOptions.Executor
   MOV  ESP, [EBX].TTurboX86Interpreter.FOldESP
-  //MOV  EBP, [EBX].TTurboX86Interpreter.FOldEBP
+  //MOV  EBP, [EDX].TTurboX86Interpreter.FOldEBP
   //MOV  EBX, [ECX].TTurboGlobalOptions._SP
   PUSH ECX
 //}
 
-  MOV  ECX, [EAX].TTurboMethodInfo.MethodAddr   
-  //MOV  EAX, EBX  //Stack Pointer
-  MOV  EAX, EBP  //Stack Pointer
+  //MOV  ECX, [EAX].TTurboMethodInfo.MethodAddr   
+  MOV  EDX, [EDI].TTurboPreservedDataMemory.ModuleHandle
+  MOV  ECX, EBP  //Stack Pointer
   CALL RunExternalFunc
   MOV  EBP, EAX  
 

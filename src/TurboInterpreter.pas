@@ -318,31 +318,34 @@ begin
     iVMEnter(FGlobalOptions);
 end;
 
-procedure RunExternalFunc(var aStack: Integer; aProcType: PMeProcType; aProcAddr: Pointer);
-var
-  vMeProc: PMeProcParams;
+procedure RunExternalFunc(const aMethod: PTurboMethodInfoEx; 
+  const aModule: TCustomTurboModule;
+  var aStack: Integer);
 begin
-  New(vMeProc, Create);
-  try
-    vMeProc.ProcType := aProcType;
-    vMeProc.AssignFromStack(Pointer(aStack), nil, 0);
-    vMeProc.Execute(aProcAddr);
+  if not Assigned(aMethod.ExternalOptions.ProcInstance) then
+  begin
+    New(aMethod.ExternalOptions.ProcInstance, Create);
+    aMethod.ExternalOptions.ProcInstance.ProcType := PMeProcType(aMethod.TurboType);
+    aModule.MeObjects.Add(aMethod.ExternalOptions.ProcInstance);
+  end;
+  with aMethod.ExternalOptions.ProcInstance^ do
+  begin
+    AssignFromStack(Pointer(aStack), nil, 0);
+    Execute(Pointer(aMethod.MethodAddr));
     //pop params 
-    Inc(aStack, vMeProc.ProcType.GetStackTypeSizeIn(0)); 
-    //TODO: push result here.
-    //how to allocate the string space. make a Heap?? 
-    if Assigned(vMeProc.ResultParam) then
+    Inc(aStack, ProcType.GetStackTypeSizeIn(0));
+  //TODO: push result here.
+  //how to allocate the string space. make a Heap?? 
+    if Assigned(ResultParam) then
     begin
-      with vMeProc.ResultParam^ do 
+      with ResultParam^ do 
       if IsByRef or (DataType.ParamType.Kind in [mtkInteger, mtkChar, mtkEnumeration, mtkSet, mtkWChar]) then
       begin
         Dec(aStack, SizeOf(tsInt));
         PPointer(aStack)^ := ParamValue.VPointer;   
       end;
     end;
-  finally
-    MeFreeAndNil(vMeProc);
-  end;
+  end; 
 end;
 
 { opCallExt<PTurboMethodInfo> }
@@ -378,7 +381,7 @@ begin
             _iVMHalt(FGlobalOptions, errTypeInfoNotFound);
             Exit;
           end;
-          RunExternalFunc(FGlobalOptions._SP, PMeProcType(vMethodInfo.TurboType), Pointer(vMethodInfo.MethodAddr));
+          RunExternalFunc(vMethodInfo, FGlobalOptions._Mem.ModuleHandle, FGlobalOptions._SP);
         end; 
       cfsExternalFunction: 
         begin
