@@ -87,14 +87,13 @@ begin
         if j > 0 then
         begin
           inc(j);
-          ParamList.DelimitedText := Trim(Copy(vOptionName, j, Length(vOptionName)-j));
+          ParamList.DelimitedText := Trim(Copy(vOptionName, j, MaxInt));
           Dec(j);
           Delete(vOptionName, j, MaxInt);
         end;
           if (Length(vOptionName) > 0) then
           begin
             vEnabled := cosDefault;
-            writeln('ApplyCompilerOption:',vOptionName, ', options:"', ParamList.Count, '"');
             if vOptionName[Length(vOptionName)] = '+' then 
             begin
               vEnabled := cosEnable;
@@ -118,6 +117,7 @@ begin
                 ParamList.Delete(0);
               end;
             end;
+            writeln('ApplyCompilerOption:',vOptionName, ', optionCount:"', ParamList.Count, '"', ',ON:', Integer(vEnabled));
             SetCompilerOption(UpperCase(vOptionName), vEnabled, ParamList);
           end;
       finally
@@ -146,6 +146,7 @@ begin
       FModule.Options := FModule.Options - [soLoadOnDemand]
     else
       FModule.Options := FModule.Options + [soLoadOnDemand];
+    //writeln('FModule.Options:',Integer(FModule.Options));
   end
   else if (aOptionName = 'MAXCODESIZE') then
   begin
