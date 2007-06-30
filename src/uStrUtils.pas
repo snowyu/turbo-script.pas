@@ -288,16 +288,18 @@ end;
 
 function LeftPos(const SubStr, S: string): Integer;
 begin
-  Result := Length(S) - Length(SubStr);
+  Result := Length(S) - Length(SubStr)+1;
   while Result > 0 do
   begin
     {$IFDEF MBCS_SUPPORT}
     if ByteType(s, Result) <> mbSingleByte then
       while (ByteType(s, Result) <> mbLeadByte) and (Result>1) do
-        Dec(Result); 
+        Dec(Result);
+    if Result < 0 then exit; 
     {$ENDIF}
-    if PChar(s[Result]) = PChar(SubStr) then exit;
-    Result := Result - Length(SubStr); 
+    if CompareMem(PChar(@s[Result]), PChar(SubStr), Length(SubStr)) then exit;
+   
+    Dec(Result);
   end;
   Result := -1;
 end;
