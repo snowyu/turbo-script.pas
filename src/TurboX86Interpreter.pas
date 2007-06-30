@@ -537,22 +537,6 @@ asm
   POP  EBX
   POP  EAX
 
-{
-  POP  ECX
-
-  MOV  ESP, [ECX].TTurboGlobalOptions._RP
-  MOV  EBP, [ECX].TTurboGlobalOptions._SP
-  MOV  ESI, [ECX].TTurboGlobalOptions._PC
-  POP  EBX
-  POP  EAX
-
-{  MOV  [EDX].TTurboX86Interpreter.FOldESP, ESP 
-  MOV  [EDX].TTurboX86Interpreter.FOldEBP, EBP
-  MOV  [EDX].TTurboX86Interpreter.FOldEBX, EBX 
-  MOV  [EDX].TTurboX86Interpreter.FOldESI, ESI 
-  MOV  [EDX].TTurboX86Interpreter.FOldEDI, EDI 
-}
-
   MOV  EDX, [EAX].TTurboMethodInfo.MethodAddr
   TEST EDX, EDX
   JZ   @@MethodNotFoundError
@@ -566,20 +550,22 @@ asm
 
   PUSH EDI
   PUSH ESI
-  //PUSH ECX
+
 
   //TODO: WORKAROUND发现是执行 LoadLibrary 函数，会占用 ReturnStack 大量空间，当将 ReturnStack 增大到4096的时候就ok!
    //so switch to use the Application Stack.
    //why it NO USE AT ALL!! I DO NOT KNOW!
   MOV  [ECX].TTurboGlobalOptions._RP, ESP
-  MOV  [ECX].TTurboGlobalOptions._SP, EBP
-  MOV  EDX, [ECX].TTurboGlobalOptions.Executor
+  //MOV  [ECX].TTurboGlobalOptions._SP, EBP
+  MOV  EBX, [ECX].TTurboGlobalOptions.Executor
   MOV  ESP, [EBX].TTurboX86Interpreter.FOldESP
-  MOV  EBP, [EBX].TTurboX86Interpreter.FOldEBP
+  //MOV  EBP, [EBX].TTurboX86Interpreter.FOldEBP
+  //MOV  EBX, [ECX].TTurboGlobalOptions._SP
   PUSH ECX
 //}
 
   MOV  ECX, [EAX].TTurboMethodInfo.MethodAddr   
+  //MOV  EAX, EBX  //Stack Pointer
   MOV  EAX, EBP  //Stack Pointer
   CALL RunExternalFunc
   MOV  EBP, EAX  
@@ -587,7 +573,7 @@ asm
  //restore the script stack.
   POP  ECX
   MOV  ESP, [ECX].TTurboGlobalOptions._RP 
-  MOV  EBP, [ECX].TTurboGlobalOptions._SP
+  //MOV  EBP, [ECX].TTurboGlobalOptions._SP
 //}  
 
   //POP  ECX
