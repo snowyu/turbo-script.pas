@@ -16,7 +16,90 @@ TODO:
 ~ Delphi 嵌入汇编调用System单元的内置函数如： _LStrLAsg 的时候，必须：
   CALL SYSTEM.@LStrLAsg
 
+2007-7-3 7:58
+*  [Bug] issue 48: crtical error the TurboCodeMem is dynamic increase the memory on demand. so the memory address will be changed by reallocMem!!
+  you MUST DO NOT ResolveAddr by absoulted address!!
+  * the Entry MUST be related offset address.
+* TurboSymbol issue 47: Redesign the TurboSymbol Architecture(Compiler)
+  + Line, Column property
+  + OnError Event: TTurboCompilerErrorEvent = procedure(const Sender: TurboSymbol; const aErrCode: Integer) of object;
+  + CompileError(const aErrCode: Integer);
+  //+ CompileError(cosnt aMsgType: Integer; const aMsg: string; const aLine, aCol: Integer)
+  ~ Compile Method
+      将 Public 或 FRefCount>0 或没有 OwnerSymbol 的符号编译到OwnerSymbol中。
+    ReferenceTo(aSymbol) Method: 
+      该符号在aSymbol的当前位置被引用,同时引用计数+1. 如果不能解决地址,则将 UnResolvedRefRec 项加入 UnResolvedRefs(未解决地址列表)
+    UnResolvedRefs Property:
+      未解决地址列表
+    ResolveAddr(const aValue: PTurboUnResolvedRefRec);
+      在引用的时候没能解决地址的项,将在编译后被调用,解决地址. 该过程在Compile方法执行后自动被调用.
+    TTurboConstSymbol.OwnerSymbol: TTurboModuleSymbol
+      Compile: 检查有无类型,没有就报错,否则如果常量是字符串类型,那么将该字符串编入 Module.
+      ReferenceTo: 限定只能被 Method 引用! 如果是字符串类型检测能否解决字符串地址,不能则将该项加入 UnResolvedRefs(未解决地址列表)
+      ResolveAddr: 将编译后的字符串地址保存到原来的aSymbol中的地址.
+    TTurboVarSymbol.OwnerSymbol: TTurboModuleSymbol
+      Compile: 根据是否Public变量,决定是否将该符号放到静态字段列表中, 在Module 的 DataMemory上开辟变量空间,并将其变量地址记下.
+      ReferenceTo: 限定只能被 Method 引用! 检查变量地址是否解决,没有解决则将该项加入 UnResolvedRefs(未解决地址列表)
+      ResolveAddr: 将编译后的变量地址保存到原来的aSymbol中的地址.
+    TTurboMethodSymbol.OwnerSymbol: TTurboModuleSymbol
+      Compile: 首先编译当前方法引用的其它符号(CompileRefSymbols),然后根据 CodeFieldStyle 类型分别编译.
+      ReferenceTo: 限定只能被 Method 引用! 根据 CodeFieldStyle 类型分别处理,检查方法地址是否解决,没有解决则将该项加入 UnResolvedRefs(未解决地址列表)
+      ResolveAddr: 根据 CodeFieldStyle 类型, 将编译后的方法地址保存到原来的aSymbol中的地址.
+      BodyInit:  在进入代码体前调用,初始化工作: 如果该方法没有被添加到 OwnerSymbol 则添加, 然后如果是函数不是引用,则清空代码体内存.
+      BodyFinal: 在代码体最后调用,收尾工作! 如果是主入口则需要清理所有是字符串的静态字段.如果是引用函数则需要搜索引用的哪一个模块中的函数
+    TTurboModuleSymbol.OwnerSymbol: TTurboModuleSymbol
+      如果没有OwnerSymbol的,就认为是主Module: 正在编译的Module, 否则就是 Module 的引用.
+      Compile: 根据是否有OwnerSymbol, 分别编译. 有则被认为是引用module,
+      ReferenceTo: 无,简单的返回OK
+      ResolveAddr: 无
+    TTurboTypeSymbol.OwnerSymbol: TTurboModuleSymbol
+      Compile: 如果该类型不是内部类型,那么则将该类型添加到 OwnerSymbol 模块上的 RegisteredTypes 中.
+      ReferenceTo: 无,简单的返回OK
+      ResolveAddr: 无
+  
+
+2007-7-2 13:03
+!+ Init and Final for Module and Method:
+  Init/Final Module:
+    
+* issue 47: Redesign the TurboSymbol Architecture(Compiler)
+
+2007-7-1 8:43
+* [Enhanced] [Compiler] TurboMethodSymbol should store the directive in itsself if it's cfsFunction.
+  * TTurboSymbol
+    + FUnResolvedRefs: PMeList; //store the address need to resolve.
+    + RefCount
+    + function IsCompiled: Boolean; virtual; abstract;
+    + procedure iReferenceTo(const aSymbol: PTurboSymbol); virtual; abstract;
+    + function  iCompile: Integer; virtual; abstract;
+    + procedure ReferenceTo(const aSymbol: PTurboSymbol); 
+    + function Compile; 
+  + TTurboRefMethodItem = packed record
+      Method: PTurboMethodSymbol;
+      Addr: Pointer;
+    end
+  * TurboMethodSymbol
+    + Body: PTurboCodeMemory; //store the cfsFunction's function body here.
+    + RefMethods: PMeList; 在本函数中引用的其它未确定地址的(not declareTo)方法Index(在OwnerSymbol中的Index)列表. 保存: PTurboRefMethodItem
+    + RefStaticFields: PMeList; 
+    + procedure BodyInit;
+    + procedure BodyFinal;
+    + ResolveAddr(Addr: Pointer); if call this and not declareTo then it will declareTo first.
+  * TTurboConstSymbol.PushTo(aMethod: PTurboMethodSymbol)
+  * TTurboVarSymbol.PushTo(aMethod: PTurboMethodSymbol)
+  * TurboMethodSymbol.PushTo(aMethod: PTurboMethodSymbol)  
+    到底是压入 aMethod 还是 aModule? 
+    实际上PushTo就是引用到(RefBy),但是PushTo总是顺序压入.
+    调用了 DeclareTo(aModuleSymbol):才会实际存在于模块中, 并在 Entry 中保存在模块中的地址.
+    执行 Word 的DeclareTo:
+      首先将 RefMethods表中的全部DeclareTo
+      然后将 RefStaticFields 表中的全部DeclareTo
+  * rename DeclareTo to CompileTo
+  * rename PushTo to ReferenceTo
+
 2007-6-30 7:19
+!* [Enhanced] [Compiler] TurboMethodSymbol should store the directive in itsself if it's cfsFunction.
+
 * [Bug] issue 40: 并没有解决 X86Interprter中执行外部DLL函数（如果DLL函数使用了字符串）引起的问题，只不过是碰巧没出错！！
   即便是全部都使用Delphi的堆栈依然会出错！！
   在DLL函数调用前， EBX的值不是Execturor,所有没有能取得正确的APP堆栈原值。

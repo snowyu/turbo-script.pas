@@ -89,6 +89,7 @@ var
   r: integer;
   lastErr: TTurboProcessorErrorCode;
   LastAddr: tsInt;
+  LastAddrC: tsInt;
   aFileName: string;
   s: string;
   CountFreq: Int64;
@@ -156,7 +157,11 @@ begin
         QueryPerformanceCounter(tEnd);
         c := c + tEnd - tBegin;
         lastErr := LastErrorCode;
-        LastAddr := tsInt(GlobalOptions.ErrorAddr);// - tsInt(Memory);
+        LastAddr := tsInt(GlobalOptions._PC) ;//- tsInt(GlobalOptions._Mem.ModuleHandle.Memory);
+        LastAddr := LastAddr - 4;
+        LastAddrC := PtsInt(LastAddr)^;
+        if Assigned(GlobalOptions._Mem) then
+          LastAddr := LastAddr - tsInt(GlobalOptions._Mem.ModuleHandle.Memory);
 
         P := Executor.SP;
         if (eoShowDebugInfo in vExeOptions) and (Integer(P) < GlobalOptions.ParamStackBottom)  then
@@ -269,7 +274,7 @@ begin
   begin
     WriteLn('');
     WriteLn('');
-    write('lasterr(', Integer(lasterr) ,'):', cRunTimeErrors[lasterr], ' at address:'+ IntToHex(LastAddr, 4));
+    write('lasterr(', Integer(lasterr) ,'):', cRunTimeErrors[lasterr], ' at address:',IntToStr(LastAddr),'($'+ IntToHex(LastAddr, 4), ') C:', LastAddrC);
     WriteLn('');
   end;
   if eoShowDebugInfo in vExeOptions then 
