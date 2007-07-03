@@ -36,13 +36,16 @@ ERRORS
     cSymbolErrorMethodNotFound:  Result := rsWordNotFoundError;
     cSymbolErrorInvalidOption: Result := '"' + Data + '" is an invalid option';
     cSymbolErrorInvalidOptionParam: Result := 'invalid modifiers for option "' + Data + '"';
-    cSymbolErrorStrToIntCovnert: Result := 'Can not convert the strin to int!';
+    cSymbolErrorStrToIntCovnert: Result := 'Can not convert the string to int!';
     cSymbolErrorMessageCompilerOption: Result := Data;
     cSymbolErrorConstDeclaration: Result := 'ConstDeclarationError ' + Data;
     cSymbolErrorVarDeclaration: Result := 'VarDeclarationError ' + Data;
     cSymbolErrorMethodDeclaration: Result := 'MethodDeclarationError ' + Data;
     cSymbolErrorTypeDeclaration: Result := 'TypeDeclarationError ' + Data;
     cSymbolErrorLabelDeclaration: Result := 'LabelDeclarationError ' + Data;
+    cSymbolErrorNoRefCount: Result := '<optimal>this symbol need not to compile ' + Data;
+    cSymbolErrorMethodBodyNotFine: Result := 'cSymbolErrorMethodBodyNotFine ' + Data;
+    cSymbolErrorMethodExternalNoBody: Result := 'the external Method should is no function Body ' + Data;
 
     cSymbolErrorUnknownConstType: Result := 'UnknownConstType ' + Data;
     cSymbolErrorRegisterType: Result := 'RegisterType Error ' + Data;
@@ -275,18 +278,20 @@ PRODUCTIONS
     Identifier                                         (. SaveModuleName(LexString); .)
     [UseModulesBlock]
     [DeclarationBlock]  
-    "BEGIN"                                            (. FInitProcCFA := FModule.UsedMemory; 
+    "BEGIN"                                            (. //FInitProcCFA := FModule.UsedMemory; 
                                                           vMainMethod := FModuleSymbol.NewMethod(cMainEntryProcName);
                                                           try
+                                                            vMainMethod.Line := TCocoRScannerAccess(Scanner).CurrentSymbol.Line;
+                                                            vMainMethod.Column := TCocoRScannerAccess(Scanner).CurrentSymbol.Col;
                                                             vMainMethod.CallStyle := ccForth;
                                                             vMainMethod.CodeFieldStyle := cfsFunction;
                                                             vMainMethod.Visibility := tvPrivateVisibilty;
                                                             //vMainMethod.CFA := FModule.UsedMemory;
-                                                            vMainMethod.DeclareTo(FModuleSymbol);
+                                                            vMainMethod.BodyInit;
                                                        .)
     ASMStatementBlock<vMainMethod>
-    "END."                                             (.   vMainMethod.DeclareEndTo(FModuleSymbol);
-                                                            //FModule.AddOpToMem(opPushInt); FModule.AddIntToMem(0); FModule.AddOpToMem(opHalt); 
+    "END."                                             (.   vMainMethod.BodyFinal;
+                                                            //aWord.Body.AddOpCode(opPushInt); FModule.AddIntToMem(0); aWord.Body.AddOpCode(opHalt); 
                                                           finally
                                                             //MeFreeAndNil(vMainMethod); //managed by FModuleSymbol.
                                                           end;
@@ -317,6 +322,8 @@ PRODUCTIONS
     Identifier                              (. vTypeSymbol := FModuleSymbol.NewType(LexString); 
                                                if Assigned(vTypeSymbol) then 
                                                begin 
+                                                 vTypeSymbol.Line := TCocoRScannerAccess(Scanner).CurrentSymbol.Line;
+                                                 vTypeSymbol.Column := TCocoRScannerAccess(Scanner).CurrentSymbol.Col;
                                             .)
     "="
     (TypeKind<vType>|RestrictedType<vType>)
@@ -366,6 +373,8 @@ PRODUCTIONS
                                vValue := FModuleSymbol.NewConst(vName);
                                if Assigned(vValue) then
                                begin
+                                 vValue.Line := TCocoRScannerAccess(Scanner).CurrentSymbol.Line;
+                                 vValue.Column := TCocoRScannerAccess(Scanner).CurrentSymbol.Col;
                             .) 
     [":" TypeKind<vType>    (.   vValue.TurboType := vType; .) ]
     "=" Value<vValue> 
@@ -391,13 +400,16 @@ PRODUCTIONS
                                                       if Assigned(vValue) then
                                                       begin
                                                    .)
-    [WordVsibility<vValue.Visibility>] Identifier  (.   vValue.Name := LexString; .)
+    [WordVsibility<vValue.Visibility>] Identifier  (.   vValue.Name := LexString; 
+                                                        vValue.Line := TCocoRScannerAccess(Scanner).CurrentSymbol.Line;
+                                                        vValue.Column := TCocoRScannerAccess(Scanner).CurrentSymbol.Col;
+                                                   .)
     ":" TypeKind<vType>                            (.   vValue.TurboType := vType; .)
     ["=" Value<vValue>]
     ";"                                            (.   if IsUniqueIdentifier(vValue.Name) then
                                                          begin
                                                            FModuleSymbol.StaticFields.Add(vValue);
-                                                           if vValue.IsPublic(FModule) then vValue.DeclareTo(FModuleSymbol); 
+                                                           //if vValue.IsPublic(FModule) then vValue.DeclareTo(FModuleSymbol); 
                                                          end
                                                          else 
                                                          begin
@@ -448,26 +460,33 @@ PRODUCTIONS
                                                                       exit;
                                                                     end;
                                                                  .)
-    ":" [WordVsibility<vWord.Visibility>] Identifier            (. vWord.Name := LexString; .)
+    ":" [WordVsibility<vWord.Visibility>] Identifier            (. vWord.Name := LexString; 
+                                                                   vWord.Line := TCocoRScannerAccess(Scanner).CurrentSymbol.Line;
+                                                                   vWord.Column := TCocoRScannerAccess(Scanner).CurrentSymbol.Col;
+                                                                .)
 
     [FormalParameters<vWord>]
     
-    [                                                            (. vErrorCode := cSymbolErrorOk; .)
-    ExternalWordOption<vWord>                                    (. vErrorCode := FModuleSymbol.IsExternalMethod(vWord); 
-                                                                    if vErrorCode <> cSymbolErrorOk then
-                                                                    begin
-                                                                      writeln('eerrr heerrr');
-                                                                      SynError(vErrorCode, vWord.Name);
-                                                                    end;
-                                                                 .)
+    [
+     ExternalWordOption<vWord>
     ]
-                                                                 (. if vErrorCode = cSymbolErrorOk then vErrorCode := DefineWordBegin(vWord);  .)
-    [ASMStatementBlock<vWord>]
-    ";"                                                          (. if (vErrorCode = cSymbolErrorOk) and (vWord.CodeFieldStyle = cfsFunction) then DefineWordEnd(vWord); 
+                                                                 (. vErrorCode := vWord.BodyInit;  .)
+    [                                                            (. if (vErrorCode = cSymbolErrorOk) and (vWord.CodeFieldStyle <> cfsFunction) then
+                                                                    begin
+                                                                      vErrorCode := cSymbolErrorMethodExternalNoBody;
+                                                                    end;
+                                                                    if (vErrorCode <> cSymbolErrorOk) then exit;
+                                                                 .)
+     ASMStatementBlock<vWord>
+    ]
+    ";"                                                          (. if (vErrorCode = cSymbolErrorOk) then vErrorCode := vWord.BodyFinal;
                                                                  finally
                                                                    if vErrorCode <> cSymbolErrorOk then
                                                                    begin
                                                                      SynError(vErrorCode, vWord.Name);
+                                                                     vErrorCode := vWord.OwnerSymbol.Methods.IndexOf(vWord);
+                                                                     if vErrorCode >= 0 then
+                                                                       vWord.OwnerSymbol.Methods.Delete(vErrorCode);
                                                                      MeFreeAndNil(vWord);
                                                                    end;
                                                                  end;
@@ -581,66 +600,85 @@ PRODUCTIONS
   ASMStatement< const aWord: PTurboMethodSymbol > 
     = 
     [LabelDeclaration<aWord>]
-     PushIntAsmStatement
-    | PushStringAsmStatement 
-    | AddIntAsmStatement
-    | "i8+" (.FModule.AddOpToMem(opAddInt64); .)
-    | SubIntAsmStatement
-    | "i8-" (.FModule.AddOpToMem(opSubInt64); .)
-    | MulIntAsmStatement
-    | "!" (. FModule.AddOpToMem(opStoreInt); .)
-    | "!i8" (. FModule.AddOpToMem(opStoreInt64); .)
-    | "!i2" (. FModule.AddOpToMem(opStoreWord); .)
-    | "!i1" (. FModule.AddOpToMem(opStoreByte); .)
-    | "@" (. FModule.AddOpToMem(opFetchInt); .)
-    | "@i8" (. FModule.AddOpToMem(opFetchInt64); .)
-    | "@i2" (. FModule.AddOpToMem(opFetchWord); .)
-    | "@i1" (. FModule.AddOpToMem(opFetchByte); .)
-    | "DROP" (. FModule.AddOpToMem(opPopInt); .)
-    | EmitAsmStatement
-    | "@TICK" (. FModule.AddOpToMem(opGetTickCount); .)
-    | "!TICK" (. FModule.AddOpToMem(opStoreTickCount); .)
-    | "NOOP"  (. FModule.AddOpToMem(opNoop); .)
-    | AssertStatement
-    | WordAsmStatement
+     PushIntAsmStatement<aWord>
+    | PushStringAsmStatement<aWord>
+    | AddIntAsmStatement<aWord>
+    | "i8+" (.aWord.Body.AddOpCode(opAddInt64); .)
+    | SubIntAsmStatement<aWord>
+    | "i8-" (.aWord.Body.AddOpCode(opSubInt64); .)
+    | MulIntAsmStatement<aWord>
+    | "!" (. aWord.Body.AddOpCode(opStoreInt); .)
+    | "!i8" (. aWord.Body.AddOpCode(opStoreInt64); .)
+    | "!i2" (. aWord.Body.AddOpCode(opStoreWord); .)
+    | "!i1" (. aWord.Body.AddOpCode(opStoreByte); .)
+    | "@" (. aWord.Body.AddOpCode(opFetchInt); .)
+    | "@i8" (. aWord.Body.AddOpCode(opFetchInt64); .)
+    | "@i2" (. aWord.Body.AddOpCode(opFetchWord); .)
+    | "@i1" (. aWord.Body.AddOpCode(opFetchByte); .)
+    | "DROP" (. aWord.Body.AddOpCode(opPopInt); .)
+    | EmitAsmStatement<aWord>
+    | "@TICK" (. aWord.Body.AddOpCode(opGetTickCount); .)
+    | "!TICK" (. aWord.Body.AddOpCode(opStoreTickCount); .)
+    | "NOOP"  (. aWord.Body.AddOpCode(opNoop); .)
+    | AssertStatement<aWord>
+    | WordAsmStatement<aWord>
   .
 
   LabelDeclaration< const aWord: PTurboMethodSymbol > 
+    (. var vErrorCode: Integer; .)
     =
-    "Label" Identifier   (. DefineLabel(LexString, aWord); .)  .
+    "Label" Identifier   (. vErrorCode := aWord.DeclareLabel(LexString); 
+                            if vErrorCode <> cSymbolErrorOk then
+                              SynError(vErrorCode, LexString);
+                         .)  
+    .
 
-  PushIntAsmStatement = 
-    ( IntegerToken|HexNumberToken ) (. PushInt32(LexString); .) .
-  AddIntAsmStatement  = "+" (. FModule.AddOpToMem(opAddInt); .) .
-  SubIntAsmStatement  = "-" (. FModule.AddOpToMem(opSubInt); .) .
-  MulIntAsmStatement  = "*" (. FModule.AddOpToMem(opMulInt); .) .
-  EmitAsmStatement 
+  PushIntAsmStatement< const aWord: PTurboMethodSymbol >  
+    (.var i: integer; .)
     = 
-    "EMIT" (. FModule.AddOpToMem(opEmit); .) 
-    | ".S" (. FModule.AddOpToMem(opEmitString); .) 
-    | ".LS" (. FModule.AddOpToMem(opEmitLString); .) 
+    ( IntegerToken|HexNumberToken ) (.
+                                     try
+                                        i := StrToInt(LexString);
+                                        aWord.Body.AddOpPushInt32(i);
+                                        //Writeln('Push Int:', i);
+                                      except
+                                        on E: Exception do
+                                          SynError(cSymbolErrorStrToIntCovnert, LexString+' '+ E.Message);
+                                     end;
+                                    .)
+    .
+  AddIntAsmStatement< const aWord: PTurboMethodSymbol >    = "+" (. aWord.Body.AddOpCode(opAddInt); .) .
+  SubIntAsmStatement< const aWord: PTurboMethodSymbol >    = "-" (. aWord.Body.AddOpCode(opSubInt); .) .
+  MulIntAsmStatement< const aWord: PTurboMethodSymbol >    = "*" (. aWord.Body.AddOpCode(opMulInt); .) .
+  EmitAsmStatement< const aWord: PTurboMethodSymbol >  
+    = 
+    "EMIT" (. aWord.Body.AddOpCode(opEmit); .) 
+    | ".S" (. aWord.Body.AddOpCode(opEmitString); .) 
+    | ".LS" (. aWord.Body.AddOpCode(opEmitLString); .) 
   .
 
-  PushStringAsmStatement = "#" StringToken (. PushStringSeqToStack(LexString); .) .
+  PushStringAsmStatement< const aWord: PTurboMethodSymbol > 
+    (.var s: string; .)
+    = "#" StringToken (. s := LexString; s:= AnsiDequotedStr(s, s[1]); aWord.PushStringSeqToStack(s); .) .
 
-  WordAsmStatement 
+  WordAsmStatement< const aWord: PTurboMethodSymbol > 
     (.Var vName: string; vParams: TStringList; .)
     =
     (.vParams := nil; .)
       Identifier 
       (. vName := LexString;  //Writeln('pARSER word param::');
     try .)
-      [(. vParams := TStringList.Create; .) WordParams<vParams>  ]
+      [(. vParams := TStringList.Create; .) WordParams<aWord, vParams>  ]
       (. 
       //writeln('EndParams');
-      AddIdentifierCFA(vName, vParams);
+      AddIdentifierCFA(aWord, vName, vParams);
       //if Assigned(vParams) then writeln(vName, ' WordParams:', vParams.CommaText) else writeln(vName, ' Not Assigned Params');
       //writeln('sym:',LexString);
     finally
       FreeAndNil(vParams);
     end; .)
   .
-  WordParams< const aParams: TStringList >
+  WordParams< const aWord: PTurboMethodSymbol; const aParams: TStringList >
     (. var vParam: string; .)
     =
     "("
@@ -652,8 +690,8 @@ PRODUCTIONS
     =
     ( IntegerToken|HexNumberToken|Identifier|StringToken ) (. aParam := LexString; .)
   .
-  AssertStatement
-    (. var vExpr: string; vMsg: string; .)
+  AssertStatement< const aWord: PTurboMethodSymbol > 
+    (. var vExpr: string; vMsg: string; vMsgConst: PTurboConstSymbol; .)
     =
     "ASSERT(" WordParam< vExpr > "," WordParam< vMsg > ")"
     (. if soAssertSupport in FModule.Options then
@@ -662,9 +700,16 @@ PRODUCTIONS
          //WriteLn('AddAssert at ', TCocoRScannerAccess(Scanner).CurrLine);
          vMsg := '''Assert failed at line:'+IntToStr(TCocoRScannerAccess(Scanner).CurrentSymbol.line)+'. '''+ vMsg+ '''''';
          //PushInt32(TCocoRScannerAccess(Scanner).CurrLine);
-         PushString(vMsg);
-         PushWordParam(vExpr);
-         FModule.AddOpToMem(opAssert);
+         vMsgConst := aWord.OwnerSymbol.NewConst('ASSERT:'+DateTimeToStr(Now));
+         if vMsgConst.AssignValue(vMsg) then
+         begin
+           vMsgConst.ReferenceTo(aWord);
+         end
+         else
+           SynError(cSymbolErrorConstRedeclaration, 'Invalid String:'+ vMsg);
+         //PushString(vMsg);
+         PushWordParam(aWord, vExpr);
+         aWord.Body.AddOpCode(opAssert);
        end;
     .)
   .

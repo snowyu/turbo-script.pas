@@ -247,7 +247,7 @@ type
   protected
     //Common language turbo-compiler properties.
     FTurboGlobalOptions: TTurboGlobalOptions;
-    FInitProcCFA: Integer;
+    //FInitProcCFA: Integer;
     //正在定义的Word,如果存在 
     //FDefinedWordEntry: PTurboMethodEntry;
     //FLastWordCfa: Integer;
@@ -264,29 +264,27 @@ type
     procedure Init;
     procedure Final;
     procedure SaveModuleName(const aName: string);
-    function  DefineWordBegin(const aWord: PTurboMethodSymbol): Integer;
-    procedure DefineWordEnd(const aWord: PTurboMethodSymbol);
-    procedure PushString(const aStr: string);
-    procedure PushStringSeqToStack(const aStr: string);
+    //function  DefineWordBegin(const aWord: PTurboMethodSymbol): Integer;
+    //procedure DefineWordEnd(const aWord: PTurboMethodSymbol);
+    procedure PushString(const aWord: PTurboMethodSymbol; const aStr: string);
     procedure PushInt32(const aStr: string);overload;
     procedure PushInt32(const aInt: tsInt);overload;
     //case the aValue type push the aValue to CodeMem
-    procedure PushWordParam(const aValue: string);
+    procedure PushWordParam(const aWord: PTurboMethodSymbol; const aValue: string);
     // Add Identifier CFA address into the memory. 
-    function AddIdentifierCFA(const aName: String; const aParams: TStringList): Boolean;
+    function AddIdentifierCFA(const aWord: PTurboMethodSymbol; const aName: String; const aParams: TStringList): Boolean;
     // AddWordCFA address into the memory.
-    function AddWordCFA(aName: String; const aParams: TStringList): Boolean;
+    //aWord is the main function add the wordCfa of the name to it.
+    function AddWordCFA(const aWord: PTurboMethodSymbol; aName: String; const aParams: TStringList): Boolean;
     // Add Const address into the memory. 
-    function AddConstCFA(const aName: String): Boolean;
+    function AddConstCFA(const aWord: PTurboMethodSymbol; const aName: String): Boolean;
     // Add Var address into the memory. 
-    function AddVarCFA(const aName: String): Boolean;
+    function AddVarCFA(const aWord: PTurboMethodSymbol; const aName: String): Boolean;
   
     //if not find then add new label, return label index else raise error.
     function DefineLabel(const aName: string; const aWord: PTurboMethodSymbol): Integer;
-    function FindLocalConst(const aName: String): Integer;
     //function GetConstValueRec(const aType: PMeType; const aName: string): TMeVarRec;
   
-    function FindLocalVar(const aName: String): Integer;
   
     function FindModule(const aName: String; aModuleType: TTurboModuleType): Integer;
     //if not found then add new mtLib external module.
@@ -788,8 +786,16 @@ begin
 end; {GetSourceStream}
 
 function TCocoRGrammar.GetSuccessful : boolean;
+var
+  i : integer;
 begin
-  Result := ErrorList.Count = 0;
+  for i := 0 to fErrorList.Count - 1 do
+    with TCocoError(fErrorList[i]) do
+    begin
+      Result := ErrorType > etSymantic;
+      if not Result then exit;
+    end;
+  Result := True;
 end; {GetSuccessful}
 
 function TCocoRGrammar.LastName : string;
@@ -890,9 +896,20 @@ begin
 end; {StreamToListFile}
 
 procedure TCocoRGrammar.SynError(const errNo : integer; const Data : string);
+var
+  vErrType: integer;
 begin
+  //if errNo = cSymbolErrorOk then exit;
+  if (errNo and cCompilerHintMask) = cCompilerHintMask then 
+    vErrType := etHint
+  else if (errNo and cCompilerWarningMask) = cCompilerWarningMask then 
+    vErrType := etWarn
+  else if (errNo and cCompilerSymanticMask) = cCompilerSymanticMask then 
+    vErrType := etSymantic
+  else
+    vErrType := etSyntax;
   if errDist >= minErrDist then
-    Scanner.ScannerError(errNo, Scanner.NextSymbol, Data, etSyntax);
+    Scanner.ScannerError(errNo, Scanner.NextSymbol, Data, vErrType);
   errDist := 0;
 end; {SynError}
 
@@ -1124,6 +1141,7 @@ begin
   PrintStr(s+#13#10); 
 end;
 
+(*
 function TCocoRGrammar.DefineWordBegin(const aWord: PTurboMethodSymbol): Integer;
 begin
   if IsUniqueIdentifier(aWord.Name) then
@@ -1143,75 +1161,77 @@ procedure TCocoRGrammar.DefineWordEnd(const aWord: PTurboMethodSymbol);
 begin
   aWord.DeclareEndTo(FModuleSymbol);
 end;
+*)
 
-function TCocoRGrammar.AddIdentifierCFA(const aName: string; const aParams: TStringList): Boolean;
+function TCocoRGrammar.AddIdentifierCFA(const aWord: PTurboMethodSymbol; const aName: string; const aParams: TStringList): Boolean;
 begin
   if not Assigned(aParams) then
   begin
-    //writeln('Addconstcfa');
-    Result := AddConstCFA(aName);
+    Result := AddConstCFA(aWord, aName);
     if Result then exit;
 
-    Result := AddVarCFA(aName);
+    Result := AddVarCFA(aWord, aName);
     if Result then exit;
   end;
 
-  Result := AddWordCFA(aName, aParams);
+  Result := AddWordCFA(aWord, aName, aParams);
   if Result then exit;
 
   //writeln('cSymbolErrorUnknownMethod:',aName);
   SynError(cSymbolErrorUnknownMethod, aName);
 end;
 
-function TCocoRGrammar.AddConstCFA(const aName: String): Boolean;
+function TCocoRGrammar.AddConstCFA(const aWord: PTurboMethodSymbol; const aName: String): Boolean;
 var
   i : Integer;
 begin
-  i := FindLocalConst(aName);
+  i := aWord.OwnerSymbol.Consts.IndexOf(aName);
   Result := i >= 0;
   if Result then
-    with PTurboConstSymbol(FModuleSymbol.Consts.Items[i])^ do
+    with PTurboConstSymbol(aWord.OwnerSymbol.Consts.Items[i])^ do
     begin
-      PushTo(FModuleSymbol);
+      //PushTo(FModuleSymbol);
+      ReferenceTo(aWord);
     end
 end;
 
-function TCocoRGrammar.AddVarCFA(const aName: String): Boolean;
+function TCocoRGrammar.AddVarCFA(const aWord: PTurboMethodSymbol; const aName: String): Boolean;
 var
   i: Integer;
 begin
-  i := FindLocalVar(aName);
+  i := aWord.OwnerSymbol.StaticFields.IndexOf(aName);
   Result := i >= 0;
   if Result then
-    with PTurboVarSymbol(FModuleSymbol.StaticFields.Items[i])^ do
+    with PTurboVarSymbol(aWord.OwnerSymbol.StaticFields.Items[i])^ do
     begin
-      PushTo(FModuleSymbol);
+      //PushTo(FModuleSymbol);
+      ReferenceTo(aWord);
     end
 end;
 
-procedure TCocoRGrammar.PushWordParam(const aValue: string);
+procedure TCocoRGrammar.PushWordParam(const aWord: PTurboMethodSymbol; const aValue: string);
 begin
   if aValue = '' then exit;
   if (Length(aValue) >= 2) and (aValue[1] = '''') then
   begin
     // it's a string
-    PushString(aValue);
+    PushString(aWord, aValue);
   end
   else if StrIsInteger(aValue) then
   begin
-    PushInt32(aValue);
+    aWord.Body.AddOpPushInt32(StrToInt(aValue));
   end
   else //暂时不支持内嵌参数的word
-    AddIdentifierCFA(aValue, nil);
+    AddIdentifierCFA(aWord, aValue, nil);
 end;
 
-function TCocoRGrammar.AddWordCFA(aName: string; const aParams: TStringList): Boolean;
+function TCocoRGrammar.AddWordCFA(const aWord: PTurboMethodSymbol; aName: string; const aParams: TStringList): Boolean;
 var
   i: Integer;
   vWord: PTurboMethodSymbol;
 begin
   Result := False;
-  vWord := FModuleSymbol.FindMethodSymbol(aName);
+  vWord := aWord.OwnerSymbol.FindMethodSymbol(aName);
   if Assigned(vWord) then //with vWord^ do
   begin
     //WriteLn('DW:', aName);
@@ -1220,10 +1240,11 @@ begin
       //push the parameters
       for i := aParams.Count - 1 downto 0 do
       begin
-        PushWordParam(aParams[i]);
+        PushWordParam(aWord, aParams[i]);
       end;
     end;
-    vWord.PushTo(FModuleSymbol);
+    //vWord.PushTo(FModuleSymbol);
+    vWord.ReferenceTo(aWord);
     Result := true;
   end;
 end;
@@ -1238,40 +1259,16 @@ begin
   end;
 end;
 
-{
-function TCocoRGrammar.GetConstValueRec(const aType: PMeType; const aName: String): TMeVarRec;
-var
-  vConst: PTurboConstSymbol;
-begin
-  vConst := FModuleSymbol.FindLocalConst(aName, aType);
-  if Assigned(vConst) then
-    Result := vConst.Value
-  else
-    SynError(cSymbolErrorUnknownMethod, aName);
-end;
-//}
 function TCocoRGrammar.DefineLabel(const aName: string; const aWord: PTurboMethodSymbol): Integer;
 begin
   Result := aWord.Labels.IndexOf(aName);
   if Result = -1 then
   begin
-    Result := aWord.DeclareLabelTo(aName, FModuleSymbol);
+    Result := aWord.DeclareLabel(aName);
   end
   else 
     SynError(cSymbolErrorLabelRedeclaration);
 
-end;
-
-function TCocoRGrammar.FindLocalConst(const aName: String): Integer;
-begin
-  Result := FModuleSymbol.Consts.IndexOf(aName);
-end;
-
-function TCocoRGrammar.FindLocalVar(const aName: String): Integer;
-begin
-  //writeln('search var ', aName);
-  Result := FModuleSymbol.StaticFields.IndexOf(aName);
-  //writeln('search var ', aName, ':', Result);
 end;
 
 function TCocoRGrammar.DefineModule(const aName: String): Integer;
@@ -1291,7 +1288,12 @@ begin
   if Result >= 0 then
   begin
     vModuleSymbol := FModuleSymbol.UsedModules.Items[Result];
-    vModuleSymbol.DeclareTo(FModuleSymbol);
+    vModuleSymbol.ReferenceTo(FModuleSymbol);
+    vModuleSymbol.compile;
+    vModuleSymbol.Line := Scanner.CurrentSymbol.Line;
+    vModuleSymbol.Column := Scanner.CurrentSymbol.Col;
+
+    //vModuleSymbol.DeclareTo(FModuleSymbol);
   end
   else
   begin
@@ -1319,30 +1321,17 @@ begin
   end;
 end;
 
-procedure TCocoRGrammar.PushString(const aStr: string);
+procedure TCocoRGrammar.PushString(const aWord: PTurboMethodSymbol; const aStr: string);
 var
-  vConst: TTurboConstSymbol;
+  vConst: PTurboConstSymbol;
 begin
-  vConst.Create;
+  vConst := aWord.OwnerSymbol.NewConst('ASSERT:'+DateTimeToStr(Now));
   if vConst.AssignValue(aStr) then
   begin
-    vConst.PushTo(FModuleSymbol);
+    vConst.ReferenceTo(aWord);
   end
   else
     SynError(cSymbolErrorConstRedeclaration, 'Invalid String:'+ aStr);
-end;
-
-procedure TCocoRGrammar.PushStringSeqToStack(const aStr: string);
-var
-  s: string;
-  i: Integer;
-begin
-  s := AnsiDequotedStr(aStr, '''');
-  for i := length(s) downto 1 do
-  begin
-    FModule.AddOpToMem(opPushInt);
-    FModule.AddIntToMem(Ord(s[i])); 
-  end;
 end;
 
 procedure TCocoRGrammar.SaveModuleName(const aName: string);
@@ -1373,7 +1362,7 @@ begin
       MemorySize := cMaxMemorySize;
     //IsAddrResolved := False;
   end;
-  FInitProcCFA := 0;
+  //FInitProcCFA := 0;
   FModuleSymbol.Clear;
   //writeln('SourceFileName=', SourceFileName);
   //now use Module Name as file name, see SaveModuleName.
@@ -1384,12 +1373,19 @@ end;
 procedure TCocoRGrammar.Final;
 var
   vStream: TFileStream;
+  vErrCode: Integer;
 begin
   //writeln('Final');
   {$IFDEF DEBUG}
   QueryPerformanceCounter(tEnd);
   {$ENDIF}
-  if ErrorList.Count = 0 then
+  if Successful then
+  begin
+    vErrCode := FModuleSymbol.compile;
+    if vErrCode <> cSymbolErrorOk then
+      SynError(vErrCode);
+  end;
+  if Successful then
   begin
    //writeln('No error');
     //PrintStrLn('The Result: '+FloatToStr(fResult));
@@ -1399,7 +1395,8 @@ begin
       //writeln('InitProcCFA=', FInitProcCFA+SizeOf(TTurboModuleStreamHeader));
       with PTurboPreservedDataMemory(FModule.DataMemory)^ do
       begin
-        Integer(InitializeProc) := FInitProcCFA;
+        //Integer(InitializeProc) := FInitProcCFA;
+        Integer(InitializeProc) := PTurboMethodSymbol(FModuleSymbol.Methods.Find(cMainEntryProcName)).CFA;
       end;
       //if LowerCase(ExtractFileExt(FileName)) <> cTurboCompiledProgramFileExt then
         //FileName := ChangeFileExt(FileName, cTurboCompiledProgramFileExt);
