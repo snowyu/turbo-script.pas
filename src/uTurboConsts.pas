@@ -7,6 +7,7 @@ interface
 
 uses
   SysUtils, Classes
+  , uMeObject
   , uMeTypes
   ;
 
@@ -303,7 +304,13 @@ type
     , errOutOfDataStack, errOutOfReturnStack
     , errAssertionFailed  
   );
-
+  
+  PTurboCodeMemory = ^TTurboCodeMemory;
+  TTurboCodeMemory = object(TMeDynamicMemory)
+  public
+    procedure AddOpCode(const aOpCode: TTurboVMInstruction);
+    procedure AddOpPushInt32(const aInt: tsInt);
+  end;
   
   TStaticMemoryStream = class(TCustomMemoryStream)
   public
@@ -334,10 +341,11 @@ const
   //cTurboScriptBadInstructionBit  = [psBadInstruction];
   cMaxTurboVMInstructionCount = SizeOf(TTurboCoreWords) div SizeOf(TProcedure); //the max turbo VM code directive count
   
-  cTurboExternalFunctions = [cfsExternalFunction, cfsHostFunction, cfsDLLFunction];
+  cTurboRefFunctionTypes = [cfsExternalFunction, cfsHostFunction, cfsDLLFunction];
+  cTurboExternalFunctionTypes = [cfsHostFunction, cfsDLLFunction];
+  cTurboNativeFunctionTypes = [cfsFunction, cfsExternalFunction];
   cTurboNativeModuleTypes = [mtProgram, mtLib, mtObject, mtFunction];
   cTurboExternalModuleTypes = [mtHost, mtDLL];
-  cTurboNativeFunctionTypes = [cfsFunction, cfsExternalFunction];
 
   //用一个 LongWord（DWord）来存放：TTurboVisibility
   {: 该标识符私有，没有名字，没有类型！}
@@ -431,6 +439,27 @@ begin
 end;
 
 
+{TTurboCodeMemory}
+procedure TTurboCodeMemory.AddOpCode(const aOpCode: TTurboVMInstruction);
+var
+  p: pointer;
+begin
+  if (FUsedSize + SizeOf(aOpCode)) >= FSize then
+    Grow(SizeOf(aOpCode));
+  Assert(Assigned(FMemory), 'Err:FMemory is nil!!'+IntToStr(FSize));
+
+  //writeln(FUsedSize, ':', FSize);
+  p := Pointer(Integer(FMemory) + FUsedSize);
+  PTurboVMInstruction(P)^ := aOpCode;
+  Inc(FUsedSize, SizeOf(TTurboVMInstruction)); //}
+end;
+
+procedure TTurboCodeMemory.AddOpPushInt32(const aInt: tsInt);
+begin
+  AddOpCode(opPushInt);
+  AddInt(aInt);
+end;
+
 function IsInteger(const aValue: string): Boolean;
 begin
   Result := Length(aValue) > 0;
@@ -493,5 +522,8 @@ begin
     Result := S;
 end;
 {$ENDIF}
+
+initialization
+  SetMeVirtualMethod(TypeOf(TTurboCodeMemory), ovtVmtParent, TypeOf(TMeDynamicMemory));
 
 end.
