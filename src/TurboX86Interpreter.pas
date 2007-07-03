@@ -178,6 +178,7 @@ begin
     MOV  [ECX].TTurboGlobalOptions._RP, ESP
     MOV  [ECX].TTurboGlobalOptions._SP, EBP
     MOV  [ECX].TTurboGlobalOptions._PC, ESI
+    MOV  [ECX].TTurboGlobalOptions._Mem, EDI
 
     MOV  EAX, [ECX].TTurboGlobalOptions.Executor
 
