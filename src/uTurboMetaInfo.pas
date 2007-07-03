@@ -104,9 +104,9 @@ type
     //ExternalWordOptions: TTurboExteralWordOptions;
     function GetExternalOptionsAddr: PTurboExteralMethodOptions; 
 
-    //this is an external define: Host or DLL functions.
     //property IsExternal: Boolean read FIsExternal write FIsExternal;
-    function IsExternal: Boolean;
+    //this is an external reference function define: external, Host or DLL functions.
+    function IsRef: Boolean;
   end;
   //this for external word only
   TTurboMethodInfoEx = object(TTurboMethodInfo)
@@ -246,14 +246,14 @@ type
 implementation
 
 { TTurboMethodInfo }
-function TTurboMethodInfo.IsExternal: Boolean;
+function TTurboMethodInfo.IsRef: Boolean;
 begin
-  Result := CodeFieldStyle in cTurboExternalFunctions; 
+  Result := CodeFieldStyle in cTurboRefFunctionTypes; 
 end;
 
 function TTurboMethodInfo.GetExternalOptionsAddr: PTurboExteralMethodOptions; 
 begin
-  if IsExternal then
+  if IsRef then
   begin
     Result := PTurboExteralMethodOptions(Integer(@Self) + SizeOf(TTurboMethodInfo)); 
   end
