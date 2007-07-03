@@ -642,6 +642,7 @@ type
     BuildDate: TTimeStamp;
   end;
   
+  PMeListEx = ^ TMeListEx;
   TMeListEx = object(TMeList)
   public
     function Add(const aValue: Integer): Integer;
@@ -834,8 +835,8 @@ var
 begin
   with PTurboPreservedDataMemory(FDataMemory)^ do
   begin
-    if UsedDataSize >= DataSize then
-      GrowData;
+    if (UsedDataSize + SizeOf(Byte))>= DataSize then
+      GrowData(SizeOf(Byte));
     Integer(p) := Integer(FDataMemory) + UsedDataSize;
     PByte(P)^ := aValue;
     Inc(UsedDataSize, SizeOf(Byte));
@@ -848,8 +849,8 @@ var
 begin
   with PTurboPreservedDataMemory(FDataMemory)^ do
   begin
-    if UsedMemory >= MemorySize then
-      Grow;
+    if (UsedMemory + SizeOf(Byte))>= MemorySize then
+      Grow(SizeOf(Byte));
     Integer(p) := Integer(FMemory) + UsedMemory;
     PByte(P)^ := aValue;
     Inc(UsedMemory, SizeOf(Byte));
@@ -862,8 +863,8 @@ var
 begin
   with PTurboPreservedDataMemory(FDataMemory)^ do
   begin
-    if UsedDataSize >= DataSize then
-      GrowData;
+    if (UsedDataSize + SizeOf(Integer))>= DataSize then
+      GrowData(SizeOf(Integer));
     Integer(p) := Integer(FDataMemory) + UsedDataSize;
     PInteger(P)^ := aValue;
     Inc(UsedDataSize, SizeOf(Integer));
@@ -876,8 +877,8 @@ var
 begin
   with PTurboPreservedDataMemory(FDataMemory)^ do
   begin
-    if UsedMemory >= MemorySize then
-      Grow;
+    if (UsedMemory + SizeOf(Integer)) >= MemorySize then
+      Grow(SizeOf(Integer));
     Integer(p) := Integer(FMemory) + UsedMemory;
     PInteger(P)^ := aValue;
     Inc(UsedMemory, SizeOf(Integer));
@@ -890,8 +891,8 @@ var
 begin
   with PTurboPreservedDataMemory(FDataMemory)^ do
   begin
-    if UsedMemory >= MemorySize then
-      Grow;
+    if (UsedMemory + SizeOf(TTurboVMInstruction))>= MemorySize then
+      Grow(SizeOf(TTurboVMInstruction));
 
     Integer(p) := Integer(FMemory) + UsedMemory;
     {
@@ -969,7 +970,7 @@ var
 begin
   if not StoredInOwner then
   begin
-    if Assigned(FDataMemory) then FreeDLLLibs;
+    if Assigned(FDataMemory) and IsAddrResolved then FreeDLLLibs;
     if Assigned(FMeObjects) then
     begin
       FMeObjects.FreeMeObjects;
@@ -1192,7 +1193,7 @@ begin
   begin
     with PTurboMethodEntry(vModuleRefEntry).Word do
     begin
-      if not (CodeFieldStyle in cTurboNativeFunctionTypes) then
+      if (CodeFieldStyle in cTurboExternalFunctionTypes) then
         MeFreeAndNil(GetExternalOptionsAddr^.ProcInstance);
     end;
     vModuleRefEntry := vModuleRefEntry.Prior;
