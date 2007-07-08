@@ -69,8 +69,11 @@ Type
   PTurboSymbol = ^ TTurboSymbol;
   PTurboLabelSymbol = ^ TTurboLabelSymbol;
   PTurboConstSymbol = ^TTurboConstSymbol;
-  PTurboVarSymbol = ^ TTurboVarSymbol;
+  PTurboVariableSymbol = ^ TTurboVariableSymbol;
+  PTurboCustomBlockSymbol = ^ TTurboCustomBlockSymbol;
+  PTurboCustomMethodSymbol = ^ TTurboCustomMethodSymbol;
   PTurboMethodSymbol = ^ TTurboMethodSymbol;
+  PTurboMethodRefSymbol = ^ TTurboMethodRefSymbol;
   PTurboTypeSymbol = ^ TTurboTypeSymbol;
   PTurboTypeRefSymbol = ^ TTurboTypeRefSymbol;
   PTurboModuleSymbol = ^ TTurboModuleSymbol;
@@ -93,6 +96,7 @@ Type
     destructor Destroy; virtual;(*override;*)
     procedure Clear;
     function Add(): PTurboUnResolvedRefRec;
+    procedure Assign(const aSrc: PTurboUnResolvedRefs);
   public
     property Items[Index: Integer]: PTurboUnResolvedRefRec read GetItems;
   end;
@@ -227,7 +231,7 @@ Type
     property Size: tsInt read FSize write FSize;
   end;
 
-  TTurboVarSymbol = object(TTurboConstSymbol)
+  TTurboVariableSymbol = object(TTurboConstSymbol)
   protected
     function iReferenceTo(const aSymbol: PTurboSymbol): Integer; virtual; {override}
     function iCompile: Integer; virtual; {override}
@@ -238,70 +242,107 @@ Type
     Addr: tsInt;
   end;
 
-  TTurboMethodSymbol = object(TTurboSymbol)
+  //the abstract program block
+  TTurboCustomBlockSymbol = object(TTurboSymbol)
   protected
-    FBodyFine: Boolean; //for cfsFunction
-    FLabels: PTurboSymbols;
+    //to generate new VMT for it.
+    class function ParentClassAddress: TMeClass;virtual;abstract;
+  public
+  end;
+
+  TTurboCustomMethodSymbol = object(TTurboCustomBlockSymbol)
+  protected
     //FiTypeSymbol:internal used, when this type is not Declared!
     FiTypeSymbol: PTurboTypeSymbol; 
     FTypeSymbol: PTurboTypeSymbol;
+    FEntryOffset: tsInt;
+    //cfsFunction: 在本函数中引用的其它未确定地址的(not declareTo)的符号 PTurboSymbol
+    //if Method IsRef: 那么则是需要预先编译进入的ModuleRef符号地址（尚未确定地址的）。
+    FRefSymbols: PMeListEx;
+  protected
+    procedure Init;virtual; {override}
+    function iCompile: Integer; virtual; {override}
+    function iMethodCompile: Integer; virtual;
+    procedure iMethodCompileEntry; virtual;
+
+    function GetTypeSymbol: PTurboTypeSymbol; virtual;
+    function GetTypeInfo: PMeProcType;
+    function GetEntry: PTurboMethodEntry;
+    function GetRefSymbols: PMeListEx;
+
+    function CompileRefSymbols: Integer;
+    function DeclareMethodTypeTo(const aModule: PTurboModuleSymbol): Integer;
+  public
+    destructor Destroy; virtual; {override}
+    procedure Assign(const aSymbol: PTurboCustomSymbol); virtual;
+    function BodyInit: Integer;virtual;abstract;
+    function BodyFinal: Integer;virtual;abstract;
+  public
+    CallStyle: TCallingConvention;
+    CodeFieldStyle: TTurboCodeFieldStyle;
+    CFA: tsInt;//the offset address of the memory. -1 means not declare to Module.Memory
+    //the Param Field Length
+    //该函数主体的长度 
+    ParamFieldLength: LongWord; //this is in the Entry.
+    //Entry: tsInt; //the MUST BE Offset address: PTurboMethodEntry; 
+    property Entry: PTurboMethodEntry read GetEntry;
+    property TypeSymbol: PTurboTypeSymbol read GetTypeSymbol;
+    property TypeInfo: PMeProcType read GetTypeInfo;
+    property RefSymbols: PMeListEx read GetRefSymbols;
+  end;
+
+  TTurboMethodRefSymbol = object(TTurboCustomMethodSymbol)
+  protected
+    procedure Init;virtual; {override}
+    function iMethodCompile: Integer; virtual; {override}
+    procedure iMethodCompileEntry; virtual; {override}
+    function GetTypeSymbol: PTurboTypeSymbol; virtual; {override}
+    function GetExternalLocalMethodAddr(): tsInt;
+  public
+    destructor Destroy; virtual; {override}
+    procedure Assign(const aSymbol: PTurboCustomSymbol); virtual;
+    function iReferenceTo(const aSymbol: PTurboSymbol): Integer; virtual; {override}
+    procedure ResolveAddr(const aValue: PTurboUnResolvedRefRec); virtual; {override}
+    function BodyInit: Integer;virtual; {override}
+    function BodyFinal: Integer;virtual; {override}
+  public
+    ModuleName: String;  //for external word
+    ModuleType: TTurboModuleType;  //for external word
+    ModuleSymbol: PTurboModuleSymbol;//for external forth word, the word is in the ModuleSymbol
+    ExternalMethodSymbol: PTurboCustomMethodSymbol;
+    ExternalOptions: TTurboExteralMethodOptions; //Exteral Word Options
+  end;
+
+  TTurboMethodSymbol = object(TTurboCustomMethodSymbol)
+  protected
+    FBodyFine: Boolean; //for cfsFunction
+    FLabels: PTurboSymbols;
     //FBody:store the cfsFunction's function body here.
     FBody: PTurboCodeMemory;
-    //for cfsFunction only 在本函数中引用的其它未确定地址的(not declareTo)的符号 PTurboSymbol
-    FRefSymbols: PMeListEx;
-    FEntryOffset: tsInt;
   protected
     procedure Init;virtual; {override}
     function iReferenceTo(const aSymbol: PTurboSymbol): Integer; virtual; {override}
-    function iCompile: Integer; virtual; {override}
+    function iMethodCompile: Integer; virtual; {override}
     procedure ResolveAddr(const aValue: PTurboUnResolvedRefRec); virtual; {override}
 
     function GetLabels: PTurboSymbols;
-    function GetTypeSymbol: PTurboTypeSymbol;
-    function GetTypeInfo: PMeProcType;
-    function GetExternalLocalMethodAddr(): tsInt;
     function GetBody: PTurboCodeMemory;
-    function GetRefSymbols: PMeListEx;
-    function GetEntry: PTurboMethodEntry;
 
-    function DeclareMethodTypeTo(const aModule: PTurboModuleSymbol): Integer;
-    //for cfsFunction
-    function CompileRefSymbols: Integer;
     //for cfsFunction MainEntryProc Only
-    //procedure FinalStaticFieldsTo(const aModule: PTurboModuleSymbol);
     procedure FinalStaticFields;
   public
     destructor Destroy; virtual; {override}
     procedure Assign(const aSymbol: PTurboCustomSymbol); virtual;
     function DeclareLabel(const aLabelName: string): Integer;
     function FindLabel(const aName: string): PTurboLabelSymbol;
-    //for cfsFunction only:
-    function BodyInit: Integer;
-    function BodyFinal: Integer;
+    function BodyInit: Integer;virtual; {override}
+    function BodyFinal: Integer;virtual; {override}
     procedure PushStringSeqToStack(const aStr: string);
   public
     //Options: TTurboWordOptions;
-    CallStyle: TCallingConvention;
-    CodeFieldStyle: TTurboCodeFieldStyle;
-    //the Param Field Length
-    //该函数主体的长度 
-    ParamFieldLength: LongWord; //this is in the Entry.
-    CFA: tsInt;//the offset address of the memory. -1 means not declare to Module.Memory
-    ModuleName: String;  //for external word
-    ModuleType: TTurboModuleType;  //for external word
-    //Module: TCustomTurboModule; //for external forth word
-    ModuleSymbol: PTurboModuleSymbol;//for external forth word, the word is in the ModuleSymbol
-    ExternalMethodSymbol: PTurboMethodSymbol;
-    ExternalOptions: TTurboExteralMethodOptions; //Exteral Word Options
-    //Entry: tsInt; //the MUST BE Offset address: PTurboMethodEntry; 
-    property Entry: PTurboMethodEntry read GetEntry;
     property Labels: PTurboSymbols read GetLabels;
-    property TypeSymbol: PTurboTypeSymbol read GetTypeSymbol;
-    property TypeInfo: PMeProcType read GetTypeInfo;
     //for cfsFunction only
     property Body: PTurboCodeMemory read GetBody;
-    //for cfsFunction only
-    property RefSymbols: PMeListEx read GetRefSymbols;
   end;
 
   {: the user defined type symbol.}
@@ -350,6 +391,7 @@ Type
   protected
     //collects methods in the Module.
     FMethods: PTurboSymbols;
+    FMethodRefs: PTurboSymbols;
     FTypes: PTurboTypeSymbols;
     FTypeRefs: PTurboTypeSymbols;
     FStaticFields: PTurboSymbols;
@@ -365,6 +407,7 @@ Type
     function GetStaticFields: PTurboSymbols;
     function GetConsts: PTurboSymbols;
     function GetMethods: PTurboSymbols;
+    function GetMethodRefs: PTurboSymbols;
     function GetUsedModules: PTurboModuleRefSymbols;
     function CreateLibModuleSymbol(const aName: string): PTurboModuleSymbol;
     function CreateDLLModuleSymbol(const aName: string): PTurboModuleSymbol;
@@ -380,10 +423,10 @@ Type
     function FindLocalMethodSymbol(const aName: string): PTurboMethodSymbol;
     function FindLocalConstSymbol(const aName: string; const aType: PMeType): PTurboConstSymbol;
     //find all method in all place.
-    function FindMethodSymbol(const aName: string): PTurboMethodSymbol;
+    function FindMethodSymbol(const aName: string): PTurboCustomMethodSymbol;
     function AddUsedModule(const aName: String; const aModuleType: TTurboModuleType): Integer;
     //将外部的TSLib方法添加到本地的Methods方法列表中，注意：没有写入内存(DeclareTo)。
-    function AddExternalLibMethod(const aMethod: PTurboMethodSymbol): PTurboMethodSymbol;
+    function AddExternalLibMethod(const aMethod: PTurboCustomMethodSymbol): PTurboMethodRefSymbol;
     //Declare the external module To aModule.
     function IsUniqueIdentifier(const aName: String): Boolean;
     procedure PushInt32(const aStr: string);overload;
@@ -391,9 +434,10 @@ Type
 
     //Create a new constant
     function NewConst(const aName: string): PTurboConstSymbol;
-    function NewVar(const aName: string): PTurboVarSymbol;
+    function NewVar(const aName: string): PTurboVariableSymbol;
     function NewType(const aName: string): PTurboTypeSymbol;
     function NewMethod(const aName: string): PTurboMethodSymbol;
+    function NewMethodRef(const aName: string): PTurboMethodRefSymbol;
     //当带常量的变量有动态数组，AnsiString 的时候需要在模块的程序头添加初始化过程：对变量分配内存，并将常量赋值给变量；在程序尾添加终止过程，释放变量内存，并最后加上halt指令。
     //procedure DoInitModuleProc;
     //procedure DoFinalModuleProc;
@@ -405,6 +449,7 @@ Type
     property StaticFields: PTurboSymbols read GetStaticFields;
     property Consts: PTurboSymbols read GetConsts;
     property Methods: PTurboSymbols read GetMethods;
+    property MethodRefs: PTurboSymbols read GetMethodRefs;
     property UsedModules: PTurboModuleRefSymbols read GetUsedModules;
   end;
 
@@ -415,6 +460,7 @@ Type
     destructor Destroy; virtual;{override}
     function Compile: Integer;
     procedure Clear;
+    procedure Assign(const aSymbols: PTurboSymbols);
     function IndexOf(const aName: string; const aBeginIndex: Integer = 0): Integer; overload;
     function Find(const aName: string): PTurboSymbol;
   public
@@ -444,7 +490,7 @@ Type
     function Find(const aName: string; const aModuleType: TTurboModuleType): PTurboModuleSymbol;overload;
     function Find(const aModule: TCustomTurboModule): PTurboModuleSymbol;overload;
     function Find(const aModuleEntry: PTurboModuleRefEntry): PTurboModuleSymbol;overload;
-    function FindMethodSymbol(const aName: string; const aModuleType: TTurboModuleType = mtLib): PTurboMethodSymbol;
+    function FindMethodSymbol(const aName: string; const aModuleType: TTurboModuleType = mtLib): PTurboCustomMethodSymbol;
     function FindTypeSymbol(const aName: string): PTurboTypeSymbol;
   public
     OwnerSymbol: PTurboModuleSymbol;
@@ -578,8 +624,19 @@ end;
 
 procedure TTurboCustomSymbol.Assign(const aSymbol: PTurboCustomSymbol);
 begin
-  if Assigned(aSymbol) and aSymbol.InheritsFrom(Self.ClassType) then
+  if Assigned(aSymbol) and aSymbol.InheritsFrom(TypeOf(TTurboCustomSymbol)) then
+  begin
     Name := aSymbol.Name;
+    Line := aSymbol.Line;
+    Column := aSymbol.Column;
+    FRefCount := aSymbol.FRefCount;
+    FIsCompiled := aSymbol.FIsCompiled;
+    FOnError := aSymbol.FOnError;
+    if Assigned(aSymbol.FUnResolvedRefs) then
+      UnResolvedRefs.Assign(aSymbol.FUnResolvedRefs)
+    else
+      MeFreeAndNil(FUnResolvedRefs);
+  end;
 end;
 
 procedure TTurboCustomSymbol.CompileError(const aErrCode: Integer);
@@ -659,7 +716,7 @@ end;
 
 procedure TTurboSymbol.Assign(const aSymbol: PTurboCustomSymbol);
 begin
-  if Assigned(aSymbol) and aSymbol.InheritsFrom(Self.ClassType) then
+  if Assigned(aSymbol) and aSymbol.InheritsFrom(TypeOf(TTurboSymbol)) then
     with PTurboSymbol(aSymbol)^ do
     begin
       Self.Visibility := Visibility;
@@ -705,7 +762,7 @@ end;
 
 procedure TTurboLabelSymbol.Assign(const aSymbol: PTurboCustomSymbol);
 begin
-  if Assigned(aSymbol) and aSymbol.InheritsFrom(Self.ClassType) then
+  if Assigned(aSymbol) and aSymbol.InheritsFrom(TypeOf(TTurboLabelSymbol)) then
     with PTurboLabelSymbol(aSymbol)^ do
     begin
       Self.Method := Method;
@@ -734,38 +791,27 @@ begin
     Result := cSymbolErrorRedeclaration;
 end;
 
-{ TTurboMethodSymbol }
-procedure TTurboMethodSymbol.Init;
+{ TTurboCustomMethodSymbol }
+procedure TTurboCustomMethodSymbol.Init;
 begin
   Inherited;
   CFA := -1;
-  ExternalOptions.Index := -1;
 end;
 
-destructor TTurboMethodSymbol.Destroy;
+destructor TTurboCustomMethodSymbol.Destroy;
 begin
-  ModuleName := '';
   MeFreeAndNil(FiTypeSymbol);
-  MeFreeAndNil(FLabels);
-  MeFreeAndNil(FBody);
-  MeFreeAndNil(FRefSymbols);
   Inherited;
 end;
 
-procedure TTurboMethodSymbol.Assign(const aSymbol: PTurboCustomSymbol);
+procedure TTurboCustomMethodSymbol.Assign(const aSymbol: PTurboCustomSymbol);
 begin
-  if Assigned(aSymbol) and aSymbol.InheritsFrom(Self.ClassType) then
-    with PTurboMethodSymbol(aSymbol)^ do
+  if Assigned(aSymbol) and aSymbol.InheritsFrom(TypeOf(TTurboCustomMethodSymbol)) then
+    with PTurboCustomMethodSymbol(aSymbol)^ do
     begin
-      Self.ModuleName := ModuleName;
       Self.CallStyle := CallStyle;
       Self.CodeFieldStyle := CodeFieldStyle;
-      Self.ParamFieldLength := ParamFieldLength;
       Self.CFA:= CFA;
-      Self.ModuleType:=ModuleType;
-      Self.ModuleSymbol := ModuleSymbol;
-      Self.ExternalMethodSymbol := ExternalMethodSymbol;
-      Self.ExternalOptions:=ExternalOptions;
       Self.FEntryOffset := FEntryOffset;
       Self.FTypeSymbol := FTypeSymbol;
       Self.FiTypeSymbol := FiTypeSymbol;
@@ -773,98 +819,23 @@ begin
   Inherited;
 end;
 
-function TTurboMethodSymbol.FindLabel(const aName: string): PTurboLabelSymbol;
+Function TTurboCustomMethodSymbol.CompileRefSymbols: Integer;
 var
-  i: integer;
+  i: Integer;
 begin
-  with Labels^ do
+  if Assigned(FRefSymbols) then with FRefSymbols^ do
   begin
-    i := IndexOf(aName);
-    if i >= 0 then
-      Result := PTurboLabelSymbol(Items[i])
-    else
-      Result := nil;
-  end;
-end;
-
-function TTurboMethodSymbol.GetLabels: PTurboSymbols;
-begin
-  if not Assigned(FLabels) then
-  begin
-    New(FLabels, Create);
-  end;
-  Result := FLabels;
-end;
-
-function TTurboMethodSymbol.GetBody: PTurboCodeMemory;
-begin
-  if not Assigned(FBody) then
-  begin
-    New(FBody, Create);
-  end;
-  Result := FBody;
-end;
-
-function TTurboMethodSymbol.GetEntry: PTurboMethodEntry;
-begin
-  Result := Pointer(Integer(OwnerSymbol.Module.DataMemory) + FEntryOffset);
-end;
-
-function TTurboMethodSymbol.GetRefSymbols: PMeListEx;
-begin
-  if not Assigned(FRefSymbols) then
-  begin
-    New(FRefSymbols, Create);
-  end;
-  Result := FRefSymbols;
-end;
-
-function TTurboMethodSymbol.GetTypeSymbol: PTurboTypeSymbol;
-begin
-  if Assigned(FTypeSymbol) then
-    Result := FTypeSymbol
-  else if Assigned(FiTypeSymbol) then
-    Result := FiTypeSymbol
-  else if Assigned(ExternalMethodSymbol) then
-  begin
-    Result := ExternalMethodSymbol.TypeSymbol;
-  end
-  else
-  begin
-    //no Assigned, Create a one.
-    New(FiTypeSymbol, Create);
-    FiTypeSymbol.OwnerSymbol := OwnerSymbol;
-    Result := FiTypeSymbol;
-    //Result.GetTypeInfo(TypeOf(TMeProcType));
-  end;
-end;
-
-function TTurboMethodSymbol.GetTypeInfo: PMeProcType;
-begin
-  Result := PMeProcType(TypeSymbol.GetTypeInfoEx(TypeOf(TMeProcType)));
-end;
-
-function TTurboMethodSymbol.GetExternalLocalMethodAddr(): tsInt;
-begin
-  Result := -1;
-  if Assigned(ExternalMethodSymbol) then
-  begin
-    Result := ExternalMethodSymbol.CFA;
-  end
-  else if Assigned(ModuleSymbol) then
-  begin
-    if ExternalOptions.Name <> '' then
-      ExternalMethodSymbol := ModuleSymbol.FindLocalMethodSymbol(ExternalOptions.Name)
-    else
-      ExternalMethodSymbol := ModuleSymbol.FindLocalMethodSymbol(Name);
-    if Assigned(ExternalMethodSymbol) then
+    for i := 0 to Count -1 do if not PTurboSymbol(Items[i]).IsCompiled then
     begin
-      Result := ExternalMethodSymbol.CFA;
+      Result := PTurboSymbol(Items[i]).Compile;
+      if not IsSymbolOk(Result) then exit;
     end;
+    Clear;
   end;
+  Result := cSymbolErrorOk;
 end;
 
-function TTurboMethodSymbol.DeclareMethodTypeTo(const aModule: PTurboModuleSymbol): Integer;
+function TTurboCustomMethodSymbol.DeclareMethodTypeTo(const aModule: PTurboModuleSymbol): Integer;
 var
   vTypeSymbol: PTurboTypeSymbol;
   i: Integer;
@@ -910,181 +881,55 @@ begin
     aModule.Module.RelocatedDataTypes.Add(Integer(@Entry.Word.TurboType) - Integer(aModule.Module.DataMemory));
 end;
 
-function TTurboMethodSymbol.iReferenceTo(const aSymbol: PTurboSymbol): Integer;
-var
-  vCFA: tsInt;
+function TTurboCustomMethodSymbol.GetEntry: PTurboMethodEntry;
 begin
-  if aSymbol.InheritsFrom(TypeOf(TTurboMethodSymbol)) then
-  begin
-    Result := cSymbolErrorOk;
-    case CodeFieldStyle of
-      cfsFunction: with PTurboMethodSymbol(aSymbol).Body^ do
-        begin
-          if IsPublic(OwnerSymbol.Module) then
-          begin
-            AddOpCode(opEnterFar);
-            AddInt(0);
-          end
-          else
-          begin
-            AddOpCode(opEnter);
-          end;
-          if CFA = -1 then
-          begin
-            with UnResolvedRefs.Add^ do
-            begin
-              Symbol := aSymbol;
-              Addr := UsedSize;
-            end;
-            PTurboMethodSymbol(aSymbol).RefSymbols.Add(Cardinal(@Self));
-          end;
-          AddInt(CFA);
-        end;
-      cfsExternalFunction: //the external TurboScript Lib Function.
-        begin
-          vCFA := CFA;
-          if vCFA = -1 then
-          begin
-            vCFA := GetExternalLocalMethodAddr();  //外部的方法CFA地址总是存在的。
-          end;
-          if vCFA <> -1 then with PTurboMethodSymbol(aSymbol).Body^ do
-          begin
-            Assert(Assigned(ModuleSymbol), 'cfsExternalFunction: ModuleSymbol = nil');
-            ModuleSymbol.ReferenceTo(aSymbol);
-            PTurboMethodSymbol(aSymbol).RefSymbols.Add(Cardinal(ModuleSymbol));
-            AddOpCode(opCallFar);
-            if Assigned(ExternalOptions.ModuleRef) then
-            begin
-              AddInt(Integer(ExternalOptions.ModuleRef) - Integer(aSymbol.OwnerSymbol.Module.DataMemory));
-            end
-            else
-            begin
-              with UnResolvedRefs.Add()^ do
-              begin
-                Symbol := aSymbol;
-                Addr := UsedSize;
-              end;
-              PTurboMethodSymbol(aSymbol).RefSymbols.Add(Cardinal(@Self));
-              AddInt(0);
-            end;
-            AddInt(vCFA);
-            //writeln(Name, '.CFA:',vCFA);
-          end
-          else
-            Result := cSymbolErrorUnknownMethod;
-        end;
-      cfsDLLFunction:
-        begin
-          with PTurboMethodSymbol(aSymbol).Body^ do
-          begin
-            Assert(Assigned(ModuleSymbol), 'cfsExternalFunction: ModuleSymbol = nil');
-            ModuleSymbol.ReferenceTo(aSymbol);
-            PTurboMethodSymbol(aSymbol).RefSymbols.Add(Cardinal(ModuleSymbol));
-            AddOpCode(opCallExt);
-            if FIsCompiled then
-            begin
-              vCFA := Integer(@Entry.Word);
-              vCFA := vCFA - Integer(aSymbol.OwnerSymbol.Module.DataMemory);
-            end
-            else
-            begin
-              with UnResolvedRefs.Add()^ do
-              begin
-                Symbol := aSymbol;
-                Addr := UsedSize;
-                //writeln('RefTO:',UsedSize);
-              end;
-              PTurboMethodSymbol(aSymbol).RefSymbols.Add(Cardinal(@Self));
-              vCFA := 0;
-            end;
-            //writeln('RefCFA:',CFA);
-            AddInt(vCFA);
-          end;
-        end;
-    end;//case
-  end
-  else
-    Result := cSymbolErrorUnknownRef;
+  Assert(Assigned(OwnerSymbol), 'OwnerSymbol=nil');
+  Assert(Assigned(OwnerSymbol.Module), 'OwnerSymbol.Module=nil');
+  Result := Pointer(Integer(OwnerSymbol.Module.DataMemory) + FEntryOffset);
 end;
 
-Function TTurboMethodSymbol.CompileRefSymbols: Integer;
-var
-  i: Integer;
+function TTurboCustomMethodSymbol.GetRefSymbols: PMeListEx;
 begin
-  if Assigned(FRefSymbols) then with FRefSymbols^ do
+  if not Assigned(FRefSymbols) then
   begin
-    for i := 0 to Count -1 do if not PTurboSymbol(Items[i]).IsCompiled then
-    begin
-      Result := PTurboSymbol(Items[i]).Compile;
-      if not IsSymbolOk(Result) then exit;
-    end;
-    Clear;
+    New(FRefSymbols, Create);
   end;
-  Result := cSymbolErrorOk;
+  Result := FRefSymbols;
 end;
 
-function TTurboMethodSymbol.iCompile: Integer;
+
+function TTurboCustomMethodSymbol.GetTypeSymbol: PTurboTypeSymbol;
+begin
+  if Assigned(FTypeSymbol) then
+    Result := FTypeSymbol
+  else if Assigned(FiTypeSymbol) then
+    Result := FiTypeSymbol
+  else
+  begin
+    //writeLn('MethodtypeCre:',Name);
+    //no Assigned, Create a one.
+    New(FiTypeSymbol, Create);
+    FiTypeSymbol.OwnerSymbol := OwnerSymbol;
+    Result := FiTypeSymbol;
+    //Result.GetTypeInfo(TypeOf(TMeProcType));
+  end;
+end;
+
+function TTurboCustomMethodSymbol.GetTypeInfo: PMeProcType;
+begin
+  Result := PMeProcType(TypeSymbol.GetTypeInfoEx(TypeOf(TMeProcType)));
+end;
+
+function TTurboCustomMethodSymbol.iCompile: Integer;
 var
-  p: PTurboExteralMethodOptions;
+  //p: PTurboExteralMethodOptions;
   vIsPublic: Boolean;
 begin
     //Result := cSymbolErrorOk;
   Result := CompileRefSymbols;
 
   if IsSymbolOk(Result) then
-    Case CodeFieldStyle of
-      cfsFunction:
-        begin
-          if FBodyFine then
-          begin
-              //writeln('TTurboMethodSymbol(',Name,').iCompile:',Body.UsedSize);
-              Integer(p) := Integer(Body.Memory) + 16;
-              //writeln(Integer(p), '=',PInteger(p)^);
-              CFA := OwnerSymbol.Module.UsedMemory;
-              OwnerSymbol.Module.AllocSpace(Body.UsedSize);
-              p := Pointer(Integer(OwnerSymbol.Module.Memory) + CFA);
-              Move(Body.Memory^, p^, Body.UsedSize);
-          end
-          else
-          begin
-            Result := cSymbolErrorMethodBodyNotFine;
-          end;
-        end;
-      cfsExternalFunction: //the external forth function
-        begin
-          CFA := GetExternalLocalMethodAddr();
-          if CFA = -1 then
-            Result := cSymbolErrorUnknownMethod;
-
-          if (Result = cSymbolErrorOk) and not Assigned(ExternalOptions.ModuleRef) then
-          begin
-            Result := ModuleSymbol.Compile;
-            if not IsSymbolOk(Result) then Exit;
-            Integer(p) := OwnerSymbol.UsedModules.IndexOf(ModuleSymbol);
-            if Integer(p) >= 0 then
-            begin
-              ExternalOptions.ModuleRef := Pointer(Integer(OwnerSymbol.UsedModules.Entries[Integer(p)]) + SizeOf(tsPointer));
-            end
-            else
-              Result := cSymbolErrorModuleRefAddedFailed;
-          end;
-        end;
-      cfsDLLFunction:
-        begin
-          CFA := 0;
-          //writeln('CompileDLL:', Name);
-          if not Assigned(ExternalOptions.ModuleRef) then
-            Result := ModuleSymbol.DeclareTo(OwnerSymbol);
-          if not IsSymbolOk(Result) then Exit;
-          Integer(p) := OwnerSymbol.UsedModules.IndexOf(ModuleSymbol);
-          if Integer(p) >= 0 then
-          begin
-              ExternalOptions.ModuleRef := Pointer(Integer(OwnerSymbol.UsedModules.Entries[Integer(p)]) + SizeOf(tsPointer));
-          end
-          else
-              Result := cSymbolErrorModuleRefAddedFailed;
-        end;
-    end; //case
+    Result := iMethodCompile;
 
   if IsSymbolOk(Result) then
   begin
@@ -1117,29 +962,8 @@ begin
       Entry.Word.Visibility := Visibility;
       Entry.Word.CallStyle := CallStyle;
       Entry.Word.CodeFieldStyle := CodeFieldStyle;
-      if Entry.Word.IsRef then
-      begin
-        //writeln('IsExternal:', Self.Name);
-        Integer(p) := UsedDataSize;
-        AllocDataSpace(SizeOf(TTurboExteralMethodOptions));
-        Integer(p) := Integer(DataMemory) + Integer(p);
-        if not Assigned(Entry.Word.Name) and (ExternalOptions.Index = -1) then
-        begin
-          if CodeFieldStyle = cfsExternalFunction then
-          begin
-            //ExternalOptions.Name is shortString, but the Name is String, 万一放不下，所以对DLL可以用 ExternalOptions.Name，但是对本族的外部函数还是用这个！
-            Entry.Word.Name := Pointer(UsedDataSize);
-            //PChar:
-            AddPCharToData(Self.Name);
-          end
-          else if ExternalOptions.Name = '' then
-            ExternalOptions.Name := Self.Name;
-        end;
-        p^ := ExternalOptions;
-        Integer(p^.ModuleRef) := Integer(ExternalOptions.ModuleRef) - Integer(DataMemory);
-        RelocatedDataAddresses.Add(Integer(@p^.ModuleRef)-Integer(DataMemory));
-        Assert(p=Entry.Word.GetExternalOptionsAddr, 'Method.DeclareTo: ExternalOptionsAddr mismatch');
-      end;
+
+      iMethodCompileEntry;
 
       if vIsPublic then
       begin
@@ -1157,77 +981,64 @@ begin
   end;
 end;
 
-procedure TTurboMethodSymbol.ResolveAddr(const aValue: PTurboUnResolvedRefRec);
-var
-  p: PInteger;
+function TTurboCustomMethodSymbol.iMethodCompile: Integer;
 begin
-  with aValue^ do 
-    p := Pointer(Integer(PTurboMethodSymbol(Symbol)^.Body.Memory) + Addr);
-
-  case CodeFieldStyle of
-      cfsFunction:
-        begin
-          p^ := CFA;
-        end;
-      cfsExternalFunction: //the external forth function
-        begin
-          p^ := Integer(ExternalOptions.ModuleRef) - Integer(aValue.Symbol.OwnerSymbol.Module.DataMemory);
-        end;
-      cfsDLLFunction:
-        begin
-          //writeln(Entry.Word.GetExternalOptionsAddr.Name, ' ',Integer(Body.UsedSize),' = ', PInteger(p)^, ',', Integer(aValue.Symbol.OwnerSymbol.Module.DataMemory));
-          p^ := Integer(@Entry.Word) - Integer(aValue.Symbol.OwnerSymbol.Module.DataMemory);
-          //writeln(Entry.Word.GetExternalOptionsAddr.Name, ' ',Integer(p),' = ', PInteger(p)^, ',', Integer(aValue.Symbol.OwnerSymbol.Module.DataMemory));
-        end;
-  end; //case
+  Result :=cSymbolErrorOk;
 end;
 
-function TTurboMethodSymbol.BodyInit: Integer;
+procedure TTurboCustomMethodSymbol.iMethodCompileEntry;
+begin
+end;
+
+{ TTurboMethodRefSymbol }
+procedure TTurboMethodRefSymbol.Init;
+begin
+  Inherited;
+  ExternalOptions.Index := -1;
+end;
+
+destructor TTurboMethodRefSymbol.Destroy;
+begin
+  ModuleName := '';
+  Inherited;
+end;
+
+procedure TTurboMethodRefSymbol.Assign(const aSymbol: PTurboCustomSymbol);
+begin
+  if Assigned(aSymbol) and aSymbol.InheritsFrom(TypeOf(TTurboMethodRefSymbol)) then
+    with PTurboMethodRefSymbol(aSymbol)^ do
+    begin
+      Self.ModuleName := ModuleName;
+      Self.ModuleType:=ModuleType;
+      Self.ModuleSymbol := ModuleSymbol;
+      Self.ExternalMethodSymbol := ExternalMethodSymbol;
+      Self.ExternalOptions:=ExternalOptions;
+    end;
+  Inherited;
+end;
+
+function TTurboMethodRefSymbol.BodyInit: Integer;
 begin
   Result := cSymbolErrorOk;
-  if Assigned(OwnerSymbol) and (OwnerSymbol.Methods.IndexOf(@Self) < 0) then
+  if Assigned(OwnerSymbol) and (OwnerSymbol.MethodRefs.IndexOf(@Self) < 0) then
   begin
+    //Writeln('ok:',Name);
     if OwnerSymbol.IsUniqueIdentifier(Name) then
     begin
-      OwnerSymbol.Methods.Add(@Self);
+      OwnerSymbol.MethodRefs.Add(@Self);
     end
     else
       Result := cSymbolErrorRedeclaration;
   end;
-
-  if CodeFieldStyle = cfsFunction then
-    Body.Clear;
-  FBodyFine := False;
 end;
 
-function TTurboMethodSymbol.BodyFinal: Integer;
+function TTurboMethodRefSymbol.BodyFinal: Integer;
 var
-  vIsPublic: Boolean;
+  //vIsPublic: Boolean;
   i: Integer;
   vModuleEntry: PTurboModuleRefEntry;
 begin
-  //if FBodyFine then exit;
   case CodeFieldStyle of
-    cfsFunction: with Body^ do
-      begin
-        Result := cSymbolErrorOk;
-        vIsPublic := IsPublic(OwnerSymbol.Module);
-    
-        if Self.Name = cMainEntryProcName then  //for MainEntryProc ONly
-        begin
-          Inc(FRefCount);
-          //writeln('DeclareEndTo:',cMainEntryProcName );
-          FinalStaticFields;
-          AddOpPushInt32(0);
-          AddOpCode(opHalt);
-        end
-        else if vIsPublic then
-          AddOpCode(opExitFar)
-        else
-          AddOpCode(opExit);
-        ParamFieldLength := UsedSize;
-        FBodyFine := True;
-      end;
     cfsExternalFunction, cfsDLLFunction, cfsHostFunction:
       begin
         Result := cSymbolErrorOk;
@@ -1296,13 +1107,412 @@ begin
   end; //case
 end;
 
+function TTurboMethodRefSymbol.GetExternalLocalMethodAddr(): tsInt;
+begin
+  Result := -1;
+  if Assigned(ExternalMethodSymbol) then
+  begin
+    Result := ExternalMethodSymbol.CFA;
+  end
+  else if Assigned(ModuleSymbol) then
+  begin
+    if ExternalOptions.Name <> '' then
+      ExternalMethodSymbol := ModuleSymbol.FindLocalMethodSymbol(ExternalOptions.Name)
+    else
+      ExternalMethodSymbol := ModuleSymbol.FindLocalMethodSymbol(Name);
+    if Assigned(ExternalMethodSymbol) then
+    begin
+      Result := ExternalMethodSymbol.CFA;
+    end;
+  end;
+end;
+
+function TTurboMethodRefSymbol.GetTypeSymbol: PTurboTypeSymbol;
+begin
+  if Assigned(FTypeSymbol) then
+    Result := FTypeSymbol
+  else if Assigned(FiTypeSymbol) then
+    Result := FiTypeSymbol
+  else if Assigned(ExternalMethodSymbol) then
+  begin
+    Result := ExternalMethodSymbol.TypeSymbol;
+  end
+  else
+  begin
+    //no Assigned, Create a one.
+    New(FiTypeSymbol, Create);
+    FiTypeSymbol.OwnerSymbol := OwnerSymbol;
+    Result := FiTypeSymbol;
+    //Result.GetTypeInfo(TypeOf(TMeProcType));
+  end;
+end;
+
+function TTurboMethodRefSymbol.iMethodCompile: Integer;
+var
+  i: tsInt;
+  //vIsPublic: Boolean;
+begin
+    Result := cSymbolErrorOk;
+    Case CodeFieldStyle of
+      cfsExternalFunction: //the external forth function
+        begin
+          CFA := GetExternalLocalMethodAddr();
+          if CFA = -1 then
+            Result := cSymbolErrorUnknownMethod;
+
+          if (Result = cSymbolErrorOk) and not Assigned(ExternalOptions.ModuleRef) then
+          begin
+            Result := ModuleSymbol.Compile;
+            if not IsSymbolOk(Result) then Exit;
+            i := OwnerSymbol.UsedModules.IndexOf(ModuleSymbol);
+            if i >= 0 then
+            begin
+              ExternalOptions.ModuleRef := Pointer(Integer(OwnerSymbol.UsedModules.Entries[i]) + SizeOf(tsPointer));
+            end
+            else
+              Result := cSymbolErrorModuleRefAddedFailed;
+          end;
+        end;
+      cfsDLLFunction:
+        begin
+          CFA := 0;
+          //writeln('CompileDLL:', Name);
+          if not Assigned(ExternalOptions.ModuleRef) then
+            Result := ModuleSymbol.DeclareTo(OwnerSymbol);
+          if not IsSymbolOk(Result) then Exit;
+          i := OwnerSymbol.UsedModules.IndexOf(ModuleSymbol);
+          if i >= 0 then
+          begin
+              ExternalOptions.ModuleRef := Pointer(Integer(OwnerSymbol.UsedModules.Entries[i]) + SizeOf(tsPointer));
+          end
+          else
+              Result := cSymbolErrorModuleRefAddedFailed;
+        end;
+      else
+        Result := cSymbolErrorUnknownMethod;
+    end; //case
+
+end;
+
+procedure TTurboMethodRefSymbol.iMethodCompileEntry;
+var
+  p: PTurboExteralMethodOptions;
+begin
+      if Entry.Word.IsRef then with OwnerSymbol.Module do
+      begin
+        //writeln('IsExternal:', Self.Name);
+        Integer(p) := UsedDataSize;
+        AllocDataSpace(SizeOf(TTurboExteralMethodOptions));
+        Integer(p) := Integer(DataMemory) + Integer(p);
+        if not Assigned(Entry.Word.Name) and (ExternalOptions.Index = -1) then
+        begin
+          if CodeFieldStyle = cfsExternalFunction then
+          begin
+            //ExternalOptions.Name is shortString, but the Name is String, 万一放不下，所以对DLL可以用 ExternalOptions.Name，但是对本族的外部函数还是用这个！
+            Entry.Word.Name := Pointer(UsedDataSize);
+            //PChar:
+            AddPCharToData(Self.Name);
+          end
+          else if ExternalOptions.Name = '' then
+            ExternalOptions.Name := Self.Name;
+        end;
+        p^ := ExternalOptions;
+        Integer(p^.ModuleRef) := Integer(ExternalOptions.ModuleRef) - Integer(DataMemory);
+        RelocatedDataAddresses.Add(Integer(@p^.ModuleRef)-Integer(DataMemory));
+        Assert(p=Entry.Word.GetExternalOptionsAddr, 'Method.DeclareTo: ExternalOptionsAddr mismatch');
+      end;
+end;
+
+function TTurboMethodRefSymbol.iReferenceTo(const aSymbol: PTurboSymbol): Integer;
+var
+  vCFA: tsInt;
+begin
+  if aSymbol.InheritsFrom(TypeOf(TTurboMethodSymbol)) then
+  begin
+    Result := cSymbolErrorOk;
+    case CodeFieldStyle of
+      cfsExternalFunction: //the external TurboScript Lib Function.
+        begin
+          vCFA := CFA;
+          if vCFA = -1 then
+          begin
+            vCFA := GetExternalLocalMethodAddr();  //外部的方法CFA地址总是存在的。
+          end;
+          if vCFA <> -1 then with PTurboMethodSymbol(aSymbol).Body^ do
+          begin
+            Assert(Assigned(ModuleSymbol), 'cfsExternalFunction: ModuleSymbol = nil');
+            ModuleSymbol.ReferenceTo(aSymbol);
+            PTurboMethodSymbol(aSymbol).RefSymbols.Add(Cardinal(ModuleSymbol));
+            AddOpCode(opCallFar);
+            if Assigned(ExternalOptions.ModuleRef) then
+            begin
+              AddInt(Integer(ExternalOptions.ModuleRef) - Integer(aSymbol.OwnerSymbol.Module.DataMemory));
+            end
+            else
+            begin
+              with UnResolvedRefs.Add()^ do
+              begin
+                Symbol := aSymbol;
+                Addr := UsedSize;
+              end;
+              PTurboMethodSymbol(aSymbol).RefSymbols.Add(Cardinal(@Self));
+              AddInt(0);
+            end;
+            AddInt(vCFA);
+            //writeln(Name, '.CFA:',vCFA);
+          end
+          else
+            Result := cSymbolErrorUnknownMethod;
+        end;
+      cfsDLLFunction:
+        begin
+          with PTurboMethodSymbol(aSymbol).Body^ do
+          begin
+            Assert(Assigned(ModuleSymbol), 'cfsExternalFunction: ModuleSymbol = nil');
+            ModuleSymbol.ReferenceTo(aSymbol);
+            PTurboMethodSymbol(aSymbol).RefSymbols.Add(Cardinal(ModuleSymbol));
+            AddOpCode(opCallExt);
+            if FIsCompiled then
+            begin
+              vCFA := Integer(@Entry.Word);
+              vCFA := vCFA - Integer(aSymbol.OwnerSymbol.Module.DataMemory);
+            end
+            else
+            begin
+              with UnResolvedRefs.Add()^ do
+              begin
+                Symbol := aSymbol;
+                Addr := UsedSize;
+                //writeln('RefTO:',UsedSize);
+              end;
+              PTurboMethodSymbol(aSymbol).RefSymbols.Add(Cardinal(@Self));
+              vCFA := 0;
+            end;
+            //writeln('RefCFA:',CFA);
+            AddInt(vCFA);
+          end;
+        end;
+    end;//case
+  end
+  else
+    Result := cSymbolErrorUnknownRef;
+end;
+
+procedure TTurboMethodRefSymbol.ResolveAddr(const aValue: PTurboUnResolvedRefRec);
+var
+  p: PInteger;
+begin
+  with aValue^ do 
+    p := Pointer(Integer(PTurboMethodSymbol(Symbol)^.Body.Memory) + Addr);
+
+  case CodeFieldStyle of
+      cfsExternalFunction: //the external forth function
+        begin
+          p^ := Integer(ExternalOptions.ModuleRef) - Integer(aValue.Symbol.OwnerSymbol.Module.DataMemory);
+        end;
+      cfsDLLFunction:
+        begin
+          //writeln(Entry.Word.GetExternalOptionsAddr.Name, ' ',Integer(Body.UsedSize),' = ', PInteger(p)^, ',', Integer(aValue.Symbol.OwnerSymbol.Module.DataMemory));
+          p^ := Integer(@Entry.Word) - Integer(aValue.Symbol.OwnerSymbol.Module.DataMemory);
+          //writeln(Entry.Word.GetExternalOptionsAddr.Name, ' ',Integer(p),' = ', PInteger(p)^, ',', Integer(aValue.Symbol.OwnerSymbol.Module.DataMemory));
+        end;
+  end; //case
+end;
+
+{ TTurboMethodSymbol }
+procedure TTurboMethodSymbol.Init;
+begin
+  Inherited;
+  CodeFieldStyle := cfsFunction;
+end;
+
+destructor TTurboMethodSymbol.Destroy;
+begin
+  MeFreeAndNil(FLabels);
+  MeFreeAndNil(FBody);
+  MeFreeAndNil(FRefSymbols);
+  Inherited;
+end;
+
+procedure TTurboMethodSymbol.Assign(const aSymbol: PTurboCustomSymbol);
+begin
+  if Assigned(aSymbol) and aSymbol.InheritsFrom(TypeOf(TTurboMethodSymbol)) then
+    with PTurboMethodSymbol(aSymbol)^ do
+    begin
+      Self.ParamFieldLength := ParamFieldLength;
+      if Assigned(FLabels) then
+        Self.Labels.Assign(FLabels);
+      if Assigned(FBody) then
+        Self.Body.Assign(FBody);
+      if Assigned(FRefSymbols) then
+        Self.RefSymbols.Assign(FRefSymbols);
+    end;
+  Inherited;
+end;
+
+function TTurboMethodSymbol.FindLabel(const aName: string): PTurboLabelSymbol;
+var
+  i: integer;
+begin
+  with Labels^ do
+  begin
+    i := IndexOf(aName);
+    if i >= 0 then
+      Result := PTurboLabelSymbol(Items[i])
+    else
+      Result := nil;
+  end;
+end;
+
+function TTurboMethodSymbol.GetLabels: PTurboSymbols;
+begin
+  if not Assigned(FLabels) then
+  begin
+    New(FLabels, Create);
+  end;
+  Result := FLabels;
+end;
+
+function TTurboMethodSymbol.GetBody: PTurboCodeMemory;
+begin
+  if not Assigned(FBody) then
+  begin
+    New(FBody, Create);
+  end;
+  Result := FBody;
+end;
+
+function TTurboMethodSymbol.iReferenceTo(const aSymbol: PTurboSymbol): Integer;
+//var
+  //vCFA: tsInt;
+begin
+  if aSymbol.InheritsFrom(TypeOf(TTurboMethodSymbol)) then
+  begin
+    Result := cSymbolErrorOk;
+    case CodeFieldStyle of
+      cfsFunction: with PTurboMethodSymbol(aSymbol).Body^ do
+        begin
+          if IsPublic(OwnerSymbol.Module) then
+          begin
+            AddOpCode(opEnterFar);
+            AddInt(0);
+          end
+          else
+          begin
+            AddOpCode(opEnter);
+          end;
+          if CFA = -1 then
+          begin
+            with UnResolvedRefs.Add^ do
+            begin
+              Symbol := aSymbol;
+              Addr := UsedSize;
+            end;
+            PTurboMethodSymbol(aSymbol).RefSymbols.Add(Cardinal(@Self));
+          end;
+          AddInt(CFA);
+        end;
+    end;//case
+  end
+  else
+    Result := cSymbolErrorUnknownRef;
+end;
+
+function TTurboMethodSymbol.iMethodCompile: Integer;
+var
+  p: Pointer;
+  //vIsPublic: Boolean;
+begin
+  if FBodyFine then
+  begin
+      //writeln('TTurboMethodSymbol(',Name,').iCompile:',Body.UsedSize);
+      Integer(p) := Integer(Body.Memory) + 16;
+      //writeln(Integer(p), '=',PInteger(p)^);
+      CFA := OwnerSymbol.Module.UsedMemory;
+      OwnerSymbol.Module.AllocSpace(Body.UsedSize);
+      p := Pointer(Integer(OwnerSymbol.Module.Memory) + CFA);
+      Move(Body.Memory^, p^, Body.UsedSize);
+      Result := cSymbolErrorOk;
+  end
+  else
+  begin
+    Result := cSymbolErrorMethodBodyNotFine;
+  end;
+end;
+
+procedure TTurboMethodSymbol.ResolveAddr(const aValue: PTurboUnResolvedRefRec);
+var
+  p: PInteger;
+begin
+  with aValue^ do 
+    p := Pointer(Integer(PTurboMethodSymbol(Symbol)^.Body.Memory) + Addr);
+
+  case CodeFieldStyle of
+      cfsFunction:
+        begin
+          p^ := CFA;
+        end;
+  end; //case
+end;
+
+function TTurboMethodSymbol.BodyInit: Integer;
+begin
+  Result := cSymbolErrorOk;
+  if Assigned(OwnerSymbol) and (OwnerSymbol.Methods.IndexOf(@Self) < 0) then
+  begin
+    if OwnerSymbol.IsUniqueIdentifier(Name) then
+    begin
+      OwnerSymbol.Methods.Add(@Self);
+    end
+    else
+      Result := cSymbolErrorRedeclaration;
+  end;
+
+  if CodeFieldStyle = cfsFunction then
+    Body.Clear;
+  FBodyFine := False;
+end;
+
+function TTurboMethodSymbol.BodyFinal: Integer;
+var
+  vIsPublic: Boolean;
+  //i: Integer;
+  //vModuleEntry: PTurboModuleRefEntry;
+begin
+  //if FBodyFine then exit;
+  case CodeFieldStyle of
+    cfsFunction: with Body^ do
+      begin
+        vIsPublic := IsPublic(OwnerSymbol.Module);
+    
+        if Self.Name = cMainEntryProcName then  //for MainEntryProc ONly
+        begin
+          Inc(FRefCount);
+          //writeln('DeclareEndTo:',cMainEntryProcName );
+          FinalStaticFields;
+          //AddOpPushInt32(0);
+          AddOpCode(opHalt);
+        end
+        else if vIsPublic then
+          AddOpCode(opExitFar)
+        else
+          AddOpCode(opExit);
+        ParamFieldLength := UsedSize;
+        FBodyFine := True;
+        Result := cSymbolErrorOk;
+      end;
+    else
+      Result := cSymbolErrorUnknownMethod;
+  end; //case
+end;
+
 procedure TTurboMethodSymbol.FinalStaticFields;
 var
   i: Integer;
 begin
   for i := 0 to OwnerSymbol.StaticFields.Count - 1 do
   begin
-    with PTurboVarSymbol(OwnerSymbol.StaticFields.Items[i])^ do
+    with PTurboVariableSymbol(OwnerSymbol.StaticFields.Items[i])^ do
     begin
       if Assigned(TurboType) and ((FRefCount > 0) or IsPublic(OwnerSymbol.Module)) then
       begin
@@ -1362,7 +1572,7 @@ end;
 
 procedure TTurboModuleSymbol.Assign(const aSymbol: PTurboCustomSymbol);
 begin
-  if Assigned(aSymbol) and aSymbol.InheritsFrom(Self.ClassType) then
+  if Assigned(aSymbol) and aSymbol.InheritsFrom(TypeOf(TTurboModuleSymbol)) then
     with PTurboModuleSymbol(aSymbol)^ do
     begin
       //Self.Entry:= Entry;
@@ -1372,6 +1582,12 @@ begin
         Self.Methods.Assign(FMethods)
       else 
         MeFreeAndNil(Self.FMethods);
+
+      if Assigned(FMethodRefs) then
+        Self.MethodRefs.Assign(FMethodRefs)
+      else 
+        MeFreeAndNil(Self.FMethodRefs);
+        //}
 
       if Assigned(FStaticFields) then
         Self.StaticFields.Assign(FStaticFields)
@@ -1409,6 +1625,7 @@ end;
 procedure TTurboModuleSymbol.Clear;
 begin
   MeFreeAndNil(FMethods);
+  MeFreeAndNil(FMethodRefs);
   MeFreeAndNil(FUsedModules);
   //MeFreeAndNil(FUsedModuleEntries);
   MeFreeAndNil(FStaticFields);
@@ -1488,7 +1705,7 @@ begin
         
         vMethodEntry := Module.FindWordEntry(aName, cfsFunction);
         //writeln(Name, ' try...', aName, ' ', Integer(vMethodEntry));
-        if Assigned(vMethodEntry) and (vMethodEntry.Word.CodeFieldStyle = cfsFunction) then
+        if Assigned(vMethodEntry) then
         begin
             New(Result, Create);
             Result.Name := aName;
@@ -1496,8 +1713,8 @@ begin
             //Result.ExternalOptions.ModuleRef := Pointer(Integer(Entry) + SizeOf(Pointer));
             Result.CallStyle := vMethodEntry.Word.CallStyle;
             Result.CodeFieldStyle := vMethodEntry.Word.CodeFieldStyle;
-            Result.ModuleType := mtLib;
-            Result.ModuleName := Name;
+            //Result.ModuleType := mtLib;
+            //Result.ModuleName := Name;
             //Result.ModuleSymbol := @Self;
             //Result.Module := Module;
             Result.OwnerSymbol := @Self;
@@ -1509,22 +1726,29 @@ begin
   end;
 end;
 
-function TTurboModuleSymbol.FindMethodSymbol(const aName: string): PTurboMethodSymbol;
+function TTurboModuleSymbol.FindMethodSymbol(const aName: string): PTurboCustomMethodSymbol;
 var
   i: Integer;
 begin
   i := Methods.IndexOf(aName);
   if i >= 0 then
-    Result := PTurboMethodSymbol(Methods.Items[i])
+    Result := PTurboCustomMethodSymbol(Methods.Items[i])
   else begin
-    Result := UsedModules.FindMethodSymbol(aName);
-    if Assigned(Result) then
-    begin
-      i := Methods.IndexOf(Result.ModuleName + cDotSeparatorSymbol + aName);
-      if i >= 0 then
-        Result := PTurboMethodSymbol(Methods.Items[i])
-      else
-        Result := AddExternalLibMethod(Result);
+    i := MethodRefs.IndexOf(aName);
+    if i >= 0 then
+      Result := PTurboCustomMethodSymbol(MethodRefs.Items[i])
+    else //}
+    begin //search the MethodRefs in the UsedModules
+      Result := UsedModules.FindMethodSymbol(aName);
+      if Assigned(Result) then
+      begin
+        Assert(Assigned(Result.OwnerSymbol), 'Result.OwnerSymbol is nil');
+        i := MethodRefs.IndexOf(Result.OwnerSymbol.Name + cDotSeparatorSymbol + aName);
+        if i >= 0 then
+          Result := PTurboCustomMethodSymbol(MethodRefs.Items[i])
+        else
+          Result := PTurboCustomMethodSymbol(AddExternalLibMethod(Result));
+      end;
     end;
   end;
 end;
@@ -1537,6 +1761,16 @@ begin
   end;
   Result := FConsts;
 end;
+
+function TTurboModuleSymbol.GetMethodRefs: PTurboSymbols;
+begin
+  if not Assigned(FMethodRefs) then
+  begin
+    New(FMethodRefs, Create);
+  end;
+  Result := FMethodRefs;
+end;
+//}
 
 function TTurboModuleSymbol.GetMethods: PTurboSymbols;
 begin
@@ -1585,11 +1819,12 @@ begin
   Result := FStaticFields;
 end;
 
-function TTurboModuleSymbol.AddExternalLibMethod(const aMethod: PTurboMethodSymbol): PTurboMethodSymbol;
+function TTurboModuleSymbol.AddExternalLibMethod(const aMethod: PTurboCustomMethodSymbol): PTurboMethodRefSymbol;
 begin
   if Assigned(aMethod) then
   begin
-    Result := NewMethod(aMethod.ModuleName + cDotSeparatorSymbol + aMethod.Name);
+    Assert(Assigned(aMethod.OwnerSymbol), 'aMethod.OwnerSymbol is nil');
+    Result := NewMethodRef(aMethod.OwnerSymbol.Name + cDotSeparatorSymbol + aMethod.Name);
     if Assigned(Result) then
     begin
       Result.ExternalMethodSymbol := aMethod;
@@ -1674,6 +1909,8 @@ begin
     Result := Consts.Compile;
     if not IsSymbolOk(Result) then Exit;
     Result := StaticFields.Compile;
+    if not IsSymbolOk(Result) then Exit;
+    Result := MethodRefs.Compile;
     if not IsSymbolOk(Result) then Exit;
     Result := Methods.Compile;
     if not IsSymbolOk(Result) then Exit;
@@ -1760,7 +1997,7 @@ begin
     Result := nil;
 end;
 
-function TTurboModuleSymbol.NewVar(const aName: string): PTurboVarSymbol;
+function TTurboModuleSymbol.NewVar(const aName: string): PTurboVariableSymbol;
 begin
   if (aName = '') or (StaticFields.IndexOf(aName) < 0) then
   begin
@@ -1772,6 +2009,7 @@ begin
   else
     Result := nil;
 end;
+
 function TTurboModuleSymbol.NewMethod(const aName: string): PTurboMethodSymbol;
 begin
   if (aName = '') or (Methods.IndexOf(aName) < 0) then
@@ -1780,6 +2018,19 @@ begin
     Result.Name := aName;
     Result.OwnerSymbol := @Self;
     if aName <> '' then Methods.Add(Result);
+  end
+  else
+    Result := nil;
+end;
+
+function TTurboModuleSymbol.NewMethodRef(const aName: string): PTurboMethodRefSymbol;
+begin
+  if (aName = '') or (MethodRefs.IndexOf(aName) < 0) then
+  begin
+    New(Result, Create);
+    Result.Name := aName;
+    Result.OwnerSymbol := @Self;
+    if aName <> '' then MethodRefs.Add(Result);
   end
   else
     Result := nil;
@@ -1818,7 +2069,7 @@ end;
 
 procedure TTurboConstSymbol.Assign(const aSymbol: PTurboCustomSymbol);
 begin
-  if Assigned(aSymbol) and aSymbol.InheritsFrom(Self.ClassType) then
+  if Assigned(aSymbol) and aSymbol.InheritsFrom(TypeOf(TTurboConstSymbol)) then
   begin
     AssignValue(PTurboConstSymbol(aSymbol));
   end;
@@ -2112,18 +2363,18 @@ begin
   end;
 end;
 
-{ TTurboVarSymbol }
-procedure TTurboVarSymbol.Assign(const aSymbol: PTurboCustomSymbol);
+{ TTurboVariableSymbol }
+procedure TTurboVariableSymbol.Assign(const aSymbol: PTurboCustomSymbol);
 begin
-  if Assigned(aSymbol) and aSymbol.InheritsFrom(Self.ClassType) then
-    with PTurboVarSymbol(aSymbol)^ do
+  if Assigned(aSymbol) and aSymbol.InheritsFrom(TypeOf(TTurboVariableSymbol)) then
+    with PTurboVariableSymbol(aSymbol)^ do
     begin
       Self.Addr := Addr;
     end;
   Inherited;
 end;
 
-function TTurboVarSymbol.iReferenceTo(const aSymbol: PTurboSymbol): Integer;
+function TTurboVariableSymbol.iReferenceTo(const aSymbol: PTurboSymbol): Integer;
 begin
   if aSymbol.InheritsFrom(TypeOf(TTurboMethodSymbol)) then
   begin
@@ -2145,7 +2396,7 @@ begin
     Result := cSymbolErrorUnknownRef;
 end;
 
-function TTurboVarSymbol.iCompile: Integer;
+function TTurboVariableSymbol.iCompile: Integer;
 var
   vVaraibleEntry: PTurboStaticFieldEntry;
   vValue: Pointer;
@@ -2203,7 +2454,7 @@ begin
   end;
 end;
 
-procedure TTurboVarSymbol.ResolveAddr(const aValue: PTurboUnResolvedRefRec);
+procedure TTurboVariableSymbol.ResolveAddr(const aValue: PTurboUnResolvedRefRec);
 var
   p: PInteger;
 begin
@@ -2221,7 +2472,7 @@ end;
 
 procedure TTurboTypeSymbol.Assign(const aSymbol: PTurboCustomSymbol);
 begin
-  if Assigned(aSymbol) and aSymbol.InheritsFrom(Self.ClassType) then
+  if Assigned(aSymbol) and aSymbol.InheritsFrom(TypeOf(TTurboTypeSymbol)) then
     with PTurboTypeSymbol(aSymbol)^ do
     begin
       Self.FEntryOffset := FEntryOffset;
@@ -2291,7 +2542,7 @@ end;
 { TTurboTypeRefSymbol }
 procedure TTurboTypeRefSymbol.Assign(const aSymbol: PTurboCustomSymbol);
 begin
-  if Assigned(aSymbol) and aSymbol.InheritsFrom(Self.ClassType) then
+  if Assigned(aSymbol) and aSymbol.InheritsFrom(TypeOf(TTurboTypeRefSymbol)) then
     with PTurboTypeRefSymbol(aSymbol)^ do
     begin
       Self.RefModule := RefModule;
@@ -2303,7 +2554,7 @@ end;
 { TTurboStatementSymbol }
 procedure TTurboStatementSymbol.Assign(const aSymbol: PTurboCustomSymbol); 
 begin
-  if Assigned(aSymbol) and aSymbol.InheritsFrom(Self.ClassType) then
+  if Assigned(aSymbol) and aSymbol.InheritsFrom(TypeOf(TTurboStatementSymbol)) then
     with PTurboStatementSymbol(aSymbol)^ do
     begin
       Self.OwnerSymbol := OwnerSymbol;
@@ -2314,7 +2565,7 @@ end;
 { TTurboOpStatementSymbol }
 procedure TTurboOpStatementSymbol.Assign(const aSymbol: PTurboCustomSymbol); 
 begin
-  if Assigned(aSymbol) and aSymbol.InheritsFrom(Self.ClassType) then
+  if Assigned(aSymbol) and aSymbol.InheritsFrom(TypeOf(TTurboOpStatementSymbol)) then
     with PTurboOpStatementSymbol(aSymbol)^ do
     begin
       Self.Instruction := Instruction;
@@ -2334,6 +2585,21 @@ procedure TTurboSymbols.Clear;
 begin
   FreeMeObjects;
   inherited;
+end;
+
+procedure TTurboSymbols.Assign(const aSymbols: PTurboSymbols);
+var
+  i: integer;
+begin
+  if Assigned(aSymbols) then
+  begin
+    Clear;
+    Count := aSymbols.Count;
+    for i := 0 to Count - 1 do
+    begin
+      Add(NewMeObject(PTurboSymbol(aSymbols.List^[i]).ClassType));
+    end;
+  end;
 end;
 
 function TTurboSymbols.Compile: Integer;
@@ -2521,7 +2787,7 @@ begin
     Result := nil;
 end;
 
-function TTurboModuleRefSymbols.FindMethodSymbol(const aName: string; const aModuleType: TTurboModuleType): PTurboMethodSymbol;
+function TTurboModuleRefSymbols.FindMethodSymbol(const aName: string; const aModuleType: TTurboModuleType): PTurboCustomMethodSymbol;
 var
   i: integer;
 begin
@@ -2637,6 +2903,22 @@ begin
   Inherited Clear;
 end;
 
+procedure TTurboUnResolvedRefs.Assign(const aSrc: PTurboUnResolvedRefs);
+var
+  i: integer;
+  vItem: PTurboUnResolvedRefRec;
+begin
+  Clear;
+  if Assigned(aSrc) then
+  begin
+    for i := 0 to aSrc.Count - 1 do
+    begin
+      vItem := Add;
+      vItem^ := aSrc.Items[i]^;
+    end;
+  end;
+end;
+
 function TTurboUnResolvedRefs.Add(): PTurboUnResolvedRefRec;
 begin
   New(Result);
@@ -2657,8 +2939,13 @@ initialization
   SetMeVirtualMethod(TypeOf(TTurboSymbol), ovtVmtParent, TypeOf(TTurboCustomSymbol));
   SetMeVirtualMethod(TypeOf(TTurboLabelSymbol), ovtVmtParent, TypeOf(TTurboCustomSymbol));
   SetMeVirtualMethod(TypeOf(TTurboConstSymbol), ovtVmtParent, TypeOf(TTurboSymbol));
-  SetMeVirtualMethod(TypeOf(TTurboVarSymbol), ovtVmtParent, TypeOf(TTurboConstSymbol));
-  SetMeVirtualMethod(TypeOf(TTurboMethodSymbol), ovtVmtParent, TypeOf(TTurboSymbol));
+  SetMeVirtualMethod(TypeOf(TTurboVariableSymbol), ovtVmtParent, TypeOf(TTurboConstSymbol));
+
+  SetMeVirtualMethod(TypeOf(TTurboCustomBlockSymbol), ovtVmtParent, TypeOf(TTurboSymbol));
+  SetMeVirtualMethod(TypeOf(TTurboCustomMethodSymbol), ovtVmtParent, TypeOf(TTurboCustomBlockSymbol));
+  SetMeVirtualMethod(TypeOf(TTurboMethodSymbol), ovtVmtParent, TypeOf(TTurboCustomMethodSymbol));
+  SetMeVirtualMethod(TypeOf(TTurboMethodRefSymbol), ovtVmtParent, TypeOf(TTurboCustomMethodSymbol));
+
   SetMeVirtualMethod(TypeOf(TTurboModuleSymbol), ovtVmtParent, TypeOf(TTurboSymbol));
   SetMeVirtualMethod(TypeOf(TTurboTypeSymbol), ovtVmtParent, TypeOf(TTurboSymbol));
   SetMeVirtualMethod(TypeOf(TTurboTypeRefSymbol), ovtVmtParent, TypeOf(TTurboTypeSymbol));
@@ -2673,8 +2960,11 @@ initialization
   SetMeVirtualMethod(TypeOf(TTurboSymbol), ovtVmtClassName, nil);
   SetMeVirtualMethod(TypeOf(TTurboLabelSymbol), ovtVmtClassName, nil);
   SetMeVirtualMethod(TypeOf(TTurboConstSymbol), ovtVmtClassName, nil);
-  SetMeVirtualMethod(TypeOf(TTurboVarSymbol), ovtVmtClassName, nil);
+  SetMeVirtualMethod(TypeOf(TTurboVariableSymbol), ovtVmtClassName, nil);
+  SetMeVirtualMethod(TypeOf(TTurboCustomBlockSymbol), ovtVmtClassName, nil);
+  SetMeVirtualMethod(TypeOf(TTurboCustomMethodSymbol), ovtVmtClassName, nil);
   SetMeVirtualMethod(TypeOf(TTurboMethodSymbol), ovtVmtClassName, nil);
+  SetMeVirtualMethod(TypeOf(TTurboMethodRefSymbol), ovtVmtClassName, nil);
   SetMeVirtualMethod(TypeOf(TTurboModuleSymbol), ovtVmtClassName, nil);
   SetMeVirtualMethod(TypeOf(TTurboTypeSymbol), ovtVmtClassName, nil);
   SetMeVirtualMethod(TypeOf(TTurboTypeRefSymbol), ovtVmtClassName, nil);

@@ -116,13 +116,63 @@ Fields(实例化才有的字段), 多了实例化功能。
 所以在流中不设模块名称，模块名称由Accessor单独处理！
 
 
+== Instruction Set ==
+
+This specification is a detailed description of the TurboScript IL instruction set.
+
+=== Base Instructions ===
+
+==== Core Instructions ====
+
+===== halt(break) Instruction =====
+  terminate the script execution and return the host env.
+
+Stack: ( -- )
+
+===== Assert Instruction =====
+
+Tests whether a Boolean expression is true. use Assert as a debugging tool to test that conditions assumed to be true are never violated. Assert provides an opportunity to intercept an unexpected condition and halt a program rather than allow execution to continue under unanticipated conditions.
+
+Assert takes a Boolean expression and an optional message string as parameters. If the Boolean test fails, Assert raises an EAssertionFailed exception. If a message string was passed to Assert, the exception object is created with that string. Otherwise it is created with a default string indicating that the assertion failed. The message is displayed along with the complete path, filename, and the line number on which Assert failed.
+
+The SysUtils unit causes runtime errors to be turned into exceptions. If SysUtils is not used anywhere in your application, you will get a runtime error 227 rather than an EAssertionFailed exception. This runtime error will halt the program.
+
+Because assertions are not usually used in shipping versions of a product, compiler directives are provided to disable the generation of assertion code:
+
+$ASSERTIONS ON/OFF	(long form)
+$C +/-	(short form)
+
+These are global switches that affect the entire source file where they occur, regardless of their position in the file. It is not possible to enable and disable assertions for something smaller than a source file. Assertions are on by default.
+
+Stack: (ShortString(Msg), expr -- )
+
+===== Error =====
+raise the Error of the specified ErrorCode and halt.
+这里的错误，是指堆栈、序列等的边界错误、无效的内存指针以及IO错误。当错误发生的时候，调用 iVMError 过程.
+设置错误地址为返回栈的栈顶.
+
+Stack: (ErrorCode -- )
+
+===== Call(Enter)<Addr> =====
+call the near native function at the Addr(offset).
+
+Stack: ( -- )
+
+=====  =====
+=====  =====
+=====  =====
+=====  =====
+=====  =====
+=====  =====
+
 == 错误和异常处理机制 ==
 
 本版本实现的是Delphi的错误异常处理机制。
 
 === 错误处理机制 ===
 这里的错误，是指堆栈、序列等的边界错误、无效的内存指针以及IO错误。当错误发生的时候，调用 iVMError 过程.
-
+实际上在现阶段的架构中，俺是直接在 iVMHalt 中传递 ErrorCode，并没有通过 iVMError 执行！
+以修正, halt 指令不带任何参数了! 只有内部过程 _Halt才有 ErrorCode 参数.
   {System.pas}
   TRuntimeError = (reNone, reOutOfMemory, reInvalidPtr, reDivByZero,
   reRangeError, reIntOverflow, reInvalidOp, reZeroDivide, reOverflow,
@@ -170,6 +220,193 @@ begin
   RunErrorAt(errorCode, ErrorAddr);
 end;
 
+=== 异常处理机制 ===
+<code>
+<sehBlock> ::=  <tryBlock> <sehClause> [<sehClause>*]
+<tryBlock> ::=   .try <label> to <label> 
+               | .try <scopeBlock>
+<sehClause> ::=   catch <typeReference> <handlerBlock>  Catch all objects of the specified type.
+                | fault <handlerBlock>                  Handle all exceptions but not normal exit.
+                | filter <label> <handlerBlock>         Enter handler only if filter succeeds.
+                | finally <handlerBlock>                Handle all exceptions and normal exit.
+<handlerBlock> ::= handler <label> to <label>           Handler range is from first label to prior to second.
+                   | <scopeBlock>                       <scopeBlock> is the handler block.
+</code>
+ 
+Note: Control transfers into and out of try, catch, filter, and finally blocks cannot be performed by this instruction. (Such transfers are severely restricted and must use the leave instruction instead
+
+OpCodes.endFilter
+格式    汇编格式   说明
+FE 11   endfilter  SEH 异常处理的 End filter 子句。
+
+堆栈转换行为依次为：
+
+   1.value 被推送到堆栈上。
+   2.从堆栈中弹出 value；执行 endfilter 并将控制转移到异常处理程序。
+
+从筛选子句返回 Value（必须是类型 int32 并且是值的特定集合之一）。它应该是以下值之一：
+    * exception_continue_search ( value = 0)，继续搜索异常处理程序
+    * exception_execute_handler ( value = 1)，开始异常处理的第二阶段，在此阶段中在定位与此筛选子句关联的处理程序前运行 finally 块。在发现后，执行处理程序。
+
+其他整数值将生成未指定的结果。
+
+筛选器的入口点（如该方法的异常表中所示）必须在筛选器的代码块中是第一个指令。endfilter 指令在筛选器的代码块中必须是最后一个指令（因此对于任何单个筛选器块，只能有一个 endfilter）。在执行 endfilter 指令后，控制逻辑上流回 CLI 异常处理机制。
+
+除非通过异常机制，否则不能将控制转移到筛选器块中。除非通过使用 throw 指令或通过执行最终的 endfilter 指令，否则不能将控制转移出筛选器块。不能将 try 块嵌入到 filter 块内。如果在 filter 块内引发一个异常，将截获它并返回值 0 ( exception_continue_search )。
+
+下面的 Emit 方法重载可以使用 endfilter 操作码：
+ * ILGenerator.Emit(OpCode)
+
+
+OpCodes.Endfinally
+
+将控制从异常块的 fault 或 finally 子句转移回公共语言结构 (CLI) 异常处理程序。 
+
+格式
+	
+
+汇编格式
+	
+
+说明
+
+DC
+	
+
+endfinally
+
+endfault
+	
+
+结束异常块的 finally 或 fault 子句。
+
+此指令没有堆栈转换行为。
+
+Endfinally 和 endfault 通知 finally 或 fault 子句的结束，以便堆栈展开可以在调用异常处理程序前继续进行。endfinally 或 endfault 指令将控制转移回 CLI 异常机制。该机制然后在链中搜索下一个 finally 子句（如果受保护的块已由退出指令退出）。如果受保护的块已由异常退出，则 CLI 将搜索下一个 finally 或 fault，或者进入在第一遍异常处理期间选择的异常处理程序。
+
+endfinally 指令只可以在词法上出现在 finally 块内。与 endfilter 指令不同，不要求该块以 endfinally 指令结束，并且在该块内可以具有所需的任意数目的 endfinally 指令。这些限制同样适用于 endfault 指令和 fault 块。
+
+除非通过异常机制，否则控制不能被转移到 finally（或 fault）块。除非通过使用 throw 指令或执行 endfinally（或 endfault）指令，否则不能将控制转移出 finally（或 fault）块。尤其是，您不能“脱离”finally（或 fault）块或在 finally（或 fault）块内执行 Ret 或 Leave 指令。
+
+请注意，endfault 和 endfinally 指令是别名，即它们对应于同一操作码。
+
+下面的 Emit 方法重载可以使用 endfinally (endfault) 操作码以及 ILGenerator 方法 EndExceptionBlock。
+
+    * ILGenerator.Emit(OpCode)
+    * ILGenerator.EndExceptionBlock()
+
+Catch Example (informative):
+
+<code>
+.try {
+
+     ...                           // protected instructions
+
+     leave   exitSEH               // normal exit
+
+} catch [mscorlib]System.FormatException {
+
+     ...                           // handle the exception
+
+     pop                           // pop the exception object
+
+     leave   exitSEH               // leave catch handler
+
+}
+
+exitSEH:                           // continue here
+
+</code>
+
+Filter Example (informative):
+<code>
+   .try {
+
+      ...                          // protected instructions
+
+      leave                        exitSEH        // normal exit
+
+    }
+
+    filter {
+
+      ...                         // decide whether to handle
+
+      pop                         // pop exception object
+
+      ldc.i4.1                    // EXCEPTION_EXECUTE_HANDLER
+
+      endfilter                     // return answer to CLI
+
+    }
+
+    {
+
+      ...                           // handle the exception
+
+      pop                           // pop the exception object
+
+      leave               exitSEH   // leave filter handler
+
+    }
+
+exitSEH:
+
+    ...
+
+}
+</code>
+
+Finally Example (informative):
+
+<code>
+.try {
+
+     ...                     // protected instructions
+
+     leave exitTry           // shall use leave
+
+} finally {
+
+     ...                     // finally handler
+
+     endfinally
+
+}
+
+exitTry:                     // back to normal
+</code>
+
+fault:
+<code>
+startTry:
+
+           ...                     // protected instructions
+
+           leave     exitSEH       // shall use leave
+
+endTry:
+
+
+
+startFault:
+
+           ...                     // fault handler instructions
+
+          endfault
+
+endFault:
+
+
+
+     .try startTry to endTry fault handler startFault to endFault
+
+
+
+exitSEH:                           // back to normal
+
+}
+</code>
 
 == Type Fundamentals ==
 

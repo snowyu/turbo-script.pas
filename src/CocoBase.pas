@@ -1202,7 +1202,7 @@ begin
   i := aWord.OwnerSymbol.StaticFields.IndexOf(aName);
   Result := i >= 0;
   if Result then
-    with PTurboVarSymbol(aWord.OwnerSymbol.StaticFields.Items[i])^ do
+    with PTurboVariableSymbol(aWord.OwnerSymbol.StaticFields.Items[i])^ do
     begin
       //PushTo(FModuleSymbol);
       ReferenceTo(aWord);
@@ -1228,7 +1228,7 @@ end;
 function TCocoRGrammar.AddWordCFA(const aWord: PTurboMethodSymbol; aName: string; const aParams: TStringList): Boolean;
 var
   i: Integer;
-  vWord: PTurboMethodSymbol;
+  vWord: PTurboCustomMethodSymbol;
 begin
   Result := False;
   vWord := aWord.OwnerSymbol.FindMethodSymbol(aName);

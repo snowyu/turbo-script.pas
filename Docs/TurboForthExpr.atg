@@ -10,6 +10,8 @@ DELPHI
 USES (INTERFACE) TypInfo, uMeObject, uMeTypes, uMeProcType, uStrUtils, uTurboConsts, uTurboMetaInfo, uTurboExecutor, uTurboAccessor, uTurboModuleFileAccessor, uTurboCompilerUtils//, uTurboSymbols
 
 TYPE
+  PTurboMethodSymbolAccess = ^ TTurboMethodSymbolAccess;
+  TTurboMethodSymbolAccess = object(TTurboCustomMethodSymbol) end; 
 
 PRIVATE
   procedure ProcessGrammarComment(Sender : TObject; CommentList : TCommentList);
@@ -394,7 +396,7 @@ PRODUCTIONS
   .
 
   DefineVariable
-    (.Var vValue: PTurboVarSymbol; vType: PMeType; .)
+    (.Var vValue: PTurboVariableSymbol; vType: PMeType; .)
     =                                              (.
                                                       vValue := FModuleSymbol.NewVar(''); 
                                                       if Assigned(vValue) then
@@ -446,7 +448,7 @@ PRODUCTIONS
   .
 
   DefineWord 
-    (. Var vErrorCode: Integer; vWord: PTurboMethodSymbol; .)
+    (. Var vErrorCode: Integer; vWord: PTurboCustomMethodSymbol; vWordRef: PTurboMethodRefSymbol; .)
     = 
                                                                  (. vErrorCode := cSymbolErrorOk;
                                                                     vWord := FModuleSymbol.NewMethod('');;
@@ -463,25 +465,32 @@ PRODUCTIONS
     ":" [WordVsibility<vWord.Visibility>] Identifier            (. vWord.Name := LexString; 
                                                                    vWord.Line := TCocoRScannerAccess(Scanner).CurrentSymbol.Line;
                                                                    vWord.Column := TCocoRScannerAccess(Scanner).CurrentSymbol.Col;
-                                                                .)
+                                                                 .)
 
     [FormalParameters<vWord>]
     
-    [
-     ExternalWordOption<vWord>
+    [                                                            (.
+                                                                    vWordRef := FModuleSymbol.NewMethodRef('');
+                                                                    vWordRef.Assign(vWord);
+                                                                    PTurboMethodSymbolAccess(vWord).FiTypeSymbol := nil; //to avoid free the FiTypeSymbol when vWord is free.
+                                                                    MeFreeAndNil(vWord);
+                                                                    vWord := vWordRef;
+                                                                    
+                                                                 .)
+     ExternalWordOption<vWordRef>
     ]
-                                                                 (. vErrorCode := vWord.BodyInit;  .)
-    [                                                            (. if (vErrorCode = cSymbolErrorOk) and (vWord.CodeFieldStyle <> cfsFunction) then
+                                                                 (. vErrorCode := vWord.BodyInit; .)
+    [                                                            (. if IsSymbolOk(vErrorCode) and (vWord.CodeFieldStyle in cTurboRefFunctionTypes) then
                                                                     begin
                                                                       vErrorCode := cSymbolErrorMethodExternalNoBody;
                                                                     end;
-                                                                    if (vErrorCode <> cSymbolErrorOk) then exit;
+                                                                    if not IsSymbolOk(vErrorCode) then exit;
                                                                  .)
-     ASMStatementBlock<vWord>
+     ASMStatementBlock<PTurboMethodSymbol(vWord)>
     ]
-    ";"                                                          (. if (vErrorCode = cSymbolErrorOk) then vErrorCode := vWord.BodyFinal;
+    ";"                                                          (. if IsSymbolOk(vErrorCode) then vErrorCode := vWord.BodyFinal;
                                                                  finally
-                                                                   if vErrorCode <> cSymbolErrorOk then
+                                                                   if not IsSymbolOk(vErrorCode) then
                                                                    begin
                                                                      SynError(vErrorCode, vWord.Name);
                                                                      vErrorCode := vWord.OwnerSymbol.Methods.IndexOf(vWord);
@@ -492,8 +501,8 @@ PRODUCTIONS
                                                                  end;
                                                                  .)
   .
-  FormalParameters<const aWord: PTurboMethodSymbol> = "(" [FormalParms<aWord>] ")" [":" ResultParamType<aWord.TypeInfo>].
-  FormalParms<const aWord: PTurboMethodSymbol> 
+  FormalParameters<const aWord: PTurboCustomMethodSymbol> = "(" [FormalParms<aWord>] ")" [":" ResultParamType<aWord.TypeInfo>].
+  FormalParms<const aWord: PTurboCustomMethodSymbol> 
     (. var vProcType: PMeProcType; .)
     =                                                            (. vProcType := aWord.TypeInfo; 
                                                                     if not Assigned(vProcType) then
@@ -542,7 +551,7 @@ PRODUCTIONS
     
   .
 
-  ExternalWordOption< const aWord: PTurboMethodSymbol >
+  ExternalWordOption< const aWord: PTurboMethodRefSymbol >
     =
     //the default is the LastModuleRefEntry if no the module name.
                                                             (. aWord.ModuleName := ''; 

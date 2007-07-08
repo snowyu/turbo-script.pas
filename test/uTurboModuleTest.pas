@@ -17,7 +17,7 @@ uses
   Math,
   TypInfo,
   TestFramework
-  , uTurboScriptConsts
+  , uTurboConsts
   , uTurboExecutor
   ;
 
@@ -30,15 +30,16 @@ type
     FTestObject: TCustomTurboModule;
   protected
     procedure CreateTestObject;virtual;
-    procedure Setup;override;
+    procedure SetUp;override;
     procedure TearDown;override;
+    procedure TestClear;
+    procedure TestAddMem;
+    procedure TestAddData;
   public
   published
     //Code Mem Access Methods:
-    procedure Test_AlignMem;
-    procedure Test_AddBufferToMem;
-    procedure Test_AddByteToMem;
-    procedure Test_AddIntToMem;
+    procedure Test_AddMem;
+    procedure Test_AddData;
   end;
 
 
@@ -49,7 +50,7 @@ begin
   FTestObject := TCustomTurboModule.Create();
 end;
 
-procedure TTest_CustomTurboModule.Setup;
+procedure TTest_CustomTurboModule.SetUp;
 begin
   if not Assigned(FTestObject) then
     CreateTestObject;
@@ -60,49 +61,176 @@ begin
   FreeAndNil(FTestObject);
 end;
 
-procedure TTest_CustomTurboModule.Test_AddBufferToMem;
-var
-  i: Integer;
-  vBuf: PChar;
-  s: string;
+procedure TTest_CustomTurboModule.TestClear;
 begin
-  i := FTestObject.UsedMemory;
-  s := '_____18a9-012 Test My Add Buffer To Code Memory Xzxvvei79832#@#jnjfv^*)x____'#0;
-  FTestObject.AddBufferToMem(s[1], Length(s));
-  CheckEquals(Length(s), FTestObject.UsedMemory-i, 'the size of buffer is mismatch.');
-  Integer(vBuf) := i + Integer(FTestObject.Memory);
-  CheckEquals(s, String(vBuf), 'the buffer content is mismatch.');
+  FTestObject.ClearMemory;
+  with FTestObject do
+  begin
+    CheckEquals(0, UsedMemory, 'the UsedMemory is mismatch.');
+    CheckEquals(SizeOf(TTurboPreservedDataMemory), UsedDataSize, 'the UsedDataSize is mismatch.');
+  end;
 end;
 
-procedure TTest_CustomTurboModule.Test_AddByteToMem;
-var
-  i: Integer;
-  vBuf: PByte;
-  s: byte;
+procedure TTest_CustomTurboModule.Test_AddMem;
 begin
-  i := FTestObject.UsedMemory;
-  s := 111;
-  FTestObject.AddByteToMem(s);
-  CheckEquals(1, FTestObject.UsedMemory-i, 'the byte size error.');
-  Integer(vBuf) := i + Integer(FTestObject.Memory);
-  CheckEquals(s, vBuf^, 'the byte content is mismatch.');
+  TestClear;
+  TestAddMem;
+  TestClear;
 end;
 
-procedure TTest_CustomTurboModule.Test_AddIntToMem;
-var
-  i: Integer;
-  vBuf: PInteger;
-  s: Integer;
+procedure TTest_CustomTurboModule.Test_AddData;
 begin
-  Test_AlignMem;
-  i := FTestObject.UsedMemory;
-  s := 11112222;
-  FTestObject.AddIntToMem(s);
-  CheckEquals(SizOf(Integer), FTestObject.UsedMemory-i, 'the Integer size error.');
-  Integer(vBuf) := i + Integer(FTestObject.Memory);
-  CheckEquals(s, vBuf^, 'the Integer content is mismatch.');
+  TestClear;
+  TestAddData;
+  TestClear;
 end;
 
+procedure TTest_CustomTurboModule.TestAddMem;
+var
+ p: pointer;
+ i: integer;
+ vSize: integer;
+ s: string;
+begin
+  with FTestObject do
+  begin
+    i := Random(MaxInt);
+    vSize := UsedMemory;
+    p := Pointer(UsedMemory);
+    AddIntToMem(i);
+    p := Pointer(Integer(Memory) + Integer(p));
+    vSize := vSize + SizeOf(Integer);
+    CheckEquals(vSize, UsedMemory, 'the addint UsedMemory is mismatch.');
+    CheckEquals(i, PInteger(p)^, 'the addint value is mismatch.');
+    Check(MemorySize>=UsedMemory, 'the MemorySize should greater or equ UsedMemory.');
+
+    i := Random($FF);
+    p := Pointer(UsedMemory);
+    AddByteToMem(i);
+    p := Pointer(Integer(Memory) + Integer(p));
+    vSize := vSize + SizeOf(Byte);
+    CheckEquals(vSize, UsedMemory, 'the addbyte UsedMemory is mismatch.');
+    CheckEquals(i, PByte(p)^, 'the addbyte value is mismatch.');
+    Check(MemorySize>=UsedMemory, 'the MemorySize should greater or equ UsedMemory.');
+
+    AlignMem; //align by dword border.
+    vSize := (vSize + 3) and $FFFFFFFC;
+    CheckEquals(vSize, UsedMemory, 'the Align is mismatch.');
+    CheckEquals(0, vSize mod SizeOf(Integer), 'the Align does not work(Size mod SizeOf(Integer) should be 0)..');
+    Check(MemorySize>=UsedMemory, 'the MemorySize should greater or equ UsedMemory.');
+
+    {i := Random($FFFF);
+    p := Pointer(UsedMemory);
+    AddWord(i);
+    p := Pointer(Integer(Memory) + Integer(p));
+    vSize := vSize + SizeOf(Word);
+    CheckEquals(vSize, UsedMemory, 'the addword UsedMemory is mismatch.');
+    CheckEquals(i, PWord(p)^, 'the addword value is mismatch.');
+    Check(MemorySize>=UsedMemory, 'the MemorySize should greater or equ UsedMemory.');
+
+    s := 'Hello 测试字符串PChar内存分配 Tao Is Nothing!!!';
+    p := Pointer(UsedMemory);
+    AddPCharToMem(s);
+    p := Pointer(Integer(Memory) + Integer(p));
+    vSize := vSize + Length(s) + 1;
+    CheckEquals(vSize, UsedMemory, 'the addPChar UsedMemory is mismatch.');
+    CheckEquals(s, PChar(p), 'the addPchar value is mismatch.');
+    Check(MemorySize>=UsedMemory, 'the MemorySize should greater or equ UsedMemory.');
+    //}
+
+    s := 'Hello 测试Buffer 内存分配 Tao Is Buffer Nothing!!!';
+    p := Pointer(UsedMemory);
+    AddBufferToMem(s[1], Length(s));
+    p := Pointer(Integer(Memory) + Integer(p));
+    vSize := vSize + Length(s);
+    CheckEquals(vSize, UsedMemory, 'the addbuffer UsedMemory is mismatch.');
+    CheckEqualsMem(@s[1], p, Length(s), 'the addbuffer value is mismatch.');
+    Check(MemorySize>=UsedMemory, 'the MemorySize should greater or equ UsedMemory.');
+
+    i := Random($FFF) + 10;
+    p := Pointer(UsedMemory);
+    AllocSpace(i);
+    p := Pointer(Integer(Memory) + Integer(p));
+    vSize := vSize + i;
+    CheckEquals(vSize, UsedMemory, 'the AllocSpace UsedMemory is mismatch.');
+    Check(MemorySize>=UsedMemory, 'the MemorySize should greater or equ UsedMemory.');
+
+  end;
+end;
+
+procedure TTest_CustomTurboModule.TestAddData;
+var
+ p: pointer;
+ i: integer;
+ vSize: integer;
+ s: string;
+begin
+  with FTestObject do
+  begin
+    i := Random(MaxInt);
+    vSize := UsedDataSize;
+    p := Pointer(UsedDataSize);
+    AddIntToData(i);
+    p := Pointer(Integer(DataMemory) + Integer(p));
+    vSize := vSize + SizeOf(Integer);
+    CheckEquals(vSize, UsedDataSize, 'the addint UsedDataSize is mismatch.');
+    CheckEquals(i, PInteger(p)^, 'the addint value is mismatch.');
+    Check(DataMemorySize>=UsedDataSize, 'the DataMemorySize should greater or equ UsedDataSize.');
+
+    i := Random($FF);
+    p := Pointer(UsedDataSize);
+    AddByteToData(i);
+    p := Pointer(Integer(DataMemory) + Integer(p));
+    vSize := vSize + SizeOf(Byte);
+    CheckEquals(vSize, UsedDataSize, 'the addbyte UsedDataSize is mismatch.');
+    CheckEquals(i, PByte(p)^, 'the addbyte value is mismatch.');
+    Check(DataMemorySize>=UsedDataSize, 'the DataMemorySize should greater or equ UsedDataSize.');
+
+    AlignData; //align by dword border.
+    vSize := (vSize + 3) and $FFFFFFFC;
+    CheckEquals(vSize, UsedDataSize, 'the Align is mismatch.');
+    CheckEquals(0, vSize mod SizeOf(Integer), 'the Align does not work(Size mod SizeOf(Integer) should be 0)..');
+    Check(DataMemorySize>=UsedDataSize, 'the DataMemorySize should greater or equ UsedDataSize.');
+
+    {i := Random($FFFF);
+    p := Pointer(UsedDataSize);
+    AddWord(i);
+    p := Pointer(Integer(DataMemory) + Integer(p));
+    vSize := vSize + SizeOf(Word);
+    CheckEquals(vSize, UsedDataSize, 'the addword UsedDataSize is mismatch.');
+    CheckEquals(i, PWord(p)^, 'the addword value is mismatch.');
+    Check(DataMemorySize>=UsedDataSize, 'the DataMemorySize should greater or equ UsedDataSize.');
+    //}
+
+    s := 'Hello 测试字符串PChar内存分配 Tao Is Nothing!!!';
+    p := Pointer(UsedDataSize);
+    AddPCharToData(s);
+    p := Pointer(Integer(DataMemory) + Integer(p));
+    vSize := vSize + Length(s) + 1;
+    CheckEquals(vSize, UsedDataSize, 'the addPChar UsedDataSize is mismatch.');
+    CheckEquals(s, PChar(p), 'the addPchar value is mismatch.');
+    Check(DataMemorySize>=UsedDataSize, 'the DataMemorySize should greater or equ UsedDataSize.');
+
+    s := 'Hello 测试Buffer 内存分配 Tao Is Buffer Nothing!!!很好的不错风格仅仅只是测试sdJlrrjei#@$##$%^%HBRTBfdfdfgdfg32323##$#$#2121ej jedj98rurfhfwer33$$444rrertertetefjuoisssssssssssssssssss';
+    s := s + s + s + s;
+    p := Pointer(UsedDataSize);
+    AddBufferToData(s[1], Length(s));
+    p := Pointer(Integer(DataMemory) + Integer(p));
+    vSize := vSize + Length(s);
+    CheckEquals(vSize, UsedDataSize, 'the addbuffer UsedDataSize is mismatch.');
+    CheckEqualsMem(@s[1], p, Length(s), 'the addbuffer value is mismatch.');
+    Check(DataMemorySize>=UsedDataSize, 'the DataMemorySize should greater or equ UsedDataSize');
+
+    i := Random($FFF) + 10;
+    p := Pointer(UsedDataSize);
+    AllocDataSpace(i);
+    p := Pointer(Integer(DataMemory) + Integer(p));
+    vSize := vSize + i;
+    CheckEquals(vSize, UsedDataSize, 'the AllocSpace UsedDataSize is mismatch');
+    Check(DataMemorySize>=UsedDataSize, 'the DataMemorySize should greater or equ UsedDataSize');
+
+  end;
+end;
 
 Initialization
   RegisterTests('TurboScript suites',

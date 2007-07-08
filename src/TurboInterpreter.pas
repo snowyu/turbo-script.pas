@@ -135,13 +135,14 @@ begin
 }    
 end;
 
-//(ErrorCode -- )
+//( -- )
 procedure iVMHalt(const FGlobalOptions: PTurboGlobalOptions);
 var
   vErrorCode: TTurboProcessorErrorCode;  
 begin
-  vErrorCode := PTurboProcessorErrorCode(FGlobalOptions._SP)^;
-  Inc(FGlobalOptions._SP, SizeOf(tsPointer));
+  vErrorCode := errNone;
+  //vErrorCode := PTurboProcessorErrorCode(FGlobalOptions._SP)^;
+  //Inc(FGlobalOptions._SP, SizeOf(tsPointer));
   _iVMHalt(FGlobalOptions, vErrorCode); 
 end;
 
@@ -745,6 +746,7 @@ begin
   GTurboCoreWords[opNoop] := iVMNoop;
   GTurboCoreWords[opNext] := iVMNext;
   GTurboCoreWords[opHalt] := iVMHalt;
+  GTurboCoreWords[opError] := iVMError;
   GTurboCoreWords[opAssert] := iVMAssert;
 
   GTurboCoreWords[opEnter] := iVMEnter;

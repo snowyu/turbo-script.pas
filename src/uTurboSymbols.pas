@@ -21,6 +21,7 @@ type
   TTurboModuleImportStyle = (misNone, misImport, misUse);
   
   TTurboSymbol = class;
+  TTurboCustomSymbol = class;
   TTurboTypeSymbol = class;
   TTurboModuleSymbol = class;
   TTurboProgramSymbol = class;
@@ -28,7 +29,7 @@ type
   TTurboConstSymbol = class;
   TTurboVariableSymbol = class;
   TTurboConstSymbolList = class;
-  TTurboWordSymbol = class;
+  TTurboMethodSymbol = class;
   TTurboVariableSymbolList = class;
   TTurboWordSymbolList = class;
   {: the abstract symbol class. }
@@ -39,93 +40,91 @@ type
     变量的本体就是变量数据所在地址空间，引用编译则是将该数据地址编入代码区内存。
     过程的本体就是过程的代码，引用编译就是将过程的入口地址编译到指定的内存。
   }
-  TTurboSymbol = class(TObject)
+  TTurboSymbol = class(TTurboCustomSymbol)
   private
-    FCaption: string;
-    FDescription: string;
-    FIsCompiled: Boolean;
-    FIsExternal: Boolean;
-    FName: string;
-    FParent: TObject;
-    FRefs: LongInt;
-    FVisibility: TTurboVisibility;
-    function GetProgramSymbol: TTurboProgramSymbol;
-  protected
-    {: 没有解决引用地址的列表 }
-    FUnResolvedRefs: TList;
-    {: : 将标识符本体编译（添加到）到指定的模块。 }
-    procedure iCompileTo(const aModule: TCustomTurboModule); virtual; abstract;
-    {: 将标识符引用编译（添加到）到指定的地址 }
-    { Description
-    注意你必须保证有足够的空间容纳该地址。
-    }
-    procedure iReferenceTo(const aMem: Pointer); virtual; abstract;
+    FOwnerSymbol: TTurboModuleSymbol;
   public
-    constructor Create; virtual;
-    destructor Destroy; override;
-    {: :将标识符本体编译（添加到）到指定的模块。 }
-    { Description
-    只有 Refs 引用计数大于0 的才会被编译。
-    }
-    procedure CompileTo(const aModule: TCustomTurboModule);
-    {: 将标识符引用编译（添加到）到指定的地址 }
-    { Description
-    注意你必须保证有足够的空间容纳该地址。
-    }
-    procedure ReferenceTo(const aMem: Pointer);
-    {: 解决所有未填充的引用地址。 }
-    { Description
-    注意，必须编译本体才能确定应用地址。
-    IsCompiled 必须为真.
-    }
+    function IsCompileAllowed: Boolean; override;
+    procedure IsNamed(const aModule: TCustomTurboModule);
+    procedure IsPublic(const aModule: TCustomTurboModule);
+    procedure IsTyped(const aModule: TCustomTurboModule);
+    property OwnerSymbol: TTurboModuleSymbol read FOwnerSymbol write
+            FOwnerSymbol;
+  end;
+
+  {: the abstract symbol class. }
+  { Description
+  ~ 编译标识符
+    可以分为标识符本体编译，和标识符的引用编译。
+    常量除开字符串常量外，没有本体！
+    变量的本体就是变量数据所在地址空间，引用编译则是将该数据地址编入代码区内存。
+    过程的本体就是过程的代码，引用编译就是将过程的入口地址编译到指定的内存。
+  }
+  TTurboCustomSymbol = class(TObject)
+  private
+    FColumn: Integer;
+    FLine: Integer;
+    FName: string;
+    FOnError: TTurboCompilerErrorEvent;
+    FRefCount: Integer;
+    FUnResolvedRefs: TList;
+    function GetUnResolvedRefs: TList;
+  protected
+    procedure iCompile; virtual; abstract;
+    procedure iReferenceTo; virtual; abstract;
+    procedure ResolveAddr(const aValue: PTurboUnResolvedRefRec); virtual;
+            abstract;
+  public
+    procedure Assign(const aSymbol: TTurboCustomSymbol);
+    procedure Compile;
+    procedure CompileError(const aErrCode: Integer);
+    function IsCompileAllowed: Boolean; virtual;
+    procedure ReferenceTo(const aSymbol: TurboSymbol);
     procedure ResolveRefs;
-    {: the short comment(one line) for the symbol. }
-    property Caption: string read FCaption write FCaption;
-    {: the long comment(multi-line) for the symbol. }
-    property Description: string read FDescription write FDescription;
-    {: 标识符主体是否已经被编译进入内存。 }
-    property IsCompiled: Boolean read FIsCompiled;
-    property IsExternal: Boolean read FIsExternal write FIsExternal;
-    {: the symbol name }
+    property Column: Integer read FColumn write FColumn;
+    property Line: Integer read FLine write FLine;
     property Name: string read FName write FName;
-    property Parent: TObject read FParent write FParent;
-    property ProgramSymbol: TTurboProgramSymbol read GetProgramSymbol;
-    {: Indicates how many times this symbol is refered in the parsed code for
-            compiling only. }
-    { Description
-    }
-    property Refs: LongInt read FRefs write FRefs;
-    property Visibility: TTurboVisibility read FVisibility write FVisibility;
+    property RefCount: Integer read FRefCount;
+    property UnResolvedRefs: TList read GetUnResolvedRefs;
+    property OnError: TTurboCompilerErrorEvent read FOnError write FOnError;
   end;
 
   TTurboTypeSymbol = class(TTurboSymbol)
   private
+    FIsInternal: Boolean;
     FTypeInfo: PTurboTypeInfo;
+  protected
+    procedure iCompile; override;
+    procedure iReferenceTo; override;
+    procedure ResolveAddr(const aValue: PTurboUnResolvedRefRec); override;
   public
+    property IsInternal: Boolean read FIsInternal;
     property TypeInfo: PTurboTypeInfo read FTypeInfo write FTypeInfo;
   end;
 
   TTurboModuleSymbol = class(TTurboSymbol)
   private
     FConstants: TTurboConstSymbolList;
-    FImportStyle: TTurboModuleImportStyle;
+    FMethods: TTurboWordSymbolList;
+    FStaticFields: TTurboVariableSymbolList;
+    FTypes: TList;
     FUsedModules: TTurboModuleSymbolList;
-    FVariables: TTurboVariableSymbolList;
-    FWords: TTurboWordSymbolList;
   protected
     FModule: TCustomTurboModule;
+    procedure iCompile; override;
+    procedure iReferenceTo; override;
+    procedure ResolveAddr(const aValue: PTurboUnResolvedRefRec); override;
   public
     constructor Create; override;
     destructor Destroy; override;
     property Constants: TTurboConstSymbolList read FConstants write FConstants;
-    property ImportStyle: TTurboModuleImportStyle read FImportStyle write
-            FImportStyle;
+    property Methods: TTurboWordSymbolList read FMethods write FMethods;
     property Module: TCustomTurboModule read FModule write FModule;
+    property StaticFields: TTurboVariableSymbolList read FStaticFields write
+            FStaticFields;
+    property Types: TList read FTypes write FTypes;
     property UsedModules: TTurboModuleSymbolList read FUsedModules write
             FUsedModules;
-    property Variables: TTurboVariableSymbolList read FVariables write
-            FVariables;
-    property Words: TTurboWordSymbolList read FWords write FWords;
   end;
 
   TTurboProgramSymbol = class(TTurboModuleSymbol)
@@ -168,23 +167,24 @@ type
   TTurboConstSymbol = class(TTurboSymbol)
   private
     FSize: Integer;
-    FTypeKind: TTurboSimpleTypeKind;
+    FTurboType: PMeType;
     FValue: TTurboValueRec;
     FValueStr: string;
-    procedure SetValue(const aValue: TTurboValueRec);
-  protected
-    {: 如果是字符串类型（序列类型）则将其编译入数据区。 }
-    procedure iCompileTo(const aModule: TCustomTurboModule); override;
-    procedure iReferenceTo(const aMem: Pointer); override;
-  public
-    {: 根据aValue 如果aTypeKind is ttkUnknown 那么会自动判断其类型 }
     function AssignValue(const aValue: string; const aTypeKind:
             TTurboSimpleTypeKind = ttkUnknown): Boolean;
     procedure AssignValueTo(aMem: Pointer);
     procedure SaveString(const aModule: TCustomTurboModule);
     procedure SetTypeKind(aValue: TTurboSimpleTypeKind);
+    procedure SetValue(const aValue: TTurboValueRec);
+  protected
+    {: 如果是字符串类型（序列类型）则将其编译入数据区。 }
+    procedure iCompile; override;
+    procedure iReferenceTo; override;
+    procedure ResolveAddr(const aValue: PTurboUnResolvedRefRec); override;
+  public
+    procedure Assign(const aSymbol: TTurboCustomSymbol);
     property Size: Integer read FSize write FSize;
-    property TypeKind: TTurboSimpleTypeKind read FTypeKind write FTypeKind;
+    property TurboType: PMeType read FTurboType write FTurboType;
     property Value: TTurboValueRec read FValue write SetValue;
     property ValueStr: string read FValueStr write FValueStr;
   end;
@@ -193,14 +193,12 @@ type
   TTurboVariableSymbol = class(TTurboConstSymbol)
   private
     FAddr: tsInt;
-    FTyped: Boolean;
   protected
-    procedure iCompileTo(const aModule: TCustomTurboModule); override;
-    procedure iReferenceTo(const aMem: Pointer); override;
+    procedure iCompile; override;
+    procedure iReferenceTo; override;
+    procedure ResolveAddr(const aValue: PTurboUnResolvedRefRec); override;
   public
     property Addr: tsInt read FAddr write FAddr;
-    {: 注明该标识符需要编入RTTI信息。 }
-    property Typed: Boolean read FTyped write FTyped;
   end;
 
   TTurboConstSymbolList = class(TTurboSymbolList)
@@ -219,7 +217,7 @@ type
   end;
 
   {: the turbo script virtual machine code symbol. }
-  TTurboWordSymbol = class(TCustomTurboWordSymbol)
+  TTurboMethodSymbol = class(TTurboSymbol)
   private
     FCallStyle: TTurboCallStyle;
     FCFA: tsInt;
@@ -232,8 +230,9 @@ type
     FModule: TCustomTurboModule;
     procedure iCompileTo(const aModule: TCustomTurboModule); override;
     procedure iReferenceTo(const aMem: Pointer); override;
+    procedure ResolveAddr(const aValue: PTurboUnResolvedRefRec); override;
   public
-    constructor Create; override;
+    constructor Create;
     destructor Destroy; override;
     property CallStyle: TTurboCallStyle read FCallStyle write FCallStyle;
     property CFA: tsInt read FCFA write FCFA;
@@ -265,12 +264,12 @@ type
   {: keep the function body symbol. }
   TTurboWordSymbolList = class(TTurboSymbolList)
   private
-    function GetItems(Index: Integer): TTurboWordSymbol;
+    function GetItems(Index: Integer): TTurboMethodSymbol;
     function GetOwner: TTurboModuleSymbol;
   public
-    function Add: TTurboWordSymbol;
+    function Add: TTurboMethodSymbol;
     function AddWordCFA(aName: string): Boolean;
-    property Items[Index: Integer]: TTurboWordSymbol read GetItems; default;
+    property Items[Index: Integer]: TTurboMethodSymbol read GetItems; default;
     property Owner: TTurboModuleSymbol read GetOwner;
   end;
 
@@ -284,62 +283,66 @@ implementation
 {
 ********************************* TTurboSymbol *********************************
 }
-constructor TTurboSymbol.Create;
+function TTurboSymbol.IsCompileAllowed: Boolean;
 begin
-  inherited Create;
-  FUnResolvedRefs := TList.Create;
 end;
 
-destructor TTurboSymbol.Destroy;
+procedure TTurboSymbol.IsNamed(const aModule: TCustomTurboModule);
 begin
-  FreeAndNil(FUnResolvedRefs);
-  inherited Destroy;
 end;
 
-procedure TTurboSymbol.CompileTo(const aModule: TCustomTurboModule);
+procedure TTurboSymbol.IsPublic(const aModule: TCustomTurboModule);
 begin
-  if (FVisibility = fvPublished) or (FRefs > 0) then
-  begin
-    iCompileTo(aModule);
-    FIsCompiled := True;
-  end;
 end;
 
-function TTurboSymbol.GetProgramSymbol: TTurboProgramSymbol;
+procedure TTurboSymbol.IsTyped(const aModule: TCustomTurboModule);
 begin
-  Result := TTurboProgramSymbol(FParent);
-  while Assigned(Result) do
-  begin
-    if Result is TTurboProgramSymbol then exit;
-    Result := TTurboProgramSymbol(Result.Parent);
-  end;
-  Result := nil;
 end;
 
-procedure TTurboSymbol.ReferenceTo(const aMem: Pointer);
+{
+****************************** TTurboCustomSymbol ******************************
+}
+procedure TTurboCustomSymbol.Assign(const aSymbol: TTurboCustomSymbol);
 begin
-  Inc(FRefs);
-  if FIsCompiled then
-  begin
-    iReferenceTo(aMem);
-  end
-  else
-    FUnResolvedRefs.Add(aMem);
 end;
 
-procedure TTurboSymbol.ResolveRefs;
-var
-  I: Integer;
+procedure TTurboCustomSymbol.Compile;
 begin
-  if FIsCompiled then
-    with FUnResolvedRefs do
-    begin
-      for i := 0 to Count -1 do
-      begin
-        ReferenceTo(Items[i]);
-      end;
-      Clear;
-    end;
+end;
+
+procedure TTurboCustomSymbol.CompileError(const aErrCode: Integer);
+begin
+end;
+
+function TTurboCustomSymbol.GetUnResolvedRefs: TList;
+begin
+end;
+
+function TTurboCustomSymbol.IsCompileAllowed: Boolean;
+begin
+end;
+
+procedure TTurboCustomSymbol.ReferenceTo(const aSymbol: TurboSymbol);
+begin
+end;
+
+procedure TTurboCustomSymbol.ResolveRefs;
+begin
+end;
+
+{
+******************************* TTurboTypeSymbol *******************************
+}
+procedure TTurboTypeSymbol.iCompile;
+begin
+end;
+
+procedure TTurboTypeSymbol.iReferenceTo;
+begin
+end;
+
+procedure TTurboTypeSymbol.ResolveAddr(const aValue: PTurboUnResolvedRefRec);
+begin
 end;
 
 {
@@ -349,16 +352,28 @@ constructor TTurboModuleSymbol.Create;
 begin
   inherited Create;
   FConstants := TTurboConstSymbolList.Create(Self);
-  FVariables := TTurboVariableSymbolList.Create(Self);
-  FWords     := TTurboWordSymbolList.Create(Self);
+  FStaticFields := TTurboVariableSymbolList.Create(Self);
+  FMethods     := TTurboWordSymbolList.Create(Self);
 end;
 
 destructor TTurboModuleSymbol.Destroy;
 begin
   FreeAndNil(FConstants);
-  FreeAndNil(FVariables);
-  FreeAndNil(FWords);
+  FreeAndNil(FStaticFields);
+  FreeAndNil(FMethods);
   inherited Destroy;
+end;
+
+procedure TTurboModuleSymbol.iCompile;
+begin
+end;
+
+procedure TTurboModuleSymbol.iReferenceTo;
+begin
+end;
+
+procedure TTurboModuleSymbol.ResolveAddr(const aValue: PTurboUnResolvedRefRec);
+begin
 end;
 
 {
@@ -455,6 +470,11 @@ end;
 {
 ****************************** TTurboConstSymbol *******************************
 }
+procedure TTurboConstSymbol.Assign(const aSymbol: TTurboCustomSymbol);
+begin
+  inherited Assign(aSymbol);
+end;
+
 function TTurboConstSymbol.AssignValue(const aValue: string; const aTypeKind:
         TTurboSimpleTypeKind = ttkUnknown): Boolean;
 begin
@@ -485,26 +505,26 @@ begin
       if aTypeKind = ttkUnknown then
       begin
         if (Value.VInt64 >= Low(ShortInt)) and (Value.VInt64<=High(ShortInt)) then
-          FTypeKind := ttkSByte
+          FTurboType := ttkSByte
         else if (Value.VInt64 >= Low(Byte)) and (Value.VInt64<=High(Byte)) then
-          FTypeKind := ttkUByte
+          FTurboType := ttkUByte
         else if (Value.VInt64 >= Low(SmallInt)) and (Value.VInt64<=High(SmallInt)) then
-          FTypeKind := ttkSWord
+          FTurboType := ttkSWord
         else if (Value.VInt64 >= Low(Word)) and (Value.VInt64<=High(Word)) then
-          FTypeKind := ttkUWord
+          FTurboType := ttkUWord
         else if (Value.VInt64 >= Low(LongInt)) and (Value.VInt64<=High(LongInt)) then
-          FTypeKind := ttkSLong
+          FTurboType := ttkSLong
         else if (Value.VInt64 >= Low(LongWord)) and (Value.VInt64<=High(LongWord)) then
-          FTypeKind := ttkULong
+          FTurboType := ttkULong
         else //if (Value.VInt64 >= Low(Int64)) and (Value.VInt64<=High(Int64)) then
-          FTypeKind := ttkInt64;
+          FTurboType := ttkInt64;
       end;
     except
-      FTypeKind := ttkUnknown;
+      FTurboType := ttkUnknown;
       Result := False;
     end;
   if aTypeKind <> ttkUnknown then begin
-    FTypeKind := aTypeKind;
+    FTurboType := aTypeKind;
     Result := True;
   end;
   if Result then
@@ -532,15 +552,18 @@ begin
   //writeln('PSource=', PInteger(aMem)^);
 end;
 
-procedure TTurboConstSymbol.iCompileTo(const aModule: TCustomTurboModule);
+procedure TTurboConstSymbol.iCompile;
 begin
-  inherited iCompileTo(aModule);
-  SaveString(aModule);
+  inherited iCompile;
 end;
 
-procedure TTurboConstSymbol.iReferenceTo(const aMem: Pointer);
+procedure TTurboConstSymbol.iReferenceTo;
 begin
   AssignValueTo(aMem);
+end;
+
+procedure TTurboConstSymbol.ResolveAddr(const aValue: PTurboUnResolvedRefRec);
+begin
 end;
 
 procedure TTurboConstSymbol.SaveString(const aModule: TCustomTurboModule);
@@ -563,8 +586,8 @@ end;
 
 procedure TTurboConstSymbol.SetTypeKind(aValue: TTurboSimpleTypeKind);
 begin
-  FTypeKind := aValue;
-  FSize := GetSimpleTurboTypeSize(FTypeKind);
+  FTurboType := aValue;
+  FSize := GetSimpleTurboTypeSize(FTurboType);
 end;
 
 procedure TTurboConstSymbol.SetValue(const aValue: TTurboValueRec);
@@ -602,7 +625,7 @@ end;
 {
 ***************************** TTurboVariableSymbol *****************************
 }
-procedure TTurboVariableSymbol.iCompileTo(const aModule: TCustomTurboModule);
+procedure TTurboVariableSymbol.iCompile;
 var
   vVaraibleEntry: PTurboVariableEntry;
   vValue: Pointer;
@@ -646,9 +669,14 @@ begin
   end;
 end;
 
-procedure TTurboVariableSymbol.iReferenceTo(const aMem: Pointer);
+procedure TTurboVariableSymbol.iReferenceTo;
 begin
   PtsInt(aMem)^ := Addr;
+end;
+
+procedure TTurboVariableSymbol.ResolveAddr(const aValue:
+        PTurboUnResolvedRefRec);
+begin
 end;
 
 {
@@ -735,9 +763,9 @@ begin
 end;
 
 {
-******************************* TTurboWordSymbol *******************************
+****************************** TTurboMethodSymbol ******************************
 }
-constructor TTurboWordSymbol.Create;
+constructor TTurboMethodSymbol.Create;
 var
   vProg: TTurboProgramSymbol;
 begin
@@ -754,13 +782,13 @@ begin
   FRefs := 1;
 end;
 
-destructor TTurboWordSymbol.Destroy;
+destructor TTurboMethodSymbol.Destroy;
 begin
   //FreeAndNil(FBody);
   inherited Destroy;
 end;
 
-procedure TTurboWordSymbol.iCompileTo(const aModule: TCustomTurboModule);
+procedure TTurboMethodSymbol.iCompileTo(const aModule: TCustomTurboModule);
 var
   I: Integer;
   vName: string;
@@ -792,9 +820,13 @@ begin
   end;
 end;
 
-procedure TTurboWordSymbol.iReferenceTo(const aMem: Pointer);
+procedure TTurboMethodSymbol.iReferenceTo(const aMem: Pointer);
 begin
   Move(FCFA, aMem^, SizeOf(Addr));
+end;
+
+procedure TTurboMethodSymbol.ResolveAddr(const aValue: PTurboUnResolvedRefRec);
+begin
 end;
 
 {
@@ -825,9 +857,9 @@ end;
 {
 ***************************** TTurboWordSymbolList *****************************
 }
-function TTurboWordSymbolList.Add: TTurboWordSymbol;
+function TTurboWordSymbolList.Add: TTurboMethodSymbol;
 begin
-  Result := TTurboWordSymbol.Create;
+  Result := TTurboMethodSymbol.Create;
   Result.Parent := TTurboModuleSymbol(FOwner);
   inherited Add(Result);
 end;
@@ -883,9 +915,9 @@ begin
   end;
 end;
 
-function TTurboWordSymbolList.GetItems(Index: Integer): TTurboWordSymbol;
+function TTurboWordSymbolList.GetItems(Index: Integer): TTurboMethodSymbol;
 begin
-  Result := TTurboWordSymbol(inherited Get(Index));
+  Result := TTurboMethodSymbol(inherited Get(Index));
 end;
 
 function TTurboWordSymbolList.GetOwner: TTurboModuleSymbol;

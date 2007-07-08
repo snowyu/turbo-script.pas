@@ -16,6 +16,91 @@ TODO:
 ~ Delphi 嵌入汇编调用System单元的内置函数如： _LStrLAsg 的时候，必须：
   CALL SYSTEM.@LStrLAsg
 
+2007-7-8 8:14
+* [Bug] CustomModule 在分配Data内存的时候,有时候出错,UsedDataSize的值不对! [DUnit]发现的
+  相关的 AddXXToData都可能要修改!!
+  with PTurboPreservedDataMemory(FDataMemory)^ do
+  begin
+    if (UsedDataSize + SizeOf(aSize))>= DataSize then
+      //Just be careful, the GrowData maybe change the FDataMemory address!!
+      GrowData(SizeOf(Integer));  //<----有可能重新分配内容块,导致FDataMemory地址改变,不过一般小数据不会出现,这个错误比较隐蔽.
+
+    //Inc(UsedDataSize, SizeOf(Integer)); //<---- 如果FDataMemory地址改变就会出错,写入的地方不是新的FDataMemory所在!!
+  end;
+
+  with PTurboPreservedDataMemory(FDataMemory)^ do //这样重新取 FDataMemory 地址就对了!!
+  begin
+    Inc(UsedDataSize, SizeOf(Integer)); 
+  end;
+  
+
+* [Bug] Critical error: can not assign CustomSymbol.Assign() 
+  //if Assigned(aSymbol) and aSymbol.InheritsFrom(Self.ClassType) then //Wrong!!
+  if Assigned(aSymbol) and aSymbol.InheritsFrom(TypeOf(TTurboCustomSymbol)) then
+* Method 算了,先Method MethodRef的数据合用放在基类 CustomMethod.
+* [Bug] MethodSymbol.Assign(aSrc) 由于没有新建 FiTypeSymbol,导致如果aSrc释放,那么 FiTypeSymbol 将无效!!!
+  鉴于MeType 没有 Assign方法,暂时的解决方法是在assign后,将 src的 FiTypeSymbol 赋值为空.  in TurboForthExpr.atg
+     vWordRef.Assign(vWord);
+     PTurboMethodSymbolAccess(vWord).FiTypeSymbol := nil; //to avoid free the FiTypeSymbol when vWord is free.
+     MeFreeAndNil(vWord);
+     vWord := vWordRef;
+   折腾了这么久,我发现以现阶段来说似乎将MethodRef从method分开的意义不是很大!因为我在声明的word的时候还未确定word类型就直接用了该符号类(除非建立一个记录存放数据,等到了能确定类型的时候再~),除了增加可读性,当然对于以后调整架构方便了许多.
+好了,可以暂时冻结了,开发自己的AI脚本函数编译器了!
+
+2007-7-7 22:26
++ 好了彻底解耦 MethodRefSymbol from MethodSymbol.
++ ModuleSymbol.MethodRefs 专门用于存放模块引用的外部方法。
+
+2007-7-7 8:49
+* TTurboModuleType
+    + @param mtUnit             only for compile-time, store all symbols
+~ Structure Exception Handler(SEH):
+  .try {tryBlock}
+  .catch<errcode> { catchBlock}
+  .filter
+  .finally {finallyBlock}
+  throw
+  leave
+  endfilter
+
+2007-7-6 11:03
+* opHalt is no parameter now!!
+  ( -- )
+异常处理,对于X86嵌入汇编写的,不能象纯pascal写的那样简单了.
+  不过还好,发生操作系统的异常,就是运算(除法,浮点小数),取/设置地址数据(地址越界)和调用DLL,Host函数这里!!只要处理好这几个就行了.
+
+2007-7-5 7:33
++ TTurboGlobalOptions.LocalVariables: array[0..255] of tsInt;
+  用于作为临时局部变量使用。
++ cfsInlineFunction in TTurboCodeFieldStyle
+  如果是Public的,则不能访问StaticField字段,直接将代码嵌入到另一个单元的函数体中,尽管其本身存在于编译后的单元,但是该函数不能被直接运行!!只用于编译!
+  这是为了System单元编译的一些内部函数过程而准备的.
+* rename TurboVarSymbol to TurboVariableSymbol
+
+TurboConstantSymbol
+  TurboVariableSymbol
+    TurboStaticFieldSymbol
+
+TurboStaticFieldSymbol
+~ 
+TurboCustomBlockSymbol 程序块, 以后程序块内有局部类型,变量,常量(算了还是不要,免得优化麻烦),以及嵌套的过程块.
+  TurboCustomMethodSymbol
+    TurboMethodSymbol
+    TurboMethodRefSymbol
+  TurboCustomModuleSymbol
+    TurboModuleSymbol
+    TurboModuleRefSymbol
+
+2007-7-4 13:13
+~ 看了下Linq Framework 介绍,感觉Linq 的目的是在保障可读性的前提下,对书写源代码程序做的简化尝试,比如遍历列表查询这样一些公式化的程序语句
+  class Customer
+  {
+      public string CustomerID { get; set; }
+      public string ContactName { get; set; }
+      public string City { get; set; }
+  }
+  这样就不用写私有域!编译器自动产生!书写是不是简化很多.
+
 2007-7-3 7:58
 *  [Bug] issue 48: crtical error the TurboCodeMem is dynamic increase the memory on demand. so the memory address will be changed by reallocMem!!
   you MUST DO NOT ResolveAddr by absoulted address!!

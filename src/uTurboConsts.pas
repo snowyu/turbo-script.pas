@@ -61,8 +61,10 @@ type
     @param mtFunction         the script function(word).
     @param mtHost             the module is in the host application
     @param mtDLL              the DLL module
+    @param mtUnit             the unit only for compile-time
+    @param mtLib              the runtime lib, it's the native DLL. 
   }
-  TTurboModuleType = (mtUnknown, mtProgram, mtLib, mtObject, mtFunction, mtHost, mtDLL);
+  TTurboModuleType = (mtUnknown, mtProgram, mtLib, mtObject, mtFunction, mtHost, mtDLL, mtUnit);
 
   {
     @param soSymbolPublic the module is SymbolPublic. all the indentities are linked to the module.
@@ -116,13 +118,14 @@ type
   //TTurboCallStyle = (csForth, csRegister, csPascal, csCdecl, csStdCall, csFastCall);
   {: the Method Style. }
   {
+  @param cfsInlineFunction    It's Inlline, only used by compiler. DO NOT CALL IT at run-time!
   @param cfsFunction          It's the local Lib function.          
   @param cfsExternalFunction  It's the external Lib function. 
   @param cfsHostFunction      It's the external Host function.
   @param cfsDLLFunction       It's the external DLL function.
   see Also ExternalOptions.ModuleType
   }
-  TTurboCodeFieldStyle = (cfsFunction, cfsExternalFunction, cfsHostFunction, cfsDLLFunction);
+  TTurboCodeFieldStyle = (cfsInlineFunction, cfsFunction, cfsExternalFunction, cfsHostFunction, cfsDLLFunction);
 {  TTurboWordOptions = packed record //a DWORD
       //优先级, highest means an IMMEDIATE word
       //1=True; 0=False; Smudge bit. used to prevent FIND from finding this word
@@ -138,11 +141,11 @@ type
   TTurboVMInstruction = (
     opNoop,
     {## The FORTH CORE instructions }
-    //ErrorCode = 0 means no error
-    opHalt, //(ErrorCode -- )
+    opHalt, //( -- )
     //要想用断言，必须使用参数
     //其中行号是编译器压入的
     opAssert, //(ShortString(Msg), expr -- )
+    //ErrorCode = 0 means no error
     opError,  //(ErrorCode -- )
     opEnter, //inEnter Addr
     opExit,

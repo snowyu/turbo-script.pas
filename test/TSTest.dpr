@@ -39,7 +39,7 @@ program TSTest;
 uses
 {$IFDEF FASTMM}    // From Project | Options | Directories/Conditionals
   {$IFNDEF VER180}
-    ($IFNDEF CLR}
+    {$IFNDEF CLR}
       FastMM4,
     {$ENDIF}
   {$ENDIF}

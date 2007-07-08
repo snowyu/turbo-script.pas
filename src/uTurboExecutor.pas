@@ -98,6 +98,7 @@ type
     //The built-in I/O routines use InOutResult to store the value that 
     //the next call to the IOResult standard function will return.
     IOResult: tsInt;
+    LocalVariables: array[0..255] of tsInt;
     {: the States in [psRunning, psStepping]}
     property IsRunning: Boolean read GetIsRunning write SetIsRunning;   
   end;
@@ -809,6 +810,10 @@ begin
   begin
     if (UsedDataSize+aSize) > DataMemorySize then
       GrowData(aSize);
+  end;
+
+  with PTurboPreservedDataMemory(FDataMemory)^ do
+  begin
     Integer(p) := Integer(FDataMemory) + UsedDataSize;
     Move(aValue, p^, aSize);
     Inc(UsedDataSize, aSize);
@@ -837,6 +842,10 @@ begin
   begin
     if (UsedDataSize + SizeOf(Byte))>= DataSize then
       GrowData(SizeOf(Byte));
+  end;
+
+  with PTurboPreservedDataMemory(FDataMemory)^ do
+  begin
     Integer(p) := Integer(FDataMemory) + UsedDataSize;
     PByte(P)^ := aValue;
     Inc(UsedDataSize, SizeOf(Byte));
@@ -865,6 +874,10 @@ begin
   begin
     if (UsedDataSize + SizeOf(Integer))>= DataSize then
       GrowData(SizeOf(Integer));
+  end;
+
+  with PTurboPreservedDataMemory(FDataMemory)^ do
+  begin
     Integer(p) := Integer(FDataMemory) + UsedDataSize;
     PInteger(P)^ := aValue;
     Inc(UsedDataSize, SizeOf(Integer));
@@ -912,7 +925,12 @@ begin
   begin
     Integer(p) := Length(aValue)+1;
     if (UsedDataSize+Integer(p)) > DataMemorySize then
+      //Just be careful, the GrowData maybe change the FDataMemory address!!
       GrowData(Integer(p));
+  end;
+
+  with PTurboPreservedDataMemory(FDataMemory)^ do
+  begin
     Integer(p) := Integer(FDataMemory) + UsedDataSize;
     if aValue <> '' then
     begin
@@ -947,8 +965,12 @@ begin
   with PTurboPreservedDataMemory(FDataMemory)^ do
   begin
     if (UsedDataSize + aSize) >= DataMemorySize then
+      //Just be careful, the GrowData maybe change the FDataMemory address!!
       GrowData(aSize);
-
+  end;
+  // so re-get the PTurboPreservedDataMemory(FDataMemory) address
+  with PTurboPreservedDataMemory(FDataMemory)^ do
+  begin
     Inc(UsedDataSize, aSize);
   end;
 end;

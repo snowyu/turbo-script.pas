@@ -280,20 +280,21 @@ asm
 //}
 end;
 
-//(ErrorCode -- )
+//( -- )
 procedure iVMHalt;
 asm
-  MOV EAX, EBX
+  //MOV EAX, EBX
 
   //move the top in stack to EAX 
-  MOV  EBX, [EBP] 
+  //MOV  EBX, [EBP] 
   //Increment the data stack pointer.
   //ADD  EBP, Type(tsInt)
-  INC EBP
-  INC EBP
-  INC EBP
-  INC EBP
+  //INC EBP
+  //INC EBP
+  //INC EBP
+  //INC EBP
   
+  MOV EAX, errNone
   JMP _iVMHalt 
 end;
 
@@ -1215,6 +1216,7 @@ begin
   GTurboCoreWords[opNoop] := iVMNoop;
   GTurboCoreWords[opNext] := iVMNext;
   GTurboCoreWords[opHalt] := iVMHalt;
+  GTurboCoreWords[opError] := iVMError;
   GTurboCoreWords[opAssert] := iVMAssert;
 
   GTurboCoreWords[opEnter] := iVMEnter;

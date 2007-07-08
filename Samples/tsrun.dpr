@@ -14,7 +14,7 @@ program tsrun;
 
 uses
   {$IFNDEF FPC}
-  FastMM4,
+  //FastMM4,
   {$ENDIF}
   Windows,  SysUtils, Classes
   , uStrUtils

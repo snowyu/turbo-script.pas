@@ -120,6 +120,9 @@ JITCompiler 存放的本地CPU指令随着应用的终止而自动被释放（除非使用 NGen.exe），当
 
 另外，我很想知道的，IL(MetaData)加载到内存是什么时候？实际上IL只有当JITCompiler编译的时候才需要，如果一直都放在内存那就太浪费了。
 
+=== 异常保护机制 ===
+
+
 == Remoting 机制 ==
 Remoting 机制作为在AppDomain之间沟通的桥梁，当你引用你一个AppDomain的对象或成员的时候，Remoting就要负责处理了。Remoting 也被用于
 在地址空间之间沟通。Remoting 是在 MarshalByRefObject 类中实现的。
@@ -688,7 +691,7 @@ Format                Assembly Format   Description
 0x29<T>               calli callsitedescr Call method indicated on the stack with arguments described by callsitedescr.
 0x2A                  Ret                 Return from method, possibly with a value.
 0x2B<int8>            br.s target         Branch to target, short form. <unconditional branch>
-0x2C<int8>            brfalse.s target    Branch to target if value is zero (false), short form.
+0x2C<int8>            brfalse.s target    Branch to target if value is zero (false), short form.   堆栈的值测试完毕，就从堆栈移出了！所有的分支指令都是如此。
 0x2D<int8>            brtrue.s target     Branch to target if value is non-zero (true), short form.
 0x2E<int8>            beq.s target        Branch to target if equal, short form.
 0x2F<int8>            bge.s target        Branch to target if greater than or equal to, short form.
