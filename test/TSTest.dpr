@@ -34,11 +34,13 @@
 }
 program TSTest;
 
+{$I jedi.inc}
+
 {$DEFINE FASTMM}
 
 uses
 {$IFDEF FASTMM}    // From Project | Options | Directories/Conditionals
-  {$IFNDEF VER180}
+  {$IFNDEF COMPILER10_UP}
     {$IFNDEF CLR}
       FastMM4,
     {$ENDIF}
