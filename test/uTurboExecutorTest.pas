@@ -26,30 +26,37 @@ type
   { abstract }
   TTest_TurboExecutor = class (TTestCase)
   protected
-    FTestObject: TCustomTurboExecutor;
+    FApp: TTurboAppDomain;
   protected
-    procedure CreateTestObject;virtual;abstract;
-    procedure Setup;override;
+    class function GetExecutorClass: TCustomTurboExecutor;virtual; abstract; //need override to confirm the FExecutorClass
+    procedure SetUp;override;
     procedure TearDown;override;
   public
   published
+    property Test_VM_AlignStr;
   end;
 
 
 implementation
 
 
-procedure TTest_TurboExecutor.Setup;
+procedure TTest_TurboExecutor.SetUp;
 begin
   if not Assigned(FTestObject) then
-    CreateTestObject;
+  begin
+    FApp := TTurboAppDomain.Create;
+    FApp.ExecutorClass := GetExecutorClass;
+  end;
 end;
 
 procedure TTest_TurboExecutor.TearDown;
 begin
-  FreeAndNil(FTestObject);
+  FreeAndNil(FApp);
 end;
 
+property TTest_TurboExecutor.Test_VM_AlignStr;
+begin
+end;
 
 Initialization
   {RegisterTests('TurboScript suites',
