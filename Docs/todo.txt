@@ -16,6 +16,12 @@ TODO:
 ~ Delphi 嵌入汇编调用System单元的内置函数如： _LStrLAsg 的时候，必须：
   CALL SYSTEM.@LStrLAsg
 
+2007-7-12 15:17
+* CustomTurboModule
+  + function AddStringToData(const aValue: String): Integer
+  + function AddShortStringToData(const aValue: String): Integer
+    Return the offset address of the constant in the data memory.
+
 2007-7-8 8:14
 * [Bug] CustomModule 在分配Data内存的时候,有时候出错,UsedDataSize的值不对! [DUnit]发现的
   相关的 AddXXToData都可能要修改!!

@@ -208,6 +208,9 @@ Type
     function iReferenceTo(const aSymbol: PTurboSymbol): Integer; virtual; {override}
     function iCompile: Integer; virtual; {override}
     procedure ResolveAddr(const aValue: PTurboUnResolvedRefRec); virtual; {override}
+    //if the value is string then save the string to the module's dataMemory.
+    //and put the offset of the dataMemory to Value.VInteger
+    //procedure DeclareStringTo(const aModule: TCustomTurboModule);
   public
     destructor Destroy; virtual; {override}
     procedure Assign(const aSymbol: PTurboCustomSymbol); virtual;
@@ -220,9 +223,6 @@ Type
     //根据aValue 如果aTypeKind is mtkUnknown 那么会自动判断其类型
     function AssignValue(const aValue: string; aType: PMeType = nil; const aQuote: char = ''''): Boolean; overload;
     procedure AssignValue(const aConst: PTurboConstSymbol); overload;
-    //if the value is string then save the string to the module's dataMemory.
-    //and put the offset of the dataMemory to Value.VInteger
-    procedure DeclareStringTo(const aModule: TCustomTurboModule);
   public
     property TurboType: PMeType read FTurboType write SetTurboType;
     property Value: TMeVarRec read FValue write FValue;
@@ -2301,16 +2301,10 @@ begin
     with OwnerSymbol.Module do
     Case TurboType.Kind of
       mtkString: begin
-        FValue.VInteger := UsedDataSize;
-        AddByteToData(Length(ValueStr));
-        AddBufferToData(ValueStr[1], Length(ValueStr));
+        FValue.VInteger := AddShortStringToData(ValueStr);
       end;
       mtkLString: begin
-        AddIntToData(-1);
-        AddIntToData(Length(ValueStr));
-        FValue.VInteger := UsedDataSize;
-        AddBufferToData(ValueStr[1], Length(ValueStr));
-        AddByteToData(0);
+        FValue.VInteger := AddStringToData(ValueStr);
       end;
     end;//case
   end
@@ -2327,6 +2321,7 @@ begin
   AssignValueTo(p);
 end;
 
+{
 procedure TTurboConstSymbol.DeclareStringTo(const aModule: TCustomTurboModule);
 begin
   if Assigned(TurboType) then
@@ -2337,14 +2332,11 @@ begin
         aModule.AddBufferToData(ValueStr[1], Length(ValueStr));
       end;
       mtkLString: begin
-        aModule.AddIntToData(-1);
-        aModule.AddIntToData(Length(ValueStr));
-        FValue.VInteger := aModule.UsedDataSize;
-        aModule.AddBufferToData(ValueStr[1], Length(ValueStr));
-        aModule.AddByteToData(0);
+        FValue.VInteger := aModule.AddStringToData(ValueStr);
       end;
     end;//case
 end;
+//}
 
 procedure TTurboConstSymbol.SetTurboType(const aValue: PMeType);
 begin
@@ -2433,7 +2425,8 @@ begin
   begin
     if TurboType.Kind in [mtkLString, mtkString] then
     begin
-      DeclareStringTo(OwnerSymbol.Module); //if the init value is string
+      //DeclareStringTo(OwnerSymbol.Module); //if the init value is string
+      Result := Inherited iCompile;
       OwnerSymbol.Module.RelocatedDataAddresses.Add(Addr);
     end;
     AssignValueTo(vValue);

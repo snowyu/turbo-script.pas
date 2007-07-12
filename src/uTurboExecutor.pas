@@ -215,49 +215,41 @@ type
     destructor Destroy; override;
     {: add a integer to the free memory, and add UsedMemory }
     { Description
-    Note: you must InitExecution first.
     }
     procedure AddBufferToData(const aValue; aSize: Integer);
     {: add a integer to the free memory, and add UsedMemory }
-    { Description
-    Note: you must InitExecution first.
-    }
     procedure AddBufferToMem(const aValue; aSize: Integer);
     {: add a integer to the free memory, and add UsedMemory }
-    { Description
-    Note: you must InitExecution first.
-    }
     procedure AddByteToData(const aValue: Byte);
     {: add a integer to the free memory, and add UsedMemory }
-    { Description
-    Note: you must InitExecution first.
-    }
     procedure AddByteToMem(const aValue: Byte);
     {: add a integer to the free memory, and add UsedMemory }
-    { Description
-    Note: you must InitExecution first.
-    }
     procedure AddIntToData(const aValue: Integer);
     {: add a integer to the free memory, and add UsedMemory }
-    { Description
-    Note: you must InitExecution first.
-    }
     procedure AddIntToMem(const aValue: Integer);
     {: add a OpCode to the free memory, and add UsedMemory }
-    { Description
-    Note: you must InitExecution first.
-    }
     procedure AddOpToMem(const aOpCode: TTurboVMInstruction);
     {: add a PChar to the free data-memory, and add UsedMemory }
-    { Description
-    Note: you must InitExecution first.
-    }
     procedure AddPCharToData(const aValue: string);
+    {: add(construct) an AnsiString constant to the free data-memory, and add
+            UsedMemory }
+    { Description
+    return the offset address of the AnsiString constant in the dataMemory.
+    }
+    function AddShortStringToData(const aValue: string): Integer;
+    {: add(construct) an AnsiString constant to the free data-memory, and add
+            UsedMemory }
+    { Description
+    return the offset address of the AnsiString constant in the dataMemory.
+    }
+    function AddStringToData(const aValue: string): Integer;
     {: fill 0 to align the memory. }
     procedure AlignData;
     {: fill 0 to align the memory. }
     procedure AlignMem;
+    {: alloc the space to data memory. }
     procedure AllocDataSpace(const aSize: Integer);
+    {: alloc the space to code memory. }
     procedure AllocSpace(const aSize: Integer);
     {: reduce the memory size to initialization state }
     procedure ClearMemory;
@@ -940,6 +932,22 @@ begin
     PByte(p)^ := 0;
     Inc(UsedDataSize, Length(aValue) + 1);
   end;
+end;
+
+function TCustomTurboModule.AddShortStringToData(const aValue: string): Integer;
+begin
+  Result := UsedDataSize;
+  AddByteToData(Length(aValue));
+  AddBufferToData(aValue[1], Length(aValue));
+end;
+
+function TCustomTurboModule.AddStringToData(const aValue: string): Integer;
+begin
+  //the RefCount of the constant ansi string is always -1
+  AddIntToData(-1);
+  AddIntToData(Length(aValue));
+  Result := UsedDataSize;
+  AddPCharToData(aValue);
 end;
 
 procedure TCustomTurboModule.AlignData;
