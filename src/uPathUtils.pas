@@ -23,6 +23,8 @@
     @author Juanco Añez
     @history
       remove jcl dependentment. by riceball
+
+deprecated: move and rename to uMePathUtils!!
 }
 
 unit uPathUtils;

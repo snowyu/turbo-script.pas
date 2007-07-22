@@ -1,3 +1,5 @@
+//deprecated: move and rename to uMePathUtils!!
+
 unit uStrUtils;
 
 {$I Setting.inc}
