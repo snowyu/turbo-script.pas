@@ -17,7 +17,7 @@ uses
   //FastMM4,
   {$ENDIF}
   Windows,  SysUtils, Classes
-  , uStrUtils
+  , uMeStrUtils
   , uTurboPE
   , uTurboConsts
   , uTurboExecutor

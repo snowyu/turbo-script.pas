@@ -3,7 +3,7 @@ $E-  //Generate a component registration unit
 $Z+  //Generate console app
 
 //{$IFDEF MSWINDOWS}Windows,{$ENDIF}
-COMPILER TurboForthCompiler
+COMPILER TurboPascalCompiler
 
 DELPHI
 
@@ -259,16 +259,14 @@ PRAGMAS
    //CompilerDirective DESCRIPTION "TurboScript Assembler Compiler Directive" 
      // = "[$" { noEOL } "]". (. Writeln('SDDSSDL:'+ LexString); .) //古怪得很，LexString 取得的值是上一个标识的，而不是这个CompilerDirective的！
 
-//COMMENTS FROM "(" TO ")"
+COMMENTS FROM "(*" TO "*)"
 COMMENTS FROM "//" TO EOL
 COMMENTS FROM "{" TO "}"
 
-
-
 PRODUCTIONS
 
-  (* TurboForthCompiler = Statement {Statement}  . *)  
-  TurboForthCompiler DESCRIPTION "TurboScript Assembler Compiler"
+  (* TurboPascalCompiler = Statement {Statement}  . *)  
+  TurboPascalCompiler DESCRIPTION "TurboScript Pascal Compiler"
     (. Var vMainMethod: PTurboMethodSymbol; .)
     =                                                  (. Init ; .)  
                                                        (. FModule.ModuleType := mtLib; .)
@@ -291,7 +289,7 @@ PRODUCTIONS
                                                             //vMainMethod.CFA := FModule.UsedMemory;
                                                             vMainMethod.BodyInit;
                                                        .)
-    ASMStatementBlock<vMainMethod>
+    StatementBlock<vMainMethod>
     "END" "."                                          (.   vMainMethod.BodyFinal;
                                                             //aWord.Body.AddOpCode(opPushInt); FModule.AddIntToMem(0); aWord.Body.AddOpCode(opHalt); 
                                                           finally
@@ -486,7 +484,7 @@ PRODUCTIONS
                                                                     end;
                                                                     if not IsSymbolOk(vErrorCode) then exit;
                                                                  .)
-     ASMStatementBlock<PTurboMethodSymbol(vWord)>
+     StatementBlock<PTurboMethodSymbol(vWord)>
     ]
     ";"                                                          (. if IsSymbolOk(vErrorCode) then vErrorCode := vWord.BodyFinal;
                                                                  finally
@@ -590,16 +588,131 @@ PRODUCTIONS
 
   WordVsibility< var aVisibility: TTurboVisibility > 
     = 
-    "PRIVATE"                                         (. aVisibility := tvPrivateVisibilty; .)
+    "PRIVATE"                                          (. aVisibility := tvPrivateVisibilty; .)
     |("PUBLIC"                                         (. aVisibility := tvPublicVisibilty; .)
       ["NAMED" (. aVisibility :=  aVisibility or tvPublicNamedVisibilty; .)]
       ["TYPED" (. aVisibility :=  aVisibility or tvPublicTypedVisibilty; .)]
      )
   .
 
+  Expression = SimpleExpression {RelOp SimpleExpression} .
+  
+  SimpleExpression 
+    = 
+    [
+        "+" 
+      | "-" 
+    ] 
+    Term {AddOp Term} 
+  .
+
+  Term =  Factor {MulOp Factor} .
+  Factor = Identifier ['(' ExprList ')']
+    | Integer
+    | StringToken
+  .
+  Integer = IntegerToken|HexNumberToken .
+
+  ExprList = Expression {"," Expression} .
+
+  RelOp =
+       ">"
+      | "<"
+      | "="
+      | "<="
+      | ">="
+      | "<>"
+  .
+  AddOp = "+" 
+      | "-"
+      | "OR"
+      | "XOR"
+  .
+
+  MulOp = "*"
+      | "/"
+      | "DIV"
+      | "MOD"
+      | "AND"
+      | "SHL"
+      | "SHR"
+  .
+
+  Statement< const aWord: PTurboMethodSymbol > 
+  (. var s: string; vResult: Integer; .)
+    = 
+    [LabelId                                         (. s:= LexString; .)
+      ":"                                            (. vResult := aWord.DeclareLabel(s); 
+                                                        if not IsSymbolOk(vResult) then
+                                                        begin
+                                                          SynError(vResult, s);
+                                                          exit;
+                                                        end;
+                                                      .)
+    ] 
+    [SimpleStatement<aWord> | StructStatement<aWord>]
+  .
+
+  LabelId = "@"["@"] Identifier .
+
+  StatementList< const aWord: PTurboMethodSymbol > = {Statement<aWord> ";"} .
+
+  SimpleStatement< const aWord: PTurboMethodSymbol >
+  (. var vName: string; .)
+   = 
+     Identifier                                    (. vName := LexString; .)
+       ["(" [ExprList] ")"]
+     | Identifier ":=" Expression
+
+     | "INHERITED"
+     | "GOTO" LabelId
+  .
+
+  StructStatement< const aWord: PTurboMethodSymbol > 
+    = 
+    StatementBlock<aWord>
+           | ConditionalStmt<aWord>
+           | LoopStmt<aWord>
+           //| WithStmt<aWord>
+           | ASMStatementBlock<aWord>
+  .
+
+  ConditionalStmt< const aWord: PTurboMethodSymbol > 
+    =
+    IfStmt<aWord>
+    |CaseStmt<aWord>
+  .
+
+  IfStmt< const aWord: PTurboMethodSymbol >  = "IF" Expression "THEN" Statement<aWord> ["ELSE" Statement<aWord>] .
+  CaseStmt< const aWord: PTurboMethodSymbol >  = "CASE" Expression "OF" {CaseSelector<aWord> ";" } ["ELSE" Statement<aWord>] [";"] "END" .
+  CaseSelector< const aWord: PTurboMethodSymbol >  = CaseLabel {"," CaseLabel} ':' Statement<aWord> .
+  CaseLabel = ConstExpr [".." ConstExpr] .
+  ConstExpr 
+    = 
+    Integer
+    |StringToken
+  .
+
+  LoopStmt< const aWord: PTurboMethodSymbol > 
+    = 
+      RepeatStmt<aWord>
+      | WhileStmt<aWord>
+      | ForStmt<aWord>
+  .
+
+  RepeatStmt< const aWord: PTurboMethodSymbol > = "REPEAT" Statement<aWord> "UNTIL" Expression .
+  WhileStmt< const aWord: PTurboMethodSymbol > = "WHILE" Expression "DO" Statement<aWord> .
+  ForStmt< const aWord: PTurboMethodSymbol > = "FOR" Identifier ":=" Expression ("TO" | "DOWNTO") Expression "DO" Statement<aWord> .
+
+  StatementBlock< const aWord: PTurboMethodSymbol > = "BEGIN" StatementList<aWord> "END" 
+  .
+
+
   ASMStatementBlock< const aWord: PTurboMethodSymbol > 
     = 
+    "ASM"
     ASMStatement<aWord> {ASMStatement<aWord>}
+    "END"
     .
 
   ASMStatement< const aWord: PTurboMethodSymbol > 
@@ -721,4 +834,4 @@ PRODUCTIONS
     
 
 
-END TurboForthCompiler.
+END TurboPascalCompiler.

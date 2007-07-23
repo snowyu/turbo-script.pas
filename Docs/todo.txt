@@ -15,6 +15,16 @@ TODO:
 !* [Bug] ModuleParent is not set or convert to related or absolute address!
 ~ Delphi 嵌入汇编调用System单元的内置函数如： _LStrLAsg 的时候，必须：
   CALL SYSTEM.@LStrLAsg
+~ [Coco/R]  
+  {} :是重复0-无穷次的意思。
+  []: 是可选项
+  | : 或者
+  (): 组合在一起。
+
+2007-7-18 10:49
+ XXX(a+3*d,b,c);
+ 转化为汇编: push a; push b, push c; call xxx
+ 但是里面的参数可能是表达式. 另外如果我要做类型检查,怎么做.
 
 2007-7-12 15:17
 * CustomTurboModule

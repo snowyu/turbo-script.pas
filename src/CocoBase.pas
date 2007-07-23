@@ -14,7 +14,7 @@ uses
   Classes, SysUtils
   , uMeObject
   , uMeTypes
-  , uStrUtils
+  , uMeStrUtils
   , uTurboConsts
   , uTurboMetaInfo
   , uTurboExecutor
