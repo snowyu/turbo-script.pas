@@ -4,7 +4,7 @@ writen by riceball LEE
 
 Feature:
   * 平台无关：采用 Forth Virtual Machine Codes 指令集；
-  * 高速执行：各种 TurboExecutor 可以根据 VM codes 即时翻译成不同CPU的真实指令集，直接运行，或通过高度优化的解释执行的Executor类运行(效率只比直接运行慢0.3倍)。
+  * 高速执行：各种 TurboExecutor 可以根据 VM codes 即时翻译成不同CPU的真实指令集JIT执行，或编译后直接运行，或通过高度优化的解释执行的Executor类运行(效率只比直接运行慢0.3倍)。
   * TurboInterpreter： 以解释方式执行VMCode是基于x86 机器代码优化，执行速度直逼C++，Delphi等高级编译语言。
     * 可以在脚本中调用宿主程序或DLL中的函数(支持Register, pascal, stdcall, cdecl, fastcall调用约定)
     * 可以在宿主程序调用脚本中的任一过程!

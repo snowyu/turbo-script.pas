@@ -21,6 +21,12 @@ TODO:
   | : 或者
   (): 组合在一起。
 
+2007-7-27 8:30
+~ TurboDebuger : 可以用AOP实现，拦截 iVMNext！
+  维护一个中断地址列表。和当前中断地址，首先查是否为当前中断地址然后在中断地址列表中查。
+  记住源程序行对应的编译后地址，按下F7/F8，则重新设置当前中断地址。
+* 准备采用于 PHP 类似的协议：http://www.php.net/license/
+
 2007-7-18 10:49
  XXX(a+3*d,b,c);
  转化为汇编: push a; push b, push c; call xxx
