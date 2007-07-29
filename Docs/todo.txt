@@ -27,6 +27,31 @@ TODO:
   记住源程序行对应的编译后地址，按下F7/F8，则重新设置当前中断地址。
 * 准备采用于 PHP 类似的协议：http://www.php.net/license/
 
+The TurboCompiler Architecture Framework Plan - The alternative future for Delphi Compiler
+
+
+The CodeGear/Borland give up the development of the compiler?
+What is the next gerneration object compiler Architecture?
+
+It seems that the Borland(CodeGear) is tired to continue researching the compiler since the M$ has relased the ECMA Specification(Common.Language.Infrastructure).
+So, the Delphi fans have to optimize the RTL performance by themself: the FastCode project, the FastMM project.
+
+Why not the Borland(CodeGear) can design their CIL Specification, and just following the M$?
+
+The M$ CIL is not good enough for general scrpiter/compiler developer.
+The M$ CIL insufficiencies:
+It's the enforced strong-type, not decided by developer.
+It's not a scrpiter/compiler Architecture Framework.
+It can not be commercial even though the M$ open source the rotor.
+It can not switch freely between JITter and interpreter.
+
+
+the CodeGear/Borland turn to the IDE products:  PHP IDE, Rubby IDE...
+.
+Should CodeGear/Borland open source for Delphi compiler?
+
+
+
 2007-7-18 10:49
  XXX(a+3*d,b,c);
  转化为汇编: push a; push b, push c; call xxx
