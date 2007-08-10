@@ -1,4 +1,4 @@
-Program test2
+Program testAdd
 
 var
   tBegin: Int64;

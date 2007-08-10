@@ -1,6 +1,7 @@
 function Add(const a, b: integer): integer;
 begin
-  Result := a +b;
+  //Result := a +b;
+  //Result := 0;
 end;
 
 var

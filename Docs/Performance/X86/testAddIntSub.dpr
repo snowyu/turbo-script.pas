@@ -10,7 +10,7 @@ var
   tBegin, tEnd: Int64;
   a: integer;
 
-function add(a,b: integer): integer;
+function add(const a,b: integer): integer;
 asm
   //mov EAX, a
   add EAX, b

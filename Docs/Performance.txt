@@ -5,6 +5,7 @@ Summary: ÕâÀï½«ÆÀ²âÊÀ½çÉÏ×î¿ìµÄ½Å±¾ÒýÇæµÄ½âÊÍÆ÷Ö´ÐÐÐ§ÂÊ ¡ª¡ª  EUPHORIA, Lua£¬ÒÔ¼
 
 == ÒýÑÔ ==
 
+
 ºâÁ¿½Å±¾ÒýÇæÐ§ÂÊ£¬¶ÔÓÚ·ÇJITterÖ´ÐÐµÄ½âÊÍÐÍ½Å±¾À´Ëµ£¬½âÊÍÆ÷±¾ÉíµÄÖ´ÐÐÐ§ÂÊ¾ÍÊÇºËÐÄµÄºËÐÄ£¬¹Ø¼üÖ®¹Ø¼üÁË¡£
 ×ÜËùÖÜÖª£¬½âÊÍµÄËÙ¶ÈÂýÓÚ±àÒëµÄÔ­Òò¾ÍÊÇ£¬ÒòÎª¶àÁËÒ»µÀ¹¤Ðò£¬Ö¸Áî±ØÐë¾­¹ý½âÊÍ²ÅÄÜÖ´ÐÐ¡£ÒªÏëÌá¸ß½âÊÍÆ÷µÄ
 ÐÔÄÜ£¬×ÔÈ»ÊÇÒª¾¡Á¿Ëõ¶Ì½âÊÍµÄ¹ý³Ì¡£Õâ¸ö½âÊÍµÄ¹ý³Ì¾ÍÊÇ¿ÕºÄÁË£¬Ò²¾ÍÊÇÎÒÃÇÆ½Ê±ËµµÄ×öµÄÎÞÓÃ¹¦¡£Òò´Ë£¬ÕâÀï
@@ -14,16 +15,11 @@ Summary: ÕâÀï½«ÆÀ²âÊÀ½çÉÏ×î¿ìµÄ½Å±¾ÒýÇæµÄ½âÊÍÆ÷Ö´ÐÐÐ§ÂÊ ¡ª¡ª  EUPHORIA, Lua£¬ÒÔ¼
 Ì«¿ì£¬Èç¹ûÖ»ÖØ¸´Ö´ÐÐ¼¸´Î£¬¾ÍËãÊÇÓÃ¸ßÐÔÄÜ¼ÆÊýÆ÷Ò²ÎÞ·¨¼ÆÊ±£¬ËùÒÔÕâÀï½«ÖØ¸´Ö´ÐÐ2017´Î¼Ó·¨Ö¸Áî£¬ÒÔ300ÀÛ¼Ó£¬
 ½á¹ûÎª300*2017¡£²âÊÔÈ«²¿²ÉÓÃ QueryPerformanceCounter ¸ß¾«¶È¼ÆÊý¡£
 
-ÔÚ½âÊÍÆ÷Ö±½ÓÖ´ÐÐVMÖ¸ÁîµÄÐ§ÂÊÖ®ºó£¬ÎÒÃÇ»¹Ïë²âÊÔÏÂ½âÊÍÆ÷×ö¹ý³Ìµ÷ÓÃµÄÐ§ÂÊ£¬±Ï¾¹ÔÚÊµ¼ÊÓ¦ÓÃÖÐ´ó²¿·Ö¶¼ÊÇÖ´ÐÐµÄ
-¹ý³Ìµ÷ÓÃ£¨Ðé·½·¨ÕâÐ©¸üÊÇ¹ý³ÌµÄÉý»ª£¬µ±È»ÓÉÓÚÐé·½·¨Òª²é±íËùÒÔÓÖÒª±Èµ÷ÓÃÆÕÍ¨¹ý³ÌÂý£©¡£¾Í½«¼Ó·¨Ö¸Áî·Åµ½×Ó¹ý
+ÔÚ½âÊÍÆ÷Ö±½ÓÖ´ÐÐVMÖ¸ÁîµÄÐ§ÂÊÖ®ºó£¬ÎÒÃÇ»¹Ïë²âÊÔÏÂ½âÊÍÆ÷Ö´ÐÐ¹ý³Ìµ÷ÓÃµÄÐ§ÂÊ£¬±Ï¾¹ÔÚÊµ¼ÊÓ¦ÓÃÖÐ´ó²¿·Ö¶¼ÊÇÖ´ÐÐµÄ
+¹ý³Ìµ÷ÓÃ£¨·½·¨£¬Ðé·½·¨Êµ¼ÊÉÏÒÀÈ»ÊÇ¹ý³Ì£¬µ±È»ÓÉÓÚÐé·½·¨Òª²é±íËùÒÔÓÖÒª±Èµ÷ÓÃÆÕÍ¨¹ý³ÌÂý£©¡£¾Í½«¼Ó·¨Ö¸Áî·Åµ½×Ó¹ý
 ³ÌÖÐ£¬¾Í¿ÉÒÔ²âÊÔÁË¡£
 
 ÆäÊµÈç¹û½Å±¾ÒýÇæ¶¼ÄÜÊµÏÖÒ»¸ö¿ÕÖ¸ÁîÄÇÃ´¾ÍÄÜ¾«È·µÄ¿´³ö½âÊÍÆ÷µÄ¿ÕºÄÁË¡£
-
-paxCompiler 1.4: 
-  PaxCompiler1.RegisterHeader(0, 'function QueryPerformanceCounter(var a: Int64):Boolean;stdcall;', @QueryPerformanceCounter);
-  ÔÚ½Å±¾ÖÐ×¢²á QueryPerformanceCounterº¯Êýºóµ«ÊÇ²»ÄÜÈ¡µÃ·µ»ØÖµ¡£
-
 
 
 == ËÙ¶ÈÐ§ÂÊÍ¼ ==
@@ -32,6 +28,8 @@ paxCompiler 1.4:
 Ö´ÐÐËÙ¶ÈµÄ73%£¬Ò²¾ÍÊÇËµËüµÄ¿ÕºÄÖ»ÓÐ27%¡£
 
   ScriptPerformance.gif
+  [[Image:./ScriptPerformance-3.gif|thumb|none|95%|]]
+
 
 Êµ¼ÊÉÏ Lua ÊÇÓÃFloatÊµÏÖµÄÕûÊýµÄÔËËã£¬ÔÚËüµÄÊý×ÖÀàÐÍÊµÏÖÖÐ£¬ÆäÊµÔÚÄÚ²¿Ö»ÓÐ¸¡µãÀàÐÍ£¬ËùÒÔÔÚÖ´ÐÐÉÏÕ¼ÁËÁÓÊÆ¡£
 ¶øEUPHORIAÔòÔÚÄÚ²¿×¨ÃÅÊµÏÖÁËÕûÊýÀàÐÍ£¬²»¹ýÆæ¹ÖµÄÊÇËü¾ÍÃ»ÓÐ×¨ÃÅÊµÏÖ¸¡µãÀàÐÍÁË£¬Ê£ÏÂµÄ¾ÍÈ«²¿ÊÇÓÃatomÀàÐÍ½ø
@@ -82,8 +80,10 @@ TurboScript½âÊÍÆ÷ÔòÓÖÊÇÓÃ¸ß¶ÈÓÅ»¯µÄx86Ç¶Èë»ã±àÐ´µÄ£¬ÕâÊÇTurboScript½âÊÍÆ÷ÔËÐÐ¸ßÐ
   (¼ÆÊ±½áÊø)
 </code>
 
-¡¾Lua5.0.2¡¿ÔËÐÐÊ±¼ä£º 110£»ÊÇx86Ö´ÐÐËÙ¶ÈµÄ49%£»¿ÕºÄÎª51%
-¡¾Lua5.1 ¡¿ ÔËÐÐÊ±¼ä£º 120£»ÊÇx86Ö´ÐÐËÙ¶ÈµÄ45%£»¿ÕºÄÎª55%
+LuaÄÚ²¿²»´æÔÚIntÀàÐÍ£¬ËùÓÐÊý×ÖÈ«²¿ÊÇDouble¸¡µãÐ¡Êý£¬ËùÒÔÕâÀïÓÚ x86¸¡µã¼Ó·¨ÔËËãÖ¸Áî±È½Ï¡£
+
+[Lua5.0.2] QueryPerformanceCount: 110; ÊÇx86Ö´ÐÐËÙ¶ÈµÄ61%£»¿ÕºÄÎª39%
+[Lua5.1 ] QueryPerformanceCount: 120;  ÊÇx86Ö´ÐÐËÙ¶ÈµÄ56%£»¿ÕºÄÎª44%
 
 
 === EUPHORIA ¼Ó·¨Ö¸ÁîË³ÐòÖ´ÐÐÐ§ÂÊ²âÊÔ½Å±¾ ===
@@ -109,6 +109,13 @@ TurboScript½âÊÍÆ÷ÔòÓÖÊÇÓÃ¸ß¶ÈÓÅ»¯µÄx86Ç¶Èë»ã±àÐ´µÄ£¬ÕâÊÇTurboScript½âÊÍÆ÷ÔËÐÐ¸ßÐ
 </code>
  
 ½á¹ûÔËÐÐÊ±¼ä£º286£»ÊÇx86Ö´ÐÐËÙ¶ÈµÄ19%£»¿ÕºÄÎª81%
+
+Notes:
+paxCompiler 1.4: 
+  PaxCompiler1.RegisterHeader(0, 'function QueryPerformanceCounter(var a: Int64):Boolean;stdcall;', @QueryPerformanceCounter);
+  ÔÚ½Å±¾ÖÐÖ±½Ó×¢²á QueryPerformanceCounterº¯Êýºóµ«ÊÇ²»ÄÜÈ¡µÃ·µ»ØÖµ¡£
+
+
 
 === TurboScript ½Å±¾ ===
 <code>
@@ -213,6 +220,7 @@ end;
 </code>
  
 ½á¹ûÔËÐÐÊ±¼ä£º410£»ÊÇx86Ö´ÐÐËÙ¶ÈµÄ31%£»¿ÕºÄÎª69%
+(¿Õ×Óº¯ÊýµÄÐ§ÂÊºÍÖ´ÐÐ¼Ó·¨¼ÆËãµÄÐ§ÂÊ²î²»¶à£º401)
 
 === TurboScript ×Ó¹ý³Ì½üµ÷ÓÃÐ§ÂÊ²âÊÔ ===
 <code>
@@ -272,6 +280,6 @@ PurePascalEngineÔËÐÐÊ±¼ä(Ô¤ÏÈ¼ÓÔØ): 4733-4847; LoadOnDemand: 16617-17242(29035)
 == ÍøÕ¾ ==
  * Lua: http://www.lua.org
  * EUPHORIA: http://www.rapideuphoria.com
- * TurboScript: http://www.mesdk.com [½¨ÔìÖÐ]
+ * TurboScript: [½¨ÔìÖÐ]
  
 == ²âÊÔ½Å±¾ºÍ³ÌÐòÏÂÔØ ==

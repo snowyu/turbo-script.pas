@@ -21,6 +21,19 @@ TODO:
   | : 或者
   (): 组合在一起。
 
+2007-7-30 13:09
+~ treat the TurboModule as a function
+  然后构造函数式语言.
+!+ creation_cy: 
+  Feature(Script):
+   cache the function result for specified function:
+   如果该函数是 cached那么只要运行一次后，下次再有相同参数，则直接查找cache，返回结果。
+   function XXX: result; cached;
+   这相当于为这类需要Cache的方法利用AOP进行拦截，也不需要解释器的直接支持 
+   是的，呵呵，我刚才还想在解释器内核中实现拦截，你倒是提醒了我，可以在脚本中通过实现AOP来做
+   这个脚本AOP功能的确没有考虑到，这个功能可以加上，不过复杂度就比直接在解释器内核中实现AOP大多了，那个几行代码就能实现
+
+
 2007-7-27 8:30
 ~ TurboDebuger : 可以用AOP实现，拦截 iVMNext！
   维护一个中断地址列表。和当前中断地址，首先查是否为当前中断地址然后在中断地址列表中查。

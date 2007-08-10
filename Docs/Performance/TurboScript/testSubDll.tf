@@ -1,12 +1,12 @@
-Program testSubEx
-//: Add +;
-: Add external 'test';
+{.$LOADONDEMAND ON}
+Program testSubDll
+: Add(const a: Integer; const b: Integer): Integer external 'dlltest.dll' DLL REGISTER Name 'AddCalc';
 
 var
   tBegin: Int64;
   tEnd: Int64;
 begin
-tBegin !Tick //save the QueryPerformanceCounter to tBegin variable
+tBegin !Tick
 300
 300 Add
 300 Add
@@ -2026,5 +2026,5 @@ tBegin !Tick //save the QueryPerformanceCounter to tBegin variable
 300 Add
 
 tEnd !Tick
-tBegin @i8 tEnd @i8 i8-  //tEnd - tBegin
+tBegin @i8 tEnd @i8 i8-
 end.
