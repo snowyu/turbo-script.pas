@@ -40,6 +40,8 @@ type
    { Description
        @param tfAddrResolved  the address resolved or not
        @param tfInited        the module(static class) initialized or not.
+
+    Note: One byte only!
    }
    TTurboModuleFlag = (tfAddrResolved, tfInited);
    TTurboModuleFlags = set of TTurboModuleFlag;

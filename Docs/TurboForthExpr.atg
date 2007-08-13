@@ -292,7 +292,7 @@ PRODUCTIONS
                                                             vMainMethod.BodyInit;
                                                        .)
     ASMStatementBlock<vMainMethod>
-    "END" "."                                          (.   vMainMethod.BodyFinal;
+    "END."                                          (.   vMainMethod.BodyFinal;
                                                             //aWord.Body.AddOpCode(opPushInt); FModule.AddIntToMem(0); aWord.Body.AddOpCode(opHalt); 
                                                           finally
                                                             //MeFreeAndNil(vMainMethod); //managed by FModuleSymbol.
@@ -467,7 +467,7 @@ PRODUCTIONS
                                                                    vWord.Column := TCocoRScannerAccess(Scanner).CurrentSymbol.Col;
                                                                  .)
 
-    [FormalParameters<vWord>] [":" ResultParamType<aWord.TypeInfo>]
+    [FormalParameters<vWord>] [":" ResultParamType<vWord.TypeInfo>]
     
     [                                                            (.
                                                                     vWordRef := FModuleSymbol.NewMethodRef('');
@@ -577,8 +577,8 @@ PRODUCTIONS
        |"PASCAL"               (. aWord.CallStyle := ccPascal; .)
        |"FORTH"                (. aWord.CallStyle := ccForth; .)
       )
-      ["Name" StringToken (. aOptions.Name := AnsiDequotedStr(LexString, ''''); .) ]
-      ["Index" IntegerToken (. aOptions.Index := StrToInt(LexString); .)]
+      ["Name" StringToken (. aWord.ExternalOptions.Name := AnsiDequotedStr(LexString, ''''); .) ]
+      ["Index" IntegerToken (. aWord.ExternalOptions.Index := StrToInt(LexString); .)]
     ]
   .
   ModuleType< var aType: TTurboModuleType >

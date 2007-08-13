@@ -19,7 +19,7 @@ uses
 
 const
   sErrorDetail = 'Error Detail can be found in ';
-  cProgCopyright = '-->MODULENAME<-- 1.0 Copyright(c) 2006 Riceball LEE<riceballl@hotmail.com>';
+  cProgCopyright = '-->MODULENAME<-- 1.0 Copyright(c) 2006,2007 Riceball LEE<riceballl@hotmail.com>';
   cProgTitle     = 'Turbo Forth Command Line Complier';
 
 type

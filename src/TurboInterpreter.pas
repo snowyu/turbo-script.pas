@@ -308,6 +308,7 @@ end;
 procedure iVMCallFar(const FGlobalOptions: PTurboGlobalOptions);
 var
   vModuleRefInfo: PTurboModuleRefInfo;
+  vCFA: tsInt;
 begin
   vModuleRefInfo := PPointer(FGlobalOptions._PC)^;
   Inc(FGlobalOptions._PC, SizeOf(vModuleRefInfo));
@@ -316,7 +317,29 @@ begin
     Integer(vModuleRefInfo) := Integer(vModuleRefInfo) + Integer(FGlobalOptions._Mem);
 
   if _DoVMCallFarMemBase(FGlobalOptions, vModuleRefInfo) then
-    iVMEnter(FGlobalOptions);
+  begin
+    if not Assigned(FGlobalOptions._Mem.InitializeProc) or (FGlobalOptions._Mem.Flags and Ord(tfInited)) = Ord(tfInited) then
+    begin
+      iVMEnter(FGlobalOptions);
+    end
+    else
+    begin
+      FGlobalOptions._Mem.Flags := FGlobalOptions._Mem.Flags or Ord(tfInited);
+      //fetch the subroutine CFA From the PC
+      vCFA := PtsInt(FGlobalOptions._PC)^;
+      Inc(FGlobalOptions._PC, SizeOf(tsInt));
+      //Push the current PC to return stack.
+      Dec(FGlobalOptions._RP, SizeOf(tsPointer));
+      PtsInt(FGlobalOptions._RP)^ := FGlobalOptions._PC; 
+
+      //Push the current far subroutine to return stack.
+      Dec(FGlobalOptions._RP, SizeOf(tsPointer));
+      PtsInt(FGlobalOptions._RP)^ := vCFA;
+      vCFA := FGlobalOptions._Mem.InitializeProc + Integer(FGlobalOptions._Mem.Code);
+      //Update the new PC
+      FGlobalOptions._PC := vCFA;    
+    end;
+  end;
 end;
 
 procedure RunExternalFunc(const aMethod: PTurboMethodInfoEx; 

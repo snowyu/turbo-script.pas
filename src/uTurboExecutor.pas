@@ -182,6 +182,7 @@ type
     function GetLastTypeRefEntry: PTurboTypeRefEntry;
     function GetLastVariableEntry: PTurboStaticFieldEntry;
     function GetLastWordEntry: PTurboMethodEntry;
+    function GetMainEntry: Integer;
     function GetMemorySize: tsInt;
     function GetModuleType: TTurboModuleType;
     function GetRoot: TCustomTurboModule;
@@ -339,6 +340,7 @@ type
             GetLastVariableEntry write SetLastVariableEntry;
     property LastWordEntry: PTurboMethodEntry read GetLastWordEntry write
             SetLastWordEntry;
+    property MainEntry: Integer read GetMainEntry;
     {: The Code Memory }
     property Memory: Pointer read FMemory write FMemory;
     {: : the Memory Size. }
@@ -606,10 +608,11 @@ type
     //in LastModuleEntry 链表中
     ModuleParent: PTurboModuleRefInfo;
 
-    //如果ModuleType是模块，那么就是装载运行该模块前执行的初始化过程，入口地址
-    //如果是函数，则是该函数的入口地址
+    MainEntry: Pointer; //for ApplicationModule and FunctionModule. 是函数的入口地址
+    //装载运行该模块前执行的初始化过程，入口地址
     InitializeProc: Pointer; //it is the offset address of the FMemory
-    FinalizeProc: Pointer; //如果是模块的话
+    FinalizeProc: Pointer; //终止化过程，入口地址
+
     //last Used(import) module entry.
     LastModuleRefEntry: PTurboModuleRefEntry;
     //有名字的函数链表，指向最后一个函数入口。
@@ -1273,6 +1276,11 @@ end;
 function TCustomTurboModule.GetLastWordEntry: PTurboMethodEntry;
 begin
   Result := PTurboPreservedDataMemory(FDataMemory).LastWordEntry;
+end;
+
+function TCustomTurboModule.GetMainEntry: Integer;
+begin
+  Result := Integer(PTurboPreservedDataMemory(FDataMemory)^.MainEntry);
 end;
 
 function TCustomTurboModule.GetMemorySize: tsInt;

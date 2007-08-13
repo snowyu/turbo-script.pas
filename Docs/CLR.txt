@@ -6,6 +6,8 @@ CIR(Common Intermediate Language (CIL))分析
 它的加法指令只有一种形式，这说明它的加法指令的数据类型是后期约束的，不过这样一来，构成加法的指令的数据必须要有数据类型了！
 CLR 比我多了一个参数表用于传递过程的参数。
 
+CLR 实现了两个new: newarr(创建一个1维数组), newobj.
+
 = CLI Architecture =
 The Common Language Infrastructure (CLI) provides a specification for executable code and the execution environment (the Virtual Execution System, or VES) in which it runs.
 
@@ -765,11 +767,12 @@ Format                Assembly Format   Description
 0x6C                 conv.r8
 0x6D                 conv.u4
 0x6E                 conv.u8
-0x6F                 callvirt
+0x6F<T>              callvirt method      call a method associated, at runtime, with an object (obj, arg1, … argN -- Result<if any>)
 0x70                 cpobj
 0x71                 ldobj
 0x72                 ldstr
-0x73                 newobj
+0x73<T>              newobj ctor          create a new object   (arg1, … argN -- obj)
+                                          allocate an uninitialized object or value type and call ctor. Ctor is a metadata token (a methodref or methodef that must be marked as a constructor).
 0x74                 castclass
 0x75                 isinst
 0x76                 conv.r.un
@@ -802,7 +805,7 @@ Format                Assembly Format   Description
                                              false, a null reference is pushed onto the stack; otherwise, the result of boxing
                                              val’s Value property is pushed onto the stack. If typeTok is a reference type,
                                              the box instruction does nothing.
-0x8D                 newarr
+0x8D<T>              newarr etype            Create a zero-based, one-dimensional array  (numElems -- array)
 0x8E                 ldlen
 0x8F                 ldelema
 0x90                 ldelem.i1

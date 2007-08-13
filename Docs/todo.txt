@@ -21,6 +21,152 @@ TODO:
   | : 或者
   (): 组合在一起。
 
+2007-8-12 8:47
+~ Declare statement
+Grammar
+  $SkipBlank = " " + #10:
+  $Comments = "//" to $EOL;
+  $Comments.Add  "/*" to "*/";
+  $StringLimiter.Add  "'" to "'";
+  $StringEscape = "\";                   //the default
+  $StringLimiterEscape = $StringLimiter; //the default
+
+  Function is "function" [$Identity: FunctionName]"(" FunctionParameters ")" ";" ;
+
+  Function is "procedure" [$Identity: FunctionName] "(" FunctionParameters ")" ";" ;
+
+  Expression is function (v1: Number) "+" (v2: Number): Number;
+  begin
+    Result := v1+v2;
+  end;
+
+  Statement is procedure "for" (var variable: Element) "in" (aArray: ArrayType) "do" (statements: function);
+  begin
+    for i := Low(aArray) to High(aArray) do
+    begin
+      variable := aArray[i];
+      statements();
+    end;
+  end;
+
+Type
+  TFunctionMetaInfo =
+    Name:
+    TypeInfo:
+    Attributes:
+  end;
+
+  TClassInfo = Object
+    constructor: TFucntion;
+    Attributes: Array[][];
+  end;
+  TFunction
+   
+
+  事实上语句可以看作是一种函数，不过看作函数的话效率就慢了些，另外要处理的参数也多了：必须将参数传递给statements(var variable: Element; aArray: ArrayType)。
+  不好，还是在编译器一层展开。从编译器的角度来看可以看作常量宏？
+
+~ 小析弱类型函数语言
+  我设想的弱类型函数语言只有两种结构：变量(var)，函数(function), 里面所有用户定义的标识符都是元素（element）.
+  基本类型只有： fucntion, object(属性包)
+  系统内部固化的简单类型有： number(数值), string(字符串)
+  Object.constructor = "function() {};"
+  Object.Elements: 指向RTTI表。访问该对象的RTTI信息。
+  function Object.valueOf(): Element:
+
+  function Elements.Add(aParent, aElementName: string): Element;
+  function Elements.Remove(aParent, aElementName: string);
+  function Elements.Get(aParent, aElementName: string): Element;
+  function AssignValue(aElement: Element; aValue: Element);
+  function Eval(aScript: string): Element;
+
+  Object.toString: 如果在脚本中直接使用object引用，就返回该toString的值
+  Object.toSource: 序列化object，可以用它直接创建对象。
+  Object.valueOf: convert the object to primitive value.
+  :
+  
+
+  分析javascript:
+  var x, xx = new Obj; x 依然是 undefined.
+  类型有： function, object, 在js的实现中，function 和 object是没啥差别的，唯一的不同是 Function 的 prototype 是 FunctionPrototype,而 Object则是ObjectPrototype
+
+  也就是说 object也是派生自 Function 的。
+  Prototype = { //the attributes list.
+    constructor: function() {}, 
+    . : function(aAttribute){}, //get or add attribute.
+    _delete : function(aAttribute){}, //remove an attribute.
+  };
+  function Prototype() { //等同于
+    this.constructor = function() {};
+    this."." = function(aAttribute){}, //get or add attribute.
+  }
+
+  Function = {
+    constructor: function() {prototype.constructor = Function},
+    prototype: Prototype;
+  }
+
+  Object = {
+    constructor: function() {prototype.constructor = Object},
+    prototype: Prototype,
+  }
+
+  系统内部固化的简单类型(值类型)有： number(数值), string(字符串), boolean, function, undefined, NULL
+   上面的类型以及运算是最小核心，然后就是可扩展部分。js 不支持操作符重载。
+   然后为类型分类建立相应的 Object: Number, String, Boolean, Function, Array
+  预定义的标识符： var, function
+  语句分隔符： ";"
+  预定义的内部函数：
+    赋值函数： =
+    object(属性包)： {属性名:值, ...} 该方式被称为 initializers, js1.2以上支持。
+    声明变量： var
+    声明函数： function() {};  var声明不会作为函数的子元素，只有当用this.XXX才会被作为函数的子元素
+    typeof XXX: 返回XXX的类型名
+    new XXX: 新建 object. 
+    aObject.PropName : 引用aObject的PropName属性 前期绑定的
+    aObject['PropName']: 引用aObject的PropName属性 后期绑定的
+    Object.prototype: 指向RTTI表。访问该对象的RTTI信息, 为object添加新的属性. eg, TCar.prototype.color=null;
+    Object.constructor = "function() {};"
+    Object.toString(): 如果在脚本中直接使用object引用，就返回该toString的值
+    Object.toSource(): 序列化object，可以用它直接创建对象。
+    Object.valueOf(): convert the object to primitive value.
+    get, set: Defining Getters and Setters  o = {a:7, get b() {return this.a+1; }, set c(x) {this.a = x/2}};
+  不使用 var 声明的就是是全局变量。
+
+function TCar(make, model, year) {
+   this.make = make;
+   this.model = model;
+   this.year = year;
+   //在函数内不能访问 prototype!! 实际上这个被当作了 constructor.
+}
+mycar = new TCar("Eagle", "Talon TSi", 1993);
+mycar.color = 'black';
+
+如果只知道对象实例a，如何取得它的 prototype ?
+  a.constructor.prototype(在js中它的作用仅仅限于get/add attribute)
+
+2007-8-10 8:00
+~ 在 X86Interpreter 中是用ECX保存GlobalOptions的
+  为了利用AOP实现Debug, 是否需要将 ECX 换成 EAX（纯paascal的是EAX，register调用约定）？不过对于x86是这样但是如果换做其它CPU呢？？
+  算了意义不大，还是集中精力解决 Module.Init(Final)以及Method.Init(Final).
+~ Module.Init(Final)
+  如果Module是函数那么？
+  + TTurboPreservedDataMemory.MainEntry for ApplicationModule and FunctionModule.
+  + TCustomTurboModule.MainEntry
+    是否可以将ApplicationModule视作为 FunctionModule？也就是说函数和Application有啥差别？
+    似乎没啥语意上的差别。
+    Module的Init(Final)和FunctionModule的Init(Final)执行时间的不同：
+      * Module 是在加载和卸载的时候执行
+        执行归Executor管，在Module看不到。所以在TurboExector上执行。
+        约定:所有的Init/Final过程为近调用过程(Near)！
+        //在执行时候，编译器自动将 Flags标识设置为 tfInited.由Executor完成。
+        初始化搞定，关键是Final的时机？不是在executor有FinalExec方法？应该在卸载前？
+        如果是自动管理内存，自然在卸载的时候内存就回收了。时机在哪里？
+        如果在运行结束时调用Final？那么假设我有一个垃圾自动回收装置，自动回收（卸载）未使用的模块，那么这里的模块显然不能执行Final。
+        如果在卸载前执行，就必须要考虑并行冲突！增加标志正在卸载。加查是否该模块正在使用。在全局函数增加一个调用模块链。
+      * FunctionModule 是在执行 MainEntry 前(Init)和执行 MainEntry 后运行(Final)。
+        目前还没有使用该概念
+
 2007-7-30 13:09
 ~ treat the TurboModule as a function
   然后构造函数式语言.
