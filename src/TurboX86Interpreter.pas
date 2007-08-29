@@ -967,7 +967,7 @@ asm
   INC EBP
   MOV EBX, [EBP]
   //check whether is stackbottom
-  CMP EBP, [ECX].TTurboGlobalOptions.ParamStackBase
+  CMP EBP, [ECX].TTurboGlobalOptions.ParamStackBottom
   JLE @@exit //already is bottom then exit.
   INC EBP 
   INC EBP 
@@ -995,7 +995,7 @@ asm
   INC EBP
   MOV EBX, [EBP]
   //check whether is stackbottom
-  CMP EBP, [ECX].TTurboGlobalOptions.ParamStackBase
+  CMP EBP, [ECX].TTurboGlobalOptions.ParamStackBottom
   JLE @@exit //already is bottom then exit.
   INC EBP 
   INC EBP 
@@ -1016,7 +1016,7 @@ asm
   INC EBP
   MOV EBX, [EBP]
   //check whether is stackbottom
-  CMP EBP, [ECX].TTurboGlobalOptions.ParamStackBase
+  CMP EBP, [ECX].TTurboGlobalOptions.ParamStackBottom
   JLE @@exit //already is bottom then exit.
   INC EBP 
   INC EBP 

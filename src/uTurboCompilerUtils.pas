@@ -250,6 +250,15 @@ Type
   public
   end;
 
+  TTurboMethodArgument = Object(TTurboCustomSymbol)
+  protected
+    //to generate new VMT for it.
+    class function ParentClassAddress: TMeClass;virtual;abstract;
+  Public
+    ParamFlags: TParamFlags; //pfVar, pfConst, etc...
+    Symbol: TTurboSymbol;
+  end;
+
   TTurboCustomMethodSymbol = object(TTurboCustomBlockSymbol)
   protected
     //FiTypeSymbol:internal used, when this type is not Declared!
@@ -2248,7 +2257,7 @@ begin
     with PTurboMethodSymbol(aSymbol)^ do
     if Assigned(TurboType) then
     begin
-      vResolved := True;
+      vResolved := True; //purpose already resolved.
       Case TurboType.Kind of
         mtkLString, mtkString: if FValue.VInteger = 0 then vResolved := False;
         else
@@ -2270,7 +2279,7 @@ begin
           else
             Body.AddOpCode(opPushInt64);
         end;
-      end;
+      end; //Case
       Integer(p) := Body.UsedSize;
       Body.AllocSpace(Size);
       if vResolved then

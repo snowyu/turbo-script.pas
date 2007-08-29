@@ -235,6 +235,7 @@ begin
   Inc(FGlobalOptions._RP, SizeOf(tsPointer));
   FGlobalOptions._Mem := PPointer(FGlobalOptions._RP)^;
   Inc(FGlobalOptions._RP, SizeOf(tsPointer));
+  InterlockedDecrement(FGlobalOptions._Mem.RefCount);
 end;
 
 //save the old MemoryBase, pass the CPUStates to the new MemoryBase.
@@ -253,6 +254,7 @@ begin
     //load the new MemoryBase
     FGlobalOptions._Mem := p;
   end;
+  InterlockedIncrement(FGlobalOptions._Mem.RefCount);
   iVMEnter(FGlobalOptions);
 
 {//@@LocalEnter:
@@ -297,6 +299,7 @@ begin
       aModuleRefInfo.Handle := p;
     end;
     FGlobalOptions._Mem := TTurboMemoryModuleAccess(p).FDataMemory;
+    InterlockedIncrement(FGlobalOptions._Mem.RefCount);
   end;
 end;
 
@@ -322,7 +325,7 @@ begin
     begin
       iVMEnter(FGlobalOptions);
     end
-    else
+    else //Initialize Process...
     begin
       FGlobalOptions._Mem.Flags := FGlobalOptions._Mem.Flags or Ord(tfInited);
       //fetch the subroutine CFA From the PC

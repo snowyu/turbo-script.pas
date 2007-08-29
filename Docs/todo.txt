@@ -21,6 +21,85 @@ TODO:
   | : 或者
   (): 组合在一起。
 
+~ 通过 FreeMem 释放字符串的内存,警告, 这将跳过引用计数直接释放！这可能使得还在使用该字符串的函数出错！
+procedure FreeAnsiStringMem(var s);
+type
+  PStrRec = ^StrRec;
+  StrRec = packed record
+    refCnt: Longint;
+    length: Longint;
+  end;
+var
+  P: PStrRec;
+begin
+  if Pointer(S) <> nil then
+  begin
+    P := Pointer(Integer(S) - Sizeof(StrRec));
+    if P.refCnt > 0 then
+      FreeMem(P);
+  end;
+end;
+
+2007-8-24 20:59
+~ JS中一切都是函数和值：
+使用 New 函数创建一个新值(TJsValue)。分配内存后，这时候， construtor会被赋值，然后 this 会被赋值为该aVar的地址，构造预定义的局部变量 var arguments = New Arguments(12,22) 然后执行Function()函数。
+aVar = New Function(12,22);
+
+那么剩下的问题就是局部变量的处理？作为堆栈变量？可以开辟一个数据堆栈，但是堆栈变量不好随机访问！
+
+TJsValue =
+  Constructor: TJsFunction;
+  Attributes: TJsValueMap;
+end;
+
+TJsFunction =
+  FunctionList: TJsFunctionList; //internal function list.
+  Prototype: TJsValue;
+end;
+
+function GlobalObject(){
+  function XXX(){};  // FunctionList
+}
+
+
+
+2007-8-16 8:42
+* TTurboGlobalOptions
+  + ParamStackTop
+  + ReturnStackTop 
+
++ TTurboPreservedDataMemory.RefCount
+
+2007-8-14 14:40
+~ 函数调用with parameters.
+  编译时刻，检查函数是否存在，然后检查参数个数和参数类型是否一致。
+  对函数的调用的参数问题，本来是放在编译器中解决。能否放到symbol中？可能涉及到递归。
+  TTurboMethodArgument = Object(TTurboCustomSymbol)
+    ParamFlags: TParamFlags; //pfVar, pfConst, etc...
+    Symbol: TTurboSymbol;
+  end;
+  
+  TTurboMethodArguments = TurboSymbols;
+  
+
+  TJsCompiler = TCustomTurboModule
+    FJsFunctionList: TList; //user defined functions
+    Function Compile(aScript: string): Boolean;.
+  end;
+
+  函数类型添加一个 attributes
+
+  TJsTypeInfo = (jtiNumber, jtiString, jtiFunction, jtiObject);
+  TJsAttributeInfo = record
+    Name: string;
+    TypeInfo: TJsTypeInfo;
+  end;
+
+  TJsMethodInfo = object(TTurboMethodInfo)
+  public
+    Attributes: PJsAttributeInfos;
+  end;
+
 2007-8-12 8:47
 ~ Declare statement
 Grammar
@@ -111,7 +190,7 @@ Type
     prototype: Prototype,
   }
 
-  系统内部固化的简单类型(值类型)有： number(数值), string(字符串), boolean, function, undefined, NULL
+  系统内部固化的简单类型(值类型)有： number(数值), string(字符串), boolean, undefined, NULL
    上面的类型以及运算是最小核心，然后就是可扩展部分。js 不支持操作符重载。
    然后为类型分类建立相应的 Object: Number, String, Boolean, Function, Array
   预定义的标识符： var, function
@@ -132,6 +211,7 @@ Type
     Object.valueOf(): convert the object to primitive value.
     get, set: Defining Getters and Setters  o = {a:7, get b() {return this.a+1; }, set c(x) {this.a = x/2}};
   不使用 var 声明的就是是全局变量。
+  新建对象实例的属性仅在属性被赋值的时候才被添加到该对象实例上。
 
 function TCar(make, model, year) {
    this.make = make;

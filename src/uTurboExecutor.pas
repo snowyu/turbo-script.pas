@@ -77,12 +77,18 @@ type
     function GetIsRunning(): Boolean;
     procedure SetIsRunning(const Value: Boolean);
   public
+    //reset options
+    { Note: the StackTop and StackSize must be assigned first!}
+    procedure Reset; 
+  public
     States: Byte; //TTurboProcessorStates; modified by FPC
     LastErrorCode: TTurboProcessorErrorCode;
     ParamStackBase: Pointer;
+    ParamStackTop: Pointer;
     ParamStackSize: Integer; //bytes
     ParamStackBottom: tsInt;
     ReturnStackBase: Pointer;
+    ReturnStackTop: Pointer; //
     ReturnStackSize: Integer; //bytes
     //if halt with errHalt then the ReturnStackBottom will be the Old RSP.   
     ReturnStackBottom: tsInt;
@@ -608,7 +614,10 @@ type
     //in LastModuleEntry 链表中
     ModuleParent: PTurboModuleRefInfo;
 
-    MainEntry: Pointer; //for ApplicationModule and FunctionModule. 是函数的入口地址
+    //when far call the method in the module incease the refCount, exit decease refCount.
+    RefCount: tsInt; 
+    //for ApplicationModule and FunctionModule. 是函数的入口地址
+    MainEntry: Pointer; 
     //装载运行该模块前执行的初始化过程，入口地址
     InitializeProc: Pointer; //it is the offset address of the FMemory
     FinalizeProc: Pointer; //终止化过程，入口地址
@@ -728,6 +737,19 @@ begin
   {$ELSE Borland}
   Result := TTurboProcessorStates(States) * [psRunning, psStepping] <> [] ;
   {$ENDIF}
+end;
+
+procedure TTurboGlobalOptions.Reset; 
+begin
+  Integer(_SP) := Integer(ParamStackTop) + ParamStackSize * SizeOf(tsInt);
+  Integer(_RP) := Integer(ReturnStackTop) + ReturnStackSize * SizeOf(Pointer);
+  //init the return stack base pointer.
+  ReturnStackBottom := _RP;
+  ReturnStackBase := _RP;
+  //init the param stack base pointer.
+  ParamStackBottom := _SP;
+  ParamStackBase := _SP;
+  LastErrorCode := errNone;
 end;
 
 procedure TTurboGlobalOptions.SetIsRunning(const Value: Boolean);
@@ -2145,7 +2167,7 @@ begin
     begin
       if Assigned(FMemory) then
       begin
-        FMemory.OnReset := nil;
+        //FMemory.OnReset := nil;
         FGlobalOptions := nil;
       end;
       FMemory := Value;
@@ -2225,12 +2247,8 @@ end;
 
 procedure TTurboAppDomain.DoModuleReset(Sender: TObject);
 begin
-  with FGlobalOptions do
-  begin
-    Integer(_SP) := Integer(ParamStackBase) + ParamStackSize * SizeOf(tsInt);
-    Integer(_RP) := Integer(ReturnStackBase) + ReturnStackSize * SizeOf(Pointer);
-    LastErrorCode := errNone;
-  end;
+  FGlobalOptions.Reset;
+
   if not (psCompiling in States) then
     FMemory.IsAddrResolved := True;
 
@@ -2257,6 +2275,9 @@ begin
     {$ELSE Borland}
     Include(TTurboModuleFlags(PTurboPreservedDataMemory(FMemory.FDataMemory).Flags), tfInited);
     {$ENDIF}
+
+    FGlobalOptions.Reset;
+    //can be stepped run, so do not reset in executeCFA
     FExecutor.ExecuteCFA(FMemory.InitializeProc);
   end;
 end;
@@ -2280,7 +2301,7 @@ end;
 
 function TTurboAppDomain.GetParameterStack: Pointer;
 begin
-  Result := FGlobalOptions.ParamStackBase;
+  Result := FGlobalOptions.ParamStackTop;
 end;
 
 function TTurboAppDomain.GetParameterStackSize: Integer;
@@ -2290,7 +2311,7 @@ end;
 
 function TTurboAppDomain.GetReturnStack: Pointer;
 begin
-  Result := FGlobalOptions.ReturnStackBase;
+  Result := FGlobalOptions.ReturnStackTop;
 end;
 
 function TTurboAppDomain.GetReturnStackSize: Integer;
@@ -2324,7 +2345,7 @@ end;
 
 procedure TTurboAppDomain.SetParameterStack(Value: Pointer);
 begin
-  FGlobalOptions.ParamStackBase := Value;
+  FGlobalOptions.ParamStackTop := Value;
 end;
 
 procedure TTurboAppDomain.SetParameterStackSize(const Value: Integer);
@@ -2332,16 +2353,21 @@ begin
   if not FGlobalOptions.IsRunning and (ParameterStackSize <> Value) then
   begin
     FGlobalOptions.ParamStackSize := Value;
-    ReallocMem(FGlobalOptions.ParamStackBase, (Value+1)*SizeOf(tsInt));
+    ReallocMem(FGlobalOptions.ParamStackTop, (Value+1)*SizeOf(tsInt));
     with FGlobalOptions do
-      Integer(_SP) := Integer(ParamStackBase) + Value * SizeOf(tsInt);
+    begin
+      Integer(_SP) := Integer(ParamStackTop) + Value * SizeOf(tsInt);
+      //init the param stack base pointer.
+      ParamStackBottom := _SP;
+      ParamStackBase := _SP;
+    end;
     //if FSP > FParameterStackSize then FSP := FParameterStackSize;
   end;
 end;
 
 procedure TTurboAppDomain.SetReturnStack(Value: Pointer);
 begin
-  FGlobalOptions.ReturnStackBase := Value;
+  FGlobalOptions.ReturnStackTop := Value;
 end;
 
 procedure TTurboAppDomain.SetReturnStackSize(const Value: Integer);
@@ -2349,9 +2375,14 @@ begin
   if not FGlobalOptions.IsRunning and (ReturnStackSize <> Value) then
   begin
     FGlobalOptions.ReturnStackSize := Value;
-    ReallocMem(FGlobalOptions.ReturnStackBase, (Value+1)*SizeOf(Pointer));
+    ReallocMem(FGlobalOptions.ReturnStackTop, (Value+1)*SizeOf(Pointer));
     with FGlobalOptions do
-      Integer(_RP) := Integer(ReturnStackBase) + Value*SizeOf(Pointer);
+    begin
+      Integer(_RP) := Integer(ReturnStackTop) + Value*SizeOf(Pointer);
+      //init the return stack base pointer.
+      ReturnStackBottom := _RP;
+      ReturnStackBase := _RP;
+    end;
     //if FSP > FParameterStackSize then FSP := FParameterStackSize;
   end;
 end;
