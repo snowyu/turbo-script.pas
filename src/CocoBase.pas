@@ -20,6 +20,7 @@ uses
   , uTurboExecutor
   , uTurboAccessor
   , uTurboModuleFileAccessor
+  , uTurboCustomSymbol
   , uTurboCompilerUtils
   ;
 

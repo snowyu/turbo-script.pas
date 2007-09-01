@@ -40,6 +40,10 @@ begin
   end;
 end;
 
+2007-9-1 10:22
++ uTurboCustomSymbol.pas  seperate from uTurboCompileUtils.pas
+  抽象出既能在MeScript用的，也能在TurboScript中用的Symbol！
+
 2007-8-24 20:59
 ~ JS中一切都是函数和值：
 使用 New 函数创建一个新值(TJsValue)。分配内存后，这时候， construtor会被赋值，然后 this 会被赋值为该aVar的地址，构造预定义的局部变量 var arguments = New Arguments(12,22) 然后执行Function()函数。

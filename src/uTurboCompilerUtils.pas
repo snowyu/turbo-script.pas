@@ -9,23 +9,20 @@ uses
   Windows,
   {$ENDIF MSWINDOWS}
   SysUtils, Classes
-  //, TypInfo
+  , TypInfo
   , uMeObject
   , uMeTypes
   , uMeProcType
   , uTurboConsts
   , uTurboMetaInfo
   , uTurboExecutor
+  , uTurboCustomSymbol
   ;
 
 Const
-  cCompilerSymanticMask = $10000000;
-  cCompilerWarningMask  = $20000000;
-  cCompilerHintMask     = $30000000;
   cDotSeparatorSymbol = '.';
   //the internal Main Entry procedure name.
   cMainEntryProcName = '._Main';
-  cSymbolErrorOk = 0;
   cSymbolErrorOwnerisNil = 313;
   cSymbolErrorUnknownCallStyle = 314;
   cSymbolErrorNoSpecifiedModule = 315;
@@ -33,7 +30,6 @@ Const
   cSymbolErrorModuleRefAddedFailed = 317;
   cSymbolErrorRegisterType = 341;
   cSymbolErrorUnknownConstType = 311;
-  cSymbolErrorNoRefCount = 312 or cCompilerHintMask;
   cSymbolErrorUnknownRef = 313;
 
   cSymbolErrorLabelRedeclaration = 300;
@@ -59,14 +55,9 @@ Const
   cSymbolErrorMessageCompilerOption = 500;
 
 Type
-  //the Compiler option state
-  TTurboCompilerOptionState = (cosDefault, cosEnable, cosDisable);
-
-  PTurboSymbols = ^ TTurboSymbols;
   PTurboModuleRefSymbols = ^ TTurboModuleRefSymbols;
-  PTurboTypeSymbols = ^ TTurboTypeSymbols;
-  PTurboCustomSymbol = ^ TTurboCustomSymbol;
   PTurboSymbol = ^ TTurboSymbol;
+  PTurboTypeSymbols = ^ TTurboTypeSymbols;
   PTurboLabelSymbol = ^ TTurboLabelSymbol;
   PTurboConstSymbol = ^TTurboConstSymbol;
   PTurboVariableSymbol = ^ TTurboVariableSymbol;
@@ -79,62 +70,6 @@ Type
   PTurboModuleSymbol = ^ TTurboModuleSymbol;
   PTurboStatementSymbol = ^ TTurboStatementSymbol;
   PTurboOpStatementSymbol = ^ TTurboOpStatementSymbol;
-
-  TTurboCompilerErrorEvent = procedure(const Sender: PTurboCustomSymbol; const aErrCode: Integer) of object;
-
-  PTurboUnResolvedRefRec = ^ TTurboUnResolvedRefRec;
-  TTurboUnResolvedRefRec = packed record
-    Symbol: PTurboSymbol;
-    Addr: tsInt; //this should be offset address only!!
-  end;
-
-  PTurboUnResolvedRefs = ^ TTurboUnResolvedRefs;
-  TTurboUnResolvedRefs = Object(TMeList)
-  protected
-    function GetItems(Index: Integer): PTurboUnResolvedRefRec;
-  public
-    destructor Destroy; virtual;(*override;*)
-    procedure Clear;
-    function Add(): PTurboUnResolvedRefRec;
-    procedure Assign(const aSrc: PTurboUnResolvedRefs);
-  public
-    property Items[Index: Integer]: PTurboUnResolvedRefRec read GetItems;
-  end;
-
-  {: abstract Symbol }
-  TTurboCustomSymbol = Object(TMeDynamicObject)
-  protected
-    FRefCount: Longint;
-    FIsCompiled: Boolean;
-    //store the address need to resolve.
-    FUnResolvedRefs: PTurboUnResolvedRefs;
-    FOnError: TTurboCompilerErrorEvent;
-  protected
-    {: 将该符号压入到 aSymbol 中(包括opCode), 如果遇到无法resolve的地址则将其加入到 UnResolvedRefs 列表.}
-    function iReferenceTo(const aSymbol: PTurboSymbol): Integer; virtual; abstract;
-    function iCompile: Integer; virtual; abstract;
-    procedure ResolveAddr(const aValue: PTurboUnResolvedRefRec); virtual;abstract;
-    function IsCompileAllowed: Boolean; virtual;
-    function GetUnResolvedRefs: PTurboUnResolvedRefs;
-    procedure CompileError(const aErrCode: Integer);
-  public
-    destructor Destroy; virtual; {override}
-    procedure Assign(const aSymbol: PTurboCustomSymbol); virtual;
-    {: 引用计数+1; 将该符号压入到 aSymbol 中(包括opCode).}
-    function ReferenceTo(const aSymbol: PTurboSymbol): Integer;
-    function Compile: Integer; //return the result code: cSymbolErrorXXX
-    procedure ResolveRefs;
-  public
-    Name: String;
-    //the symbol defined position in the src file:
-    Line: Integer;
-    Column: Integer;
-    //被引用的次数
-    property RefCount: Longint read FRefCount;
-    property UnResolvedRefs: PTurboUnResolvedRefs read GetUnResolvedRefs;
-    property IsCompiled: Boolean read FIsCompiled;
-    property OnError: TTurboCompilerErrorEvent read FOnError write FOnError;
-  end;
 
   {: abstract Statement Symbol }
   {
@@ -189,7 +124,7 @@ Type
   public
     destructor Destroy; virtual; {override}
     procedure Assign(const aSymbol: PTurboCustomSymbol); virtual;
-    function iReferenceTo(const aSymbol: PTurboSymbol): Integer; virtual; {override}
+    function iReferenceTo(const aSymbol: PTurboCustomSymbol): Integer; virtual; {override}
     function iCompile: Integer; virtual; {override}
     procedure ResolveAddr(const aValue: PTurboUnResolvedRefRec); virtual; {override}
   public
@@ -205,7 +140,7 @@ Type
     FSize: tsInt;
   protected
     //generate the op-code push const for the constant to the aSymbol(MUST BE MethodSymbol)
-    function iReferenceTo(const aSymbol: PTurboSymbol): Integer; virtual; {override}
+    function iReferenceTo(const aSymbol: PTurboCustomSymbol): Integer; virtual; {override}
     function iCompile: Integer; virtual; {override}
     procedure ResolveAddr(const aValue: PTurboUnResolvedRefRec); virtual; {override}
     //if the value is string then save the string to the module's dataMemory.
@@ -233,7 +168,7 @@ Type
 
   TTurboVariableSymbol = object(TTurboConstSymbol)
   protected
-    function iReferenceTo(const aSymbol: PTurboSymbol): Integer; virtual; {override}
+    function iReferenceTo(const aSymbol: PTurboCustomSymbol): Integer; virtual; {override}
     function iCompile: Integer; virtual; {override}
     procedure ResolveAddr(const aValue: PTurboUnResolvedRefRec); virtual; {override}
   public
@@ -310,7 +245,7 @@ Type
   public
     destructor Destroy; virtual; {override}
     procedure Assign(const aSymbol: PTurboCustomSymbol); virtual;
-    function iReferenceTo(const aSymbol: PTurboSymbol): Integer; virtual; {override}
+    function iReferenceTo(const aSymbol: PTurboCustomSymbol): Integer; virtual; {override}
     procedure ResolveAddr(const aValue: PTurboUnResolvedRefRec); virtual; {override}
     function BodyInit: Integer;virtual; {override}
     function BodyFinal: Integer;virtual; {override}
@@ -330,7 +265,7 @@ Type
     FBody: PTurboCodeMemory;
   protected
     procedure Init;virtual; {override}
-    function iReferenceTo(const aSymbol: PTurboSymbol): Integer; virtual; {override}
+    function iReferenceTo(const aSymbol: PTurboCustomSymbol): Integer; virtual; {override}
     function iMethodCompile: Integer; virtual; {override}
     procedure ResolveAddr(const aValue: PTurboUnResolvedRefRec); virtual; {override}
 
@@ -367,7 +302,7 @@ Type
     FTypeInfo: PMeType;
     FEntryOffset: tsInt;
   protected
-    function iReferenceTo(const aSymbol: PTurboSymbol): Integer; virtual; {override}
+    function iReferenceTo(const aSymbol: PTurboCustomSymbol): Integer; virtual; {override}
     function iCompile: Integer; virtual; {override}
     procedure ResolveAddr(const aValue: PTurboUnResolvedRefRec); virtual; {override}
     function GetEntry: PTurboTypeInfoEntry;
@@ -407,7 +342,7 @@ Type
     FConsts: PTurboSymbols;
     FUsedModules: PTurboModuleRefSymbols;
   protected
-    function iReferenceTo(const aSymbol: PTurboSymbol): Integer; virtual; {override}
+    function iReferenceTo(const aSymbol: PTurboCustomSymbol): Integer; virtual; {override}
     function iCompile: Integer; virtual; {override}
     procedure ResolveAddr(const aValue: PTurboUnResolvedRefRec); virtual; {override}
 
@@ -460,20 +395,6 @@ Type
     property Methods: PTurboSymbols read GetMethods;
     property MethodRefs: PTurboSymbols read GetMethodRefs;
     property UsedModules: PTurboModuleRefSymbols read GetUsedModules;
-  end;
-
-  TTurboSymbols = object(TMeList)
-  protected
-    function GetItem(Index: Integer): PTurboSymbol;
-  public
-    destructor Destroy; virtual;{override}
-    function Compile: Integer;
-    procedure Clear;
-    procedure Assign(const aSymbols: PTurboSymbols);
-    function IndexOf(const aName: string; const aBeginIndex: Integer = 0): Integer; overload;
-    function Find(const aName: string): PTurboSymbol;
-  public
-    property Items[Index: Integer]: PTurboSymbol read GetItem; default;
   end;
 
   TTurboModuleRefSymbols = object(TTurboSymbols)
@@ -533,23 +454,12 @@ function UnitStrToInt(s: string): integer;
 }
 function IsIdentifier(const aValue: string): Boolean;
 
-function IsSymbolOk(const aErrorCode: Integer): Boolean;
-
 implementation
 
 const
   LetterSet = ['A'..'Z', 'a'..'z', '_'];
   DigitSet = ['0'..'9'];
   IdentSet = LetterSet + DigitSet;
-
-function IsSymbolOk(const aErrorCode: Integer): Boolean;
-begin
-  Result := aErrorCode = cSymbolErrorOk;
-  if not Result then
-    Result := (aErrorCode and cCompilerHintMask) = cCompilerHintMask;
-  if not Result then
-    Result := (aErrorCode and cCompilerWarningMask) = cCompilerWarningMask;
-end;
 
 function IsIdentifier(const aValue: string): Boolean;
 var
@@ -624,96 +534,6 @@ begin
     end;
 end;
 
-{ TTurboCustomSymbol }
-destructor TTurboCustomSymbol.Destroy;
-begin
-  Name := '';
-  Inherited;
-end;
-
-procedure TTurboCustomSymbol.Assign(const aSymbol: PTurboCustomSymbol);
-begin
-  if Assigned(aSymbol) and aSymbol.InheritsFrom(TypeOf(TTurboCustomSymbol)) then
-  begin
-    Name := aSymbol.Name;
-    Line := aSymbol.Line;
-    Column := aSymbol.Column;
-    FRefCount := aSymbol.FRefCount;
-    FIsCompiled := aSymbol.FIsCompiled;
-    FOnError := aSymbol.FOnError;
-    if Assigned(aSymbol.FUnResolvedRefs) then
-      UnResolvedRefs.Assign(aSymbol.FUnResolvedRefs)
-    else
-      MeFreeAndNil(FUnResolvedRefs);
-  end;
-end;
-
-procedure TTurboCustomSymbol.CompileError(const aErrCode: Integer);
-begin
-  if Assigned(FOnError) then
-    FOnError(@Self, aErrCode);
-  if not IsSymbolOk(aErrCode) then
-    Raise Exception.Create(Name +  ' ErrorCode: '+ IntTOStr(aErrCode));
-end;
-
-function TTurboCustomSymbol.GetUnResolvedRefs: PTurboUnResolvedRefs;
-begin
-  if not Assigned(FUnResolvedRefs) then
-    New(FUnResolvedRefs, Create);
-  Result := FUnResolvedRefs;
-end;
-
-function TTurboCustomSymbol.Compile: Integer; //return the result code: cSymbolErrorXXX
-begin
-  Result := cSymbolErrorOk;
-  if not FIsCompiled then
-  begin
-    if IsCompileAllowed then
-    begin
-      Result := iCompile;
-      if IsSymbolOk(Result) then
-      begin
-        FIsCompiled := True;
-        ResolveRefs;
-      end;
-    end
-    else begin
-      Result := cSymbolErrorNoRefCount;
-      //writeln( 'cSymbolErrorNoRefCount ', Name)
-    end;
-  end;
-  //else
-    //Result := cSymbolErrorRedeclaration;
-  if Result <> cSymbolErrorOk then
-    CompileError(Result);
-end;
-
-function TTurboCustomSymbol.ReferenceTo(const aSymbol: PTurboSymbol): Integer;
-begin
-  Inc(FRefCount);
-  Result := iReferenceTo(aSymbol);
-end;
-
-procedure TTurboCustomSymbol.ResolveRefs;
-var
-  i: Integer;
-begin
-  if FIsCompiled and Assigned(FUnResolvedRefs) then
-    with FUnResolvedRefs^ do
-    begin
-      for i := 0 to Count -1 do
-      begin
-        ResolveAddr(Items[i]);
-      end;
-      Clear;
-    end;
-end;
-
-function TTurboCustomSymbol.IsCompileAllowed: Boolean;
-begin
-  Result := FRefCount > 0;
-end;
-
 { TTurboSymbol }
 
 destructor TTurboSymbol.Destroy;
@@ -780,7 +600,7 @@ begin
   Inherited;
 end;
 
-function TTurboLabelSymbol.iReferenceTo(const aSymbol: PTurboSymbol): Integer; 
+function TTurboLabelSymbol.iReferenceTo(const aSymbol: PTurboCustomSymbol): Integer; 
 begin
   Result := cSymbolErrorOk;
 end;
@@ -1232,7 +1052,7 @@ begin
       end;
 end;
 
-function TTurboMethodRefSymbol.iReferenceTo(const aSymbol: PTurboSymbol): Integer;
+function TTurboMethodRefSymbol.iReferenceTo(const aSymbol: PTurboCustomSymbol): Integer;
 var
   vCFA: tsInt;
 begin
@@ -1255,7 +1075,7 @@ begin
             AddOpCode(opCallFar);
             if Assigned(ExternalOptions.ModuleRef) then
             begin
-              AddInt(Integer(ExternalOptions.ModuleRef) - Integer(aSymbol.OwnerSymbol.Module.DataMemory));
+              AddInt(Integer(ExternalOptions.ModuleRef) - Integer(PTurboMethodSymbol(aSymbol).OwnerSymbol.Module.DataMemory));
             end
             else
             begin
@@ -1284,7 +1104,7 @@ begin
             if FIsCompiled then
             begin
               vCFA := Integer(@Entry.Word);
-              vCFA := vCFA - Integer(aSymbol.OwnerSymbol.Module.DataMemory);
+              vCFA := vCFA - Integer(PTurboMethodSymbol(aSymbol).OwnerSymbol.Module.DataMemory);
             end
             else
             begin
@@ -1317,12 +1137,12 @@ begin
   case CodeFieldStyle of
       cfsExternalFunction: //the external forth function
         begin
-          p^ := Integer(ExternalOptions.ModuleRef) - Integer(aValue.Symbol.OwnerSymbol.Module.DataMemory);
+          p^ := Integer(ExternalOptions.ModuleRef) - Integer(PTurboSymbol(aValue.Symbol).OwnerSymbol.Module.DataMemory);
         end;
       cfsDLLFunction:
         begin
           //writeln(Entry.Word.GetExternalOptionsAddr.Name, ' ',Integer(Body.UsedSize),' = ', PInteger(p)^, ',', Integer(aValue.Symbol.OwnerSymbol.Module.DataMemory));
-          p^ := Integer(@Entry.Word) - Integer(aValue.Symbol.OwnerSymbol.Module.DataMemory);
+          p^ := Integer(@Entry.Word) - Integer(PTurboSymbol(aValue.Symbol).OwnerSymbol.Module.DataMemory);
           //writeln(Entry.Word.GetExternalOptionsAddr.Name, ' ',Integer(p),' = ', PInteger(p)^, ',', Integer(aValue.Symbol.OwnerSymbol.Module.DataMemory));
         end;
   end; //case
@@ -1391,7 +1211,7 @@ begin
   Result := FBody;
 end;
 
-function TTurboMethodSymbol.iReferenceTo(const aSymbol: PTurboSymbol): Integer;
+function TTurboMethodSymbol.iReferenceTo(const aSymbol: PTurboCustomSymbol): Integer;
 //var
   //vCFA: tsInt;
 begin
@@ -1899,7 +1719,7 @@ begin
     //Integer(Result.Entry) := Integer(Module.DataMemory) + Module.UsedDataSize; //the offset address.
 end;
 
-function TTurboModuleSymbol.iReferenceTo(const aSymbol: PTurboSymbol): Integer;
+function TTurboModuleSymbol.iReferenceTo(const aSymbol: PTurboCustomSymbol): Integer;
 begin
   Result := cSymbolErrorOk;
 end;
@@ -2245,7 +2065,7 @@ begin
   //writeln('PSource=', PInteger(Source)^);
 end;
 
-function TTurboConstSymbol.iReferenceTo(const aSymbol: PTurboSymbol): Integer;
+function TTurboConstSymbol.iReferenceTo(const aSymbol: PTurboCustomSymbol): Integer;
 var
   p: Pointer;
   vResolved: Boolean;
@@ -2375,7 +2195,7 @@ begin
   Inherited;
 end;
 
-function TTurboVariableSymbol.iReferenceTo(const aSymbol: PTurboSymbol): Integer;
+function TTurboVariableSymbol.iReferenceTo(const aSymbol: PTurboCustomSymbol): Integer;
 begin
   if aSymbol.InheritsFrom(TypeOf(TTurboMethodSymbol)) then
   begin
@@ -2485,7 +2305,7 @@ begin
   Inherited;
 end;
 
-function TTurboTypeSymbol.iReferenceTo(const aSymbol: PTurboSymbol): Integer; 
+function TTurboTypeSymbol.iReferenceTo(const aSymbol: PTurboCustomSymbol): Integer; 
 begin
   //TODO
   Result := cSymbolErrorOk;
@@ -2574,73 +2394,6 @@ begin
       Self.Param := Param;
     end;
   Inherited;
-end;
-
-{ TTurboSymbols }
-destructor TTurboSymbols.Destroy;
-begin
-  FreeMeObjects;
-  inherited;
-end;
-
-procedure TTurboSymbols.Clear;
-begin
-  FreeMeObjects;
-  inherited;
-end;
-
-procedure TTurboSymbols.Assign(const aSymbols: PTurboSymbols);
-var
-  i: integer;
-begin
-  if Assigned(aSymbols) then
-  begin
-    Clear;
-    Count := aSymbols.Count;
-    for i := 0 to Count - 1 do
-    begin
-      Add(NewMeObject(PTurboSymbol(aSymbols.List^[i]).ClassType));
-    end;
-  end;
-end;
-
-function TTurboSymbols.Compile: Integer;
-var
-  i: Integer;
-begin
-  Result := cSymbolErrorOk;
-  for i := 0 to Count - 1 do
-  begin
-    Result := Items[i].Compile;
-    //writeln(Items[i].name, ' Compiled:', Result);
-    if not IsSymbolOk(Result) then Exit;
-  end;
-end;
-
-function TTurboSymbols.GetItem(Index: Integer): PTurboSymbol;
-begin
-  Result := Inherited Get(Index);
-end;
-
-function TTurboSymbols.Find(const aName: string): PTurboSymbol;
-var
-  i: integer;
-begin
-  i := IndexOf(aName);
-  if i >= 0 then
-    Result := Items[i]
-  else
-    Result := nil;
-end;
-
-function TTurboSymbols.IndexOf(const aName: string; const aBeginIndex: Integer = 0): Integer;
-begin
-  for Result := aBeginIndex to Count - 1 do
-  begin
-    if AnsiSameText(aName, Items[Result].Name) then
-      exit;
-  end;
-  Result := -1;
 end;
 
 { TTurboModuleRefSymbols }
@@ -2889,55 +2642,7 @@ begin
     Result := nil;
 end;
 
-{TTurboUnResolvedRefs}
-destructor TTurboUnResolvedRefs.Destroy;
-begin
-  Clear;
-  Inherited;
-end;
-
-procedure TTurboUnResolvedRefs.Clear;
-var
-  i: integer;
-begin
-  for i := 0 to Count -1 do
-    Dispose(Items[i]);
-  Inherited Clear;
-end;
-
-procedure TTurboUnResolvedRefs.Assign(const aSrc: PTurboUnResolvedRefs);
-var
-  i: integer;
-  vItem: PTurboUnResolvedRefRec;
-begin
-  Clear;
-  if Assigned(aSrc) then
-  begin
-    for i := 0 to aSrc.Count - 1 do
-    begin
-      vItem := Add;
-      vItem^ := aSrc.Items[i]^;
-    end;
-  end;
-end;
-
-function TTurboUnResolvedRefs.Add(): PTurboUnResolvedRefRec;
-begin
-  New(Result);
-  if Inherited Add(Result) < 0 then
-  begin
-    Dispose(Result);
-    Result := nil;
-  end;
-end;
-
-function TTurboUnResolvedRefs.GetItems(Index: Integer): PTurboUnResolvedRefRec;
-begin
-  Result := Get(Index);
-end;
-
 initialization
-  SetMeVirtualMethod(TypeOf(TTurboCustomSymbol), ovtVmtParent, TypeOf(TMeDynamicObject));
   SetMeVirtualMethod(TypeOf(TTurboSymbol), ovtVmtParent, TypeOf(TTurboCustomSymbol));
   SetMeVirtualMethod(TypeOf(TTurboLabelSymbol), ovtVmtParent, TypeOf(TTurboCustomSymbol));
   SetMeVirtualMethod(TypeOf(TTurboConstSymbol), ovtVmtParent, TypeOf(TTurboSymbol));
@@ -2958,7 +2663,6 @@ initialization
   {$IFDEF MeRTTI_SUPPORT}
   //Make the ovtVmtClassName point to PShortString class name
   //SetMeVirtualMethod(TypeOf(TTurboCustomSymbol), ovtVmtClassName, @cMeObjectClassName);
-  SetMeVirtualMethod(TypeOf(TTurboCustomSymbol), ovtVmtClassName, nil);
   SetMeVirtualMethod(TypeOf(TTurboSymbol), ovtVmtClassName, nil);
   SetMeVirtualMethod(TypeOf(TTurboLabelSymbol), ovtVmtClassName, nil);
   SetMeVirtualMethod(TypeOf(TTurboConstSymbol), ovtVmtClassName, nil);

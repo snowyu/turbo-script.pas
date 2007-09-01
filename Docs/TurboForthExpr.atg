@@ -7,7 +7,7 @@ COMPILER TurboForthCompiler
 
 DELPHI
 
-USES (INTERFACE) TypInfo, uMeObject, uMeTypes, uMeProcType, uMeStrUtils, uTurboConsts, uTurboMetaInfo, uTurboExecutor, uTurboAccessor, uTurboModuleFileAccessor, uTurboCompilerUtils//, uTurboSymbols
+USES (INTERFACE) TypInfo, uMeObject, uMeTypes, uMeProcType, uMeStrUtils, uTurboConsts, uTurboMetaInfo, uTurboExecutor, uTurboAccessor, uTurboModuleFileAccessor, uTurboCustomSymbol, uTurboCompilerUtils//, uTurboSymbols
 
 TYPE
   PTurboMethodSymbolAccess = ^ TTurboMethodSymbolAccess;

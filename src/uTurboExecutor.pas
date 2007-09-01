@@ -85,11 +85,11 @@ type
     LastErrorCode: TTurboProcessorErrorCode;
     ParamStackBase: Pointer;
     ParamStackTop: Pointer;
-    ParamStackSize: Integer; //bytes
+    ParamStackSize: tsInt; //bytes
     ParamStackBottom: tsInt;
     ReturnStackBase: Pointer;
     ReturnStackTop: Pointer; //
-    ReturnStackSize: Integer; //bytes
+    ReturnStackSize: tsInt; //bytes
     //if halt with errHalt then the ReturnStackBottom will be the Old RSP.   
     ReturnStackBottom: tsInt;
     _PC: tsInt; //program counter address pointer: 该PC只有当运行进入前（TODO,复位的时候）和退出后才会被设置。只是临时保存。
@@ -745,10 +745,10 @@ begin
   Integer(_RP) := Integer(ReturnStackTop) + ReturnStackSize * SizeOf(Pointer);
   //init the return stack base pointer.
   ReturnStackBottom := _RP;
-  ReturnStackBase := _RP;
+  Integer(ReturnStackBase) := _RP;
   //init the param stack base pointer.
   ParamStackBottom := _SP;
-  ParamStackBase := _SP;
+  Integer(ParamStackBase) := _SP;
   LastErrorCode := errNone;
 end;
 
@@ -2359,7 +2359,7 @@ begin
       Integer(_SP) := Integer(ParamStackTop) + Value * SizeOf(tsInt);
       //init the param stack base pointer.
       ParamStackBottom := _SP;
-      ParamStackBase := _SP;
+      Integer(ParamStackBase) := _SP;
     end;
     //if FSP > FParameterStackSize then FSP := FParameterStackSize;
   end;
@@ -2381,7 +2381,7 @@ begin
       Integer(_RP) := Integer(ReturnStackTop) + Value*SizeOf(Pointer);
       //init the return stack base pointer.
       ReturnStackBottom := _RP;
-      ReturnStackBase := _RP;
+      Integer(ReturnStackBase) := _RP;
     end;
     //if FSP > FParameterStackSize then FSP := FParameterStackSize;
   end;
