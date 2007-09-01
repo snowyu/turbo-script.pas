@@ -2,6 +2,7 @@ unit uTurboCompilerUtils;
 
 interface
 
+{$I MeSetting.inc}
 {$I TurboScript.inc}
 
 uses
@@ -110,7 +111,7 @@ Type
     function IsCompileAllowed: Boolean; virtual; {override}
   public
     destructor Destroy; virtual; {override}
-    procedure Assign(const aSymbol: PTurboCustomSymbol); virtual;
+    procedure Assign(const aSymbol: PTurboCustomSymbol); virtual; {override}
     function IsPublic(const aModule: TCustomTurboModule): Boolean;
     function IsTyped(const aModule: TCustomTurboModule): Boolean;
     function IsNamed(const aModule: TCustomTurboModule): Boolean;
@@ -123,7 +124,7 @@ Type
   TTurboLabelSymbol = object(TTurboCustomSymbol)
   public
     destructor Destroy; virtual; {override}
-    procedure Assign(const aSymbol: PTurboCustomSymbol); virtual;
+    procedure Assign(const aSymbol: PTurboCustomSymbol); virtual; {override}
     function iReferenceTo(const aSymbol: PTurboCustomSymbol): Integer; virtual; {override}
     function iCompile: Integer; virtual; {override}
     procedure ResolveAddr(const aValue: PTurboUnResolvedRefRec); virtual; {override}
@@ -148,7 +149,7 @@ Type
     //procedure DeclareStringTo(const aModule: TCustomTurboModule);
   public
     destructor Destroy; virtual; {override}
-    procedure Assign(const aSymbol: PTurboCustomSymbol); virtual;
+    procedure Assign(const aSymbol: PTurboCustomSymbol); virtual; {override}
     procedure SetTurboType(const aValue: PMeType);
     {: assign value to mem! }
     {
@@ -172,7 +173,7 @@ Type
     function iCompile: Integer; virtual; {override}
     procedure ResolveAddr(const aValue: PTurboUnResolvedRefRec); virtual; {override}
   public
-    procedure Assign(const aSymbol: PTurboCustomSymbol); virtual;
+    procedure Assign(const aSymbol: PTurboCustomSymbol); virtual; {override}
   public
     Addr: tsInt;
   end;
@@ -218,7 +219,7 @@ Type
     function DeclareMethodTypeTo(const aModule: PTurboModuleSymbol): Integer;
   public
     destructor Destroy; virtual; {override}
-    procedure Assign(const aSymbol: PTurboCustomSymbol); virtual;
+    procedure Assign(const aSymbol: PTurboCustomSymbol); virtual; {override}
     function BodyInit: Integer;virtual;abstract;
     function BodyFinal: Integer;virtual;abstract;
   public
@@ -244,7 +245,7 @@ Type
     function GetExternalLocalMethodAddr(): tsInt;
   public
     destructor Destroy; virtual; {override}
-    procedure Assign(const aSymbol: PTurboCustomSymbol); virtual;
+    procedure Assign(const aSymbol: PTurboCustomSymbol); virtual; {override}
     function iReferenceTo(const aSymbol: PTurboCustomSymbol): Integer; virtual; {override}
     procedure ResolveAddr(const aValue: PTurboUnResolvedRefRec); virtual; {override}
     function BodyInit: Integer;virtual; {override}
@@ -276,7 +277,7 @@ Type
     procedure FinalStaticFields;
   public
     destructor Destroy; virtual; {override}
-    procedure Assign(const aSymbol: PTurboCustomSymbol); virtual;
+    procedure Assign(const aSymbol: PTurboCustomSymbol); virtual; {override}
     function DeclareLabel(const aLabelName: string): Integer;
     function FindLabel(const aName: string): PTurboLabelSymbol;
     function BodyInit: Integer;virtual; {override}
@@ -307,7 +308,7 @@ Type
     procedure ResolveAddr(const aValue: PTurboUnResolvedRefRec); virtual; {override}
     function GetEntry: PTurboTypeInfoEntry;
   public
-    procedure Assign(const aSymbol: PTurboCustomSymbol); virtual;
+    procedure Assign(const aSymbol: PTurboCustomSymbol); virtual; {override}
     function GetTypeInfoEx(const aClass: TMeClass = nil): PMeType;
     function GetTypeInfo(): PMeType;
   public
@@ -321,7 +322,7 @@ Type
 
   TTurboTypeRefSymbol = object(TTurboTypeSymbol)
   public
-    procedure Assign(const aSymbol: PTurboCustomSymbol); virtual;
+    procedure Assign(const aSymbol: PTurboCustomSymbol); virtual; {override}
   public
     //use the TypeSymbol's entry:
     //Entry: PTurboTypeRefEntry;
@@ -360,7 +361,7 @@ Type
   public
     destructor Destroy; virtual; {override}
     procedure Clear;
-    procedure Assign(const aSymbol: PTurboCustomSymbol); virtual;
+    procedure Assign(const aSymbol: PTurboCustomSymbol); virtual; {override}
     function FindType(const aName: string): PMeType;
     //function FindLocalType(const aName: string): PMeType;
     function FindLocalTypeSymbol(const aName: string): PTurboTypeSymbol;
@@ -408,7 +409,7 @@ Type
   public
     destructor Destroy; virtual; {override}
     function Add(const aModuleSymbol: PTurboModuleSymbol): Integer;
-    procedure Assign(const aSrc: PTurboModuleRefSymbols);
+    procedure Assign(const aSrc: PTurboModuleRefSymbols); {override}
     procedure Delete(const Index: Integer);
     procedure Swap(const Idx1, Idx2: Integer);
     procedure Remove(const Value: PTurboModuleSymbol);
@@ -538,7 +539,6 @@ end;
 
 destructor TTurboSymbol.Destroy;
 begin
-  MeFreeAndNil(FUnResolvedRefs);
   //writeLn(Name,'.Free');
   Inherited;
 end;

@@ -2,7 +2,8 @@ unit uTurboCustomSymbol;
 
 interface
 
-{$I Setting.inc}
+{$I MeSetting.inc}
+{$I TurboScript.inc}
 
 uses
   {$IFDEF MSWINDOWS}
@@ -21,6 +22,7 @@ Const
   cCompilerHintMask     = $30000000;
   cSymbolErrorOk = 0;
   cSymbolErrorNoRefCount = 312 or cCompilerHintMask;
+
 
 type
   PTurboSymbols = ^ TTurboSymbols;
@@ -164,6 +166,7 @@ end;
 destructor TTurboCustomSymbol.Destroy;
 begin
   Name := '';
+  MeFreeAndNil(FUnResolvedRefs);
   Inherited;
 end;
 
