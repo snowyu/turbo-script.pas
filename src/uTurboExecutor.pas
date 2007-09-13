@@ -2583,6 +2583,7 @@ begin
   for i := 0 to Count -1 do
      aStream.WriteBuffer(List^[i], SizeOf(Pointer));
 end;
+//}
 
 {TTurboRelocatedAddresses}
 procedure TTurboRelocatedAddresses.Relocate(BaseAddress: Pointer; 
