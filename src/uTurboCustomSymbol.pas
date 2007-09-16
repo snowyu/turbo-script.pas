@@ -17,6 +17,7 @@ uses
   ;
 
 Const
+  cCompilerSyntaxMask   = $00000000;
   cCompilerSymanticMask = $10000000;
   cCompilerWarningMask  = $20000000;
   cCompilerHintMask     = $30000000;
