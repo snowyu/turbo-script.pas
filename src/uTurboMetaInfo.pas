@@ -40,10 +40,11 @@ type
    { Description
        @param tfAddrResolved  the address resolved or not
        @param tfInited        the module(static class) initialized or not.
+       @param tfDestroying    the module is destroying(the FInit method is executing).
 
     Note: One byte only!
    }
-   TTurboModuleFlag = (tfAddrResolved, tfInited);
+   TTurboModuleFlag = (tfAddrResolved, tfInited, tfDestroying);
    TTurboModuleFlags = set of TTurboModuleFlag;
 
   //the basis metaKind

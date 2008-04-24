@@ -40,8 +40,28 @@ begin
   end;
 end;
 
+2008-4-24 20:59
+~ Unload 的时机
+ 1 Normal Unload 采用单线程: Init MainProc FInit
+ 2 Force Unload:
+   Free Heap Memory
+   + TurboModule.Heap: 实际上是未释放的指针列表。
+   + TurboModule.GetHeapMem(var P: Pointer; const Size: Integer);
+   + TurboModule.FreeHeapMem(var P: Pointer; const Size: Integer=0);
+
+2008-4-23 20:48
++ tfDestroying in TTurboModuleFlag
+  which means the module is destroying(the FInit method is executing).
+  RefCount 当每次CallFar的时候+1，退出CallFar的时候-1.
+  在Unload之前应该检查 RefCount.
+我都忘记了，我已经实现了DLL的引入，也就是DLL模块类型。
+!+ Cache the loaded DLL Module(uTurboMetaInfo).
+  TTurboModuleRefInfo.RequireDLLHandle;
+  TTurboModuleRefInfo.FreeDLLHandle;
+
 2007-11-26 21:24
-* Module的Init初始化时机
+* Module的Init初始化时机: 不要预先初始化，降低复杂度，仅当执行模块函数的时候才去检查。这里初始化，指的是执行初始化过程，应该将内存初始化和代码执行分开。
+
  当调用某个Moudle中的函数的时候(iVMCallFar)，检查该Module是否已经初始化(tfInited)，如果无则执行Module初始化过程并设置标志tfInited。
  同时该Module的引用计数将增1(_DoVMCallFarMemBase  Module.RefCount)。
  约定:所有的Init/Final过程为近调用过程(Near)！
@@ -50,6 +70,7 @@ end;
         如果在运行结束时调用Final？那么假设我有一个垃圾自动回收装置，自动回收（卸载）未使用的模块，那么这里的模块显然不能执行Final。
         如果在卸载前执行，就必须要考虑并行冲突！增加标志正在卸载。加查是否该模块正在使用。在全局函数增加一个调用模块链。
  垃圾回收装置，首先判断 RefCount, 才从内存中卸载Module.如果使用垃圾回收装置卸载，那么可能会出现并行冲突。
+实际上Final考虑的就是对于堆的内存释放！！当然如果全部都是代码控制，那么就可以不管这个。
 
 2007-9-1 10:22
 + uTurboCustomSymbol.pas  seperate from uTurboCompileUtils.pas

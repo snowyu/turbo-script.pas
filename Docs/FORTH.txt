@@ -33,7 +33,16 @@ Heap:
   LStrAsg： 是用于联系模块字符串变量，LStrLAsg() 用于联系局部字符串变量。
 】
 
+== 模块 ==
+the Module Type(TTurboModuleType):
+    @param mtFunction         the script function(word).
+    @param mtHost             the module is in the host application
+    @param mtDLL              the DLL module，并没有真的存在，只是在ModuleRef中保存DLL的Handle.
+    @param mtUnit             the unit only for compile-time, store all symbols，包括那些私有的变量方法类型。
+    @param mtLib              the runtime lib, it's the native DLL. 
+
 == 模块内存镜像详解 ==
+
 
 模块是保存于文件的最小的单位，是各种类型函数的集合。引用的是模块。
 也是内存的最小单位，只有模块才拥有代码区和数据区。

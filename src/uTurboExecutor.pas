@@ -181,6 +181,8 @@ type
     }
     FTextIndex: Integer;
     FVisibility: TTurboVisibility;
+    {: Free the loaded DLL Library and free the external word
+            ProcInstance:PMeProcParams cache. }
     procedure FreeDLLLibs;
     function GetDataMemorySize: tsInt;
     function GetInitializeProc: Integer;
@@ -614,7 +616,7 @@ type
     //in LastModuleEntry 链表中
     ModuleParent: PTurboModuleRefInfo;
 
-    //when far call the method in the module incease the refCount, exit decease refCount.
+    //when far call the method in the module increase the refCount, exit decrease refCount.
     RefCount: tsInt; 
     //for ApplicationModule and FunctionModule. 是函数的入口地址
     MainEntry: Pointer; 
