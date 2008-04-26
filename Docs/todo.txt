@@ -40,6 +40,32 @@ begin
   end;
 end;
 
+FORTH.txt
+  从VM指令以及内存布局的角度进行说明。
+
+ReadmeVM.txt
+  从架构，模块角度进行说明
+
+2008-4-26 7:26
+* [TCustomTurboExecutor] 
+  ＋ 添加执行超时限制！
+    + Duration: Integer 执行最大期限（毫秒） 0 means no limits.
+    + StartTick: Longword;
+  !＋ 如何执行CallFar的函数：既>Private的函数都是CallFar的，这些最后执行的是ExitFar
+    我的主意是在代码区（Memory）搞一个短的保留区域，然后填写调用CallFar函数的代码，在执行！
+!* [uTurboExecutor]
+  LoadLibrary 将检查内存First，没有才加载文件，并增加RefCount
+  我实现以下函数的目的是为了延迟DLL卸载的时间，当模块卸载后并不立刻卸载DLL，直到AppDomain停止执行或释放才卸载。
+  + function TurboLoadDLL(const aFileName: string): HInstance;
+  + function TurboFreeDLL(const aHandle: HModule): Boolean;
+  + function TurboFreeDLLs(): Integer; //clear all libraries. the result is the leak count.
+  + function GTurboDLLs: TTurboDLLInfos;
+  + TTurboDLLInfo = record
+    FileName: string;
+    Handle: HModule;
+    RefCount: Integer;
+    end;
+
 2008-4-24 20:59
 ~ Unload 的时机
  1 Normal Unload 采用单线程: Init MainProc FInit

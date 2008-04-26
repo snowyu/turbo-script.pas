@@ -36,7 +36,7 @@ Heap:
 == 模块 ==
 the Module Type(TTurboModuleType):
     @param mtFunction         the script function(word).
-    @param mtHost             the module is in the host application
+    @param mtHost             the module is in the host application, not really exists, only in ModuleRef
     @param mtDLL              the DLL module，并没有真的存在，只是在ModuleRef中保存DLL的Handle.
     @param mtUnit             the unit only for compile-time, store all symbols，包括那些私有的变量方法类型。
     @param mtLib              the runtime lib, it's the native DLL. 
@@ -48,6 +48,12 @@ the Module Type(TTurboModuleType):
 也是内存的最小单位，只有模块才拥有代码区和数据区。
 
 名称长度不能超过1023，因为是PChar,加上#0长度为1024。
+
+模块数据区(FDataMemory)
+模块数据区头为 TTurboPreservedDataMemory 结构，里面指明了代码区的位置，大小，名称，模块类型等等。
+
+模块代码区(FMemory)
+
 
 发现C#的编译器语法很好写，和汇编差不多，就再写一个类似C#的。
 namespace MyCompany; //默认添加的前缀。

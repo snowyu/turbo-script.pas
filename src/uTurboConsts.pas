@@ -303,6 +303,7 @@ type
   TTurboProcessorErrorCode = (errNone, errBadInstruction, errInstructionBadParam, errDizZero
     , errModuleNotFound, errMethodNotFound, errTypeInfoNotFound
     , errStaticFieldNotFound, errFieldNotFound
+    , errExecTimeOut
     , errOutOfMem
     , errOutOfMetaData
     , errOutOfDataStack, errOutOfReturnStack

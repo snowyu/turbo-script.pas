@@ -13,6 +13,7 @@
 {$Define TurboScript_DataStack_Overflow_Inspect}
 {$Define TurboScript_ReturnStack_Overflow_Inspect}
 {$Define TurboScript_Memory_Overflow_Inspect}
+{$Define TurboScript_ExecTimeOut_Supports}
 
 {Include Common setting File}
 {$I Setting.inc}

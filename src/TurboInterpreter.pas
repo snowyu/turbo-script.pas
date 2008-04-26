@@ -85,14 +85,22 @@ var
   vInstruction: TTurboVMInstruction; //the instruction.
   vProc: TTurboInstructionProc;
 begin
+  with FGlobalOptions^ do
   {$IFDEF FPC}
-  While (psRunning in TTurboProcessorStates(LongWord(FGlobalOptions.States))) do
+  While (psRunning in TTurboProcessorStates(LongWord(States))) do
   {$ELSE Borland}
-  While (psRunning in TTurboProcessorStates(FGlobalOptions.States)) do
+  While (psRunning in TTurboProcessorStates(States)) do
   {$ENDIF}
   begin
-    vInstruction := PTurboVMInstruction(FGlobalOptions._PC)^;
-    Inc(FGlobalOptions._PC);
+    {$IFDEF TurboScript_ExecTimeOut_Supports}
+    if (ExecDuration > 0) and (GetTickCount - ExecStartTime >= ExecDuration) then
+    begin
+      _iVMHalt(FGlobalOptions, errExecTimeOut);
+      Continue;
+    end;
+    {$ENDIF}
+    vInstruction := PTurboVMInstruction(_PC)^;
+    Inc(_PC);
     vProc := GTurboCoreWords[vInstruction];
     if Assigned(vProc) then
     begin
@@ -321,7 +329,7 @@ begin
 
   if _DoVMCallFarMemBase(FGlobalOptions, vModuleRefInfo) then
   begin
-    if not Assigned(FGlobalOptions._Mem.InitializeProc) or (FGlobalOptions._Mem.Flags and Ord(tfInited)) = Ord(tfInited) then
+    if not Assigned(FGlobalOptions._Mem.InitializeProc) or ((FGlobalOptions._Mem.Flags and Ord(tfInited)) = Ord(tfInited)) then
     begin
       iVMEnter(FGlobalOptions);
     end
@@ -338,7 +346,7 @@ begin
       //Push the current far subroutine to return stack.
       Dec(FGlobalOptions._RP, SizeOf(tsPointer));
       PtsInt(FGlobalOptions._RP)^ := vCFA;
-      vCFA := FGlobalOptions._Mem.InitializeProc + Integer(FGlobalOptions._Mem.Code);
+      vCFA := Integer(FGlobalOptions._Mem.InitializeProc) + Integer(FGlobalOptions._Mem.Code);
       //Update the new PC
       FGlobalOptions._PC := vCFA;    
     end;

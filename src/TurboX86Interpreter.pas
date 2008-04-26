@@ -203,6 +203,11 @@ asm
   JMP  iVMNext
 end;
 
+function M_GetTickCount: LongWord;
+begin
+  Result := GetTickCount;
+end;
+
 //the interpreter core here:
 procedure iVMNext;
 asm
@@ -212,6 +217,26 @@ asm
   BT EDX, psRunning //cTurboScriptIsRunningBit
   JNC @@Exit
 
+{$IFDEF TurboScript_ExecTimeOut_Supports}
+  MOV  EDX, [ECX].TTurboGlobalOptions.ExecDuration
+  TEST EDX, EDX
+  JZ   @@DoEnter
+    
+  PUSH ECX //backup
+  PUSH EDX
+  XCHG ESP, EBP
+  CALL GetTickCount
+  //POP  EAX
+  XCHG ESP, EBP
+  POP  EDX
+  POP  ECX //backup
+
+  SUB  EAX, [ECX].TTurboGlobalOptions.ExecStartTime
+  CMP  EAX, EDX  //CurrentExecTime - Duration
+  JLE   @@DoEnter //if CurrentExecTime <= Duration then jump @@DoEnter
+  MOV  EAX, errExecTimeOut
+  JMP  @@ExitHalt
+{$ENDIF}
 @@DoEnter:
   //MOV EAX, [ESI]  //the current instruction in W register
   //ADD ESI, Type(tsInt) //4 = INC PC INC PC INC PC INC PC
@@ -233,6 +258,7 @@ asm
   //MOV  EAX, [EDI].TTurboPreservedDataMemory.GlobalOptions
   //MOV  [EAX].TTurboGlobalOptions.LastErrorCode, errBadInstruction
   MOV  EAX, errBadInstruction
+@@ExitHalt:
   JMP  _iVMHalt
   //Bad OpCode: no procedure assigned to the OpCode.
 {@@IsUserWord:

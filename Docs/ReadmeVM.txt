@@ -21,15 +21,24 @@
 
 因此可以分为两大部件：编译器，执行器。
 
-编译器
+一、编译器
+
 抽象层: uTurboCompiler.pas(CustomTurboCompiler, CustomTurboScriptModule)
 使用层: TurboForthCompiler.pas, TurboPascalCompiler.pas, TurboBasicCompiler.pas, TurboCCompiler.pas, etc
 扩展层: 
 
+目前编译器的使用层：语言Parser层是由Coco/R描述语言书写，自动产生代码。
+抽象层：语法符号层为手工书写： 
+uTurboCustomSymbol.pas
+  抽象的符号类，实际产生 VM codes 在这里。
+uTurboCompilerUtils.pas
+  各种具体的符号类实现。也许单元名称该改个名字。
+
+
 连接器模块：根据需要将编译好的VM单元静态引入主脚本程序模块，需要处理地址重定位，优化（如：其它unit的初始化过程是对某个单元变量赋值，但是该变量并没有被主程序使用，那么该初始化过程就不会被连接进入或执行）
 抽象与使用层: uTurboLinker.pas
 
-执行器
+二、执行器
 抽象层: 
   执行引擎核心：uTurboExecutor.pas(include abstract executor, TurboProgram classes)
     模块内存镜像类： TCustomTurboModule
@@ -37,17 +46,23 @@
     执行引擎抽象类： TCustomTurboExecutor
     AppDomain类： TTurboProgram 一个程序就是一个AppDomain.
   加载器： uTurboAccessor.pas (抽象的模块加载器，以及加载器的管理器)
-    文件加载器： 加载文件模块
+    文件加载器： 加载文件模块 （uTurboModuleFileAccessor）
     数据库加载器： 加载存放于数据库种的模块
+  RTTI(Meta Info): uTurboMetaInfo
   
 使用层: TurboInterpreter.pas, TurboJITExecutor.pas, TurboX86Executor.pas; TurboZ80Executor.pas, TurboJavaVMExecutor.pas
+目前实现的有：
+  TurboInterpreter: 纯Pascal 实现的VM解释器
+  TurboX86Interpreter:  X86汇编优化 实现的VM解释器
+
+
 扩展层: 如 TurboDebugger.pas
 
 JIT Translator 即时翻译模块：由执行器调用，将VM及时翻译成本族语言直接执行。
 
 执行器中只包括Codes, ImportModules(自己提供给脚本使用的以及通过LoadLibrary装入的), Resource, 其它信息(ImportTable)只在PEFormat中存在。
 
-TurboInterpreter_S: Pure Pascal 实现，暂缓
+TurboInterpreter: Pure Pascal 实现
 TurboX86Interpreter: 基于x86指令优化。核心指令汇编实现，寄存器采用x86的寄存器，对应关系如下：
 ESP: 返回堆栈指针.记住压入减少，弹出增加地址。
 EBP: 数据栈指针，基址指针放在内存某个单元中。所以EBP总是指向次栈顶。

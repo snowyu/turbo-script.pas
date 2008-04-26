@@ -48,6 +48,7 @@ const
     , 'TypeInfoNotFound'
     , 'StaticFieldNotFound'
     , 'FieldNotFound'
+    , 'ExecTimeOut'
     , '代码区内存无可用的空间'
     ,'MetaData区已无可用的空间'
     , 'OutOfDataStack'
@@ -153,10 +154,21 @@ begin
         Memory.LoadFromStream(vStream);
         FreeAndNil(vStream);
         QueryPerformanceCounter(tBegin);
-        Execute();
+        //try
+        Execute(1000);
+        {except
+          On E: Exception do
+          begin
+            writeln('Exception:' + E.ClassName + ':'+E.Message);
+          end;
+        end; //}
         QueryPerformanceCounter(tEnd);
         c := c + tEnd - tBegin;
         lastErr := LastErrorCode;
+        if lastErr = errExecTimeOut then
+        begin
+          writeln('D=', Executor.Duration, ' S=', Executor.StartTime );
+        end;
         LastAddr := tsInt(GlobalOptions._PC) ;//- tsInt(GlobalOptions._Mem.ModuleHandle.Memory);
         LastAddr := LastAddr - 4;
         LastAddrC := PtsInt(LastAddr)^;

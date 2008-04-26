@@ -96,6 +96,8 @@ type
     _SP: tsInt; //the Parameter Stack(or data stack) Pointer, 同上，临时保存
     _RP: tsInt; //return stack pointer(TOS). 同上，临时保存
     _Mem: PTurboPreservedDataMemory; //current engine used memory. temp(only some executor class used.)
+    ExecDuration: Integer; //the max Execution duration(ms).
+    ExecStartTime: LongWord; //the start execution TickCount(ms)
     Executor: TCustomTurboExecutor;
     //{:  放到系统单元库中？ 好处是移植自举，缺点是速度变慢吧。
     ErrorAddr: Pointer;
@@ -423,16 +425,20 @@ type
   TCustomTurboExecutor = class(TCustomTurboObject)
   private
     FOnPrintString: TTurboPrintStringEvent;
+    function GetDuration: Integer;
     function GetOptions: TTurboScriptOptions;
     function GetPC: Pointer;
     function GetRP: Pointer;
     function GetSP: Pointer;
+    function GetStartTime: LongWord;
+    procedure SetDuration(const Value: Integer);
     procedure SetGlobalOptions(Value: PTurboGlobalOptions);
     procedure SetMemory(const Value: TCustomTurboModule);
     procedure SetOptions(Value: TTurboScriptOptions);
     procedure SetPC(Value: Pointer);
     procedure SetRP(Value: Pointer);
     procedure SetSP(Value: Pointer);
+    procedure SetStartTime(const Value: LongWord);
   protected
     FGlobalOptions: PTurboGlobalOptions;
     FMemory: TCustomTurboModule;
@@ -491,6 +497,8 @@ type
     }
     function ExecuteWordEntry(const aWord: PTurboMethodEntry): Integer;
     procedure Stop;
+    {: the max execution duration(ms). -1 means no limits. }
+    property Duration: Integer read GetDuration write SetDuration;
     property GlobalOptions: PTurboGlobalOptions read FGlobalOptions write
             SetGlobalOptions;
     property Memory: TCustomTurboModule read FMemory write SetMemory;
@@ -512,6 +520,8 @@ type
     property RP: Pointer read GetRP write SetRP;
     {: the Parameter Stack(or data stack) Pointer }
     property SP: Pointer read GetSP write SetSP;
+    {: the execution start time }
+    property StartTime: LongWord read GetStartTime write SetStartTime;
     {: the current status of the script. }
     { Description
     the Memory is related address when the status is in the psConpiling
@@ -529,6 +539,7 @@ type
   The TTurboAppDomain should be a Main Application Module too.
 
   allocate the memory to return stack and param stack.
+
   }
   TTurboAppDomain = class(TCustomTurboObject)
   private
@@ -558,7 +569,9 @@ type
     }
     constructor Create(const aMemory: TCustomTurboModule = nil);
     destructor Destroy; override;
+    {: execute the VM MainProc(InitializeProc). }
     { Description
+    @param aTimeOut the max execution duration(second). 0 means no limits.
     }
     procedure Execute(aTimeOut : Integer = 0);
     property Executor: TCustomTurboExecutor read GetExecutor;
@@ -2035,6 +2048,14 @@ begin
   //Apply the SP to TProgram.SP.
 end;
 
+function TCustomTurboExecutor.GetDuration: Integer;
+begin
+  if Assigned(FGlobalOptions) then
+    Result := FGlobalOptions.ExecDuration
+  else
+    Result := 0;
+end;
+
 function TCustomTurboExecutor.GetOptions: TTurboScriptOptions;
 begin
   if Assigned(FMemory) then
@@ -2066,6 +2087,14 @@ begin
     Result := Pointer(FGlobalOptions._SP)
   else
     Result := nil;
+end;
+
+function TCustomTurboExecutor.GetStartTime: LongWord;
+begin
+  if Assigned(FGlobalOptions) then
+    Result := FGlobalOptions.ExecStartTime
+  else
+    Result := 0;
 end;
 
 function TCustomTurboExecutor.GetStates: TTurboProcessorStates;
@@ -2132,6 +2161,7 @@ begin
   //TTurboProcessorStates(FGlobalOptions.States) := TTurboProcessorStates(FGlobalOptions.States) + [psRunning];
   FMemory.IsAddrResolved := True;
   //Include(PTurboPreservedDataMemory(FDataMemory).GlobalOptions.States, psRunning);
+  StartTime := GetTickCount;
 end;
 
 function TCustomTurboExecutor.IsGlobalOptionsExists: Boolean;
@@ -2145,6 +2175,12 @@ begin
 
   if not Result then
     Raise ETurboScriptError.Create(rsTurboScriptNoGlobalOptionsError);
+end;
+
+procedure TCustomTurboExecutor.SetDuration(const Value: Integer);
+begin
+  if Assigned(FGlobalOptions) then
+    FGlobalOptions.ExecDuration := Value;
 end;
 
 procedure TCustomTurboExecutor.SetGlobalOptions(Value: PTurboGlobalOptions);
@@ -2201,6 +2237,12 @@ procedure TCustomTurboExecutor.SetSP(Value: Pointer);
 begin
   if IsGlobalOptionsExists then
     FGlobalOptions._SP := tsInt(Value);
+end;
+
+procedure TCustomTurboExecutor.SetStartTime(const Value: LongWord);
+begin
+  if Assigned(FGlobalOptions) then
+    FGlobalOptions.ExecStartTime := Value;
 end;
 
 procedure TCustomTurboExecutor.SetStates(Value: TTurboProcessorStates);
@@ -2279,6 +2321,7 @@ begin
     {$ENDIF}
 
     FGlobalOptions.Reset;
+    FExecutor.Duration := aTimeOut;
     //can be stepped run, so do not reset in executeCFA
     FExecutor.ExecuteCFA(FMemory.InitializeProc);
   end;
