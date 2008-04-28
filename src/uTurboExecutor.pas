@@ -1527,13 +1527,16 @@ begin
       if Assigned(vName) then
         Integer(vName) := Integer(FDataMemory) + Integer(vName);
     end;
-    vModule := nil;
-    case vModuleRefEntry.Module.ModuleType of
-      mtLib, mtProgram: vModule := RequireModule(vName);
-      mtDLL: vModuleRefEntry.Module.RequireDLLHandle;
-    end; //case
-    if Assigned(vModule) then
-      vModuleRefEntry.Module.Handle := vModule;
+    if not Assigned(vModuleRefEntry.Module.Handle) then
+    begin
+      vModule := nil;
+      case vModuleRefEntry.Module.ModuleType of
+        mtLib, mtProgram: vModule := RequireModule(vName);
+        mtDLL: vModuleRefEntry.Module.RequireDLLHandle;
+      end; //case
+      if Assigned(vModule) then
+        vModuleRefEntry.Module.Handle := vModule;
+    end;
     vModuleRefEntry := vModuleRefEntry.Prior;
   end;
 end;

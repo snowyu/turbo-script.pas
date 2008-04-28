@@ -10,7 +10,7 @@ interface
 
 uses
   SysUtils, Classes
-  , uMeStrUtils
+  , uStrUtils
   , uTurboConsts
   , uTurboExecutor 
   , uTurboAccessor
@@ -100,9 +100,10 @@ begin
 
   for I := 0 to FIncludeDirs.Count - 1 do
   begin
-    vFolder := IncludeTrailingPathDelimiter(FIncludeDirs[i]);
+    vFolder := FIncludeDirs[i];
     if vFolder <> '' then
     begin
+      vFolder := IncludeTrailingPathDelimiter(vFolder);
       Result := ExpandFileName(vFolder + aModuleName);
       if FileExists(Result) then Exit;
     end;

@@ -46,6 +46,41 @@ FORTH.txt
 ReadmeVM.txt
   从架构，模块角度进行说明
 
+2008-4-28 21:22
+* LoadUsedModules
+  仅当Module.Handle为nil的时候才去加载！！
+  避免当初始化的时候有些模块事实上已经在执行的时候加载。
+Load Module:
+  LoadFromStream:
+    FRelocatedDataAddresses.LoadFromStream(aStream);
+    FRelocatedDataTypes.LoadFromStream(aStream);
+    if not FRegisteredTypes.loaded.then Load FRegisteredTypes 
+    Load DataMem(数据区)
+    Load Mem(代码区)
+  Run
+    Init
+    {//只有AppModule才会有这步？？
+    if not (soLoadOnDemand in Options) then LoadUsedModules
+       LoadUsedModles:
+         遍历 ModuleRefs
+           RequireModule
+    }
+  
+现在的执行结构是错误的！！App和Module应该分开
+Load App:
+  LoadFromStream:
+    FRelocatedDataAddresses.LoadFromStream(aStream);
+    FRelocatedDataTypes.LoadFromStream(aStream);
+    if not FRegisteredTypes.loaded.then Load FRegisteredTypes 
+    Load DataMem(数据区)
+    Load Mem(代码区)
+    if not (soLoadOnDemand in Options) then LoadUsedModules
+  Run
+    MainProc
+    FInit
+    
+
+
 2008-4-26 7:26
 * [TCustomTurboExecutor] 
   ＋ 添加执行超时限制！
