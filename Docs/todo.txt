@@ -46,6 +46,9 @@ FORTH.txt
 ReadmeVM.txt
   从架构，模块角度进行说明
 
+2008-5-12 22:30
+由于我已经将Moudle和执行机构分开，
+
 2008-4-28 21:22
 * LoadUsedModules
   仅当Module.Handle为nil的时候才去加载！！
