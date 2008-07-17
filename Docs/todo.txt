@@ -46,6 +46,20 @@ FORTH.txt
 ReadmeVM.txt
   从架构，模块角度进行说明
 
+2008-7-18 7:15
+!+ uTurboHostModule.pas
+  the module is in the host application.
+  //以下方法也可以放入基类CustomModule中
+  + RegisterFunc
+  + RegisterType
+  + RegisterVariable
+  //+ RegisterConst
+* [uTurboAccess] TTurboModuleManager
+  + FHostHostModules: 
+  + RegisterModule
+  * first search FModules, then FHostHostModules, and last search ModuleAccessors
+  还有一个方案是建立一个新Accessor类： TTurboHostAccessor，将所有的HostModule放入，并作为系统Accessor首先注册到 TTurboModuleManager。
+
 2008-5-12 22:30
 由于我已经将Moudle和执行机构分开，
 
