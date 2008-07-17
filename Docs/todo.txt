@@ -47,12 +47,17 @@ ReadmeVM.txt
   从架构，模块角度进行说明
 
 2008-7-18 7:15
+调用外部函数有两种，一种是调用DLL或Host内部的函数，用 CallExt 机器指令执行；一种是调用其它模块的公开函数，用 CallFar 机器指令执行。
+CallFar PTurboModuleEntry cfa-address
+CallExt PTurboWordEntry
+如果要实现 Host function 应该是用 CallExt,并将该word 加入到LastWordEntry中。
+
 !+ uTurboHostModule.pas
   the module is in the host application.
-  //以下方法也可以放入基类CustomModule中
+  //以下方法也可以放入基类 CustomModule 中，决定放入 CustomModule.
   + RegisterFunc
   + RegisterType
-  + RegisterVariable
+  //+ RegisterVariable
   //+ RegisterConst
 * [uTurboAccess] TTurboModuleManager
   + FHostHostModules: 

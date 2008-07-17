@@ -730,6 +730,10 @@ TypeName =
 == Forth代码区内存镜像(TCustomTurboExecutor.Memory) ==
 
 每一个Executor 实例都有一个独立的代码内存区和数据区，数据区的头几k字节是保留的，内容见 TTurboPreservedDataMemory 记录.
+调用外部函数有两种，一种是调用DLL或Host内部的函数，用 CallExt 机器指令执行；一种是调用其它模块的公开函数，用 CallFar 机器指令执行。
+CallFar PTurboModuleEntry cfa-address
+CallExt PTurboWordEntry
+如果要实现Host function 应该是用 CallExt,并将该word 加入到LastWordEntry中。
 
 type //in TurboScriptConsts
   PTurboPreservedDataMemory = ^ TTurboPreservedDataMemory;
@@ -788,7 +792,7 @@ VM指令采用字节流实现。一个VM指令至少占用1个字节。
 【现在改为方式2了，指令以字节流的形式体现】：
   1、尽量与 CLR 兼容
   2、字节装载比Int32装载快
-  3、扩充可以通过某个指令扩展实现。
+  3、指令扩充可以通过某个指令扩展实现。
 
 VM 处理器寄存器：
 SP, RP, PC, TOS, W, StatesRegister, 
