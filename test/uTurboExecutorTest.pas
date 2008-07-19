@@ -33,7 +33,8 @@ type
     procedure TearDown;override;
   public
   published
-    property Test_VM_AlignStr;
+    procedure Test_VM_AlignStr;
+    procedure Test_VM_StoreInt64;
   end;
 
 
@@ -56,6 +57,12 @@ end;
 
 property TTest_TurboExecutor.Test_VM_AlignStr;
 begin
+end;
+
+procedure TTest_TurboExecutor.Test_VM_StoreInt64;
+begin
+  //(int64 addr) --
+  //检查执行后堆栈是否为空；数据是否存在指定的地址上；如果输入错误，是否会触发OutOfDataStack错误！
 end;
 
 Initialization

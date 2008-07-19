@@ -46,6 +46,23 @@ FORTH.txt
 ReadmeVM.txt
   ´Ó¼Ü¹¹£¬Ä£¿é½Ç¶È½øĞĞËµÃ÷
 
+2008-7-19 23:11
+* [Bug] Issue 56[Done]: µ÷ÓÃÍâ²¿Ä£¿éµÄº¯Êı±¨´í£¬ÑÏÖØ´íÎó¡£·¢ÏÖÊÇ±àÒëÆ÷Ã»ÓĞ³õÊ¼»¯ÒıÓÃÄ£¿éµ¥ÔªµØÖ·£¨handle£©µÄÔµ¹Ê¡£
+  TTurboModuleSymbol.DeclareTo
+    vModuleEntry.Module.Handle := nil;
+* [Bug] Issue 57[Done]: !i8 µÈ´æ´¢ÕûÊıÖ¸Áî ÔÚX86Interpreter ÖĞ´íÎó£¬¶àÑ¹ÈëÁËÒ»¸ö32Î»µÄ0ÕûÊı¡£
+  //check whether is stackbottom
+  CMP EBP, [ECX].TTurboGlobalOptions.ParamStackBottom
+  JG @@OverflowError //already is bottom then stack overflow error.
+  JMP  iVMNext
+
+@@OverflowError:  
+  MOV EAX, errOutOfDataStack
+  JMP _iVMHalt 
+
++ ´æ´¢ÕûÊıÖ¸ÁîÔ¤ÏÈÅĞ¶¨Êı¾İÊÇ·ñ×ã¹»¡£
+
+
 2008-7-18 7:15
 µ÷ÓÃÍâ²¿º¯ÊıÓĞÁ½ÖÖ£¬Ò»ÖÖÊÇµ÷ÓÃDLL»òHostÄÚ²¿µÄº¯Êı£¬ÓÃ CallExt »úÆ÷Ö¸ÁîÖ´ĞĞ£»Ò»ÖÖÊÇµ÷ÓÃÆäËüÄ£¿éµÄ¹«¿ªº¯Êı£¬ÓÃ CallFar »úÆ÷Ö¸ÁîÖ´ĞĞ¡£
 CallFar PTurboModuleEntry cfa-address
@@ -589,7 +606,6 @@ TurboCustomBlockSymbol ³ÌĞò¿é, ÒÔºó³ÌĞò¿éÄÚÓĞ¾Ö²¿ÀàĞÍ,±äÁ¿,³£Á¿(ËãÁË»¹ÊÇ²»Òª,Ãâµ
 
 2007-6-30 7:19
 !* [Enhanced] [Compiler] TurboMethodSymbol should store the directive in itsself if it's cfsFunction.
-
 * [Bug] issue 40: ²¢Ã»ÓĞ½â¾ö X86InterprterÖĞÖ´ĞĞÍâ²¿DLLº¯Êı£¨Èç¹ûDLLº¯ÊıÊ¹ÓÃÁË×Ö·û´®£©ÒıÆğµÄÎÊÌâ£¬Ö»²»¹ıÊÇÅöÇÉÃ»³ö´í£¡£¡
   ¼´±ãÊÇÈ«²¿¶¼Ê¹ÓÃDelphiµÄ¶ÑÕ»ÒÀÈ»»á³ö´í£¡£¡
   ÔÚDLLº¯Êıµ÷ÓÃÇ°£¬ EBXµÄÖµ²»ÊÇExecturor,ËùÓĞÃ»ÓĞÄÜÈ¡µÃÕıÈ·µÄAPP¶ÑÕ»Ô­Öµ¡£
@@ -603,6 +619,11 @@ TurboCustomBlockSymbol ³ÌĞò¿é, ÒÔºó³ÌĞò¿éÄÚÓĞ¾Ö²¿ÀàĞÍ,±äÁ¿,³£Á¿(ËãÁË»¹ÊÇ²»Òª,Ãâµ
   ²»ÆôÓÃ°´Ğè¼ÓÔØ¼¼Êõ£¬¶øÊÇÔ¤ÏÈ¼ÓÔØÄ£¿é£º 129625(Å¼¶ûÉÏÁË130000) ÓÅ»¯ºó: 7744-7954(Å¼¶û10877)
   PurePascalEngineÔËĞĞÊ±¼ä(Ô¤ÏÈ¼ÓÔØ): 4933-5210; LoadOnDemand: 16251-19789
   
+2008-7-19 13:35
+! TCustomTurboModule.MeObjects
+  * [TurboXXXInterpreter] RunExternalFunc 
+  ÎÒ½« DLLº¯ÊıµÄ ProcType ÉùÃ÷»º´æµ½MeObjectsÖĞ£¬µ«ÊÇ²¢Ã»ÓĞÊ¹ÓÃËü¡£¶øÇÒ·Åµ½ÕâÀïÖ»ÄÜ¸ÃÄ£¿éÓÃ²»Í×£¬ÔİÊ±²»ÓÃ(ÒÑ¾­×¢ÊÍµôÁË)¡£
+  ÔÚ TCustomTurboModule.FreeDLLLibsÖĞ»áÊÍ·Å ProcType¡£RunExternalFunc »á¼ì²âÃ»ÓĞÔò»á´´½¨¡£
 
 2007-6-29 11:58
 ~ issue 40: ½ñÌì×ĞÏ¸×·×ÙÁËÏÂÔÚÖ´ĞĞDLLº¯Êı±¨´íµÄÔ­Òò,Ô­À´²»ÊÇLoadLibµÄÎÊÌâ£¬¶øÊÇ:

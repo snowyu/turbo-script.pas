@@ -10,7 +10,7 @@ interface
 
 uses
   SysUtils, Classes
-  , uStrUtils
+  , uMeStrUtils
   , uTurboConsts
   , uTurboExecutor 
   , uTurboAccessor

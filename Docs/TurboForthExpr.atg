@@ -291,7 +291,7 @@ PRODUCTIONS
                                                             //vMainMethod.CFA := FModule.UsedMemory;
                                                             vMainMethod.BodyInit;
                                                        .)
-    ASMStatementBlock<vMainMethod>
+    [ASMStatementBlock<vMainMethod>]
     "END."                                          (.   vMainMethod.BodyFinal;
                                                             //aWord.Body.AddOpCode(opPushInt); FModule.AddIntToMem(0); aWord.Body.AddOpCode(opHalt); 
                                                           finally

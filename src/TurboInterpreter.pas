@@ -361,7 +361,7 @@ begin
   begin
     New(aMethod.ExternalOptions.ProcInstance, Create);
     aMethod.ExternalOptions.ProcInstance.ProcType := PMeProcType(aMethod.TurboType);
-    aModule.MeObjects.Add(aMethod.ExternalOptions.ProcInstance);
+    //aModule.MeObjects.Add(aMethod.ExternalOptions.ProcInstance);
   end;
   with aMethod.ExternalOptions.ProcInstance^ do
   begin
