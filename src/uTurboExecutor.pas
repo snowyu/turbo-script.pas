@@ -1040,6 +1040,7 @@ var
 begin
   if not StoredInOwner then
   begin
+    //It is indepent moudle, so can free memory.
     if Assigned(FDataMemory) and IsAddrResolved then FreeDLLLibs;
     if Assigned(FMeObjects) then
     begin
@@ -1264,6 +1265,7 @@ begin
     with PTurboMethodEntry(vModuleRefEntry).Word do
     begin
       if (CodeFieldStyle in cTurboExternalFunctionTypes) then
+      //if CodeFieldStyle = cfsDLLFunction then
         MeFreeAndNil(GetExternalOptionsAddr^.ProcInstance);
     end;
     vModuleRefEntry := vModuleRefEntry.Prior;

@@ -62,6 +62,9 @@ ReadmeVM.txt
 
 + 存储整数指令预先判定数据是否足够。
 
++ [TCocoRGrammar.SaveModuleName] Init     
+    ModuleDate := DateTimeToTimeStamp(Now);
+    ModuleVersion := 0; //TODO: + Compiler directive for set the ModuleVersion.
 
 2008-7-18 7:15
 调用外部函数有两种，一种是调用DLL或Host内部的函数，用 CallExt 机器指令执行；一种是调用其它模块的公开函数，用 CallFar 机器指令执行。
