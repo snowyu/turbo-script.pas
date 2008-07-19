@@ -1290,7 +1290,7 @@ begin
   begin
     vModuleSymbol := FModuleSymbol.UsedModules.Items[Result];
     vModuleSymbol.ReferenceTo(FModuleSymbol);
-    vModuleSymbol.compile;
+    vModuleSymbol.Compile;
     vModuleSymbol.Line := Scanner.CurrentSymbol.Line;
     vModuleSymbol.Column := Scanner.CurrentSymbol.Col;
 
@@ -1340,7 +1340,10 @@ begin
   FModule.Name := aName;
   FileName := aName;
   FModuleSymbol.Name := aName;
-  with FModule do 
+  with FModule do
+  begin
+    ModuleDate := DateTimeToTimeStamp(Now);
+    ModuleVersion := 0;
     if aName <> '' then
     begin
       PTurboPreservedDataMemory(DataMemory).ModuleName := Pointer(UsedDataSize);
@@ -1349,6 +1352,7 @@ begin
     end
     else
       PTurboPreservedDataMemory(DataMemory).ModuleName := nil;
+  end;
 end;
 
 procedure TCocoRGrammar.Init;
