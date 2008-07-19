@@ -220,7 +220,7 @@ asm
 {$IFDEF TurboScript_ExecTimeOut_Supports}
   MOV  EDX, [ECX].TTurboGlobalOptions.ExecDuration
   TEST EDX, EDX
-  JZ   @@DoEnter
+  JZ   @@DoEnter //0 means ignore timeout.
     
   PUSH ECX //backup
   PUSH EDX
@@ -352,6 +352,7 @@ asm
   MOV  [ECX].TTurboGlobalOptions.ReturnStackBottom, EAX
 @@byebye:
   MOV  [ECX].TTurboGlobalOptions.States, DL
+  JMP  iVMNext
 end;
 
 //(ErrorCode, ErrorAdr -- )
@@ -506,7 +507,7 @@ begin
   begin
     New(aMethod.ExternalOptions.ProcInstance, Create);
     aMethod.ExternalOptions.ProcInstance.ProcType := PMeProcType(aMethod.TurboType);
-    aModule.MeObjects.Add(aMethod.ExternalOptions.ProcInstance);
+    //aModule.MeObjects.Add(aMethod.ExternalOptions.ProcInstance);
   end;
   Result := aStack;
   with aMethod.ExternalOptions.ProcInstance^ do
@@ -984,6 +985,12 @@ end;
 //(int addr -- )
 procedure vStoreInt;
 asm
+  //check whether is out of stackbottom
+  MOV EAX, EBP
+  INC EAX   INC EAX   INC EAX   INC EAX
+  CMP EAX, [ECX].TTurboGlobalOptions.ParamStackBottom
+  JG @@OverflowError //already is bottom then stack overflow error.
+
   ADD EBX, EDI 
   MOV EAX, [EBP]
   MOV [EBX], EAX
@@ -992,19 +999,27 @@ asm
   INC EBP 
   INC EBP
   MOV EBX, [EBP]
-  //check whether is stackbottom
-  CMP EBP, [ECX].TTurboGlobalOptions.ParamStackBottom
-  JLE @@exit //already is bottom then exit.
   INC EBP 
   INC EBP 
   INC EBP 
   INC EBP
-@@exit:  
   JMP  iVMNext
+
+@@OverflowError:  
+  MOV EAX, errOutOfDataStack
+  JMP _iVMHalt 
 end;
 
+//(int8 addr -- )
 procedure vStoreInt64;
 asm
+  //check whether is out of stackbottom
+  MOV EAX, EBP
+  INC EAX   INC EAX   INC EAX   INC EAX
+  INC EAX   INC EAX   INC EAX   INC EAX
+  CMP EAX, [ECX].TTurboGlobalOptions.ParamStackBottom
+  JG @@OverflowError //already is bottom then stack overflow error.
+
   ADD EBX, EDI 
   MOV EAX, [EBP]
   MOV [EBX], EAX
@@ -1020,19 +1035,25 @@ asm
   INC EBP 
   INC EBP
   MOV EBX, [EBP]
-  //check whether is stackbottom
-  CMP EBP, [ECX].TTurboGlobalOptions.ParamStackBottom
-  JLE @@exit //already is bottom then exit.
   INC EBP 
   INC EBP 
   INC EBP 
   INC EBP
-@@exit:  
   JMP  iVMNext
+
+@@OverflowError:  
+  MOV EAX, errOutOfDataStack
+  JMP _iVMHalt 
 end;
 
 procedure vStoreWord;
 asm
+  //check whether is out of stackbottom
+  MOV EAX, EBP
+  INC EAX   INC EAX   INC EAX   INC EAX
+  CMP EAX, [ECX].TTurboGlobalOptions.ParamStackBottom
+  JG @@OverflowError //already is bottom then stack overflow error.
+
   ADD EBX, EDI 
   MOV EAX, [EBP]
   MOV [EBX], AX
@@ -1041,19 +1062,25 @@ asm
   INC EBP 
   INC EBP
   MOV EBX, [EBP]
-  //check whether is stackbottom
-  CMP EBP, [ECX].TTurboGlobalOptions.ParamStackBottom
-  JLE @@exit //already is bottom then exit.
   INC EBP 
   INC EBP 
   INC EBP 
   INC EBP
-@@exit:  
   JMP  iVMNext
+
+@@OverflowError:  
+  MOV EAX, errOutOfDataStack
+  JMP _iVMHalt 
 end;
 
 procedure vStoreByte;
 asm
+  //check whether is out of stackbottom
+  MOV EAX, EBP
+  INC EAX   INC EAX   INC EAX   INC EAX
+  CMP EAX, [ECX].TTurboGlobalOptions.ParamStackBottom
+  JG @@OverflowError //already is bottom then stack overflow error.
+
   ADD EBX, EDI 
   MOV EAX, [EBP]
   MOV [EBX], AL
@@ -1062,15 +1089,15 @@ asm
   INC EBP 
   INC EBP
   MOV EBX, [EBP]
-  //check whether is stackbottom
-  CMP EBP, [ECX].TTurboGlobalOptions.ParamStackBase
-  JLE @@exit //already is bottom then exit.
   INC EBP 
   INC EBP 
   INC EBP 
   INC EBP
-@@exit:  
   JMP  iVMNext
+
+@@OverflowError:  
+  MOV EAX, errOutOfDataStack
+  JMP _iVMHalt 
 end;
 
 //print a char
