@@ -1756,6 +1756,7 @@ var
   i: Integer;
   vModuleEntry: PTurboModuleRefEntry;
 begin
+  //writeln(name, ' module DeclareTo');
   Result := cSymbolErrorOk;
   i := aModule.UsedModules.IndexOf(PTurboModuleSymbol(@Self));
   if i < 0 then
@@ -1779,19 +1780,22 @@ begin
       AllocDataSpace(SizeOf(TTurboModuleRefEntry));
       vModuleEntry.Prior := LastModuleRefEntry;
       vModuleEntry.Module.ModuleType := Self.ModuleType;
-      //writeln(Self.Name, Integer(Self.ModuleType));
+      writeln(Self.Name, Integer(Self.ModuleType));
+      vModuleEntry.Module.Handle := nil;
+      vModuleEntry.Module.Revision := Self.Module.ModuleVersion;
+      vModuleEntry.Module.BuildDate := Self.Module.ModuleDate;
+      {//TODO: 这样判断是不对的，应该从它是否重磁盘加载来判定！
       if not (Self.ModuleType in cTurboExternalModuleTypes) then
       begin
-        vModuleEntry.Module.Revision := Module.ModuleVersion;
-        vModuleEntry.Module.BuildDate := Module.ModuleDate;
+        vModuleEntry.Module.Revision := Self.Module.ModuleVersion;
+        vModuleEntry.Module.BuildDate := Self.Module.ModuleDate;
       end
       else
       begin
-        vModuleEntry.Module.Handle := nil;
         vModuleEntry.Module.Revision := 0;
         vModuleEntry.Module.BuildDate.Time := 0;
         vModuleEntry.Module.BuildDate.Date := 0;
-      end;
+      end; //}
       vModuleEntry.Module.Name := Pointer(UsedDataSize);
       if Length(Self.Name) > 0 then
         AddBufferToData(Self.Name[1], Length(Self.Name));
