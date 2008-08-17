@@ -54,6 +54,14 @@ the Module Type(TTurboModuleType):
 
 模块代码区(FMemory)
 
+模块的加载流程：
+  LoadFromStream: 模块来自流
+    需重定位的数据地址表加载： FRelocatedDataAddresses.LoadFromStream(aStream); 
+    需重定位的数据类型表加载： FRelocatedDataTypes.LoadFromStream(aStream);
+    当没有注册类型表加载的时候加载否则跳过： if not FRegisteredTypes.loaded.then Load FRegisteredTypes 
+    加载数据区： Load DataMem(数据区)
+    加载代码区： Load Mem(代码区)
+
 
 发现C#的编译器语法很好写，和汇编差不多，就再写一个类似C#的。
 namespace MyCompany; //默认添加的前缀。

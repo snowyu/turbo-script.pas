@@ -46,6 +46,17 @@ FORTH.txt
 ReadmeVM.txt
   从架构，模块角度进行说明
 
+2008-7-20 8:48
+!+ [uTurboExecutor.pas] TTurboCustomModule
+  我需要将编译器中的一小部分（在模块中注册新的DLL和Host的函数，这样可以方便的在Host中创建Host方法有关的模块）以方法的形式放入到TTurboCustomModule.
+  + RegisterFunc : 可以注册DLL和Host函数，如果函数中的类型模块中没有（包括引用的模块），会自动注册该类型。【所有注册的函数都是public with named】
+  + RegisterType : 单独在模块中注册类型。
+  //+ RegisterVariable : 如果考虑变量，可以考虑增加一组存储/获取绝对地址的VM指令。
+  //+ RegisterConst
+~ 关于数据区(Data Memory)的设想：
+  可以采用类似Windows Memory页式分配方式：在Windows平台下可以直接使用，但是其它Linux平台就不知道了（也许需要模拟）。
+  也就是约定一个最大数据区内存空间值，但是实际上分配的只是实际使用的，其它的并没有真正的分配，只有当需要的时候才申请空间。
+
 2008-7-19 23:11
 * [Bug] Issue 56[Done]: 调用外部模块的函数报错，严重错误。发现是编译器没有初始化引用模块单元地址（handle）的缘故。
   TTurboModuleSymbol.DeclareTo
@@ -83,7 +94,8 @@ CallExt PTurboWordEntry
   + FHostHostModules: 
   + RegisterModule
   * first search FModules, then FHostHostModules, and last search ModuleAccessors
-  还有一个方案是建立一个新Accessor类： TTurboHostAccessor，将所有的HostModule放入，并作为系统Accessor首先注册到 TTurboModuleManager。
+  【选择该方案:】还有一个方案是建立一个新Accessor类： TTurboHostAccessor，将所有的HostModule放入，并作为系统Accessor首先注册到 TTurboModuleManager。
+    GHostModules.Register(aModuleClass)
 
 2008-5-12 22:30
 由于我已经将Moudle和执行机构分开，

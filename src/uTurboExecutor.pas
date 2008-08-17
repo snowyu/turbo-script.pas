@@ -314,7 +314,7 @@ type
     {: reset the stack pointers. }
     procedure Reset;
     procedure SaveToFile(const aFileName: String);
-    {: save FMemory to stream }
+    {: save module to a stream }
     procedure SaveToStream(const aStream: TStream);
     {: 是否被存放在 Owner 中. }
     function StoredInOwner: Boolean;
@@ -358,7 +358,10 @@ type
     warining: if in the running status, you may be get trouble!!
     }
     property MemorySize: tsInt read GetMemorySize write SetMemorySize;
-    {: this module used MeObjects in runtime }
+    {: : Cache the Meobjects which used by this module MeObjects at runtime. }
+    { Description
+    these cached MeObects will be free on unload.
+    }
     property MeObjects: PMeList read GetMeObjects;
     { Description
     (The ModuleDate field indicates the number of calendar days since the start

@@ -166,16 +166,18 @@ type
     opPopInt64, //opPopInt64 QWordVar-Addr (n --)
 
     {## Memory Operation opstruction }
+    //these memory address is offset address of the data memory.
     opStoreInt,  //! Store a opteger,pop data to memory (aInt offsetAddr --)
     opStoreByte, //C! CStore
-    opStoreWord, //inStoreWord  (aWord aWord-addr --)
-    opStoreInt64, //int64, opStoreQWord (aQWord aQWord-addr --)
+    opStoreWord, //!i2 inStoreWord  (aWord aWord-addr --)
+    opStoreInt64, //!i8 int64, opStoreQWord (aQWord aQWord-addr --)
     opStoreRP, //RP! Set return stack pointer (offsetAddr -- )
-    opFetchInt,  //Fetch, push a opteger from memory. (offsetAddr -- aInt)
+    opFetchInt,  //@ Fetch, push a 32 bit integer from memory. (offsetAddr -- aInt)
     opFetchByte, //CFetch
     opFetchWord, //inFetchWord (aWord-addr -- aWord) 
-    opFetchInt64,
-    opFetchRP, //RP@ Push current RP(returnStacck Poiinter) as data (-- RP)
+    opFetchInt64, //@i8
+    opFetchRP, //RP@ Push current RP(returnStacck Pointer) as data (-- RP)
+
     //Copies bytes from a source to a destination.
     opMove, //Move(dest-addr, src-addr, size --)
     opALLOT, //Allocate n bytes : usedMemory+n (n --) 
