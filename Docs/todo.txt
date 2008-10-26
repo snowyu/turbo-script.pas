@@ -46,6 +46,11 @@ FORTH.txt
 ReadmeVM.txt
   从架构，模块角度进行说明
 
+2008-8-29 7:56
++ [uTurboExecutor.pas] TTurboCustomModule.RegisterType
+! hostFunction 没有定义如何获得和执行.
+  dllFunction 很简单,但是必须先定义dllModule(dll函数在哪一个dll文件)
+
 2008-7-20 8:48
 !+ [uTurboExecutor.pas] TTurboCustomModule
   我需要将编译器中的一小部分（在模块中注册新的DLL和Host的函数，这样可以方便的在Host中创建Host方法有关的模块）以方法的形式放入到TTurboCustomModule.

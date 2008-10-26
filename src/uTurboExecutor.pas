@@ -305,6 +305,8 @@ type
     procedure NotifyModuleFree(Sender: TObject);
     {: //triggered when some module is unloaded  }
     procedure NotifyModuleUnloaded(Sender: TObject);
+    {: register a new type to the module. }
+    function RegisterType(const aType: PMeType): Boolean;
     procedure RemoveUnloadNotification(aProc: TNotifyEvent);
     {: find and load the module into memory. }
     { Description
@@ -1572,6 +1574,13 @@ begin
 
     ResetTypeRefsBy(@vModuleRef.Module);
   end;
+end;
+
+function TCustomTurboModule.RegisterType(const aType: PMeType): Boolean;
+begin
+  Result := Assigned(aType);
+  if Result then
+    Result := RegisteredTypes.RegisterType(aType);
 end;
 
 procedure TCustomTurboModule.RemoveUnloadNotification(aProc: TNotifyEvent);
