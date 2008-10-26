@@ -2321,7 +2321,7 @@ begin
   if FIsInternal then Exit;
   if Assigned(FiType) and not Assigned(FTypeInfo) then
   begin
-    if OwnerSymbol.Module.RegisteredTypes.RegisterType(FiType) then
+    if OwnerSymbol.Module.RegisterType(FiType) then
     begin
       FTypeInfo:= FiType;
       FiType := nil;
