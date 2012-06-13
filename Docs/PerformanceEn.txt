@@ -53,7 +53,7 @@ the float add instruction test:
     FADD b
     FSTP a
   end;//}
-  ;¼ÆÊ±½áÊø
+  ;è®¡æ—¶ç»“æŸ
 </code>
  
 QueryPerformanceCount: 67; treat the Execution Efficiency is 100%;  interpretive overhead is 0%

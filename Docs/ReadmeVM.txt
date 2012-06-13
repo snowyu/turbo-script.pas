@@ -1,92 +1,92 @@
-�ҵ������(Virtual Machine)˵����
+我的虚拟机(Virtual Machine)说明：
 
-�ҽ�������Ϊ�� TurboScriptEngine. 
+我将它命名为： TurboScriptEngine. 
 
-���Ŀ�꣺
-  �߶ȿ�������
-      * ��η������߶Ȳ�������������� �ڿ���еĸ��������߶ȶ������ɲ���飨�����ж��������ϣ�������ͨ�á�
-      * ����ϸ������ƾ��ɣ����и�Ч���ڴ�ռ�õ͡�
-      * ��϶ȵ�(�ɲ����)
-  ��չ��������Ҫ�ܹ����п���չ�ԣ�����Ӧδ�����ܵı仯��
-   ���ݿ�ִ�й��ܣ�the run-time script types, constants, global variables and procedures can be stored in the memory or database.
-  �߶����������ԣ�������Ϊ�ű���������Ҳ��JIT���У�Ҳ����Ϊ�߼����Ա�������
-  ���٣����ܹ�����ִ�У�Ҳ�ܹ�����ɻ�����ֱ��ִ�У���С�ɣ���Ч��
-  ��ȫ�����а�ȫ�ȶ�������ͨ������TDD���Ի��������ϡ�
-  ������һ�����ӵļܹ������ǲ��Ի���ά���������ѵġ�����ϣ���ܹ��ܹ�������Ŀ�ĵ�����¾����ܵļ����ˡ�
+设计目标：
+  高度可重用性
+      * 层次分明，高度部件（组件）化： 在框架中的各个部件高度独立，可拆可组（任意拆卸，任意组合），着力通用。
+      * 部件细化，设计精巧，运行高效，内存占用低。
+      * 耦合度低(可拆可组)
+  延展：我们需要架构具有可拓展性，以适应未来可能的变化。
+   数据库执行功能：the run-time script types, constants, global variables and procedures can be stored in the memory or database.
+  高度自由缩放性：即可作为脚本解释器，也可JIT运行，也可作为高级语言编译器。
+  高速（既能够解释执行，也能够编译成机器码直接执行），小巧，高效；
+  安全：运行安全稳定【可以通过完善TDD测试机制来保障】
+  简明：一个复杂的架构不论是测试还是维护都是困难的。我们希望架构能够在满足目的的情况下尽可能的简单明了。
 
-��Ƽܹ������ Framework - ��̸ ORM Framework
-�ܹ������һ��Ȩ���ȡ�ᡣһ��Framework��Ϊ�˽��ĳһ�������ڵ�ĳЩ����Ĵ��븴�ö����˶����ģ������������ж��ֵĽ�������ġ�������Ҫȷ��Ψһ�ļܹ���ƵĽ������������ζ������Ҫ�ڲ�ͬ��ì����֮������һ��ȡ�ᡣ��������ƵĹ������ǿ��Կ����ܶ��ì���壺���ź����ϣ�һ���Ժ����⻯�ȵȡ��κ�һ��ì���嶼Դ�����Ƕ�Framework�Ĳ�ͬ��������Ҫ�����ڸ��ַ�����������ͬ��ȡ�ᡣû��һ��Framework�ܹ��������е�Ҫ��ֻ�Ǽܹ��Ĳ��ز�ͬ����һ���������� Framework ������������ܹ������ˣ���η��������ü�ֵ�ߣ����и�Ч�ʣ��ȶ������Ƶ�TDD���Ի��ƣ���
+设计架构优秀的 Framework - 兼谈 ORM Framework
+架构设计是一种权衡和取舍。一个Framework是为了解决某一个领域内的某些问题的代码复用而因运而生的，而问题总是有多种的解决方案的。而我们要确定唯一的架构设计的解决方案，就意味着我们要在不同的矛盾体之间做出一个取舍。我们在设计的过程总是可以看到很多的矛盾体：开放和整合，一致性和特殊化等等。任何一对矛盾体都源于我们对Framework的不同期望，需要我们在各种方案中作出不同的取舍。没有一个Framework能够满足所有的要求，只是架构的侧重不同。而一个设计优秀的 Framework 则是体现在其架构简单明了，层次分明，重用价值高；运行高效率，稳定（完善的TDD测试机制）。
 
-�����ɱ���ģ�齫����ȫ�������Forth���������,����ִ��������������뷭��ɲ�ͬƽ̨��ִ���벢ִ�л�����ִ��������ִ��.
+首先由编译模块将程序全部翻译成Forth虚拟机器码,再由执行器将虚拟机器码翻译成不同平台的执行码并执行或者由执行器解释执行.
 
-��˿��Է�Ϊ���󲿼�����������ִ������
+因此可以分为两大部件：编译器，执行器。
 
-һ��������
+一、编译器
 
-�����: uTurboCompiler.pas(CustomTurboCompiler, CustomTurboScriptModule)
-ʹ�ò�: TurboForthCompiler.pas, TurboPascalCompiler.pas, TurboBasicCompiler.pas, TurboCCompiler.pas, etc
-��չ��: 
+抽象层: uTurboCompiler.pas(CustomTurboCompiler, CustomTurboScriptModule)
+使用层: TurboForthCompiler.pas, TurboPascalCompiler.pas, TurboBasicCompiler.pas, TurboCCompiler.pas, etc
+扩展层: 
 
-Ŀǰ��������ʹ�ò㣺����Parser������Coco/R����������д���Զ��������롣
-����㣺�﷨���Ų�Ϊ�ֹ���д�� 
+目前编译器的使用层：语言Parser层是由Coco/R描述语言书写，自动产生代码。
+抽象层：语法符号层为手工书写： 
 uTurboCustomSymbol.pas
-  ����ķ����࣬ʵ�ʲ��� VM codes �����
+  抽象的符号类，实际产生 VM codes 在这里。
 uTurboCompilerUtils.pas
-  ���־���ķ�����ʵ�֡�Ҳ����Ԫ���Ƹøĸ����֡�
+  各种具体的符号类实现。也许单元名称该改个名字。
 
 
-������ģ�飺������Ҫ������õ�VM��Ԫ��̬�������ű�����ģ�飬��Ҫ������ַ�ض�λ���Ż����磺����unit�ĳ�ʼ�������Ƕ�ĳ����Ԫ������ֵ�����Ǹñ�����û�б�������ʹ�ã���ô�ó�ʼ�����̾Ͳ��ᱻ���ӽ����ִ�У�
-������ʹ�ò�: uTurboLinker.pas
+连接器模块：根据需要将编译好的VM单元静态引入主脚本程序模块，需要处理地址重定位，优化（如：其它unit的初始化过程是对某个单元变量赋值，但是该变量并没有被主程序使用，那么该初始化过程就不会被连接进入或执行）
+抽象与使用层: uTurboLinker.pas
 
-����ִ����
-�����: 
-  ִ��������ģ�uTurboExecutor.pas(include abstract executor, TurboProgram classes)
-    ģ���ڴ澵���ࣺ TCustomTurboModule
-      ��ŵ���VMָ������Meta���ݡ�
-    ִ����������ࣺ TCustomTurboExecutor
-    AppDomain�ࣺ TTurboProgram һ���������һ��AppDomain.
-  �������� uTurboAccessor.pas (�����ģ����������Լ��������Ĺ�����)
-    �ļ��������� �����ļ�ģ�� ��uTurboModuleFileAccessor��
-    ���ݿ�������� ���ش�������ݿ��ֵ�ģ��
+二、执行器
+抽象层: 
+  执行引擎核心：uTurboExecutor.pas(include abstract executor, TurboProgram classes)
+    模块内存镜像类： TCustomTurboModule
+      存放的是VM指令和相关Meta数据。
+    执行引擎抽象类： TCustomTurboExecutor
+    AppDomain类： TTurboProgram 一个程序就是一个AppDomain.
+  加载器： uTurboAccessor.pas (抽象的模块加载器，以及加载器的管理器)
+    文件加载器： 加载文件模块 （uTurboModuleFileAccessor）
+    数据库加载器： 加载存放于数据库种的模块
   RTTI(Meta Info): uTurboMetaInfo
   
-ʹ�ò�: TurboInterpreter.pas, TurboJITExecutor.pas, TurboX86Executor.pas; TurboZ80Executor.pas, TurboJavaVMExecutor.pas
-Ŀǰʵ�ֵ��У�
-  TurboInterpreter: ��Pascal ʵ�ֵ�VM������
-  TurboX86Interpreter:  X86����Ż� ʵ�ֵ�VM������
+使用层: TurboInterpreter.pas, TurboJITExecutor.pas, TurboX86Executor.pas; TurboZ80Executor.pas, TurboJavaVMExecutor.pas
+目前实现的有：
+  TurboInterpreter: 纯Pascal 实现的VM解释器
+  TurboX86Interpreter:  X86汇编优化 实现的VM解释器
 
 
-��չ��: �� TurboDebugger.pas
+扩展层: 如 TurboDebugger.pas
 
-JIT Translator ��ʱ����ģ�飺��ִ�������ã���VM��ʱ����ɱ�������ֱ��ִ�С�
+JIT Translator 即时翻译模块：由执行器调用，将VM及时翻译成本族语言直接执行。
 
-ִ������ֻ����Codes, ImportModules(�Լ��ṩ���ű�ʹ�õ��Լ�ͨ��LoadLibraryװ���), Resource, ������Ϣ(ImportTable)ֻ��PEFormat�д��ڡ�
+执行器中只包括Codes, ImportModules(自己提供给脚本使用的以及通过LoadLibrary装入的), Resource, 其它信息(ImportTable)只在PEFormat中存在。
 
-TurboInterpreter: Pure Pascal ʵ��
-TurboX86Interpreter: ����x86ָ���Ż�������ָ����ʵ�֣��Ĵ�������x86�ļĴ�������Ӧ��ϵ���£�
-ESP: ���ض�ջָ��.��סѹ����٣��������ӵ�ַ��
-EBP: ����ջָ�룬��ַָ������ڴ�ĳ����Ԫ�С�����EBP����ָ���ջ����
-EBX: Ϊ����ջջ���� 
-ESI: ָ��ǰָ���ַ
-EDX: ״̬�Ĵ���(������������ָ�TurboScript_FullSpeed����ʱʹ�ã�����Ϊ��ʱ�Ĵ���)��(0Bit: �Ƿ����У�1Bit:�Ƿ����) TTurboForthProcessorStates = set of TTurboForthProcessorState; TTurboForthState = (psLoaded, psRunning, tfsDebugging, tfsCompiling)
-     ״̬�Ĵ������ڱ����ڴ����ˣ�Ϊ���ܿ���ֹͣ����������һ��ִ�������½���3����������������ָ�TurboScript_FullSpeed������ʱ������ EDX ��Ϊ״̬�Ĵ�����
-EAX: W Register ��ʱ�Ĵ���
-ECX: ��ʱ�Ĵ���
-
-
-EDI: FMemory��ַ
-
-������PUSHAD ����Щͨ�üĴ��������ڶ�ջ������������ϵͳ�Ĺ���ʱ���á�Ȼ��POPAD.
-�����ҵ����⣬��Щ���Ĺ������÷���ʵ�ֻ��Ǻ�������ʵ�֣����޲����Ĺ���ʵ�֡�
+TurboInterpreter: Pure Pascal 实现
+TurboX86Interpreter: 基于x86指令优化。核心指令汇编实现，寄存器采用x86的寄存器，对应关系如下：
+ESP: 返回堆栈指针.记住压入减少，弹出增加地址。
+EBP: 数据栈指针，基址指针放在内存某个单元中。所以EBP总是指向次栈顶。
+EBX: 为数据栈栈顶。 
+ESI: 指向当前指令地址
+EDX: 状态寄存器(仅当条件编译指令：TurboScript_FullSpeed开启时使用，否则为临时寄存器)；(0Bit: 是否运行；1Bit:是否调试) TTurboForthProcessorStates = set of TTurboForthProcessorState; TTurboForthState = (psLoaded, psRunning, tfsDebugging, tfsCompiling)
+     状态寄存器放于保留内存中了，为了能控制停止。不过这样一来执行性能下降了3。增加了条件编译指令：TurboScript_FullSpeed，开启时候启用 EDX 作为状态寄存器。
+EAX: W Register 临时寄存器
+ECX: 临时寄存器
 
 
-����ʲô��ʽ THREADING TECHNIQUE ��ʵ���أ����ں�������ָ����ò���ֵ�ķ�ʽ���û��Զ���Word������Ե�ַ��������ռ���˴�����ǰ�������1024���ֽڣ����Ե�ַ������С��255����ʾ��
-��ô�ҵĺ���������������أ�ȫ�ֱ�������ʽ��
+EDI: FMemory基址
 
-�û��Զ���Word ʵ���� THREADING TECHNIQUE ������DTC(Direct Threaded Code) ģʽ���������а취�����Ƿ���VM����ָ�������Ե�ַ��
-����ĵģ�����Ҫ��Forthָ�����ΪVM����ָ��ʵ���ˣ�Next, Enter, Exit
+可以用PUSHAD 将这些通用寄存器保存于堆栈，供调用其他系统的过程时采用。然后POPAD.
+现在我的问题，这些核心过程是用方法实现还是函数过程实现？用无参数的过程实现。
 
-�û��Զ���word:���У� û��Enter�ˣ�ֻ��Exit.
+
+采用什么形式 THREADING TECHNIQUE 来实现呢？基于核心虚拟指令采用查表字典的方式！用户自定义Word采用相对地址（由于我占用了代码区前面的至少1024个字节，所以地址不可能小于255）表示。
+那么我的函数表放在哪里好呢？全局变量的形式。
+
+用户自定义Word 实际上 THREADING TECHNIQUE 类似于DTC(Direct Threaded Code) 模式，不过我有办法区分是否是VM机器指令，还是相对地址。
+最核心的，最重要的Forth指令，我作为VM机器指令实现了：Next, Enter, Exit
+
+用户自定义word:序列： 没有Enter了！只有Exit.
 
 iVMNext
   TEST EBX, cIsRunningBit
@@ -103,11 +103,11 @@ iVMNext
   MOV  EAX, [ECX+EAX]
   JMP  [EAX]
 @@IsUserWord:
-  ADD  EAX, [EBP] //ָ���û������word���
+  ADD  EAX, [EBP] //指向用户定义的word入口
   JMP  iVMEnter
 @@Exit:
 
-�ɴ಻��CALL ȫ�� jmp �ȽϺã�Ȼ��ÿһ�������һ��JMP vmNext
+干脆不用CALL 全部 jmp 比较好！然后每一个最后都有一个JMP vmNext
 
 iVMEnter: push the current IP(ESI),set the new IP, and run the vmNext
   PUSH ESI        //push the current IP.
@@ -125,10 +125,10 @@ iVMHalt
 
 TCoreForthWords = array [Byte] of TProcedure;
 
-Forth�������ڴ澵��(TCustomTurboExecutor.Memory)��
-FParameterStackBase(Pointer:������ջ��ַ) FParameterStackSize(Integer:������ջ��С)  
-ReturnStackBase(Pointer: ����ջ��ַ) ReturnStackSize(Integer: ����ջ��С)
-TIBLength(Integer) ToIn(Integer) TIB(PChar: 1024) LastWordEntry(Pointer: �û��Զ��嵥�������)
+Forth代码区内存镜像(TCustomTurboExecutor.Memory)：
+FParameterStackBase(Pointer:是数据栈基址) FParameterStackSize(Integer:是数据栈大小)  
+ReturnStackBase(Pointer: 返回栈基址) ReturnStackSize(Integer: 返回栈大小)
+TIBLength(Integer) ToIn(Integer) TIB(PChar: 1024) LastWordEntry(Pointer: 用户自定义单词链入口)
 type //in TurboScriptConsts
   PPreservedCodeMemory = ^ TPreservedCodeMemory;
   //the typecast for code memory area to get the parameters
@@ -150,32 +150,32 @@ type //in TurboScriptConsts
     //TIBLength: Integer; //#TIB the text buffer length
     //TIB: array [0..cMAXTIBCount-1] of char; //'TIB
     LastErrorCode: TTurboProcessorErrorCode;
-    //���ModuleType��ģ�飬��ô����װ�����и�ģ��ǰִ�еĳ�ʼ�����̣���ڵ�ַ
-    //����Ǻ��������Ǹú�������ڵ�ַ
+    //如果ModuleType是模块，那么就是装载运行该模块前执行的初始化过程，入口地址
+    //如果是函数，则是该函数的入口地址
     InitializeProc: Pointer; //it is the offset address of the FMemory
-    FinalizeProc: Pointer; //�����ģ��Ļ�
+    FinalizeProc: Pointer; //如果是模块的话
     //last Used(import) module entry.
     LastModuleEntry: PTurboModuleEntry;
-    //�����ֵĺ���������ָ�����һ��������ڡ�
+    //有名字的函数链表，指向最后一个函数入口。
     LastWordEntry: PTurboWordEntry;
-    //�����ֵı�������
+    //有名字的变量链表
     LastVariableEntry: PTurboVariableEntry;
-    //RTTI TypeInfo ����
+    //RTTI TypeInfo 链表
     LastTypeInfoEntry: PTurboTypeInfoEntry;
     //reserved: array [SizeOf() ] of byte; 
   end;
 
-����VM���룺
+测试VM代码：
 2 3 +
 
 pushInt 2 pushInt 3 AddInt Halt 
 
-�������� QueryPerformanceCounter ��� 6-8 QueryPerformanceCounter.
-������������Ҫ 400-800.QueryPerformanceCounter. �ҵ������ǵ����� ((1/6) / (1/400)) * 100 % = 6666 %��
-��delphi �� a:= 2+3 ������Ҫ��ʱ�� �� 4-7, ֻ��Delphi��( (1- (1/16) / (1/9)) * 100 % = 43.75%)��
-�����������ڴ���Ϊ״̬�Ĵ�����Ϊ����ֹͣ���������½���. ��Delphi���� �� 1- (1/18) / (1/9) = 50% ProcessorStates = 1 byte�� �� 1 - (1/36)/(1/9) = 75% ProcessorStates = 1 word ��
+运行性能 QueryPerformanceCounter 大概 6-8 QueryPerformanceCounter.
+而其他性能则要 400-800.QueryPerformanceCounter. 我的是他们的性能 ((1/6) / (1/400)) * 100 % = 6666 %。
+而delphi 的 a:= 2+3 运行需要的时间 是 4-7, 只比Delphi慢( (1- (1/16) / (1/9)) * 100 % = 43.75%)。
+现在我用了内存作为状态寄存器（为了能停止），性能下降了. 比Delphi慢了 【 1- (1/18) / (1/9) = 50% ProcessorStates = 1 byte】 【 1 - (1/36)/(1/9) = 75% ProcessorStates = 1 word 】
 
-Luna5: Delphi 1-((1/6.57)/(1/0.61))= 1-0.0928 ֻ��Delphi ���ܵ� 9.28%,��delphi����90.72%.
+Luna5: Delphi 1-((1/6.57)/(1/0.61))= 1-0.0928 只是Delphi 性能的 9.28%,比delphi慢了90.72%.
 
 
 -- $Id$
@@ -203,54 +203,54 @@ begin
   WriteLn(tot);
 end.
 
-��������������������FMemory�С�
-���Կ����Ǹ�executor�ľֲ����������������
-����ı������������������֣�Ҳ����û�С������ֵ�����������ʽ�ۼ���һ��
+变量区，代码区，都在FMemory中。
+可以看作是该executor的局部变量（或参数）。
+里面的变量、函数可以有名字，也可以没有。有名字的以链表的形式聚集在一起。
 
-�������ָ�����ڵ�ַ��Ϊ CALL ��ڵ�ַ����
-��ʽ1��ָ������ַָ��ĳ���һ����������ռ���˴�����ǰ�������1024���ֽڣ����Ե�ַ������С��255�����<256��Ϊ����ָ�����Ϊ��ڵ�ַ��
-��ʽ2��ָ���Ϊ1�ֽڣ�ר������һ��ָ��CALL,��������û����嵥�ʵ���ڵ�ַ��
+如何区分指令和入口地址（为 CALL 入口地址）？
+方式1：指令长度与地址指针的长度一样，由于我占用了代码区前面的至少1024个字节，所以地址不可能小于255，因此<256的为虚拟指令，否则为入口地址。
+方式2：指令长度为1字节，专门增加一个指令CALL,后面紧跟用户定义单词的入口地址。
 
-���÷�ʽ1�����ɣ�
-  1����Լ�ڴ棬ϵͳ��������Ҫ�����û��Զ��嵥����
-  2����������ϵͳָ���ʽ2���ֻ����256��ָ������޷����䡣
+采用方式1，理由：
+  1、节约内存，系统的扩建主要是在用户自定义单词上
+  2、便于扩充系统指令，方式2最多只能有256个指令，而且无法扩充。
 
-�ļ�֧�ֲ�: 
-  uTurboModuleAccessor(ģ��װ�뱣�����); 
-  ʵ�ʵ�װ�ء�ж�ط���������������ļ������ݿ����ģ�飬ģ���Ψһ�ԡ�
-  uTurboPEFormat.pas(���ĸ�ʽ); uTurboWin32PEFormat(windows32��PE��ʽ);
-�����Ŀ�ִ���ļ���ʽ, PE: Portable Executable File Format 
-���ܣ����ݸ�ʽ��װ��Import���е�ģ��(DLL��ForthDLLģ��)���ض�λ��ַ���Լ�����RES��Դ���Լ���Ҫ���¼���ľ��Ե�ַ��relocation����
-1��Import��(if any)
-2��Export��(if any)
-3��Relocation��(if any)����Ϊ�����ض�λ���������ض�λ����
-4��Resource��(if any)
-5��Code�α�(if any)
-7��symbol���ű�(if any)���ڵ���
+文件支持层: 
+  uTurboModuleAccessor(模块装入保存机制); 
+  实际的装载、卸载发生在这里，管理从文件或数据库加载模块，模块的唯一性。
+  uTurboPEFormat.pas(俺的格式); uTurboWin32PEFormat(windows32的PE格式);
+编译后的可执行文件格式, PE: Portable Executable File Format 
+功能：根据格式，装入Import表中的模块(DLL或ForthDLL模块)，重定位地址，以及管理RES资源。以及需要重新计算的绝对地址，relocation表。
+1、Import表(if any)
+2、Export表(if any)
+3、Relocation表(if any)：分为代码重定位表和数据重定位表。
+4、Resource表(if any)
+5、Code段表(if any)
+7、symbol符号表(if any)用于调试
 
-ע�⣺���ݰ�����ѧϰ��PE��ʽ��Ҳ��Ӧ�ý�����֯��Section��Section����Ϳ�������Ծ����������ʽ�μ�ExeCompile.txt��
+注意：根据俺正在学习的PE格式，也许应该将其组织成Section，Section的用涂由其属性决定。具体格式参见ExeCompile.txt。
 
-���SectionӦ�ó�֮Ϊģ��ɣ�TTurboScriptModule, ģ��ֻӦ���ڱ����ڴ��ڡ�SectionӦ���ǱȽϼ򵥵ĸ�ʽ����������Ч�ʲŸߡ�
+这个Section应该称之为模块吧：TTurboScriptModule, 模块只应该在编译期存在。Section应该是比较简单的格式，这样运行效率才高。
 
-ForthDLL����DLL���ƣ���������Ĵ��벻�ǻ����룬����Forth��VM�롣
+ForthDLL：与DLL类似，不过里面的代码不是机器码，而是Forth的VM码。
 
 
-uTurboModuleAccessor(ģ����ر����������):
+uTurboModuleAccessor(模块加载保存机制详述):
 
 TTurboModuleAccessor: abstract class  <-- TTurboModuleFileAccessor, TTurboModuleDataSetAccessor
-TTurboModuleAccessorList: register the accessor to here. ����ע��ļ�����ȫ�������
+TTurboModuleAccessorList: register the accessor to here. 所有注册的加载器全部在这里。
 
-TTurboModuleManager: manage the Turbo Module Accessores. ���е����ڴ��е�ģ�鶼�����
+TTurboModuleManager: manage the Turbo Module Accessores. 所有的在内存中的模块都在这里。
    //find and load the module into memory.
   function Require(const aModuleName: String; const aModuleClass: TTurboModuleClass; const aGlobal: PTurboGlobalOptions; const IsLoaded: Boolean): TCustomTurboModule;
 
-����˵����
+函数说明：
 function GTurboModuleManager.RegisterAccessor(const AccessorClass: TTurboModuleAccessorClass; const IsDefault: Boolean = False): Boolean;
-ע������������еļ���������singleton����ʵ����
+注册加载器，所有的加载器都是singleton单件实例。
 
 uTurboModuleFileAccessor
 
-���˵��:
+类的说明:
 
 { Summary the module for the TurboScript.}
 TCustomTurboScriptModule = Class
@@ -270,12 +270,12 @@ end;
 { Summary : The Abstract Virtual Machine Processor }
 { Description :
   Chinese 
-    ���������������������
-    ӵ��һ��IR(instruction register)ָ��Ĵ���, һ��SP��ջָ��Ĵ���, һ��BP��ջ��ַָ��Ĵ���, һ��PC����ָ��Ĵ�����һ��״̬�Ĵ���.
-    ָ��洢�����֣��������ŵȴ�ִ�е�ָ�����У����õ�����������ʽ��
-    ����ִ��Execute��ֹͣ(Stop)��
+    抽象虚拟机处理器抽象类
+    拥有一个IR(instruction register)指令寄存器, 一个SP堆栈指针寄存器, 一个BP堆栈基址指针寄存器, 一个PC程序指针寄存器，一个状态寄存器.
+    指令存储器部分：在这里存放等待执行的指令序列，采用单向链表的形式。
+    可以执行Execute和停止(Stop)。
   TODO
-    �Ƿ���Ҫ������Թ��ܣ�
+    是否需要加入调试功能？
 }
 TCustomVMProcessor = Class
 end;
@@ -283,7 +283,7 @@ end;
 { Summary : the Abstract stack-oriented Virtual Machine processor }
 { Description :
   Chinese 
-    ���ڶ�ջ�����������������
+    基于堆栈虚拟机处理器抽象类
 }
 TStackVMProcessor = Class(TCustomVMProcessor)
 end;
@@ -291,31 +291,31 @@ end;
 { Summary : the Forth Virtual Machine processor }
 { Description :
   Chinese 
-    ���ڶ�ջ��Forth�����������
+    基于堆栈的Forth虚拟机处理器
 }
 TForthVMProcessor = Class(TStackVMProcessor)
 
-{ Summary ����ı�����for Forth Language}
+{ Summary 抽象的编译器for Forth Language}
 TCustomCompiler = Class
 
-{ Summary ����Ľű�ִ���� for Forth Language}
+{ Summary 抽象的脚本执行器 for Forth Language}
 { Description
-  1�����أ������ļ�ͷӳ���ʽ������ģ����ض�λ��ַ��
-  2�����룬����ɱ��ػ�����
-  3��ִ�нű���
+  1、加载，根据文件头映像格式，加载模块和重定位地址。
+  2、翻译，翻译成本地机器码
+  3、执行脚本。
 }
   TCustomScriptExecutor = Class
   private
-  // ������ CodeArea : ������д��롣
+  // 代码区 CodeArea : 存放运行代码。
     FCodeArea: array of byte;
-  // ������ DataArea : ���ȫ�ֱ�����
+  // 数据区 DataArea : 存放全局变量。
     FDataArea: array of byte;
-  // ����ջ�� ����ǰ������ջָ����Ϣ��Ȼ��ϵͳջָ��ָ���FReturnStack�� ESP := @FReturnStack[0] + Length(FReturnStack) - 1; EBP := ESP;
+  // 返回栈： 运行前，保存栈指针信息，然后将系统栈指针指向该FReturnStack。 ESP := @FReturnStack[0] + Length(FReturnStack) - 1; EBP := ESP;
   // 
     FReturnStack: array of byte;
-  // ����ջ
+  // 数据栈
     FDataStack: array of byte;
-  // ������ĺ�����ַ
+  // 主程序的函数地址
     FFunctions: array of TFunctionRec;
     FVariables: array of TVariableRec;
 
@@ -323,7 +323,7 @@ TCustomCompiler = Class
     function InternalExecute: Integer;virtual;
 
   public
-  //ע��������ĺ���������ִ������
+  //注册主程序的函数变量到执行器中
     procedure AddFunction(AName:string; aProc:Pointer);
     procedure AddVariable(AName:string; aVar:Pointer);
 
@@ -335,21 +335,21 @@ TCustomCompiler = Class
 
 TFunctionProc = Function():Integer;
 
-{ Summary Intel x86 CPU ��ִ����}
+{ Summary Intel x86 CPU 的执行器}
   TIntelx86Executor = Class(TCustomScriptExecutor)
   private
-    // �������ܵ���
+    // 编译后才能调用
     FDoExecute: TFunctionProc;
 
 
   end;
 
-����˵��:
-�����������������:
- 1. ������������ָ��洢����
-   ���ȣ���Ҫ��ָ����ȷ�Ϊ��
-     1.��ָ��: û���κβ�����ָ��
-     2.������ָ��: ��һ��������ָ��
+数据说明:
+虚拟机处理的数据区:
+ 1. 程序数据区（指令存储器）
+   首先，我要将指令按长度分为：
+     1.简单指令: 没有任何参数的指令
+     2.单参数指令: 带一个参数的指令
 
    TVMCode = record
      opCode      : TInstruction;
@@ -367,39 +367,39 @@ TFunctionProc = Function():Integer;
    end;
    TProgramDataArea = array of TVMCode
    
-����һ���򵥵�ָ�����̣� ��2 3 +����������������µ�ָ������
+分析一个简单的指令流程： “2 3 +”，编译后生成如下的指令流：
   opPush 2, opPush 3, opAdd
-ʹ�� fixed length VMCode:
+使用 fixed length VMCode:
 
 
-�ڲ�(Internal)��������
-Ҳ�����ڲ��ؼ��֣����̣���IDΪLongWord��$1-$FFFFFFFF��,���Է�Ϊϵͳ�ؼ��ֹ���,ID��1-$FFFF���û��Զ���ؼ��ֹ��̣�ID($10000-$FFFFFFFF).
-��������ڲ�����ִ�У���������Ҫ���ͣ���ô�Ͳ��ò����(TTC)��ֻ�е���Ҫ�����ʱ��Ż���ִ�е�ַ(DTC or STC)��
+内部(Internal)函数总览
+也就是内部关键字（过程）。ID为LongWord（$1-$FFFFFFFF）,可以分为系统关键字过程,ID从1-$FFFF和用户自定义关键字过程，ID($10000-$FFFFFFFF).
+如果是在内部解释执行，反正都需要解释，那么就采用查表法(TTC)；只有当需要脱离的时候才换成执行地址(DTC or STC)。
 
-TTC(���)�ı��� ����ϵͳ�ؼ��֣�������ϸ����($1-$1FF)Ϊ����ϵͳ�ؼ��֣������������ʽֱ�Ӵ��ִ����ڵ�ַ��
-�����������Ĺؼ��������ɢ�е�������ʽ����Լ�ڴ档�ٺ٣������˸��õ����⣬ֱ�Ӳ��õ�ַ��
-�����ڲ��ؼ�����ȫ������������ʽ���¼ӵ���������󣨵�Ȼ�����ĺ�������û��Զ���ĺ������ܲ���Ψһ���ͱ���û��������ͻ����
-
-
-ϵͳ�ؼ��ֹ���:
-  ����������̣�
-  �߼�������̣�
-  �ַ���������
-  ���̿��ƣ� if...else, while, for...next, repeat...until.
+TTC(查表)的表： 对于系统关键字，可以在细分下($1-$1FF)为核心系统关键字，采用数组的形式直接存放执行入口地址；
+而对于其他的关键字则采用散列等其他形式来节约内存。嘿嘿，我有了更好的主意，直接采用地址。
+对于内部关键过程全部采用数组形式，新加的添加在最后（当然这样的后果就是用户自定义的函数可能不会唯一，和别的用户定义相冲突）。
 
 
- 2. ���ض�ջ��
- 3. ����������
- 4. �ڲ�������(Procs): ������Щ�̶��Ļ���ָ�����/
+系统关键字过程:
+  四则运算过程：
+  逻辑运算过程：
+  字符串处理：
+  流程控制： if...else, while, for...next, repeat...until.
 
-FORTH�����������������������������������:
- 4. ���ݶ�ջ��
 
-TTC(�����ʽ��)�Ĵ�����ʹ�ã�
+ 2. 返回堆栈区
+ 3. 变量数据区
+ 4. 内部程序区(Procs): 就是那些固定的机器指令代码/
 
-TurboScript ����ָ��(Forth)��ࣺ
-����ָ�����ֽ���Ϊ���ȡ����仰˵������ָ�����255�����ڽ������У�VM����ָ�����Բ���ķ�ʽ����ִ�С��ڷ������н���ЩVMָ���������Ļ�������Ȼ����ִ�������磺X86Executor����ִ�С�
-ָ��ɷֵ��ֽ�ָ��Ͷ��ֽ�ָ�ָ���������
+FORTH虚拟机处理的数据区除了上述的数据区外:
+ 4. 数据堆栈区
+
+TTC(查表方式下)寄存器的使用：
+
+TurboScript 机器指令(Forth)汇编：
+基本指令以字节作为长度。换句话说，机器指令最多255个。在解释器中，VM机器指令是以查表的方式解释执行。在翻译器中将这些VM指令翻译成真正的机器语言然后在执行器（如：X86Executor）中执行。
+指令可分单字节指令和多字节指令（指令＋操作数）
 
   { Summary the FORTH Virtual Mache Codes}
   TVMInstruction = (
@@ -460,17 +460,17 @@ TurboScript ����ָ��(Forth)��ࣺ
 
 
 
-TurboScript ��׼���ļ� Lib ��ʽ�� 
-���뽫�ڲ��ؼ��֣�������ȫ��Ū�ɿ����ʽ�����������Ծ١�
+TurboScript 标准库文件 Lib 格式： 
+我想将内部关键字（函数）全部弄成库的形式，这样便于自举。
 System.tcu (TurboScript Compiled Unit)
-�����ڲ����Ĺؼ���Ӧ������ΰ찡��������һ�׻��ָ���Ȼ��Forth��������ô���ָ�����Forth����ָ�
+对于内部核心关键字应该是如何办啊？必须有一套汇编指令。既然是Forth机器，那么汇编指令就是Forth核心指令。
 
-�ļ�ͷ��ʽ��
+文件头格式：
   TTurboModuleStreamHeader = packed record
-    Id: array [0..cFORTHHeaderMagicIdLen-1] of char; //MagicWord: ����Ƿ�ΪTurboScript�ļ���ʽ��
+    Id: array [0..cFORTHHeaderMagicIdLen-1] of char; //MagicWord: 辨别是否为TurboScript文件格式。
     Version: LongWord;
     BuildDate: TTimeStamp;
   end;
 
-�����ŵ����ݾ��ǣ�Forth�������ڴ澵��(TCustomTurboExecutor.Memory)��
+紧接着的内容就是：Forth代码区内存镜像(TCustomTurboExecutor.Memory)。
 

@@ -1,69 +1,69 @@
-Moving Forth¼ò½é
-Ô­ÎÄ³ö´¦http://www.zetetics.com/bj/papers/index.html
-Ïà¹ØÍøÕ¾http://www.zetetics.com/camel/index.html
+Moving Forthç®€ä»‹
+åŽŸæ–‡å‡ºå¤„http://www.zetetics.com/bj/papers/index.html
+ç›¸å…³ç½‘ç«™http://www.zetetics.com/camel/index.html
 
-Ä¿µÄ£º
-  ÈçºÎ½«ForthÒÆÖ²ÖÁÁíÒ»¸öCPUÏµÍ³ÉÏ¡£
-¸ÅÊö£º
-  Òª½«ForthÒÆÖ²ÖÁÁíÒ»¸öCPUÉÏ£¬±ØÐëÁË½âÄ¿±êCPUÖ®ÌØÐÔ¼°ForthµÄ¼Ü¹¹¡£
-´ËÆªÎÄÕÂ³ý¸ÅÊöForth¼Ü¹¹Íâ£¬ÒàËµÃ÷ÊýÖÖCPU¹¹¼ÜÏÂForthÖ®ÔË×÷ÐÍÌ¬Ö®Ñ¡Ôñ¡£
+ç›®çš„ï¼š
+  å¦‚ä½•å°†Forthç§»æ¤è‡³å¦ä¸€ä¸ªCPUç³»ç»Ÿä¸Šã€‚
+æ¦‚è¿°ï¼š
+  è¦å°†Forthç§»æ¤è‡³å¦ä¸€ä¸ªCPUä¸Šï¼Œå¿…é¡»äº†è§£ç›®æ ‡CPUä¹‹ç‰¹æ€§åŠForthçš„æž¶æž„ã€‚
+æ­¤ç¯‡æ–‡ç« é™¤æ¦‚è¿°Forthæž¶æž„å¤–ï¼Œäº¦è¯´æ˜Žæ•°ç§CPUæž„æž¶ä¸‹Forthä¹‹è¿ä½œåž‹æ€ä¹‹é€‰æ‹©ã€‚
 
-ÖØµãÕûÀí£º
-  ½«ÆäForthÉÏÖ®¼Ü¹¹¸ÅÄîÖØÐÂÕûÀí¡£
-1.ForthÏµÍ³¸Å¹Û
-  ForthÊÇÒ»Ì×½¨ÔìÓÚÒ»¸öÐéÄâÓ²¼þÉÏÖ®ÏµÍ³£¬ÆäÖÐ°üÀ¨ÓÐ²Ù×÷ÏµÍ³¡¢ÓïÑÔ¡¢³ý´íÆ÷µÈµÈÈí¼þ¡£
-  ËùÒÔForth¹æÀàÎª»ìºÏ²Ù×÷ÏµÍ³Ö®ÓïÑÔ¡£Òò´ËÖÖÌØÐÔÊ¹Ö®ÌØ±ðºÏÊÊÓÚÇ¶ÈëÊ½ÏµÍ³ÖÐ¡£
+é‡ç‚¹æ•´ç†ï¼š
+  å°†å…¶Forthä¸Šä¹‹æž¶æž„æ¦‚å¿µé‡æ–°æ•´ç†ã€‚
+1.Forthç³»ç»Ÿæ¦‚è§‚
+  Forthæ˜¯ä¸€å¥—å»ºé€ äºŽä¸€ä¸ªè™šæ‹Ÿç¡¬ä»¶ä¸Šä¹‹ç³»ç»Ÿï¼Œå…¶ä¸­åŒ…æ‹¬æœ‰æ“ä½œç³»ç»Ÿã€è¯­è¨€ã€é™¤é”™å™¨ç­‰ç­‰è½¯ä»¶ã€‚
+  æ‰€ä»¥Forthè§„ç±»ä¸ºæ··åˆæ“ä½œç³»ç»Ÿä¹‹è¯­è¨€ã€‚å› æ­¤ç§ç‰¹æ€§ä½¿ä¹‹ç‰¹åˆ«åˆé€‚äºŽåµŒå…¥å¼ç³»ç»Ÿä¸­ã€‚
 
-2.ÈÏÊ¶ForthÐéÄâ»úÆ÷
-  ForthÓÐÆä×Ô¼ºµÄCPU¼Ü¹¹£¬³ý»º´æÆ÷Íâ£¬ÓµÓÐ¶þ×é¶ÑÕ»£¬Ò»×éÎª³ÌÐò·µ»Ø¶Ñ£¬Ò»×éÎªÊý¾Ý¶ÑÕ»¡£
-  ÍêÕûµÄForth»º´æÆ÷ÓÐÏÂÁÐÁù¸ö¡£
+2.è®¤è¯†Forthè™šæ‹Ÿæœºå™¨
+  Forthæœ‰å…¶è‡ªå·±çš„CPUæž¶æž„ï¼Œé™¤ç¼“å­˜å™¨å¤–ï¼Œæ‹¥æœ‰äºŒç»„å †æ ˆï¼Œä¸€ç»„ä¸ºç¨‹åºè¿”å›žå †ï¼Œä¸€ç»„ä¸ºæ•°æ®å †æ ˆã€‚
+  å®Œæ•´çš„Forthç¼“å­˜å™¨æœ‰ä¸‹åˆ—å…­ä¸ªã€‚
   PSP:Parameter Stack(or data stack) Pointer
   TOS:Top Of Stack
   RSP:Return Stack Pointer
   IP :Interpreter Pointer
   UP :User Pointer
   W  :Working register
-  ÁíÓÐÆäËü»º´æÆ÷£¬moving forthÔ­ÎÄÄÚ³ÆÎªX»º´æÆ÷£¬ÒàÓÐÈËÓÃA(Addressing)»º´æÆ÷¡£
-  ÒÔÏÂÃèÊö¸÷»º´æÆ÷¹¦ÄÜ¡£
-  PSP,TOS£ºÎªÊý¾Ý¶ÑÕ»Ïà¹Ø»º´æÆ÷£¬PSPÎª¹ÜÀíÊý¾Ý¶ÑÕ»Ö®Ö¸ÕëÆ÷¡£
-    ¶øTOSÎªÊý¾Ý¶ÑÕ»¶¥¶Ë»º´æÆ÷£¬Ö÷ÒòÎªÊý¾Ý¶ÑÕ»¶¯×÷Á¿´ó£¬µ«Ö»ÓÐÒ»¸ö½ø³ö¿Ú¡£
-    Èô½«¶¥¶ËÊý¾ÝÁôÔÚCPUÖ®ÖÐ£¬ÓÐ¼ÓËÙÊý¾Ý´¦ÀíµÄ×÷ÓÃ¡£
-  RSP£ºÎª³ÌÐòºô½ÐÖ®·µ»Ø¶ÑÕ»Ö¸ÕëÆ÷¡£
-  IP £ºÖ´ÐÐForth wordÓÃÖ®µØÖ·»º´æÆ÷£¬ÓÃÒÔÖ¸ÏòÏÂ´ÎÖ´ÐÐ×ÖÎªºÎ£¬ÆäÔË×÷ºÍ×ÖµäÏà¹Ø¡£
-  UP £ºÊ¹ÓÃÕß¹ÜÀíÓÃ»º´æÆ÷£¬Îª¶àÈÎÎñ¹ÜÀíÓÃ»º´æÆ÷£¬Ö¸Ïòtask×÷ÓÃÇø¡£¼ÇÂ¼ÆäTaskÏà¹ØÐÅÏ¢¡£
-  W  £º¸¨Öú¹¤×÷ÓÃ»º´æÆ÷£¬¸¨Öú×Öµä¶¯×÷»òÔËËãÓÃ¡£
+  å¦æœ‰å…¶å®ƒç¼“å­˜å™¨ï¼Œmoving forthåŽŸæ–‡å†…ç§°ä¸ºXç¼“å­˜å™¨ï¼Œäº¦æœ‰äººç”¨A(Addressing)ç¼“å­˜å™¨ã€‚
+  ä»¥ä¸‹æè¿°å„ç¼“å­˜å™¨åŠŸèƒ½ã€‚
+  PSP,TOSï¼šä¸ºæ•°æ®å †æ ˆç›¸å…³ç¼“å­˜å™¨ï¼ŒPSPä¸ºç®¡ç†æ•°æ®å †æ ˆä¹‹æŒ‡é’ˆå™¨ã€‚
+    è€ŒTOSä¸ºæ•°æ®å †æ ˆé¡¶ç«¯ç¼“å­˜å™¨ï¼Œä¸»å› ä¸ºæ•°æ®å †æ ˆåŠ¨ä½œé‡å¤§ï¼Œä½†åªæœ‰ä¸€ä¸ªè¿›å‡ºå£ã€‚
+    è‹¥å°†é¡¶ç«¯æ•°æ®ç•™åœ¨CPUä¹‹ä¸­ï¼Œæœ‰åŠ é€Ÿæ•°æ®å¤„ç†çš„ä½œç”¨ã€‚
+  RSPï¼šä¸ºç¨‹åºå‘¼å«ä¹‹è¿”å›žå †æ ˆæŒ‡é’ˆå™¨ã€‚
+  IP ï¼šæ‰§è¡ŒForth wordç”¨ä¹‹åœ°å€ç¼“å­˜å™¨ï¼Œç”¨ä»¥æŒ‡å‘ä¸‹æ¬¡æ‰§è¡Œå­—ä¸ºä½•ï¼Œå…¶è¿ä½œå’Œå­—å…¸ç›¸å…³ã€‚
+  UP ï¼šä½¿ç”¨è€…ç®¡ç†ç”¨ç¼“å­˜å™¨ï¼Œä¸ºå¤šä»»åŠ¡ç®¡ç†ç”¨ç¼“å­˜å™¨ï¼ŒæŒ‡å‘taskä½œç”¨åŒºã€‚è®°å½•å…¶Taskç›¸å…³ä¿¡æ¯ã€‚
+  W  ï¼šè¾…åŠ©å·¥ä½œç”¨ç¼“å­˜å™¨ï¼Œè¾…åŠ©å­—å…¸åŠ¨ä½œæˆ–è¿ç®—ç”¨ã€‚
 
-3.Forth×ÖµäÔË×÷
-  Forth×ÖµäÔË×÷ÓÐËÄÖÖ·½Ê½£º
+3.Forthå­—å…¸è¿ä½œ
+  Forthå­—å…¸è¿ä½œæœ‰å››ç§æ–¹å¼ï¼š
   Indirect Thread Code(ITC)
   Direct Thread Code(DTC)
   Subroution Thread Code(STC)
   Token Thread Code(TTC)
-  ITC:ÎªÔ­Ê¼ForthËùÊ¹ÓÃµÄ×Öµä·½·¨¡£ÏÖÒÑ²»ÓÃ£¬¶àÎªDTCËùÈ¡´ú¡£
-    Æä½á¹¹¼°¶¯×÷Ô­Àí²ÎÕÕMoving Forth-Figure 1¡£
-  DTC:ÏÖÔÚForth³£ÓÃµÄ×Öµä·½·¨£¬½á¹¹¼°¶¯×÷Ô­Àí²ÎÕÕMoving Forth-Figure 2¡£
-¡¡¡¡ºÍITC²»Í¬µãÔÚÓÚµ×²ãÖ´ÐÐ»úÐµÂëÖ®×Öµä½á¹¹²»Í¬£¬¸ß½××ÖÔòÒ»Ñù¡£
-  STC:¶¯×÷×î¼òµ¥£¬×îÈÝÒ×Àí½âµÄ×Öµä¶¯×÷£¬Ö±½ÓÊ¹ÓÃÒ»°ãCPUµÄºô½Ð¡£
-¡¡¡¡¿ÉÄÜÓÐ½Ï¿ìµÄÖ´ÐÐËÙ¶È£¬µ«¼Ó´ó³ÌÐò´úÂëµÄÈÝÁ¿¡£
-¡¡¡¡¶øÇÒ¸ß½××Ö¼°µÍ½××ÖÓÐÏàÍ¬µÄ½á¹¹£¬×îÈÝÒ×ÊµÏÖµÄ×Öµä¶¯×÷¡£
-¡¡¡¡ÒòÀûÓÃCPU callÖ®Ö¸Áî£¬ËùÒÔÎÞIP»º´æÆ÷¡£
-¡¡¡¡½á¹¹¼°¶¯×÷Ô­Àí²ÎÕÕMoving Forth-Figure 3¡£
-  TTC:²é±íÊ½µÄ×Öµä¶¯×÷£¬ÓÐ×îÐ¡µÄÖ´ÐÐµµ£¬ÊÊºÏÔÚÍ¨ÐÅÊ½µÄ³¡ºÏÏÂÊ¹ÓÃ¡£
-¡¡¡¡ÒÔ´Ë×Öµä½á¹¹µÄÖ´ÐÐÎÄ¼þÀ´¿´£¬Ôò¿É¿´¼ûÒ»¸öForth CPUµÄÖ´ÐÐÂë¡£»á±È½ÏÏñForthÔ­ÉúCPUÖ´ÐÐÂë¡£
-¡¡¡¡½á¹¹¼°¶¯×÷Ô­Àí²ÎÕÕMoving Forth-Figure 4¡£
+  ITC:ä¸ºåŽŸå§‹Forthæ‰€ä½¿ç”¨çš„å­—å…¸æ–¹æ³•ã€‚çŽ°å·²ä¸ç”¨ï¼Œå¤šä¸ºDTCæ‰€å–ä»£ã€‚
+    å…¶ç»“æž„åŠåŠ¨ä½œåŽŸç†å‚ç…§Moving Forth-Figure 1ã€‚
+  DTC:çŽ°åœ¨Forthå¸¸ç”¨çš„å­—å…¸æ–¹æ³•ï¼Œç»“æž„åŠåŠ¨ä½œåŽŸç†å‚ç…§Moving Forth-Figure 2ã€‚
+ã€€ã€€å’ŒITCä¸åŒç‚¹åœ¨äºŽåº•å±‚æ‰§è¡Œæœºæ¢°ç ä¹‹å­—å…¸ç»“æž„ä¸åŒï¼Œé«˜é˜¶å­—åˆ™ä¸€æ ·ã€‚
+  STC:åŠ¨ä½œæœ€ç®€å•ï¼Œæœ€å®¹æ˜“ç†è§£çš„å­—å…¸åŠ¨ä½œï¼Œç›´æŽ¥ä½¿ç”¨ä¸€èˆ¬CPUçš„å‘¼å«ã€‚
+ã€€ã€€å¯èƒ½æœ‰è¾ƒå¿«çš„æ‰§è¡Œé€Ÿåº¦ï¼Œä½†åŠ å¤§ç¨‹åºä»£ç çš„å®¹é‡ã€‚
+ã€€ã€€è€Œä¸”é«˜é˜¶å­—åŠä½Žé˜¶å­—æœ‰ç›¸åŒçš„ç»“æž„ï¼Œæœ€å®¹æ˜“å®žçŽ°çš„å­—å…¸åŠ¨ä½œã€‚
+ã€€ã€€å› åˆ©ç”¨CPU callä¹‹æŒ‡ä»¤ï¼Œæ‰€ä»¥æ— IPç¼“å­˜å™¨ã€‚
+ã€€ã€€ç»“æž„åŠåŠ¨ä½œåŽŸç†å‚ç…§Moving Forth-Figure 3ã€‚
+  TTC:æŸ¥è¡¨å¼çš„å­—å…¸åŠ¨ä½œï¼Œæœ‰æœ€å°çš„æ‰§è¡Œæ¡£ï¼Œé€‚åˆåœ¨é€šä¿¡å¼çš„åœºåˆä¸‹ä½¿ç”¨ã€‚
+ã€€ã€€ä»¥æ­¤å­—å…¸ç»“æž„çš„æ‰§è¡Œæ–‡ä»¶æ¥çœ‹ï¼Œåˆ™å¯çœ‹è§ä¸€ä¸ªForth CPUçš„æ‰§è¡Œç ã€‚ä¼šæ¯”è¾ƒåƒForthåŽŸç”ŸCPUæ‰§è¡Œç ã€‚
+ã€€ã€€ç»“æž„åŠåŠ¨ä½œåŽŸç†å‚ç…§Moving Forth-Figure 4ã€‚
 
-4.Ä¿±êCPU¼Ü¹¹¼°ForthÐéÄâ»úÆ÷»º´æÆ÷Ö®Ñ¡Ôñ
-¡¡ÒòËùÊ¹ÓÃµÄÄ¿±êCPUÓÐÆä»º´æÆ÷ÏÞÖÆ£¬ËùÒÔ±ØÐë½«Áù¸ö»º´æÆ÷Ñ¡ÔñÊ¹ÓÃ»º´æÆ÷»òÄÚ´æ»òÊÇÉáÆú¡£
-¡¡ÒÀÆäÖØÒª¶ÈÀ´ËµUPÎª×îµÍµÄ£¬¿ÉÒÔÒÔÄÚ´æÀ´ÊµÏÖ¡£ÒòÊ¹ÓÃ¶È½ÏÆäËü»º´æÆ÷µÍ¡£
-¡¡Æä´ÎÎªTOS£¬´Ë»º´æÆ÷Îª¼ÓËÙÓÃ£¬²»Ê¹ÓÃ½öËÙ¶È½ÏÂý¡£
-¡¡ÔÙÆä´ÎÎªIP£¬ÈôÎÞ·¨ÊµÏÖ´Ë»º´æÆ÷£¬¿ÉÒÔ½«Forth×ÖµäÔË×÷·½Ê½¸ÄÎªSTCÔò¿ÉÒÔ½â¾ö¡£
-¡¡W»º´æÆ÷ÒÀÄ¿±êCPU¶ø¶¨¡£Moving ForthÔ­ÎÄÖÐÓÐÁÐ³öÒ»Ð©CPUÖ®±È½ÏÓëÑ¡Ôñ·½Ê½¡£
-¡¡
-5.ÆäËüÖØÒªÄÚÈÝ
+4.ç›®æ ‡CPUæž¶æž„åŠForthè™šæ‹Ÿæœºå™¨ç¼“å­˜å™¨ä¹‹é€‰æ‹©
+ã€€å› æ‰€ä½¿ç”¨çš„ç›®æ ‡CPUæœ‰å…¶ç¼“å­˜å™¨é™åˆ¶ï¼Œæ‰€ä»¥å¿…é¡»å°†å…­ä¸ªç¼“å­˜å™¨é€‰æ‹©ä½¿ç”¨ç¼“å­˜å™¨æˆ–å†…å­˜æˆ–æ˜¯èˆå¼ƒã€‚
+ã€€ä¾å…¶é‡è¦åº¦æ¥è¯´UPä¸ºæœ€ä½Žçš„ï¼Œå¯ä»¥ä»¥å†…å­˜æ¥å®žçŽ°ã€‚å› ä½¿ç”¨åº¦è¾ƒå…¶å®ƒç¼“å­˜å™¨ä½Žã€‚
+ã€€å…¶æ¬¡ä¸ºTOSï¼Œæ­¤ç¼“å­˜å™¨ä¸ºåŠ é€Ÿç”¨ï¼Œä¸ä½¿ç”¨ä»…é€Ÿåº¦è¾ƒæ…¢ã€‚
+ã€€å†å…¶æ¬¡ä¸ºIPï¼Œè‹¥æ— æ³•å®žçŽ°æ­¤ç¼“å­˜å™¨ï¼Œå¯ä»¥å°†Forthå­—å…¸è¿ä½œæ–¹å¼æ”¹ä¸ºSTCåˆ™å¯ä»¥è§£å†³ã€‚
+ã€€Wç¼“å­˜å™¨ä¾ç›®æ ‡CPUè€Œå®šã€‚Moving ForthåŽŸæ–‡ä¸­æœ‰åˆ—å‡ºä¸€äº›CPUä¹‹æ¯”è¾ƒä¸Žé€‰æ‹©æ–¹å¼ã€‚
+ã€€
+5.å…¶å®ƒé‡è¦å†…å®¹
   TIB: Text Input Buffer
-¡¡Moving ForthÎÄÖÐÓÐÐí¶àÊµÏÖForth×ÖÉÏµÄ×¢ÒâÊÂÏî£¬ÈçDOES>ÈçºÎÊµÏÖµÈµÈ¡£
-¡¡ÁíÍâÊ¹ÓÃAssemble¼°MetacompilerÊµÏÖForthµÄÓÅÈ±µãÒàÓÐËùÌá¡£
+ã€€Moving Forthæ–‡ä¸­æœ‰è®¸å¤šå®žçŽ°Forthå­—ä¸Šçš„æ³¨æ„äº‹é¡¹ï¼Œå¦‚DOES>å¦‚ä½•å®žçŽ°ç­‰ç­‰ã€‚
+ã€€å¦å¤–ä½¿ç”¨AssembleåŠMetacompilerå®žçŽ°Forthçš„ä¼˜ç¼ºç‚¹äº¦æœ‰æ‰€æã€‚
 
-Moving ForthÎªÊµÏÖForthµÄÖØÒªÈëÃÅÎÄÕÂ£¬ÊµÏÖÉÏÔòÎªCamel Forth¡£
-¿ÉÒÔ²ÎÕÕ¸÷¼ÒForthÖ®ÊµÏÖ·½·¨£¬ÒÔÁË½âForthµÄºËÐÄÔË×÷¡£
+Moving Forthä¸ºå®žçŽ°Forthçš„é‡è¦å…¥é—¨æ–‡ç« ï¼Œå®žçŽ°ä¸Šåˆ™ä¸ºCamel Forthã€‚
+å¯ä»¥å‚ç…§å„å®¶Forthä¹‹å®žçŽ°æ–¹æ³•ï¼Œä»¥äº†è§£Forthçš„æ ¸å¿ƒè¿ä½œã€‚
 

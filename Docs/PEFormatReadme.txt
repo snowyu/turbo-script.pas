@@ -1,31 +1,31 @@
 Portable Executable File Format
 
-= ��ִ���ļ���ʽ���� =
-���ܺ��ֿ�ִ���ļ���ʽ��һЩ������Ҫ���Ǳ���ģ��Զ��׼��ģ��ļ���Ӧ������������ݡ�
-��Ϊ�ļ����������ⲿ�ļ�����ķ��ţ������ͺ�����������ض�λ��Ϣ�ͷ�����ϢҲ����Ҫ
-�ġ�һЩ������Ϣ�ǿ�ѡ�ģ��������Ϣ��Ӳ����Ϣ�ȡ�����������һ�ֿ�ִ���ļ���ʽ����
-�����䱣��������Ϣ����Ϊ�Σ�Segment����ڣ�Section������ͬ���ļ���ʽ�жκͽڵĺ���
-������ϸ΢���𣬵����������Ĺ�ϵ���Ժ���������⣬�ⲻ�ǹؼ����⡣��󣬿�ִ���ļ�
-ͨ������һ���ļ�ͷ�����������ļ�������ṹ��
+= 可执行文件格式综述 =
+不管何种可执行文件格式，一些基本的要素是必须的，显而易见的，文件中应包含代码和数据。
+因为文件可能引用外部文件定义的符号（变量和函数），因此重定位信息和符号信息也是需要
+的。一些辅助信息是可选的，如调试信息、硬件信息等。基本上任意一种可执行文件格式都是
+按区间保存上述信息，称为段（Segment）或节（Section）。不同的文件格式中段和节的含义
+可能有细微区别，但根据上下文关系可以很清楚的理解，这不是关键问题。最后，可执行文件
+通常都有一个文件头部以描述本文件的总体结构。
 
 = TurboPEFormat V 1.0 =
-�Ҷ���� TurboPEFormat V1.0 ���ǲ���һSection������Section���ļ���������һ�������ڻ��ơ�
-���ͷ�Ϊ����ִ���ļ����Ϳ��ļ������ļ�������ϸ��Ϊ��DLL�⣬����ַ�����Դ�⣩��
+我定义的 TurboPEFormat V1.0 ，是采用一Section（各种Section在文件中最多存在一个）存在机制。
+类型分为：可执行文件，和库文件，库文件还可以细分为（DLL库，多国字符串资源库）。
 
-== �ļ�ͷ��ʽ ==
-�����ļ���Magic Flag���Լ��ļ����͡�������һ�����͵�TurboPE�ļ��������еġ�
-TurboPEFormat�ļ������ֽ�����: 'TurboScrptPEF'��Ȼ���������һ��DWORD���ļ��汾�š�
-�ٽ���Ϊ�ļ�����word: stExe, stLib, stRes
-����Ϊ������Ҳ��һ��word. eg, ����Lib��: ForthLib, StdLib. ����stRes ��Դ���������ԵĴ��š�
+== 文件头格式 ==
+定义文件的Magic Flag，以及文件类型。无论哪一种类型的TurboPE文件都必须有的。
+TurboPEFormat文件的首字节总是: 'TurboScrptPEF'，然后紧接着是一个DWORD的文件版本号。
+再接着为文件类型word: stExe, stLib, stRes
+接着为子类型也是一个word. eg, 对于Lib有: ForthLib, StdLib. 对于stRes 资源库则是语言的代号。
 
-== ��ִ���ļ� ==
+== 可执行文件 ==
 
-=== �����(����) ===
+=== 代码段(必须) ===
 
-=== Import��(��ѡ) ===
+=== Import段(可选) ===
 
-=== ��ַ�ض����(��ѡ) ===
+=== 地址重定向表(可选) ===
 
-=== Export��(��ѡ) ===
+=== Export段(可选) ===
 
-=== ���ݶ�(��ѡ) ===
+=== 数据段(可选) ===

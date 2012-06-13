@@ -1,55 +1,55 @@
-== ���뿪�� ==
-���еĽű����Զ�֧�����µı��뿪��:
+== 编译开关 ==
+所有的脚本语言都支持如下的编译开关:
 
 + Compiler Switch: 
   + Assert directives
-    �Ƿ����ö��ԡ�
+    是否启用断言。
     Syntax	{$C+} or {$C-}
             {$ASSERTIONS ON} or {$ASSERTIONS OFF}
     Default	{$C+}
             {$ASSERTIONS ON}
     Scope	  Local
-    ��Delphi���ƣ�����رգ��򲻻����Assert���̡�
-    Ҫ��ʹ�ö��ԣ�����ʹ�ò����������������룬���ӹ��̲�����Ȼ���룬����: �����Assert(False, 'helo'); �Զ�����ɣ�
+    和Delphi类似，如果关闭，则不会编译Assert过程。
+    要想使用断言，必须使用参数，可以这样编译，增加过程参数，然后翻译，比如: 将语句Assert(False, 'helo'); 自动翻译成：
       Push False; Push 'Helo'; CALL Assert
   + MESSAGE directive
-    ��ʾ�����û��������Ϣ�������﷨������Ϣ���������﷨�����������Ϣ�����������������ɹ�����
+    显示各种用户定义的消息，包括语法错误消息（当发生语法或语意错误消息，编译器将不会编译成功）。
     Syntax    {$MESSAGE  HINT|WARN|SYNTAX|SYMANTIC 'text string' }
     Examples: {$MESSAGE 'Boo!'}                   emits a hint 
   + MaxCodeSize directive
-    �������Ĵ�����ռ���ڴ��С�����С��ʵ�ʱ����Ĵ����С������ʵ�ʴ����СΪ׼��
+    设置最大的代码体占用内存大小，如果小于实际编译后的代码大小，则以实际代码大小为准。
     Syntax    {$MaxCodeSize  Size[KB|MB] }
-    ע�⣺�������Program|Unit֮�󣬵� MaxCodeSizeΪ-1��ʾ����ʵ�ʴ������СΪ׼��
+    注意：必须放在Program|Unit之后，当 MaxCodeSize为-1表示以以实际代码体大小为准。
   + MaxDataSize directive
-    ������������ռ���ڴ��С�����С��ʵ�ʱ����Ĵ����ݴ�С������ʵ�����ݴ�СΪ׼��
+    设置最大的数据占用内存大小，如果小于实际编译后的代数据大小，则以实际数据大小为准。
     Syntax    {$MaxDataSize  Size[KB|MB] }
-    ע�⣺�� MaxDataSizeΪ-1��ʾ����ʵ�����ݴ�СΪ׼��
+    注意：当 MaxDataSize为-1表示以以实际数据大小为准。
   + LoadOnDemand directive
-    �Ƿ�Ԥ�ȼ��أ����õģ�ģ�飬���ǰ���Ҫ���أ������ű����õ�ģ��Ĺ��̵�ʱ���ȥ���أ�
+    是否预先加载（引用的）模块，还是按需要加载（仅当脚本调用到模块的过程的时候才去加载）
     Syntax    {$L+|-} or {$LoadOnDemand ON|OFF}
     Default:  {$LoadOnDemand OFF}
-    ע�⣺�򿪰�����صĺô�������ű�û��ִ�е�ĳ��ģ��Ĺ���ʱ�����ģ�鲻�����ڴ��У�������ģ���ļ����Բ����ڣ����ܽ�ʡ�ڴ棬����Ӱ����Ч�ʡ�
+    注意：打开按需加载的好处是如果脚本没有执行到某个模块的过程时不会该模块不会在内存中（甚至该模块文件可以不存在），能节省内存，但是影响了效率。
 
 
 
 == TurboForth Grammar ==
 
-ע��֧��
-* ����ע��: //
-* ����ע��: {}
+注释支持
+* 单行注释: //
+* 多行注释: {}
 
-TurboForth֧�������ļ�: �����ļ��͵�Ԫ���ļ�,������������ֻ�����в�ͬ.��������ȴ��һ��,һ����ʾ����ִ�еĳ���,��һ�����ǹ����õĵ�Ԫ��,���ܱ�ֱ��ִ��.
-begin...end.��ĺ���ҹ��һ��,�ڳ����ļ������������ִ�����,����Ԫ�ļ������ǵ�Ԫ�ĳ�ʼ������.
+TurboForth支持两种文件: 程序文件和单元库文件,它们在声明中只是略有不同.不过含义却大不一样,一个表示可以执行的程序,另一个则是供调用的单元库,不能被直接执行.
+begin...end.块的含义夜不一样,在程序文件中是主程序的执行入口,而单元文件中则是单元的初始化过程.
 
-�ҽ� TurboForth ��Ϊ TurboScript �ĵͼ��������.
+我将 TurboForth 作为 TurboScript 的低级汇编语言.
 
-�����ļ�������ʽ����:
+程序文件大致形式如下:
 <pre>
 program aName;
-  //[UseModulesBlock] ��ѡ��.
+  //[UseModulesBlock] 可选的.
   uses test; 
   uses Another;
-  //[DeclarationBlock]: ������������,��������,��������,��������
+  //[DeclarationBlock]: 包括常量声明,变量声明,类型声明,过程声明
   type
     cc = string;
     bb = integer;
@@ -58,21 +58,21 @@ program aName;
     b = 344;
   var
     s:string [= 33];
-  //�������
+  //定义过程
   : Add(a,b: integer)  + ;
   
 begin
 end.
 </pre>
 
-��Ԫ���ļ�������Delphi��:
+单元库文件类似于Delphi的:
 <pre>
 Unit aName;
  
   Const aConstName = Value;
   [PUBLIC [NAMED] [TYPED]] Var aVarName: Type [= InitValue];
   : [PUBLIC NAMED] DefinedWord
-     [���] ������ [������]
+     [标号] 操作码 [操作数]
   ;
   
 End.
@@ -80,7 +80,7 @@ End.
 
 === 
 
-=== �ķ�����ʽ ===
+=== 文法产生式 ===
 CHARACTERS
  LETTER="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_".
  DIGIT =  "0123456789".

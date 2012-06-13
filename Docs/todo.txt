@@ -1,27 +1,27 @@
 Common Type System: CTS
-��ס����Ķ�ջ(����X86�Ķ�ջ����)�� ѹ�����ǵ�ַ���٣��������ǵ�ַ����,
-��ջ�����ڶ��������������ġ�
+记住这里的堆栈(采用X86的堆栈规则)： 压入则是地址减少，弹出则是地址增加,
+堆栈是悬在顶部，往下增长的。
 
 TODO: 
-  1. �����ҵ�һ�����·����ڴ棨����ռ䣩��ʱ�򣬻���ַ����ķ�����������Ҫ��FastMM���ҡ���
-     ����ֱ��ʹ��API���á��������Ƶĺ�������Ȼ�����������ڴ��ַ��Χ�����ɡ�
-     ���仰˵������Ҫ��MaxSize�����趨��
+  1. 必须找到一种重新分配内存（扩充空间）的时候，基地址不变的方法【可能需要在FastMM中找】。
+     可以直接使用API调用【或者类似的函数】，然后保留下最大的内存地址范围，即可。
+     换句话说，必须要有MaxSize参数设定！
   2. think about how to impl the procedure with parameters, see also CLR.
-!+ MaxStackSize directive �趨����ջ�Ĵ�С�� Ҫ�޸Ľṹ�����ܷ���,ֻ����Program��DLL(Package)�вŻ���ڡ�
+!+ MaxStackSize directive 设定数据栈的大小。 要修改结构，才能放入,只有在Program和DLL(Package)中才会存在。
     Syntax    {$MaxStackSize  Size[KB|MB] }
-    ע�⣺�������Program|Unit֮��
-!* [Bug] ��ջ��ŵ���С��λ������tsPointer����������Ӧ����tsPointerΪ׼��
-  ��Ҫ���Ҷ�ջ�йصĲ����޸�֮��
+    注意：必须放在Program|Unit之后
+!* [Bug] 堆栈存放的最小单位数据是tsPointer，所以量度应该以tsPointer为准。
+  需要查找堆栈有关的操作修改之！
 !* [Bug] ModuleParent is not set or convert to related or absolute address!
-~ Delphi Ƕ�������System��Ԫ�����ú����磺 _LStrLAsg ��ʱ�򣬱��룺
+~ Delphi 嵌入汇编调用System单元的内置函数如： _LStrLAsg 的时候，必须：
   CALL SYSTEM.@LStrLAsg
 ~ [Coco/R]  
-  {} :���ظ�0-����ε���˼��
-  []: �ǿ�ѡ��
-  | : ����
-  (): �����һ��
+  {} :是重复0-无穷次的意思。
+  []: 是可选项
+  | : 或者
+  (): 组合在一起。
 
-~ ͨ�� FreeMem �ͷ��ַ������ڴ�,����, �⽫�������ü���ֱ���ͷţ������ʹ�û���ʹ�ø��ַ����ĺ���������
+~ 通过 FreeMem 释放字符串的内存,警告, 这将跳过引用计数直接释放！这可能使得还在使用该字符串的函数出错！
 procedure FreeAnsiStringMem(var s);
 type
   PStrRec = ^StrRec;
@@ -41,32 +41,32 @@ begin
 end;
 
 FORTH.txt
-  ��VMָ���Լ��ڴ沼�ֵĽǶȽ���˵����
+  从VM指令以及内存布局的角度进行说明。
 
 ReadmeVM.txt
-  �Ӽܹ���ģ��ǶȽ���˵��
+  从架构，模块角度进行说明
 
 2008-8-29 7:56
 + [uTurboExecutor.pas] TTurboCustomModule.RegisterType
-! hostFunction û�ж�����λ�ú�ִ��.
-  dllFunction �ܼ�,���Ǳ����ȶ���dllModule(dll��������һ��dll�ļ�)
+! hostFunction 没有定义如何获得和执行.
+  dllFunction 很简单,但是必须先定义dllModule(dll函数在哪一个dll文件)
 
 2008-7-20 8:48
 !+ [uTurboExecutor.pas] TTurboCustomModule
-  ����Ҫ���������е�һС���֣���ģ����ע���µ�DLL��Host�ĺ������������Է������Host�д���Host�����йص�ģ�飩�Է�������ʽ���뵽TTurboCustomModule.
-  + RegisterFunc : ����ע��DLL��Host��������������е�����ģ����û�У��������õ�ģ�飩�����Զ�ע������͡�������ע��ĺ�������public with named��
-  + RegisterType : ������ģ����ע�����͡�
-  //+ RegisterVariable : ������Ǳ��������Կ�������һ��洢/��ȡ���Ե�ַ��VMָ�
+  我需要将编译器中的一小部分（在模块中注册新的DLL和Host的函数，这样可以方便的在Host中创建Host方法有关的模块）以方法的形式放入到TTurboCustomModule.
+  + RegisterFunc : 可以注册DLL和Host函数，如果函数中的类型模块中没有（包括引用的模块），会自动注册该类型。【所有注册的函数都是public with named】
+  + RegisterType : 单独在模块中注册类型。
+  //+ RegisterVariable : 如果考虑变量，可以考虑增加一组存储/获取绝对地址的VM指令。
   //+ RegisterConst
-~ ����������(Data Memory)�����룺
-  ���Բ�������Windows Memoryҳʽ���䷽ʽ����Windowsƽ̨�¿���ֱ��ʹ�ã���������Linuxƽ̨�Ͳ�֪���ˣ�Ҳ����Ҫģ�⣩��
-  Ҳ����Լ��һ������������ڴ�ռ�ֵ������ʵ���Ϸ����ֻ��ʵ��ʹ�õģ������Ĳ�û�������ķ��䣬ֻ�е���Ҫ��ʱ�������ռ䡣
+~ 关于数据区(Data Memory)的设想：
+  可以采用类似Windows Memory页式分配方式：在Windows平台下可以直接使用，但是其它Linux平台就不知道了（也许需要模拟）。
+  也就是约定一个最大数据区内存空间值，但是实际上分配的只是实际使用的，其它的并没有真正的分配，只有当需要的时候才申请空间。
 
 2008-7-19 23:11
-* [Bug] Issue 56[Done]: �����ⲿģ��ĺ������������ش��󡣷����Ǳ�����û�г�ʼ������ģ�鵥Ԫ��ַ��handle����Ե�ʡ�
+* [Bug] Issue 56[Done]: 调用外部模块的函数报错，严重错误。发现是编译器没有初始化引用模块单元地址（handle）的缘故。
   TTurboModuleSymbol.DeclareTo
     vModuleEntry.Module.Handle := nil;
-* [Bug] Issue 57[Done]: !i8 �ȴ洢����ָ�� ��X86Interpreter �д��󣬶�ѹ����һ��32λ��0������
+* [Bug] Issue 57[Done]: !i8 等存储整数指令 在X86Interpreter 中错误，多压入了一个32位的0整数。
   //check whether is stackbottom
   CMP EBP, [ECX].TTurboGlobalOptions.ParamStackBottom
   JG @@OverflowError //already is bottom then stack overflow error.
@@ -76,21 +76,21 @@ ReadmeVM.txt
   MOV EAX, errOutOfDataStack
   JMP _iVMHalt 
 
-+ �洢����ָ��Ԥ���ж������Ƿ��㹻��
++ 存储整数指令预先判定数据是否足够。
 
 + [TCocoRGrammar.SaveModuleName] Init     
     ModuleDate := DateTimeToTimeStamp(Now);
     ModuleVersion := 0; //TODO: + Compiler directive for set the ModuleVersion.
 
 2008-7-18 7:15
-�����ⲿ���������֣�һ���ǵ���DLL��Host�ڲ��ĺ������� CallExt ����ָ��ִ�У�һ���ǵ�������ģ��Ĺ����������� CallFar ����ָ��ִ�С�
+调用外部函数有两种，一种是调用DLL或Host内部的函数，用 CallExt 机器指令执行；一种是调用其它模块的公开函数，用 CallFar 机器指令执行。
 CallFar PTurboModuleEntry cfa-address
 CallExt PTurboWordEntry
-���Ҫʵ�� Host function Ӧ������ CallExt,������word ���뵽LastWordEntry�С�
+如果要实现 Host function 应该是用 CallExt,并将该word 加入到LastWordEntry中。
 
 !+ uTurboHostModule.pas
   the module is in the host application.
-  //���·���Ҳ���Է������ CustomModule �У��������� CustomModule.
+  //以下方法也可以放入基类 CustomModule 中，决定放入 CustomModule.
   + RegisterFunc
   + RegisterType
   //+ RegisterVariable
@@ -99,40 +99,40 @@ CallExt PTurboWordEntry
   + FHostHostModules: 
   + RegisterModule
   * first search FModules, then FHostHostModules, and last search ModuleAccessors
-  ��ѡ��÷���:������һ�������ǽ���һ����Accessor�ࣺ TTurboHostAccessor�������е�HostModule���룬����ΪϵͳAccessor����ע�ᵽ TTurboModuleManager��
+  【选择该方案:】还有一个方案是建立一个新Accessor类： TTurboHostAccessor，将所有的HostModule放入，并作为系统Accessor首先注册到 TTurboModuleManager。
     GHostModules.Register(aModuleClass)
 
 2008-5-12 22:30
-�������Ѿ���Moudle��ִ�л����ֿ���
+由于我已经将Moudle和执行机构分开，
 
 2008-4-28 21:22
 * LoadUsedModules
-  ����Module.HandleΪnil��ʱ���ȥ���أ���
-  ���⵱��ʼ����ʱ����Щģ����ʵ���Ѿ���ִ�е�ʱ����ء�
+  仅当Module.Handle为nil的时候才去加载！！
+  避免当初始化的时候有些模块事实上已经在执行的时候加载。
 Load Module:
   LoadFromStream:
     FRelocatedDataAddresses.LoadFromStream(aStream);
     FRelocatedDataTypes.LoadFromStream(aStream);
     if not FRegisteredTypes.loaded.then Load FRegisteredTypes 
-    Load DataMem(������)
-    Load Mem(������)
+    Load DataMem(数据区)
+    Load Mem(代码区)
   Run
     Init
-    {//ֻ��AppModule�Ż����ⲽ����
+    {//只有AppModule才会有这步？？
     if not (soLoadOnDemand in Options) then LoadUsedModules
        LoadUsedModles:
-         ���� ModuleRefs
+         遍历 ModuleRefs
            RequireModule
     }
   
-���ڵ�ִ�нṹ�Ǵ���ģ���App��ModuleӦ�÷ֿ�
+现在的执行结构是错误的！！App和Module应该分开
 Load App:
   LoadFromStream:
     FRelocatedDataAddresses.LoadFromStream(aStream);
     FRelocatedDataTypes.LoadFromStream(aStream);
     if not FRegisteredTypes.loaded.then Load FRegisteredTypes 
-    Load DataMem(������)
-    Load Mem(������)
+    Load DataMem(数据区)
+    Load Mem(代码区)
     if not (soLoadOnDemand in Options) then LoadUsedModules
   Run
     MainProc
@@ -142,14 +142,14 @@ Load App:
 
 2008-4-26 7:26
 * [TCustomTurboExecutor] 
-  �� ����ִ�г�ʱ���ƣ�
-    + Duration: Integer ִ��������ޣ����룩 0 means no limits.
+  ＋ 添加执行超时限制！
+    + Duration: Integer 执行最大期限（毫秒） 0 means no limits.
     + StartTick: Longword;
-  !�� ���ִ��CallFar�ĺ�������>Private�ĺ�������CallFar�ģ���Щ���ִ�е���ExitFar
-    �ҵ��������ڴ�������Memory����һ���̵ı�������Ȼ����д����CallFar�����Ĵ��룬��ִ�У�
+  !＋ 如何执行CallFar的函数：既>Private的函数都是CallFar的，这些最后执行的是ExitFar
+    我的主意是在代码区（Memory）搞一个短的保留区域，然后填写调用CallFar函数的代码，在执行！
 !* [uTurboExecutor]
-  LoadLibrary ������ڴ�First��û�вż����ļ���������RefCount
-  ��ʵ�����º�����Ŀ����Ϊ���ӳ�DLLж�ص�ʱ�䣬��ģ��ж�غ󲢲�����ж��DLL��ֱ��AppDomainִֹͣ�л��ͷŲ�ж�ء�
+  LoadLibrary 将检查内存First，没有才加载文件，并增加RefCount
+  我实现以下函数的目的是为了延迟DLL卸载的时间，当模块卸载后并不立刻卸载DLL，直到AppDomain停止执行或释放才卸载。
   + function TurboLoadDLL(const aFileName: string): HInstance;
   + function TurboFreeDLL(const aHandle: HModule): Boolean;
   + function TurboFreeDLLs(): Integer; //clear all libraries. the result is the leak count.
@@ -161,47 +161,47 @@ Load App:
     end;
 
 2008-4-24 20:59
-~ Unload ��ʱ��
- 1 Normal Unload ���õ��߳�: Init MainProc FInit
+~ Unload 的时机
+ 1 Normal Unload 采用单线程: Init MainProc FInit
  2 Force Unload:
    Free Heap Memory
-   + TurboModule.Heap: ʵ������δ�ͷŵ�ָ���б���
+   + TurboModule.Heap: 实际上是未释放的指针列表。
    + TurboModule.GetHeapMem(var P: Pointer; const Size: Integer);
    + TurboModule.FreeHeapMem(var P: Pointer; const Size: Integer=0);
 
 2008-4-23 20:48
 + tfDestroying in TTurboModuleFlag
   which means the module is destroying(the FInit method is executing).
-  RefCount ��ÿ��CallFar��ʱ��+1���˳�CallFar��ʱ��-1.
-  ��Unload֮ǰӦ�ü�� RefCount.
-�Ҷ������ˣ����Ѿ�ʵ����DLL�����룬Ҳ����DLLģ�����͡�
+  RefCount 当每次CallFar的时候+1，退出CallFar的时候-1.
+  在Unload之前应该检查 RefCount.
+我都忘记了，我已经实现了DLL的引入，也就是DLL模块类型。
 !+ Cache the loaded DLL Module(uTurboMetaInfo).
   TTurboModuleRefInfo.RequireDLLHandle;
   TTurboModuleRefInfo.FreeDLLHandle;
 
 2007-11-26 21:24
-* Module��Init��ʼ��ʱ��: ��ҪԤ�ȳ�ʼ�������͸��Ӷȣ�����ִ��ģ�麯����ʱ���ȥ��顣�����ʼ����ָ����ִ�г�ʼ�����̣�Ӧ�ý��ڴ��ʼ���ʹ���ִ�зֿ���
+* Module的Init初始化时机: 不要预先初始化，降低复杂度，仅当执行模块函数的时候才去检查。这里初始化，指的是执行初始化过程，应该将内存初始化和代码执行分开。
 
- ������ĳ��Moudle�еĺ�����ʱ��(iVMCallFar)������Module�Ƿ��Ѿ���ʼ��(tfInited)���������ִ��Module��ʼ�����̲����ñ�־tfInited��
- ͬʱ��Module�����ü�������1(_DoVMCallFarMemBase  Module.RefCount)��
- Լ��:���е�Init/Final����Ϊ�����ù���(Near)��
- ��ʼ���㶨���ؼ���Final��ʱ����������executor��FinalExec������Ӧ����ж��ǰ��
-        ������Զ������ڴ棬��Ȼ��ж�ص�ʱ���ڴ�ͻ����ˡ�ʱ�������
-        ��������н���ʱ����Final����ô��������һ�������Զ�����װ�ã��Զ����գ�ж�أ�δʹ�õ�ģ�飬��ô�����ģ����Ȼ����ִ��Final��
-        �����ж��ǰִ�У��ͱ���Ҫ���ǲ��г�ͻ�����ӱ�־����ж�ء��Ӳ��Ƿ��ģ������ʹ�á���ȫ�ֺ�������һ������ģ������
- ��������װ�ã������ж� RefCount, �Ŵ��ڴ���ж��Module.���ʹ����������װ��ж�أ���ô���ܻ���ֲ��г�ͻ��
-ʵ����Final���ǵľ��Ƕ��ڶѵ��ڴ��ͷţ�����Ȼ���ȫ�����Ǵ�����ƣ���ô�Ϳ��Բ��������
+ 当调用某个Moudle中的函数的时候(iVMCallFar)，检查该Module是否已经初始化(tfInited)，如果无则执行Module初始化过程并设置标志tfInited。
+ 同时该Module的引用计数将增1(_DoVMCallFarMemBase  Module.RefCount)。
+ 约定:所有的Init/Final过程为近调用过程(Near)！
+ 初始化搞定，关键是Final的时机？不是在executor有FinalExec方法？应该在卸载前？
+        如果是自动管理内存，自然在卸载的时候内存就回收了。时机在哪里？
+        如果在运行结束时调用Final？那么假设我有一个垃圾自动回收装置，自动回收（卸载）未使用的模块，那么这里的模块显然不能执行Final。
+        如果在卸载前执行，就必须要考虑并行冲突！增加标志正在卸载。加查是否该模块正在使用。在全局函数增加一个调用模块链。
+ 垃圾回收装置，首先判断 RefCount, 才从内存中卸载Module.如果使用垃圾回收装置卸载，那么可能会出现并行冲突。
+实际上Final考虑的就是对于堆的内存释放！！当然如果全部都是代码控制，那么就可以不管这个。
 
 2007-9-1 10:22
 + uTurboCustomSymbol.pas  seperate from uTurboCompileUtils.pas
-  �����������MeScript�õģ�Ҳ����TurboScript���õ�Symbol��
+  抽象出既能在MeScript用的，也能在TurboScript中用的Symbol！
 
 2007-8-24 20:59
-~ JS��һ�ж��Ǻ�����ֵ��
-ʹ�� New ��������һ����ֵ(TJsValue)�������ڴ����ʱ�� construtor�ᱻ��ֵ��Ȼ�� this �ᱻ��ֵΪ��aVar�ĵ�ַ������Ԥ����ľֲ����� var arguments = New Arguments(12,22) Ȼ��ִ��Function()������
+~ JS中一切都是函数和值：
+使用 New 函数创建一个新值(TJsValue)。分配内存后，这时候， construtor会被赋值，然后 this 会被赋值为该aVar的地址，构造预定义的局部变量 var arguments = New Arguments(12,22) 然后执行Function()函数。
 aVar = New Function(12,22);
 
-��ôʣ�µ�������Ǿֲ������Ĵ�������Ϊ��ջ���������Կ���һ�����ݶ�ջ�����Ƕ�ջ��������������ʣ�
+那么剩下的问题就是局部变量的处理？作为堆栈变量？可以开辟一个数据堆栈，但是堆栈变量不好随机访问！
 
 TJsValue =
   Constructor: TJsFunction;
@@ -227,9 +227,9 @@ function GlobalObject(){
 + TTurboPreservedDataMemory.RefCount
 
 2007-8-14 14:40
-~ ��������with parameters.
-  ����ʱ�̣���麯���Ƿ���ڣ�Ȼ������������Ͳ��������Ƿ�һ�¡�
-  �Ժ����ĵ��õĲ������⣬�����Ƿ��ڱ������н�����ܷ�ŵ�symbol�У������漰���ݹ顣
+~ 函数调用with parameters.
+  编译时刻，检查函数是否存在，然后检查参数个数和参数类型是否一致。
+  对函数的调用的参数问题，本来是放在编译器中解决。能否放到symbol中？可能涉及到递归。
   TTurboMethodArgument = Object(TTurboCustomSymbol)
     ParamFlags: TParamFlags; //pfVar, pfConst, etc...
     Symbol: TTurboSymbol;
@@ -243,7 +243,7 @@ function GlobalObject(){
     Function Compile(aScript: string): Boolean;.
   end;
 
-  ������������һ�� attributes
+  函数类型添加一个 attributes
 
   TJsTypeInfo = (jtiNumber, jtiString, jtiFunction, jtiObject);
   TJsAttributeInfo = record
@@ -298,15 +298,15 @@ Type
   TFunction
    
 
-  ��ʵ�������Կ�����һ�ֺ������������������Ļ�Ч�ʾ�����Щ������Ҫ�����Ĳ���Ҳ���ˣ����뽫�������ݸ�statements(var variable: Element; aArray: ArrayType)��
-  ���ã������ڱ�����һ��չ�����ӱ������ĽǶ��������Կ��������ꣿ
+  事实上语句可以看作是一种函数，不过看作函数的话效率就慢了些，另外要处理的参数也多了：必须将参数传递给statements(var variable: Element; aArray: ArrayType)。
+  不好，还是在编译器一层展开。从编译器的角度来看可以看作常量宏？
 
-~ С�������ͺ�������
-  ������������ͺ�������ֻ�����ֽṹ������(var)������(function), ���������û�����ı�ʶ������Ԫ�أ�element��.
-  ��������ֻ�У� fucntion, object(���԰�)
-  ϵͳ�ڲ��̻��ļ������У� number(��ֵ), string(�ַ���)
+~ 小析弱类型函数语言
+  我设想的弱类型函数语言只有两种结构：变量(var)，函数(function), 里面所有用户定义的标识符都是元素（element）.
+  基本类型只有： fucntion, object(属性包)
+  系统内部固化的简单类型有： number(数值), string(字符串)
   Object.constructor = "function() {};"
-  Object.Elements: ָ��RTTI�������ʸö����RTTI��Ϣ��
+  Object.Elements: 指向RTTI表。访问该对象的RTTI信息。
   function Object.valueOf(): Element:
 
   function Elements.Add(aParent, aElementName: string): Element;
@@ -315,23 +315,23 @@ Type
   function AssignValue(aElement: Element; aValue: Element);
   function Eval(aScript: string): Element;
 
-  Object.toString: ����ڽű���ֱ��ʹ��object���ã��ͷ��ظ�toString��ֵ
-  Object.toSource: ���л�object����������ֱ�Ӵ�������
+  Object.toString: 如果在脚本中直接使用object引用，就返回该toString的值
+  Object.toSource: 序列化object，可以用它直接创建对象。
   Object.valueOf: convert the object to primitive value.
   :
   
 
-  ����javascript:
-  var x, xx = new Obj; x ��Ȼ�� undefined.
-  �����У� function, object, ��js��ʵ���У�function �� object��ûɶ���ģ�Ψһ�Ĳ�ͬ�� Function �� prototype �� FunctionPrototype,�� Object����ObjectPrototype
+  分析javascript:
+  var x, xx = new Obj; x 依然是 undefined.
+  类型有： function, object, 在js的实现中，function 和 object是没啥差别的，唯一的不同是 Function 的 prototype 是 FunctionPrototype,而 Object则是ObjectPrototype
 
-  Ҳ����˵ objectҲ�������� Function �ġ�
+  也就是说 object也是派生自 Function 的。
   Prototype = { //the attributes list.
     constructor: function() {}, 
     . : function(aAttribute){}, //get or add attribute.
     _delete : function(aAttribute){}, //remove an attribute.
   };
-  function Prototype() { //��ͬ��
+  function Prototype() { //等同于
     this.constructor = function() {};
     this."." = function(aAttribute){}, //get or add attribute.
   }
@@ -346,81 +346,81 @@ Type
     prototype: Prototype,
   }
 
-  ϵͳ�ڲ��̻��ļ�����(ֵ����)�У� number(��ֵ), string(�ַ���), boolean, undefined, NULL
-   ����������Լ���������С���ģ�Ȼ����ǿ���չ���֡�js ��֧�ֲ��������ء�
-   Ȼ��Ϊ���ͷ��ཨ����Ӧ�� Object: Number, String, Boolean, Function, Array
-  Ԥ����ı�ʶ���� var, function
-  ���ָ����� ";"
-  Ԥ������ڲ�������
-    ��ֵ������ =
-    object(���԰�)�� {������:ֵ, ...} �÷�ʽ����Ϊ initializers, js1.2����֧�֡�
-    ���������� var
-    ���������� function() {};  var����������Ϊ��������Ԫ�أ�ֻ�е���this.XXX�Żᱻ��Ϊ��������Ԫ��
-    typeof XXX: ����XXX��������
-    new XXX: �½� object. 
-    aObject.PropName : ����aObject��PropName���� ǰ�ڰ󶨵�
-    aObject['PropName']: ����aObject��PropName���� ���ڰ󶨵�
-    Object.prototype: ָ��RTTI�������ʸö����RTTI��Ϣ, Ϊobject�����µ�����. eg, TCar.prototype.color=null;
+  系统内部固化的简单类型(值类型)有： number(数值), string(字符串), boolean, undefined, NULL
+   上面的类型以及运算是最小核心，然后就是可扩展部分。js 不支持操作符重载。
+   然后为类型分类建立相应的 Object: Number, String, Boolean, Function, Array
+  预定义的标识符： var, function
+  语句分隔符： ";"
+  预定义的内部函数：
+    赋值函数： =
+    object(属性包)： {属性名:值, ...} 该方式被称为 initializers, js1.2以上支持。
+    声明变量： var
+    声明函数： function() {};  var声明不会作为函数的子元素，只有当用this.XXX才会被作为函数的子元素
+    typeof XXX: 返回XXX的类型名
+    new XXX: 新建 object. 
+    aObject.PropName : 引用aObject的PropName属性 前期绑定的
+    aObject['PropName']: 引用aObject的PropName属性 后期绑定的
+    Object.prototype: 指向RTTI表。访问该对象的RTTI信息, 为object添加新的属性. eg, TCar.prototype.color=null;
     Object.constructor = "function() {};"
-    Object.toString(): ����ڽű���ֱ��ʹ��object���ã��ͷ��ظ�toString��ֵ
-    Object.toSource(): ���л�object����������ֱ�Ӵ�������
+    Object.toString(): 如果在脚本中直接使用object引用，就返回该toString的值
+    Object.toSource(): 序列化object，可以用它直接创建对象。
     Object.valueOf(): convert the object to primitive value.
     get, set: Defining Getters and Setters  o = {a:7, get b() {return this.a+1; }, set c(x) {this.a = x/2}};
-  ��ʹ�� var �����ľ�����ȫ�ֱ�����
-  �½�����ʵ�������Խ������Ա���ֵ��ʱ��ű����ӵ��ö���ʵ���ϡ�
+  不使用 var 声明的就是是全局变量。
+  新建对象实例的属性仅在属性被赋值的时候才被添加到该对象实例上。
 
 function TCar(make, model, year) {
    this.make = make;
    this.model = model;
    this.year = year;
-   //�ں����ڲ��ܷ��� prototype!! ʵ��������������� constructor.
+   //在函数内不能访问 prototype!! 实际上这个被当作了 constructor.
 }
 mycar = new TCar("Eagle", "Talon TSi", 1993);
 mycar.color = 'black';
 
-���ֻ֪������ʵ��a�����ȡ������ prototype ?
-  a.constructor.prototype(��js���������ý�������get/add attribute)
+如果只知道对象实例a，如何取得它的 prototype ?
+  a.constructor.prototype(在js中它的作用仅仅限于get/add attribute)
 
 2007-8-10 8:00
-~ �� X86Interpreter ������ECX����GlobalOptions��
-  Ϊ������AOPʵ��Debug, �Ƿ���Ҫ�� ECX ���� EAX����paascal����EAX��register����Լ��������������x86���������������������CPU�أ���
-  �������岻�󣬻��Ǽ��о������ Module.Init(Final)�Լ�Method.Init(Final).
+~ 在 X86Interpreter 中是用ECX保存GlobalOptions的
+  为了利用AOP实现Debug, 是否需要将 ECX 换成 EAX（纯paascal的是EAX，register调用约定）？不过对于x86是这样但是如果换做其它CPU呢？？
+  算了意义不大，还是集中精力解决 Module.Init(Final)以及Method.Init(Final).
 ~ Module.Init(Final)
-  ���Module�Ǻ�����ô��
+  如果Module是函数那么？
   + TTurboPreservedDataMemory.MainEntry for ApplicationModule and FunctionModule.
   + TCustomTurboModule.MainEntry
-    �Ƿ���Խ�ApplicationModule����Ϊ FunctionModule��Ҳ����˵������Application��ɶ���
-    �ƺ�ûɶ�����ϵĲ��
-    Module��Init(Final)��FunctionModule��Init(Final)ִ��ʱ��Ĳ�ͬ��
-      * Module ���ڼ��غ�ж�ص�ʱ��ִ��
-        ִ�й�Executor�ܣ���Module��������������TurboExector��ִ�С�
-        Լ��:���е�Init/Final����Ϊ�����ù���(Near)��
-        //��ִ��ʱ�򣬱������Զ��� Flags��ʶ����Ϊ tfInited.��Executor��ɡ�
-        ��ʼ���㶨���ؼ���Final��ʱ����������executor��FinalExec������Ӧ����ж��ǰ��
-        ������Զ������ڴ棬��Ȼ��ж�ص�ʱ���ڴ�ͻ����ˡ�ʱ�������
-        ��������н���ʱ����Final����ô��������һ�������Զ�����װ�ã��Զ����գ�ж�أ�δʹ�õ�ģ�飬��ô�����ģ����Ȼ����ִ��Final��
-        �����ж��ǰִ�У��ͱ���Ҫ���ǲ��г�ͻ�����ӱ�־����ж�ء��Ӳ��Ƿ��ģ������ʹ�á���ȫ�ֺ�������һ������ģ������
-      * FunctionModule ����ִ�� MainEntry ǰ(Init)��ִ�� MainEntry ������(Final)��
-        Ŀǰ��û��ʹ�øø���
+    是否可以将ApplicationModule视作为 FunctionModule？也就是说函数和Application有啥差别？
+    似乎没啥语意上的差别。
+    Module的Init(Final)和FunctionModule的Init(Final)执行时间的不同：
+      * Module 是在加载和卸载的时候执行
+        执行归Executor管，在Module看不到。所以在TurboExector上执行。
+        约定:所有的Init/Final过程为近调用过程(Near)！
+        //在执行时候，编译器自动将 Flags标识设置为 tfInited.由Executor完成。
+        初始化搞定，关键是Final的时机？不是在executor有FinalExec方法？应该在卸载前？
+        如果是自动管理内存，自然在卸载的时候内存就回收了。时机在哪里？
+        如果在运行结束时调用Final？那么假设我有一个垃圾自动回收装置，自动回收（卸载）未使用的模块，那么这里的模块显然不能执行Final。
+        如果在卸载前执行，就必须要考虑并行冲突！增加标志正在卸载。加查是否该模块正在使用。在全局函数增加一个调用模块链。
+      * FunctionModule 是在执行 MainEntry 前(Init)和执行 MainEntry 后运行(Final)。
+        目前还没有使用该概念
 
 2007-7-30 13:09
 ~ treat the TurboModule as a function
-  Ȼ���캯��ʽ����.
+  然后构造函数式语言.
 !+ creation_cy: 
   Feature(Script):
    cache the function result for specified function:
-   ����ú����� cached��ôֻҪ����һ�κ��´�������ͬ��������ֱ�Ӳ���cache�����ؽ����
+   如果该函数是 cached那么只要运行一次后，下次再有相同参数，则直接查找cache，返回结果。
    function XXX: result; cached;
-   ���൱��Ϊ������ҪCache�ķ�������AOP�������أ�Ҳ����Ҫ��������ֱ��֧�� 
-   �ǵģ��Ǻǣ��ҸղŻ����ڽ������ں���ʵ�����أ��㵹���������ң������ڽű���ͨ��ʵ��AOP����
-   ����ű�AOP���ܵ�ȷû�п��ǵ���������ܿ��Լ��ϣ��������ӶȾͱ�ֱ���ڽ������ں���ʵ��AOP����ˣ��Ǹ����д������ʵ��
+   这相当于为这类需要Cache的方法利用AOP进行拦截，也不需要解释器的直接支持 
+   是的，呵呵，我刚才还想在解释器内核中实现拦截，你倒是提醒了我，可以在脚本中通过实现AOP来做
+   这个脚本AOP功能的确没有考虑到，这个功能可以加上，不过复杂度就比直接在解释器内核中实现AOP大多了，那个几行代码就能实现
 
 
 2007-7-27 8:30
-~ TurboDebuger : ������AOPʵ�֣����� iVMNext��
-  ά��һ���жϵ�ַ�б����͵�ǰ�жϵ�ַ�����Ȳ��Ƿ�Ϊ��ǰ�жϵ�ַȻ�����жϵ�ַ�б��в顣
-  ��סԴ�����ж�Ӧ�ı�����ַ������F7/F8�����������õ�ǰ�жϵ�ַ��
-* ׼�������� PHP ���Ƶ�Э�飺http://www.php.net/license/
+~ TurboDebuger : 可以用AOP实现，拦截 iVMNext！
+  维护一个中断地址列表。和当前中断地址，首先查是否为当前中断地址然后在中断地址列表中查。
+  记住源程序行对应的编译后地址，按下F7/F8，则重新设置当前中断地址。
+* 准备采用于 PHP 类似的协议：http://www.php.net/license/
 
 The TurboCompiler Architecture Framework Plan - The alternative future for Delphi Compiler
 
@@ -449,8 +449,8 @@ Should CodeGear/Borland open source for Delphi compiler?
 
 2007-7-18 10:49
  XXX(a+3*d,b,c);
- ת��Ϊ���: push a; push b, push c; call xxx
- ��������Ĳ��������Ǳ���ʽ. ���������Ҫ�����ͼ��,��ô��.
+ 转化为汇编: push a; push b, push c; call xxx
+ 但是里面的参数可能是表达式. 另外如果我要做类型检查,怎么做.
 
 2007-7-12 15:17
 * CustomTurboModule
@@ -459,18 +459,18 @@ Should CodeGear/Borland open source for Delphi compiler?
     Return the offset address of the constant in the data memory.
 
 2007-7-8 8:14
-* [Bug] CustomModule �ڷ���Data�ڴ��ʱ��,��ʱ�����,UsedDataSize��ֵ����! [DUnit]���ֵ�
-  ��ص� AddXXToData������Ҫ�޸�!!
+* [Bug] CustomModule 在分配Data内存的时候,有时候出错,UsedDataSize的值不对! [DUnit]发现的
+  相关的 AddXXToData都可能要修改!!
   with PTurboPreservedDataMemory(FDataMemory)^ do
   begin
     if (UsedDataSize + SizeOf(aSize))>= DataSize then
       //Just be careful, the GrowData maybe change the FDataMemory address!!
-      GrowData(SizeOf(Integer));  //<----�п������·������ݿ�,����FDataMemory��ַ�ı�,����һ��С���ݲ������,�������Ƚ�����.
+      GrowData(SizeOf(Integer));  //<----有可能重新分配内容块,导致FDataMemory地址改变,不过一般小数据不会出现,这个错误比较隐蔽.
 
-    //Inc(UsedDataSize, SizeOf(Integer)); //<---- ���FDataMemory��ַ�ı�ͻ����,д��ĵط������µ�FDataMemory����!!
+    //Inc(UsedDataSize, SizeOf(Integer)); //<---- 如果FDataMemory地址改变就会出错,写入的地方不是新的FDataMemory所在!!
   end;
 
-  with PTurboPreservedDataMemory(FDataMemory)^ do //��������ȡ FDataMemory ��ַ�Ͷ���!!
+  with PTurboPreservedDataMemory(FDataMemory)^ do //这样重新取 FDataMemory 地址就对了!!
   begin
     Inc(UsedDataSize, SizeOf(Integer)); 
   end;
@@ -479,19 +479,19 @@ Should CodeGear/Borland open source for Delphi compiler?
 * [Bug] Critical error: can not assign CustomSymbol.Assign() 
   //if Assigned(aSymbol) and aSymbol.InheritsFrom(Self.ClassType) then //Wrong!!
   if Assigned(aSymbol) and aSymbol.InheritsFrom(TypeOf(TTurboCustomSymbol)) then
-* Method ����,��Method MethodRef�����ݺ��÷��ڻ��� CustomMethod.
-* [Bug] MethodSymbol.Assign(aSrc) ����û���½� FiTypeSymbol,�������aSrc�ͷ�,��ô FiTypeSymbol ����Ч!!!
-  ����MeType û�� Assign����,��ʱ�Ľ����������assign��,�� src�� FiTypeSymbol ��ֵΪ��.  in TurboForthExpr.atg
+* Method 算了,先Method MethodRef的数据合用放在基类 CustomMethod.
+* [Bug] MethodSymbol.Assign(aSrc) 由于没有新建 FiTypeSymbol,导致如果aSrc释放,那么 FiTypeSymbol 将无效!!!
+  鉴于MeType 没有 Assign方法,暂时的解决方法是在assign后,将 src的 FiTypeSymbol 赋值为空.  in TurboForthExpr.atg
      vWordRef.Assign(vWord);
      PTurboMethodSymbolAccess(vWord).FiTypeSymbol := nil; //to avoid free the FiTypeSymbol when vWord is free.
      MeFreeAndNil(vWord);
      vWord := vWordRef;
-   ��������ô��,�ҷ������ֽ׶���˵�ƺ���MethodRef��method�ֿ������岻�Ǻܴ�!��Ϊ����������word��ʱ��δȷ��word���;�ֱ�����˸÷�����(���ǽ���һ����¼�������,�ȵ�����ȷ�����͵�ʱ����~),�������ӿɶ���,��Ȼ�����Ժ�����ܹ�����������.
-����,������ʱ������,�����Լ���AI�ű�������������!
+   折腾了这么久,我发现以现阶段来说似乎将MethodRef从method分开的意义不是很大!因为我在声明的word的时候还未确定word类型就直接用了该符号类(除非建立一个记录存放数据,等到了能确定类型的时候再~),除了增加可读性,当然对于以后调整架构方便了许多.
+好了,可以暂时冻结了,开发自己的AI脚本函数编译器了!
 
 2007-7-7 22:26
-+ ���˳��׽��� MethodRefSymbol from MethodSymbol.
-+ ModuleSymbol.MethodRefs ר�����ڴ��ģ�����õ��ⲿ������
++ 好了彻底解耦 MethodRefSymbol from MethodSymbol.
++ ModuleSymbol.MethodRefs 专门用于存放模块引用的外部方法。
 
 2007-7-7 8:49
 * TTurboModuleType
@@ -508,15 +508,15 @@ Should CodeGear/Borland open source for Delphi compiler?
 2007-7-6 11:03
 * opHalt is no parameter now!!
   ( -- )
-�쳣����,����X86Ƕ����д��,������pascalд����������.
-  ��������,��������ϵͳ���쳣,��������(����,����С��),ȡ/���õ�ַ����(��ַԽ��)�͵���DLL,Host��������!!ֻҪ�������⼸��������.
+异常处理,对于X86嵌入汇编写的,不能象纯pascal写的那样简单了.
+  不过还好,发生操作系统的异常,就是运算(除法,浮点小数),取/设置地址数据(地址越界)和调用DLL,Host函数这里!!只要处理好这几个就行了.
 
 2007-7-5 7:33
 + TTurboGlobalOptions.LocalVariables: array[0..255] of tsInt;
-  ������Ϊ��ʱ�ֲ�����ʹ�á�
+  用于作为临时局部变量使用。
 + cfsInlineFunction in TTurboCodeFieldStyle
-  �����Public��,���ܷ���StaticField�ֶ�,ֱ�ӽ�����Ƕ�뵽��һ����Ԫ�ĺ�������,�����䱾�������ڱ����ĵ�Ԫ,���Ǹú������ܱ�ֱ������!!ֻ���ڱ���!
-  ����Ϊ��System��Ԫ�����һЩ�ڲ��������̶�׼����.
+  如果是Public的,则不能访问StaticField字段,直接将代码嵌入到另一个单元的函数体中,尽管其本身存在于编译后的单元,但是该函数不能被直接运行!!只用于编译!
+  这是为了System单元编译的一些内部函数过程而准备的.
 * rename TurboVarSymbol to TurboVariableSymbol
 
 TurboConstantSymbol
@@ -525,7 +525,7 @@ TurboConstantSymbol
 
 TurboStaticFieldSymbol
 ~ 
-TurboCustomBlockSymbol �����, �Ժ��������оֲ�����,����,����(���˻��ǲ�Ҫ,����Ż��鷳),�Լ�Ƕ�׵Ĺ��̿�.
+TurboCustomBlockSymbol 程序块, 以后程序块内有局部类型,变量,常量(算了还是不要,免得优化麻烦),以及嵌套的过程块.
   TurboCustomMethodSymbol
     TurboMethodSymbol
     TurboMethodRefSymbol
@@ -534,14 +534,14 @@ TurboCustomBlockSymbol �����, �Ժ��������оֲ�����,����,����(���˻��ǲ�Ҫ,��
     TurboModuleRefSymbol
 
 2007-7-4 13:13
-~ ������Linq Framework ����,�о�Linq ��Ŀ�����ڱ��Ͽɶ��Ե�ǰ����,����дԴ����������ļ򻯳���,��������б���ѯ����һЩ��ʽ���ĳ������
+~ 看了下Linq Framework 介绍,感觉Linq 的目的是在保障可读性的前提下,对书写源代码程序做的简化尝试,比如遍历列表查询这样一些公式化的程序语句
   class Customer
   {
       public string CustomerID { get; set; }
       public string ContactName { get; set; }
       public string City { get; set; }
   }
-  �����Ͳ���д˽����!�������Զ�����!��д�ǲ��Ǽ򻯺ܶ�.
+  这样就不用写私有域!编译器自动产生!书写是不是简化很多.
 
 2007-7-3 7:58
 *  [Bug] issue 48: crtical error the TurboCodeMem is dynamic increase the memory on demand. so the memory address will be changed by reallocMem!!
@@ -553,36 +553,36 @@ TurboCustomBlockSymbol �����, �Ժ��������оֲ�����,����,����(���˻��ǲ�Ҫ,��
   + CompileError(const aErrCode: Integer);
   //+ CompileError(cosnt aMsgType: Integer; const aMsg: string; const aLine, aCol: Integer)
   ~ Compile Method
-      �� Public �� FRefCount>0 ��û�� OwnerSymbol �ķ��ű��뵽OwnerSymbol�С�
+      将 Public 或 FRefCount>0 或没有 OwnerSymbol 的符号编译到OwnerSymbol中。
     ReferenceTo(aSymbol) Method: 
-      �÷�����aSymbol�ĵ�ǰλ�ñ�����,ͬʱ���ü���+1. ������ܽ����ַ,�� UnResolvedRefRec ����� UnResolvedRefs(δ�����ַ�б�)
+      该符号在aSymbol的当前位置被引用,同时引用计数+1. 如果不能解决地址,则将 UnResolvedRefRec 项加入 UnResolvedRefs(未解决地址列表)
     UnResolvedRefs Property:
-      δ�����ַ�б�
+      未解决地址列表
     ResolveAddr(const aValue: PTurboUnResolvedRefRec);
-      �����õ�ʱ��û�ܽ����ַ����,���ڱ���󱻵���,�����ַ. �ù�����Compile����ִ�к��Զ�������.
+      在引用的时候没能解决地址的项,将在编译后被调用,解决地址. 该过程在Compile方法执行后自动被调用.
     TTurboConstSymbol.OwnerSymbol: TTurboModuleSymbol
-      Compile: �����������,û�оͱ���,��������������ַ�������,��ô�����ַ������� Module.
-      ReferenceTo: �޶�ֻ�ܱ� Method ����! ������ַ������ͼ���ܷ����ַ�����ַ,�����򽫸������ UnResolvedRefs(δ�����ַ�б�)
-      ResolveAddr: ���������ַ�����ַ���浽ԭ����aSymbol�еĵ�ַ.
+      Compile: 检查有无类型,没有就报错,否则如果常量是字符串类型,那么将该字符串编入 Module.
+      ReferenceTo: 限定只能被 Method 引用! 如果是字符串类型检测能否解决字符串地址,不能则将该项加入 UnResolvedRefs(未解决地址列表)
+      ResolveAddr: 将编译后的字符串地址保存到原来的aSymbol中的地址.
     TTurboVarSymbol.OwnerSymbol: TTurboModuleSymbol
-      Compile: �����Ƿ�Public����,�����Ƿ񽫸÷��ŷŵ���̬�ֶ��б���, ��Module �� DataMemory�Ͽ��ٱ����ռ�,�����������ַ����.
-      ReferenceTo: �޶�ֻ�ܱ� Method ����! ��������ַ�Ƿ���,û�н���򽫸������ UnResolvedRefs(δ�����ַ�б�)
-      ResolveAddr: �������ı�����ַ���浽ԭ����aSymbol�еĵ�ַ.
+      Compile: 根据是否Public变量,决定是否将该符号放到静态字段列表中, 在Module 的 DataMemory上开辟变量空间,并将其变量地址记下.
+      ReferenceTo: 限定只能被 Method 引用! 检查变量地址是否解决,没有解决则将该项加入 UnResolvedRefs(未解决地址列表)
+      ResolveAddr: 将编译后的变量地址保存到原来的aSymbol中的地址.
     TTurboMethodSymbol.OwnerSymbol: TTurboModuleSymbol
-      Compile: ���ȱ��뵱ǰ�������õ���������(CompileRefSymbols),Ȼ����� CodeFieldStyle ���ͷֱ����.
-      ReferenceTo: �޶�ֻ�ܱ� Method ����! ���� CodeFieldStyle ���ͷֱ���,��鷽����ַ�Ƿ���,û�н���򽫸������ UnResolvedRefs(δ�����ַ�б�)
-      ResolveAddr: ���� CodeFieldStyle ����, �������ķ�����ַ���浽ԭ����aSymbol�еĵ�ַ.
-      BodyInit:  �ڽ��������ǰ����,��ʼ������: ����÷���û�б����ӵ� OwnerSymbol ������, Ȼ������Ǻ�����������,����մ������ڴ�.
-      BodyFinal: �ڴ�����������,��β����! ��������������Ҫ�����������ַ����ľ�̬�ֶ�.��������ú�������Ҫ�������õ���һ��ģ���еĺ���
+      Compile: 首先编译当前方法引用的其它符号(CompileRefSymbols),然后根据 CodeFieldStyle 类型分别编译.
+      ReferenceTo: 限定只能被 Method 引用! 根据 CodeFieldStyle 类型分别处理,检查方法地址是否解决,没有解决则将该项加入 UnResolvedRefs(未解决地址列表)
+      ResolveAddr: 根据 CodeFieldStyle 类型, 将编译后的方法地址保存到原来的aSymbol中的地址.
+      BodyInit:  在进入代码体前调用,初始化工作: 如果该方法没有被添加到 OwnerSymbol 则添加, 然后如果是函数不是引用,则清空代码体内存.
+      BodyFinal: 在代码体最后调用,收尾工作! 如果是主入口则需要清理所有是字符串的静态字段.如果是引用函数则需要搜索引用的哪一个模块中的函数
     TTurboModuleSymbol.OwnerSymbol: TTurboModuleSymbol
-      ���û��OwnerSymbol��,����Ϊ����Module: ���ڱ����Module, ������� Module ������.
-      Compile: �����Ƿ���OwnerSymbol, �ֱ����. ������Ϊ������module,
-      ReferenceTo: ��,�򵥵ķ���OK
-      ResolveAddr: ��
+      如果没有OwnerSymbol的,就认为是主Module: 正在编译的Module, 否则就是 Module 的引用.
+      Compile: 根据是否有OwnerSymbol, 分别编译. 有则被认为是引用module,
+      ReferenceTo: 无,简单的返回OK
+      ResolveAddr: 无
     TTurboTypeSymbol.OwnerSymbol: TTurboModuleSymbol
-      Compile: ��������Ͳ����ڲ�����,��ô�򽫸��������ӵ� OwnerSymbol ģ���ϵ� RegisteredTypes ��.
-      ReferenceTo: ��,�򵥵ķ���OK
-      ResolveAddr: ��
+      Compile: 如果该类型不是内部类型,那么则将该类型添加到 OwnerSymbol 模块上的 RegisteredTypes 中.
+      ReferenceTo: 无,简单的返回OK
+      ResolveAddr: 无
   
 
 2007-7-2 13:03
@@ -607,7 +607,7 @@ TurboCustomBlockSymbol �����, �Ժ��������оֲ�����,����,����(���˻��ǲ�Ҫ,��
     end
   * TurboMethodSymbol
     + Body: PTurboCodeMemory; //store the cfsFunction's function body here.
-    + RefMethods: PMeList; �ڱ����������õ�����δȷ����ַ��(not declareTo)����Index(��OwnerSymbol�е�Index)�б�. ����: PTurboRefMethodItem
+    + RefMethods: PMeList; 在本函数中引用的其它未确定地址的(not declareTo)方法Index(在OwnerSymbol中的Index)列表. 保存: PTurboRefMethodItem
     + RefStaticFields: PMeList; 
     + procedure BodyInit;
     + procedure BodyFinal;
@@ -615,46 +615,46 @@ TurboCustomBlockSymbol �����, �Ժ��������оֲ�����,����,����(���˻��ǲ�Ҫ,��
   * TTurboConstSymbol.PushTo(aMethod: PTurboMethodSymbol)
   * TTurboVarSymbol.PushTo(aMethod: PTurboMethodSymbol)
   * TurboMethodSymbol.PushTo(aMethod: PTurboMethodSymbol)  
-    ������ѹ�� aMethod ���� aModule? 
-    ʵ����PushTo�������õ�(RefBy),����PushTo����˳��ѹ��.
-    ������ DeclareTo(aModuleSymbol):�Ż�ʵ�ʴ�����ģ����, ���� Entry �б�����ģ���еĵ�ַ.
-    ִ�� Word ��DeclareTo:
-      ���Ƚ� RefMethods���е�ȫ��DeclareTo
-      Ȼ�� RefStaticFields ���е�ȫ��DeclareTo
+    到底是压入 aMethod 还是 aModule? 
+    实际上PushTo就是引用到(RefBy),但是PushTo总是顺序压入.
+    调用了 DeclareTo(aModuleSymbol):才会实际存在于模块中, 并在 Entry 中保存在模块中的地址.
+    执行 Word 的DeclareTo:
+      首先将 RefMethods表中的全部DeclareTo
+      然后将 RefStaticFields 表中的全部DeclareTo
   * rename DeclareTo to CompileTo
   * rename PushTo to ReferenceTo
 
 2007-6-30 7:19
 !* [Enhanced] [Compiler] TurboMethodSymbol should store the directive in itsself if it's cfsFunction.
-* [Bug] issue 40: ��û�н�� X86Interprter��ִ���ⲿDLL���������DLL����ʹ�����ַ�������������⣬ֻ����������û��������
-  ������ȫ����ʹ��Delphi�Ķ�ջ��Ȼ���������
-  ��DLL��������ǰ�� EBX��ֵ����Execturor,����û����ȡ����ȷ��APP��ջԭֵ��
-  ����û����ȷ���ݺͷ��ؽű�����ջ��ָ�롣
+* [Bug] issue 40: 并没有解决 X86Interprter中执行外部DLL函数（如果DLL函数使用了字符串）引起的问题，只不过是碰巧没出错！！
+  即便是全部都使用Delphi的堆栈依然会出错！！
+  在DLL函数调用前， EBX的值不是Execturor,所有没有能取得正确的APP堆栈原值。
+  另外没能正确传递和返回脚本参数栈的指针。
 * [Bug] issue 44: [uStrUtils] LeftPos does not work.
 * [Bug] issue 45: [Compiler] the compiler Switcher ON/OFF does not work.
 * [Feature] issue 46: [Performance] speedup run the dll function
   + CustomTurboModule.MeObjects to cache the ProcInstance:PMeProcParams
     they will be free when ClearMem.
-  ���ð�����ؼ����Ľ������ʱ�䣺144584�����ȶ��ǻ���138322-219230�� �Ż���: 16648-20556
-  �����ð�����ؼ���������Ԥ�ȼ���ģ�飺 129625(ż������130000) �Ż���: 7744-7954(ż��10877)
-  PurePascalEngine����ʱ��(Ԥ�ȼ���): 4933-5210; LoadOnDemand: 16251-19789
+  启用按需加载技术的结果运行时间：144584【不稳定徘徊在138322-219230】 优化后: 16648-20556
+  不启用按需加载技术，而是预先加载模块： 129625(偶尔上了130000) 优化后: 7744-7954(偶尔10877)
+  PurePascalEngine运行时间(预先加载): 4933-5210; LoadOnDemand: 16251-19789
   
 2008-7-19 13:35
 ! TCustomTurboModule.MeObjects
   * [TurboXXXInterpreter] RunExternalFunc 
-  �ҽ� DLL������ ProcType �������浽MeObjects�У����ǲ�û��ʹ���������ҷŵ�����ֻ�ܸ�ģ���ò��ף���ʱ����(�Ѿ�ע�͵���)��
-  �� TCustomTurboModule.FreeDLLLibs�л��ͷ� ProcType��RunExternalFunc ����û����ᴴ����
+  我将 DLL函数的 ProcType 声明缓存到MeObjects中，但是并没有使用它。而且放到这里只能该模块用不妥，暂时不用(已经注释掉了)。
+  在 TCustomTurboModule.FreeDLLLibs中会释放 ProcType。RunExternalFunc 会检测没有则会创建。
 
 2007-6-29 11:58
-~ issue 40: ������ϸ׷��������ִ��DLL����������ԭ��,ԭ������LoadLib�����⣬����:
-  ִ���� MessageBox ��������⣡���� MessageBox ��Ҫ�Ƕ� string �Ĵ�����
-  Ҳ����GetMem��FreeMem,�ҹ������õ�APP�İɣ���
-  ���Ի�ԭ��ջӦ����ִ��DLL������ʱ�򣬶�����LoadLib��ʱ��
-  �޸ĳ����µĽ������Ȼ����Ȼ���������ǣ����Ļ���APP��ջ������û��Ч��������������
-  ����ϡ�ǵ�DLL�ܷ����������ApplicationId����˿϶�����DLLMain���������õġ�������LoadLib�͵���DLL����֮ǰ��Ҫ��ԭAPP��ջ��
-  ��Ȼ������LoadLib�͵���DLL������ʱ��ȫ���л�ΪAPP�Ķ�ջһ��OK!
-  ���ˣ����¸�û�������ˡ�{��ȻFastMM ʵ�����ڴ�������������ƣ�Exe �� Dll �乲���ڴ����������Ҫ�κ� Dll ֧�֣����ǰ���û�д�ShareMM��ѡ����Զ��Ժ�FastMM�޹�}
-  �����ҵ������ԭ�򣡵�����������һ���Ĵ�����
+~ issue 40: 今天仔细追踪了下在执行DLL函数报错的原因,原来不是LoadLib的问题，而是:
+  执行了 MessageBox 后出的问题！！而 MessageBox 主要是对 string 的处理！
+  也就是GetMem和FreeMem,我估计是用的APP的吧！！
+  所以还原堆栈应该在执行DLL函数的时候，而不是LoadLib的时候。
+  修改成如下的结果，果然，依然出错，但是，俺改回用APP堆栈，还是没有效果！！气死我了
+  我依稀记得DLL能访问主程序的ApplicationId，因此肯定是在DLLMain中做了设置的。所以在LoadLib和调用DLL函数之前都要还原APP堆栈！
+  果然当我在LoadLib和调用DLL函数的时候全部切换为APP的堆栈一切OK!
+  好了，这下该没有问题了。{虽然FastMM 实现了内存管理器共享机制，Exe 和 Dll 间共享内存管理器不需要任何 Dll 支持，但是俺并没有打开ShareMM的选项！可以断言和FastMM无关}
+  我想找到具体的原因！到底是用了哪一个寄存器？
   wo
     function ShowIt: Pointer;register;
     var
@@ -669,19 +669,19 @@ TurboCustomBlockSymbol �����, �Ժ��������оֲ�����,����,����(���˻��ǲ�Ҫ,��
 
 2007-6-28 11:04
 !* [Compiler] TTurboMethodSymbol
-  + FMemory  ���� CodeFieldStyle = cfsFunction ʱ��ŷ����ڴ�
-    Ȼ��Method�Ĵ������ FMemory �У��� PushTo ����Public�Ĳ� DeclareTo
-    ��׼��ʵ�ֽ���������������ģ�飨��Ownerģ�飩����Ϊָ���п���ǣ�浽�������ı�����
-  * DeclareTo, ���� cfsFunction �����Ƚ� FMemory �����ݸ��Ƶ�ģ�飬�١���
+  + FMemory  仅当 CodeFieldStyle = cfsFunction 时候才分配内存
+    然后Method的代码放在 FMemory 中，当 PushTo 或是Public的才 DeclareTo
+    不准备实现将方法声明到其它模块（非Owner模块），因为指令中可能牵涉到数据区的变量。
+  * DeclareTo, 对于 cfsFunction 则首先将 FMemory 的内容复制到模块，再～～
 + [Compiler] issue 43: [TFCC] the word can define function:
   : Word(): Byte;
 * [Bug] issue 40: TurboX86Interpreter run the external DLL function fatal error:
   FastMM has detected an error during a FreeMem operation. The block header has been corrupted. 
-  ׷�ٷ������ͷ� ReturnStack ʱ����Ĵ���
-  ����ʵ������ִ��LoadLibrary��������ռ�� ReturnStack �����ռ䣬���� ReturnStack ����4096��ʱ���ok!
-  ���߰��ڵ��õ�ʱ��Ӧ���л���Delphi App��Stack.
-   ���е㲻�����ˣ�Ϊɶ���Ѿ��л���App��Stack�ˣ�����������Ҫ���ҵ�Stack�ռ䣡��
-   �����ˣ���Ĭ�ϴ�С��Ϊ cDefaultReturnStackSize = 4096;
+  追踪发现是释放 ReturnStack 时候出的错误。
+  经落实发现是执行LoadLibrary函数，会占用 ReturnStack 大量空间，当将 ReturnStack 增大到4096的时候就ok!
+  或者俺在调用的时候，应该切换回Delphi App的Stack.
+   俺有点不服气了，为啥我已经切换到App的Stack了，但是它还是要用我的Stack空间！！
+   不管了，将默认大小改为 cDefaultReturnStackSize = 4096;
 * [Bug] issue 41[Done]: LoadOnDemand not pre-load the DLL LIB!
 * [Bug] issue 42[Done]: [Compiler] the external DLL function "name" DO not work.
   eg, 
@@ -696,10 +696,10 @@ TurboCustomBlockSymbol �����, �Ժ��������оֲ�����,����,����(���˻��ǲ�Ҫ,��
   forget set: GTurboCoreWords[opCallExt] := iVMCallExt;
 * [Bug] the external function is not exist in LastWordEntry Link List.
 + [Feature] [Compiler] issue 36: Only public external function in LastWordEntry Link List.
-  ֻ��Public�ĺ����Ż������LastWordEntry �б��С�
-  ExternalOptions.ModuleRef �ĵ�ַ�ض�λ�ŵ�RelocatedDataAddresses���У�
+  只有Public的函数才会出现在LastWordEntry 列表中。
+  ExternalOptions.ModuleRef 的地址重定位放到RelocatedDataAddresses表中！
   + TurboCustomModule.RelocatedDataTypes
-    ���е���Ҫ����Idת��ȫ�����
+    所有的需要类型Id转换全放这里。
 * [Bug] issue 37: TurboInterpreter AssignFromStack Error.
 + [uTurboExecutor] TTurboRelocatedTypes to resolve the TypeId of a adress.
 * [uTurboExecutor] rename TRelocatedAddresses to TTurboRelocatedAddresses
@@ -711,45 +711,45 @@ TurboCustomBlockSymbol �����, �Ժ��������оֲ�����,����,����(���˻��ǲ�Ҫ,��
 2007-6-25 19:41
 * TurboCustomModule.
   + AddPCharToData(const aStr: string);
-  + RelocatedDataAddresses: ��Ҫ�ض�λ��DataMemory�еĵ�ַ�б���
+  + RelocatedDataAddresses: 需要重定位的DataMemory中的地址列表。
 * [Compiler] TTurboMethodSymbol
     * DeclareEndTo: + iFinalTo
-    + FinalStaticFieldsTo();  ������е�StaticField�������AnsiString���ͣ���ô��д��opLStrAsg(0, dest)
+    + FinalStaticFieldsTo();  检查所有的StaticField如果存在AnsiString类型，那么就写入opLStrAsg(0, dest)
 + opLStrAsg instruction ( src dest -- )
   assign the src string to dest.
 
 2007-6-22 8:13
 !+ Module.AddPCharToData(const aStr: string);
-!+ ���ڰ����Ե� Executor.
-  ���ڰ��ֶκͷ���: ["�ֶλ򷽷�"]();
-    û�����ŵ����ֶΣ������ŵ��Ƿ���.
-  + ���ں��ڰ��Ƿ��ڱ���ʱ������﷨����ѡ�
+!+ 后期绑定特性到 Executor.
+  后期绑定字段和方法: ["字段或方法"]();
+    没有括号的是字段，有括号的是方法.
+  + 对于后期绑定是否在编译时候进行语法检查的选项。
 
 2007-6-21 9:04
-* StaticField �е� AnsiString���� ʵ�ʱ������һ��ƫ�����������޸�Ϊ���Ե�ַ�� �ض�λ��
-  ���У������Ļ������û��Public�ı�������Ȼ��ƫ���������ǽ����еı���ͳһΪPublic.
-  ���ǲ���Ϊ���Ե�ַ�Ļ��������ַ�����ʼ���޷�Ū����
-  ��ʹ����Ҳ�����޸ģ��ض�λ��������ֵ�����������½�һ���������ض�λ����Ȼ���ض�λ�������еĵ�ַ����
-  �������ˣ����ͣ���
+* StaticField 中的 AnsiString类型 实质保存的是一个偏移量，必须修改为绝对地址！ 重定位。
+  不行，这样的话，如果没有Public的变量将依然是偏移量，除非将所有的变量统一为Public.
+  但是不改为绝对地址的话，俺的字符串初始化无法弄！！
+  即使这样也不会修改（重定位）变量的值啊！！必须新建一个东西（重定位表，然后重定位里面所有的地址）。
+  哎，算了，将就！！
 + RelocatedDataAddresses
-  Ӧ���Ǻܼ򵥵ĸ�ʽ������PMeListʵ�֡�
-  Ŀ�Ľ���������Ϊ�ַ����ĳ�ֵ���ݣ�ƫ�Ƶ�ַ���ض�λΪ���Ե�ַ����Ȼ�Ļ������޷������ַ�������Ϊ���õ���Delphi�����ף���
-  ����һ���취�����������е�ʱ��Ϊ�г�ֵ���ַ���������ֵ��
-  ����˵������ǰ����ʼ��������ʱ�򣬽��г�ֵ���ַ���������Ϊ���Ե�ַ�����ˣ������� RelocatedDataAddresses �򵥵㡣
-  ���ˣ����ڽ� AnsiString and ShortString �ĳ�ֵ����ͨ�� RelocatedDataAddresses ��Ϊ���Ե�ַ�ˡ�
-  Ҳ����˵ strVar @ ȡ���ĵ�ַ�Ǿ��Ե�ַร�
+  应该是很简单的格式，就用PMeList实现。
+  目的将变量类型为字符串的初值内容（偏移地址）重定位为绝对地址。不然的话根本无法操作字符串（因为我用的是Delphi的那套）。
+  还有一个办法，就是在运行的时候为有初值的字符串变量赋值。
+  或者说在运行前做初始化动作的时候，将有初值的字符串变量改为绝对地址。算了，还是用 RelocatedDataAddresses 简单点。
+  好了，现在将 AnsiString and ShortString 的初值变量通过 RelocatedDataAddresses 改为绝对地址了。
+  也就是说 strVar @ 取来的地址是绝对地址喔！
 
-* ���� cMainEntryProcName���� Init and FInit��ָ��Ƕ�����档
+* 将就 cMainEntryProcName，将 Init and FInit的指令嵌入里面。
   * TTurboMethodSymbol
-    //* DeclareTo: ������е�StaticField�������AnsiString���ͣ���ô��д���ʼ��ָ������ã���
+    //* DeclareTo: 检查所有的StaticField如果存在AnsiString类型，那么就写入初始化指令？？不用！！
     * DeclareEndTo: + iFinalTo
-    + FinalStaticFieldsTo();  ������е�StaticField�������AnsiString���ͣ���ô��д��opLStrAsg(0, dest)
+    + FinalStaticFieldsTo();  检查所有的StaticField如果存在AnsiString类型，那么就写入opLStrAsg(0, dest)
 !+ opLStrAppend instruction ( src dest -- )
   dest = dest + src
 !+ opLStrCatN instruction ( srcN ... src2 src1 N dest -- )
   dest = src1 + src2 + ... + srcN
      
-~ string ������Delphi �ڴ��еı�ʾ�� StrRec Str#0
+~ string 类型在Delphi 内存中的表示： StrRec Str#0
 type
   PStrRec = ^StrRec;
   StrRec = packed record
@@ -762,19 +762,19 @@ var
 2007-6-19 10:40
 !+ Init and Finit for module 
   first i should implement to process the AnsiString.
-  ����StaticField(ģ�����)�����AnsiString,��ô��Ҫ�ڳ�ʼ����ʱ��ֵ���ڽ�����ʱ��Free.
-  + Delphi �������ַ�����ֵ���̣�һ������ȫ�ֱ����ĸ�ֵ(LStrAsg)��һ�����ھֲ������ĸ�ֵ(LStrLAsg)��
+  对于StaticField(模块变量)如果是AnsiString,那么需要在初始化的时候赋值，在结束的时候Free.
+  + Delphi 有两个字符串赋值过程，一个用于全局变量的赋值(LStrAsg)，一个用于局部变量的赋值(LStrLAsg)。
 + opLStrAsg instruction ( src.ofsset dest.ofsset -- )
 
 2007-6-18 11:14
 !+ The TurboScript Heap Manager
   !+ the string space processor.
-  �ں��������п�����AnsiString�ַ����������ַ����Ƕ�̬����ġ�
-  + Maybe i should implement the method init and finit entry. ���ã�ֻ��Ҫ�����������ֽţ�MethodSymbol��
-  ��¼������Ҫ�˳��ͷŵĵ�ַ��Ȼ��ͳһ�ͷţ���ʵ���Ǽ��ټ�������ֵ1���������Delphi��ɣ�
-  �漰���������棬1. ��̬�����ڴ棻 2. ���ü�����
-  ��ʱʹ��Delphi�Ķѹ�����
-  ������,��Ŀǰ����ֻ��Ҫһ�ֶ�̬�������ü������ͣ�AnsiString.
+  在函数返回中可能是AnsiString字符串，这种字符串是动态分配的。
+  + Maybe i should implement the method init and finit entry. 不用，只需要编译器上做手脚（MethodSymbol）
+  记录所有需要退出释放的地址，然后统一释放（其实就是减少计数器的值1，这个是由Delphi完成）
+  涉及到两个方面，1. 动态分配内存； 2. 引用计数。
+  暂时使用Delphi的堆管理。
+  管它的,现目前，俺只需要一种动态分配引用计数类型：AnsiString.
 
 2007-6-12 15:15
 * TurboMethodInfo: 
@@ -785,7 +785,7 @@ var
      >= 1 local user defined type index-1. 
 * TurboCustomModule.ResolveAddress, UnResolveAddress
   + Resolve/UnResolve the TurboMethodInfo.TurboType
-~ ʵ���϶���һ��Symbol.DeclareTo��ģ���Ӧ������OwnerSymbol,��ô�Ƿ��ȡ��DeclareTo��ֱ��Declare�أ�
+~ 实际上对于一般Symbol.DeclareTo的模块就应该是其OwnerSymbol,那么是否该取消DeclareTo，直接Declare呢？
   
 
 2007-6-11
@@ -798,27 +798,27 @@ var
 + constant cTurboExternalFunctions
 
 2007-6-9 11:39
-~ MethodSymbol, MethodRefSymbol ��ȷ�����ˣ���ð������ˡ�
-  �ڰ���MethodList�����м����Լ��ķ����������ⲿ������ MethodRefSymbol��
-  ���ڻ���������ˣ���ǰ��������Ϊû�н�����ʹ���ⲿ������û����ʾ���壩�ķŵ�MethodList�ϣ�������ģ���ϵķ���Symbolֱ����ʹ�ã���Ȼû�����⣩��
-  ����ȫ����ģ�AddExternalLibMethod����ר�����ڽ�����ģ��ı��ط�������Ϊ�Լ�ģ����ⲿ�����ģ����û���壩��
+~ MethodSymbol, MethodRefSymbol 的确混淆了，混得俺都乱了。
+  在俺的MethodList链表中既有自己的方法，又有外部方法： MethodRefSymbol。
+  现在基本理清楚了，以前混淆是因为没有将隐含使用外部方法（没有显示定义）的放到MethodList上，将其它模块上的方法Symbol直接在使用（居然没出问题）！
+  现在全部大改，AddExternalLibMethod就是专门用于将其它模块的本地方法添加为自己模块的外部方法的（如果没定义）。
   
-* [TurboModuleSymbol] ����
-  - Entry, ���� TurboModuleRefSymbols.Entries[] ���档
+* [TurboModuleSymbol] 大修
+  - Entry, 启用 TurboModuleRefSymbols.Entries[] 代替。
   * rename TurboModuleSymbols to TurboModuleRefSymbols
-  + TurboModuleRefSymbols.Entries[]:PTurboModuleRefEntry, ��TurboModuleRefSymbols.Itemsͬ����
-  + TurboModuleRefSymbols.OwnerSymbol, TurboModuleRefSymbols.Entries[]�����ڸ�OwnerSymbol�����
+  + TurboModuleRefSymbols.Entries[]:PTurboModuleRefEntry, 与TurboModuleRefSymbols.Items同步。
+  + TurboModuleRefSymbols.OwnerSymbol, TurboModuleRefSymbols.Entries[]是属于该OwnerSymbol的入口
   + function AddExternalLibMethod(const aMethod: PTurboMethodSymbol): PTurboMethodSymbol
-    �����Methods���Ҳ�����Ϊ�� aMethod.ModuleName + cDotSeparatorSymbol + aMethod.Name �ķ����������Ӹ÷������ⲿ���õ� Methods,���������ӵĽ����
-  + FindMethodSymbol, �����ڲ��ⲿ�����еķ���
-    ������Methods���� ���Ҳ�����ȥ UsedModules���ң��ҵ���Ϊ��word��������ǰ׺����ȥMethods�������޸��ⲿ���ã���������� AddExternalLibMethod������Methods��.
-  * �������е��ⲿ�ģ��ڲ��ķ���ȫ������Methods����
+    如果在Methods上找不到名为： aMethod.ModuleName + cDotSeparatorSymbol + aMethod.Name 的方法，则添加该方法的外部引用到 Methods,并返回添加的结果。
+  + FindMethodSymbol, 查找内部外部的所有的方法
+    首先在Methods上找 ，找不到则去 UsedModules上找，找到则为该word添加名称前缀后，再去Methods上找有无该外部引用，如无则调用 AddExternalLibMethod，加在Methods上.
+  * 现在所有的外部的，内部的方法全部放在Methods上了
 
 * [TurboMethodSymbol]
   + ModuleSymbol, for external method only.
   + ExternalMethodSymbol, for external method only.
   * GetTypeSymbol
-    ���û��������Ϣ������Assigned(ExternalMethodSymbol)�����Զ����� ExternalMethodSymbol.TypeSymbol.
+    如果没有类型信息，并且Assigned(ExternalMethodSymbol)，则自动返回 ExternalMethodSymbol.TypeSymbol.
 
 * remove the SymbolError constants from the Coco.pas to uTurboCompileUtils
 
@@ -827,67 +827,67 @@ var
 * [uTurboExecutor] ForEachEntry to convert MetaData Entry address.
 
 2007-6-7 9:09
-!* ���Խ� TTurboModuleSymbol.Entry ��������������. 
-  !+ ����һ���� TTurboModuleSymbol.FModuleRefEntries: PMeList ���ԣ��ռ���ģ�����е� ModuleRefEntry.
-     ���߿��ǽ��� ModuleRefSymbol�� ModuleSymbol; Entry.
-!+ ��MethodSymbol������ UnResolvedRefList �����б����������еĵ��ø�Method��δ��������õ�ַ��
-  �� UnResolvedRefList ����������Ϊ Private��ʱ��ű�ʹ�ã�
-!* ģ���е� Init, Final ����ָ�����Ҫ�����ڱ��ع��̵�iVMCall���жϳ�ʼ�������û������ʼ������ѹ�뵱ǰ��ַ���ȵ��ó�ʼ�����̣�
-  ��Final ������ж���ڴ��ʱ���жϣ����������ʼ������ô�͵���Final��
+!* 可以将 TTurboModuleSymbol.Entry 提出来，避免混淆. 
+  !+ 建立一个： TTurboModuleSymbol.FModuleRefEntries: PMeList 属性，收集本模块所有的 ModuleRefEntry.
+     或者考虑建立 ModuleRefSymbol： ModuleSymbol; Entry.
+!+ 在MethodSymbol上添加 UnResolvedRefList 引用列表，保存所有的调用该Method的未解决的引用地址。
+  该 UnResolvedRefList 仅当本方法为 Private的时候才被使用！
+!* 模块中的 Init, Final 两个指针必须要！！在本地过程的iVMCall中判断初始化，如果没有做初始化，则压入当前地址，先调用初始化过程！
+  而Final 则是在卸载内存的时候判断，如果已作初始化，那么就调用Final！
 * [Bug] issue #14 Private Method is not work..., the RET instruction is NOT pushed.
   * TTurboMethodSymbol.DeclareTo, DeclareEndTo 
 ! + issue 0000009: execute the external method(come from host or DLL)
   + instruction opCallExt; //opCallExt PTurboMethodInfo(offset of Memory)
     + implement instruction in TurboInterpreter
     + implement instruction in TurboX86Interpreter
-  * Compiler: ����method�������õ�ָ��ⲿ�������ñ����� opCallExt ��ָ���
+  * Compiler: 根据method决定调用的指令，外部方法调用必须用 opCallExt ，指令，在
     modified in TTurboMethodSymbol.PushTo!
 
 2007-6-6 13:20
-~ TTurboModuleRefSymbol:  ����� TTurboModuleSymbol �������
-  �����޷����룬����Ҫ�� �����۲��֣�
+~ TTurboModuleRefSymbol:  将其从 TTurboModuleSymbol 分离出来
+  发现无法分离，都需要！ 最后结论不分！
 
 + const cMainEntryProcName
 * rename TTurboSymbol.ModuleSymbol to OwnerSymbol
 
 2007-6-5 7:09
-* [Bug] issue #6[Done] MeType ����Ժ�ʹ��ģ���ڴ�����������ڴ����ƣ��Զ��ͷ�ģ���ڴ棩����ô�� MeType �ڣ��������ⲿ�� MeType ���͵ģ������ִ�����Ϊģ���ڴ汻�ͷ�
-  ������
-  1��ģ���ڴ治�ͷ� MeType�����غ�һֱ�������ڴ��С�
-     ע���ٴδ������ص�ʱ���������MeTypes��Σ���������Ҫ���� MeTypes �ĳ���Ԥ�ȴ������С�
-  2���޸� MeType ���ͣ�
-    Ϊÿһ�����õ����������ڲ��ֶΣ� FXXXTypeId: Integer���� FXXXTypeId ������ 0��ʱ���ʾ����������Ϊ�ⲿ���͡�
-    Ϊÿһ�����õ����ͽ������Զ������� Property XXXType: PMeType read GetXXXType;
-    �� GetXXXType �������жϻ�ȡ��ʵ��MeType.
-  ����һ�򵥣�ѡ������
-!+ ʵ�� JITExecutor���ܼ򵥵ģ�
-  ʵ��һ��ivmNext��ǰ���ƣ�ֻ�������ò����ֱ����ת����ȡ�����ľ�����ڵ�ַ��ֱ����ת���ɣ�
-  ��������TTurboJITModule�࣬����һ�������ڴ�: FBin: Pointer,�����Ĵ�������������Ϊ��ЩVM���̵�ִ����ڵ�ַ���������䡣
-  ����TTurboTranslator(TTurboX86Translator),��VM���뷭��Ϊ��ֱ��ִ�еĻ������ԡ�
-  Ϊ��ҪJITִ�У��������£�
-  1�����ִ���ٶ�
-  2��ִ��ǰ���������Ч�ԺͺϷ��ԣ�������ȫ���롣
+* [Bug] issue #6[Done] MeType 如果以后使用模块内存管理（到了内存限制，自动释放模块内存），那么在 MeType 内，引用了外部的 MeType 类型的，将出现错误，因为模块内存被释放
+  方案：
+  1、模块内存不释放 MeType，加载后一直保存与内存中。
+     注意再次从流加载的时候必须跳过MeTypes这段！！，这需要俺将 MeTypes 的长度预先存于流中。
+  2、修改 MeType 类型：
+    为每一个引用的类型增加内部字段： FXXXTypeId: Integer，当 FXXXTypeId 不等于 0的时候表示该引用类型为外部类型。
+    为每一个引用的类型建立属性读方法： Property XXXType: PMeType read GetXXXType;
+    在 GetXXXType 方法中判断获取真实的MeType.
+  方案一简单，选择它！
+!+ 实现 JITExecutor，很简单的：
+  实现一个ivmNext与前类似，只不过不用查表，直接跳转。读取进来的就是入口地址，直接跳转即可！
+  建立派生TTurboJITModule类，增加一个代码内存: FBin: Pointer,翻译后的代码放在这里，代码为那些VM过程的执行入口地址，其它不变。
+  建立TTurboTranslator(TTurboX86Translator),将VM代码翻译为能直接执行的机器语言。
+  为何要JIT执行？意义如下：
+  1、提高执行速度
+  2、执行前检查代码的有效性和合法性，构建安全代码。
   
 2007-6-4 13:57
-~ �����������Ĺ�����
-  �ִ�(Scanner) ��ʶ���(Tokenizer)
-  Ȼ���� Compiler �ɼ����ݵ��﷨���ϣ����ݸ���������ȷ����Щ���Żᱻ����
-  �����ڴ档
+~ 编译器所作的工作：
+  分词(Scanner) ，识别词(Tokenizer)
+  然后由 Compiler 采集数据到语法树上，根据各种条件，确定哪些符号会被最终
+  编入内存。
 
-  ��������Ȼ���Եķ�������Ҳ����ˡ�
-  �ֶΣ�ÿһ�����������ĵ㡣
-  �־䣺ÿ�䶼��һ�����ĵ㣬��������Χ�Ƹ����ĵ�������
-  ͬʱҪ���ö�ǰһ�����ģ��򱾶ε��������ĵ㣩�����뱾�������
+  俺觉得自然语言的翻译流程也是如此。
+  分段：每一段有若干中心点。
+  分句：每句都有一个中心点，整个句子围绕该中心点描述。
+  同时要做好对前一句中心（或本段的所有中心点）点纳入本句分析。
 
 2007-6-3 14:28
-* [Bug] issue 0000002[Done]: [TurboScript] Executor �����ⲿ�������ڳ����е��øú�������ִ�������س�����
+* [Bug] issue 0000002[Done]: [TurboScript] Executor 定义外部函数后，在程序中调用该函数导致执行器严重出错！
   when call the external function "Add". the tsrun raise fatal error!
     : Add external 'test';  
   if I uses test; the tsrun is ok and no any error!
-  ԭ��ʵ���������ڱ����ʱ��û����ȷ��д ExternalOptions.ModuleRef �ĵ�ַ��ɣ������õ�ModuleSymbolû�б�������ģ���У�
+  原因：实际上是由于编译的时候没有正确填写 ExternalOptions.ModuleRef 的地址造成！该引用的ModuleSymbol没有被声明到模块中！
   Reasoon: the ModuleSymbol is not declared to the moduleMemory. and ExternalOptions.ModuleRef is wrong!!
 * [CTS] issue 0000003[Done]: use the new identifier Visibility and scopes speciality
-  ��һ�� LongWord��DWord������ţ�
+  用一个 LongWord（DWord）来存放：
   tvPrivateVisibilty = $00000000;
   tvPublicVisibilty  = $00000001;
   tvPublicNamedVisibilty   = $01000001;
@@ -895,39 +895,39 @@ var
   tvPublicNameTypedVisibilty   = $03000001;
 
 2007-6-2 11:08
-+ [Compiler] Issue #001 ���������Word��ʱ��ͬʱ�������Ӷ�����������͵Ķ��壬�����ӶԹ��̲����Ķ���
-  ��������ʱ����������ù��̵�ʱ��������Ƿ�Ƿ���
-!* [Common Type System] �ͼ��������� Visiblity �ĸı�
-  ��ʶ���� Visibilities:
++ [Compiler] Issue #001 当定义过程Word的时候同时定义增加定义其过程类型的定义，并增加对过程参数的定义
+  这样编译时候可以在引用过程的时候检查参数是否非法。
+!* [Common Type System] 低级语言语义 Visiblity 的改变
+  标识符的 Visibilities:
   
-  tvPrivate: �ñ�ʶ��˽�У�û�����֣�û�����ͣ�
-  tvPublic:�ñ�ʶ���������ӵ������С��߼�����ʹ�á�
-    pmNamed: �ñ�ʶ���������ӵ�������,����д���ʶ������
-    pmTyped: �ñ�ʶ���������ӵ�������,���Ҹñ�ʶ��������Ҳ����д�룡
+  tvPrivate: 该标识符私有，没有名字，没有类型！
+  tvPublic:该标识符将被连接到链表中【高级语言使用】
+    pmNamed: 该标识符将被连接到链表中,并被写入标识符名称
+    pmTyped: 该标识符将被连接到链表中,并且该标识符的类型也将被写入！
   TTurboVisibility = (tvPrivate, tvPublic);
   TTurboPublicModifier = (pmNamed, pmTyped);
   TTurboPublicModifiers = set of TTurboPublicModifier;
 
-  [�߼����Զ���]��
+  [高级语言定义]：
     ttPrivate: = tvPublic
     ttProtected: = tvPublic, pmNamed
     ttPublic: = tvPublic, pmNamed
     ttPublished: = tvPublic, pmNamed, pmTyped
 
-  ׼����һ�� LongWord��DWord������ţ�
+  准备用一个 LongWord（DWord）来存放：
   tvPrivateVisibilty = $00000000;
   tvPublicVisibilty  = $00000001;
   tvPublicNamedVisibilty   = $01000001;
   tvPublicTypedVisibilty   = $02000001;
   tvPublicNameTypedVisibilty   = $03000001;
 
-!* [Bug] PHP ���ִ��ն�stdin����Ĳ�������������utf-8����������������룡
-  ����cvs ��mantis php�������ϵͳ��ʱ���֣�
+!* [Bug] PHP 发现从终端stdin传入的参数不能正常的utf-8话，因此中文是乱码！
+  连结cvs 和mantis php错误管理系统的时候发现！
 
 
 2007-6-1 7:50
 TMeRegisteredTypes Stream Int64 -> LongInt
-  ��Ϊ��ʼ�ս����ͱ���������ǰ�棬���Ҳ������>4G���ļ���
+  因为我始终将类型保存在流的前面，而且不会出现>4G的文件！
 * [Bug] TCustomTurboModule.ClearMemory not clear the RegisteredTypes!
 //* [Bug] reset used module handle to nil when module unload
 * [Bug] reset used type.turbotype handle to nil when module unload
@@ -935,45 +935,45 @@ TMeRegisteredTypes Stream Int64 -> LongInt
 + [TCustomTurboModule] Stream: save/load the FRegisteredTypes to/from stream!
 
 2007-5-31 9:24
-* [Cocobase] ���ڱ����ģ��: FModuleSymbol
-!* ׼������ģ���ϵ� FinalProcָ�룬��ʼ���ͽ���������ȫ���������InitProcָ���ϣ�
+* [Cocobase] 正在编译的模块: FModuleSymbol
+!* 准备放弃模块上的 FinalProc指针，初始化和结束化动作全部编译放在InitProc指针上！
 * [Bug] TCustomTurboModule.ClearMemory not clear the LastTypeRefEntry!!
   LastTypeRefEntry := nil;
-+ [Compiler] �����ʹ���ֵ�ı�����ֵ֧�ֳ�����ʶ�ˣ�
++ [Compiler] 常量和带初值的变量赋值支持常量标识了！
   aConst = aOtherConst;
-* [Compiler] ����ϵͳ���������ˣ���
-  !+ �������ڴ棡
-  !+ ���뵽���У�
-  !+ �ⲿ��������
+* [Compiler] 类型系统基本工作了！！
+  !+ 编译入内存！
+  !+ 插入到流中！
+  !+ 外部引用类型
 
 2007-5-30 8:34
-!* ׼����Cocobase�� TurboScript �������еı��뷽��ȫ��Ǩ�Ƶ� uTurboCompilerUtils.pas ��
-  �涨�� ModuleSymbols �б��еĵ�һ�� ModuleSymbol Ϊ�Լ��������ڱ����ģ�顣
+!* 准备将Cocobase中 TurboScript 所有特有的编译方法全部迁移到 uTurboCompilerUtils.pas 中
+  规定： ModuleSymbols 列表中的第一个 ModuleSymbol 为自己，即正在编译的模块。
 
-  �ڱ�������ֻ���� FModules: PTurboModuleSymbols
+  在编译器上只留有 FModules: PTurboModuleSymbols
 
-�����������棺 Visible >= fvProtected or soTypeSafety or soTypeNamed
-  ����������Ϣ��typed or soTypeSafety or fvPublished
-  ����������Ϣ�� named or soTypeNamed or fvPublished
+放在链表上面： Visible >= fvProtected or soTypeSafety or soTypeNamed
+  保存类型信息：typed or soTypeSafety or fvPublished
+  保存名字信息： named or soTypeNamed or fvPublished
 
 * [TTurboSymbol] uTurboCompilerUtils
- + function IsProtected(const aModule: TCustomTurboModule): Boolean;  //������������
- + function IsTypeSafety(const aModule: TCustomTurboModule): Boolean; //����������Ϣ
- + function IsTypeNamed(const aModule: TCustomTurboModule): Boolean;  //����������Ϣ
+ + function IsProtected(const aModule: TCustomTurboModule): Boolean;  //放在链表上面
+ + function IsTypeSafety(const aModule: TCustomTurboModule): Boolean; //保存类型信息
+ + function IsTypeNamed(const aModule: TCustomTurboModule): Boolean;  //保存名字信息
 
 2007-5-29 11:42
-~ [Compiler] �����ʶ��������������˳��
-  �涨��
-    ģ�飨�ࣩ����Ϊ�������ơ��������ļ�����ģ�飨�ࣩ��Ϊ׼��
-    ��ģ���ж�������ͣ���������������ȫ��Ϊ������ơ�
-  ����[Self]��
-    1��������ʶ��
-    2��������ʶ��
-    3��������ʶ��
-  �ⲿģ��[ModuleName]
+~ [Compiler] 定义标识符的命名和搜索顺序！
+  规定：
+    模块（类）名称为绝对名称。编译后的文件名以模块（类）名为准。
+    而模块中定义的类型，变量，方法名，全部为相对名称。
+  本地[Self]：
+    1、常量标识符
+    2、变量标识符
+    3、方法标识符
+  外部模块[ModuleName]
 
-[TurboForthCompiler] ��ʶ��������˳��
-  û���κ�ǰ׺���Ƶı�ʶ����
+[TurboForthCompiler] 标识符的搜索顺序
+  没有任何前缀限制的标识符：
   LocalConsts
   LocalVars
   LocalWords
@@ -981,16 +981,16 @@ TMeRegisteredTypes Stream Int64 -> LongInt
   ExternalVars
   ExternalConsts
 
-!* uTurboCompilerUtils �е����ͣ�����ʹ��MetaInfo�е�����������
+!* uTurboCompilerUtils 中的类型，尽量使用MetaInfo中的类型来代替
 
-����Object�ж���AnsiString�ַ����Ĵ��������ش�bug,��������string���͵ĵط�����Ҫֱ��ʹ�ø�ֵ��
- aObj := aOtherObj;          //ֱ�Ӹ��ƵĽ�����ַ��������ü�����û�б䣡
- Pointer(aObj.Name) := nil;  //����������ַ���
- aObj.Name := aOtherObj.Name; //Ȼ��ֵ��
- ������ý���һ��assign����, aObj.Assign(aOtherObj) ������.
+鉴于Object中对于AnsiString字符串的处理存在重大bug,所以在有string类型的地方，不要直接使用赋值：
+ aObj := aOtherObj;          //直接复制的结果是字符串的引用计数并没有变！
+ Pointer(aObj.Name) := nil;  //所以先清空字符串
+ aObj.Name := aOtherObj.Name; //然后赋值。
+ 不过最好建立一个assign方法, aObj.Assign(aOtherObj) 来进行.
 
 * TurboMetaInfo use TMeDynamicObject now
-  !+ ע�������������ʹ���鷽������ô��������AddrResolved��ʱ����д��Ӧ��VMT��ַ����¼�У�
+  !+ 注意如果想在其中使用虚方法，那么还必须在AddrResolved的时候填写相应的VMT地址到纪录中！
 
 2007-5-28 14:22
 * [Compiler] use PMeType instead of the TurboTypeKind
@@ -999,47 +999,47 @@ TMeRegisteredTypes Stream Int64 -> LongInt
   + [Coco] TCocoRGrammar.DefineModule
   + [Coco] TCocoRGrammar.FindWordInUsedModules
   * [Coco] TCocoRGrammar.AddWordCFA: now search the word in UsedModules. TODO: need more optimal!
-    ���ڣ�����ֱ��ʹ�������õ��ⲿģ���е�word�ˣ������趨�壡
+    现在，可以直接使用在引用的外部模块中的word了，而无需定义！
 
 eg,
   uses UnitName;
   uses UnitName2;
 
-!~ [Compiler] �����ʶ��������˳��
-  ����[Self]��
-    1��������ʶ��
-    2��������ʶ��
-    3��������ʶ��
-  �ⲿģ��[ModuleName]
+!~ [Compiler] 定义标识符的搜索顺序！
+  本地[Self]：
+    1、常量标识符
+    2、变量标识符
+    3、方法标识符
+  外部模块[ModuleName]
     
 
 2007-5-27 19:07
-~ [Compile Time] ���͵�����˳��
-  ��������: LastTypeInfoEntry
-  �ⲿ����: LastTypeRefEntry
-  ϵͳ����: GRegisteredTypes
+~ [Compile Time] 类型的搜索顺序
+  本地类型: LastTypeInfoEntry
+  外部类型: LastTypeRefEntry
+  系统类型: GRegisteredTypes
 !+ [Compiler] uses clause
   uses UnitName
 !+ [Compiler] namespace clause
 
 2007-5-20 6:23
-+ TCustomTurboModule.Types: �û�����������!
-  �� GRegisteredTypes ������ϵͳ���������.
++ TCustomTurboModule.Types: 用户声明的类型!
+  而 GRegisteredTypes 中则是系统定义的类型.
 
-  ����Typesû�в���ֱ��Castģ���ڴ棬���Ա�������(ģ��)�е�Types���ǲ���ֱ��װ��ģ���ڴ澵��ģ�
-  ���Կ��Ƿ�������������ǰ���⽫���ؾ��񲻱�װ�룬ֻ��ִ��Types.LoadFromStream.
-  LastTypeInfoEntry.MeType ���浽���е�ʱ���� TurbpTypes�е����(��1��ʼ��0����Ϊnil)�����غ�Ÿ�Ϊ��ʵ��PMeType��ַ��
-  ���е�LastTypeInfoEntry�ϵ�����Ϊ�û��Զ������ͣ���
-  ����û�п�����������Ԫ��������α��棿
+  鉴于Types没有采用直接Cast模块内存，所以保存于流(模块)中的Types，是不必直接装入模块内存镜像的！
+  可以考虑放在流的最后或最前！这将加载镜像不必装入，只需执行Types.LoadFromStream.
+  LastTypeInfoEntry.MeType 保存到流中的时候是 TurbpTypes中的序号(从1开始，0保留为nil)，加载后才改为真实的PMeType地址！
+  所有的LastTypeInfoEntry上的类型为用户自定义类型！！
+  发现没有考虑在其它单元的类型如何保存？
 
   CallExternal PMethodInfoEntry
 
 2007-5-18 8:09
-~ IsExternal ���ڹ��õ�Info�в���Ҫ���˷ѣ�
-  LastModuleRefInfoEntry ���������ⲿ���ã�
-  LastMethodInfoEntry ��Ҫ����ʵҲ���Բ���Ҫ��ֻҪ�ж�CallStyle,����csForth�ģ������ⲿ���������ⲿcsForth���ڱ�����������>= protected �ĺ���ֱ�Ӳ��� CallFar���ˣ���
-  LastVariableInfoEntry ����Ҫ��������ⲿģ��ı�������ֱ��ѹPushFar (pModuleRefEntry, VarOffsetAddr)
-  LastTypeInfoEntry: ��Ҫ.
+~ IsExternal 放在公用的Info中不必要，浪费！
+  LastModuleRefInfoEntry 本来就是外部引用！
+  LastMethodInfoEntry 需要，其实也可以不必要，只要判定CallStyle,不是csForth的，就是外部函数！而外部csForth俺在编译器对所有>= protected 的函数直接采用 CallFar的了！！
+  LastVariableInfoEntry 不必要，如果是外部模块的变量，则直接压PushFar (pModuleRefEntry, VarOffsetAddr)
+  LastTypeInfoEntry: 需要.
 
 - TTurboMetaInfo.IsExternal
 * TTurboMethodInfo
@@ -1047,44 +1047,44 @@ eg,
   + function IsExternal: Boolean; //Result := CallStyle <> csForth
 - TTurboExteralMethodOptions.ProcAddr
 
-* TurboTypes: �����Ǹģ������е����͸���������TypInfo!
+* TurboTypes: 首先是改，将所有的类型改作不依赖TypInfo!
   TMeSetType = Object(TMeCustomOrdinalType)
   protected
     FCompType: PMeType;
-    //FCompType ���FCompType �޷�����������
-    //Ӧ����һ��ƫ�������������ȱ���Ҫ�ҵ�lastTypeInfoEntry�еĵ�ַ��
-    //Ҳ���� TMeRegisteredTypes ��Ҳ�ü�һ��Owner.
-    ������Ӧ�������Լ��� TTurboRegisteredTypes = Class(uMeProcType.TMeTypes)��Ȼ���ڼ����Լ��������湦�ܣ���
-    �����Ϳ�����ȫ����MeType�࣡
-~ �涨��MeType�е���������Ϊ������ƣ�������������
-~ GRegisteredTypes ��Ϊ�ڲ�Ĭ�����ͣ��������Ϊ��ʶ��
+    //FCompType 这个FCompType 无法存入流阿！
+    //应该是一个偏移量，但是首先必须要找到lastTypeInfoEntry中的地址。
+    //也许在 TMeRegisteredTypes 上也该加一个Owner.
+    或者我应该派生自己的 TTurboRegisteredTypes = Class(uMeProcType.TMeTypes)，然后在加上自己的流保存功能！！
+    这样就可以完全不动MeType类！
+~ 规定在MeType中的类型名称为相对名称，不包括父名！
+~ GRegisteredTypes 作为内部默认类型，以其序号为标识！
 !+ TCustomTurboModule.Types: TTurboRegisteredTypes
-  ��LastTypeInfoEntry ���ص� Types����ʱ����Ҫ����IsAddrResolved��״̬��
-  ��ס�� uses uMeProcType �������
+  当LastTypeInfoEntry 加载到 Types，的时候，需要留意IsAddrResolved的状态！
+  记住是 uses uMeProcType 这个！！
 
 2007-5-17 11:04
-* ���⣬����TurboType�е� Name�������ΪShortString���²�����������ΪPChar��������ҪResolveAddr,������ô��resolveaddr�ˣ�Ҳ��ȱ��һ��.
-  �����Ϊ ShortString ��ô���Ͳ���Ϊȫ����ֻ�����������̶�ռ��256�ֽڡ�
-  ���ˣ����Ǿ���PChar.
-* ���е�������Ϣ����ȫ������LastTypeInfoEntry������������VMT��ַ��
-  �涨�������ͣ��������������趨�弴��ʹ�õ�:
+* 问题，对于TurboType中的 Name，如果作为ShortString则怕不够长，而作为PChar类型则需要ResolveAddr,反正这么多resolveaddr了，也不缺这一个.
+  如果作为 ShortString 那么类型不作为全名，只不过这样将固定占用256字节。
+  算了，还是就用PChar.
+* 所有的类型信息必须全部挂上LastTypeInfoEntry，这样俺好填VMT地址。
+  规定基本类型，基本类型是无需定义即可使用的:
   const
-    //��˳�����ΪId�ţ� ��ģ�������PTurboType ƫ�Ƶ�ַС�� MaxBaseTypeCount��Ϊ�������͡�
+    //以顺序号作为Id号！ 当模块里面的PTurboType 偏移地址小于 MaxBaseTypeCount，为基本类型。
     TTurboBaseTypes : array [0..MaxBaseTypeCount - 1] of PMeType; 
-�Դ����ˣ�ֱ�ӽ�TypInfoע�뵽Module�ڴ��о����ˣ�������ô����ﰡ����Ȼ��װ�ص�ʱ���ڽ�����װ�뼴�ɰ�����
-�ðɣ���ν����ʹ��أ�ͨ��SaveToStream.
+脑袋晕了，直接将TypInfo注入到Module内存中就行了，管它这么多干嘛啊！！然后装载的时候在将它们装入即可啊！！
+好吧，如何将类型存呢？通过SaveToStream.
 RegisterTypeFromStream();
 
 
 2007-5-16 10:32
-* �ο� uMeTypes ʵ�� TTurboTypeInfo��
-  * TTurboTypeInfo �е��Ǳ���ʱ����Ҫ����Ϣ���� Visibility �� ���ڴ�TypeInfo��˵�Ե��е����ࡣ�������Բ��ܣ���Ŀǰ���͡�
-  + uTurboType.pas ������ֻ��ע��������Ϣ��
-      uTurboMetaInfo.pas �����ð��� TurboType ��Ϣ����Ҫ�����ģ��һ����
+* 参考 uMeTypes 实现 TTurboTypeInfo。
+  * TTurboTypeInfo 有的是编译时刻需要的信息，如 Visibility ！ 对于纯TypeInfo来说显得有点冗余。不过可以不管，现目前将就。
+  + uTurboType.pas 独立，只关注于类型信息！
+      uTurboMetaInfo.pas 将引用包裹 TurboType 信息，主要是针对模块一级！
   + uTurboProcType.pas
 
 2007-5-15 9:51
-+ [DUNIT] � �Զ������Ե�Ԫ ���Կ��
++ [DUNIT] 搭建 自动化测试单元 测试框架
   uTurboModuleTest
   uTurboAccessorTest
   uTurboAppDomainTest
@@ -1092,54 +1092,54 @@ RegisterTypeFromStream();
   uTurboCompilerTest
 
 2007-5-14 16:23
-~ ��Ŀǰֻ��ʵ��Delphi�йص����ͣ�һ��Ϊ�˵��ã�
+~ 现目前只想实现Delphi有关的类型，一切为了调用！
 
 * [Bug] CustomTurboModule.ClearMemory not reset the Flags to 0.
 
 ~ [DUnit]CustomTurboModule
   FMemory: (Code Memory)
-    ����: Memory, MemorySize, UsedMemory
+    属性: Memory, MemorySize, UsedMemory
     Access Methods:
       AddBufferToMem, AddByteToMem, AddIntToMem, AlignMem, AllocSpace, AddOpToMem
   
   FDataMemory:
-    ���ԣ� DataMemorySize, DataMemory, UsedDataSize
-    ���� DataMemory �ķ��� 
-    ���ԣ�ÿ��ִ�з��ʷ����󣬶�Ҫ��UsedDataSize�������Ƿ�������
+    属性： DataMemorySize, DataMemory, UsedDataSize
+    访问 DataMemory 的方法 
+    测试：每次执行访问方法后，都要看UsedDataSize等属性是否正常。
     Access Methods:
       AddBufferToData, AddByteToData, AddIntToData, AlignData, AllocDataSpace
-    ���� MetaInfo 
+    测试 MetaInfo 
 
 2007-5-13 7:52
-!+ �ű�����Delphi��������
-  !+ ��Ź������͵�MetaInfo
-     ���Թ������ϣ�LastTypeInfoEntry��Ҳ���Բ���
-     + �趨�ڲ�����MetaInfo
-        �����ڲ�����MetaInfo��Id���Զ������͵ģ�
-        �Զ������Ϳ϶��Ƿ��� LastTypeInfoEntry �ϣ������ָ�룻���ڲ���������id��
-        ֻҪ�ܱ�ָ֤���ַ> Max(�ڲ�Id)����Ϳ��������ˡ�
+!+ 脚本调用Delphi函数过程
+  !+ 存放过程类型到MetaInfo
+     可以挂在其上：LastTypeInfoEntry，也可以不！
+     + 设定内部类型MetaInfo
+        区分内部类型MetaInfo的Id和自定义类型的！
+        自定义类型肯定是放在 LastTypeInfoEntry 上，因此是指针；而内部类型则是id。
+        只要能保证指针地址> Max(内部Id)，则就可以区分了。
           
-  !+ TTurboInternalFunctionList ��Ҫ����һ�� Delphi�ڲ������б�������������̵�ַ�͹���������Ϣ��
-     ����б���ֱ�ӷ���AppDomain��Executor�ϣ�������Ϊһ�ֿ����ʽ�ҽӣ�
-     ������ô�鷳�ɣ�ֱ�ӷ��Ϻ��ˣ�Ҫ����Ļ���Ҳ������ TTurboInternalFunctionList.RegisterFunction ����ʽ���
+  !+ TTurboInternalFunctionList 需要增加一个 Delphi内部函数列表，用来保存过程地址和过程类型信息。
+     这个列表是直接放在AppDomain或Executor上？还是作为一种库的形式挂接！
+     不用这么麻烦吧，直接放上好了，要扩充的话，也可以在 TTurboInternalFunctionList.RegisterFunction 的形式加嘛。
 * [uTurboAccessor] TTurboModuleManager
   + function Add(const aModule: TCustomTurboModule): Integer;
   + function IndexOf(const aModuleName: String): Integer;
 
 * [Bug] Need resolve the address for the loaded module!
-  * �޸ĳ�����ģ���ڵ���RequireModule���ؽ����� IsAddrResolved ��ֵ�����Լ�һ����
-  * AppDomain.DoModuleReset�У��� not (psCompiling in States) ��ʱ������Ϊ IsAddrResolved := True.
-  �����ܹ����������ַ���⣬�������ĳ��ģ���ֶ��޸���IsAddrResolved���ٺ٣���
-* [Bug] AppDomain��ģ��û������ GTurboModuleManager ������
-  * AppDomain.DoModuleReset�� ��ģ�����ӵ� GTurboModuleManager��
-* [TurboModuleFileAccessor]ע���ļ����Ʊ�����ȫ���ڶ����ģ�����ƣ���
-  �����һ����ô�ļ����ƣ�������չ��������Ϊģ�����ƣ�(see ModuleFileAccessor)
-  ��DBϵͳ��Ҳ������������⣡����ͬ���������ѹ���ǰû�������б���ģ�����ƣ�����������������Ϊ׼��
+  * 修改成了在模块内调用RequireModule加载进来的 IsAddrResolved 赋值成与自己一样。
+  * AppDomain.DoModuleReset中，当 not (psCompiling in States) 的时候设置为 IsAddrResolved := True.
+  这样能够基本解决地址问题，但是如果某个模块手动修改了IsAddrResolved，嘿嘿！！
+* [Bug] AppDomain的模块没有纳入 GTurboModuleManager 管理。
+  * AppDomain.DoModuleReset中 将模块添加到 GTurboModuleManager。
+* [TurboModuleFileAccessor]注意文件名称必须完全等于定义的模块名称！！
+  如果不一样那么文件名称（不含扩展名）将作为模块名称！(see ModuleFileAccessor)
+  在DB系统中也会遇到这个问题！可以同样处理，难怪以前没有在流中保存模块名称，看样子是想以外面为准。
 
-* [Bug] [FPC] �����ļ�����йص����ݽṹ�еļ�������ȫ����֮��Ϊ��ȷ�����С�����ͣ���:Byte��
-  * tfcc ������Ի���ͨ����
-  * tsrun PurePascal FPC�汾�������ͨ����
-  ���飺������ݵ��ֽڴ�С��һ�£��Ͳ���ֱ��cast���ͣ���������������
+* [Bug] [FPC] 将于文件存放有关的数据结构中的集合类型全部改之成为能确定其大小的类型，如:Byte！
+  * tfcc 编译测试基本通过！
+  * tsrun PurePascal FPC版本编译测试通过！
+  经验：如果数据的字节大小不一致，就不能直接cast类型！不过可以这样：
     {$IFDEF FPC}
     Result := TTurboProcessorStates(LongWord(FGlobalOptions.States))
     {$ELSE Borland}
@@ -1147,190 +1147,190 @@ RegisterTypeFromStream();
     {$ENDIF}
 * TTurboScriptOptions is LongWord now. i added some preserved enum values.
 
-!* [Bug] ��ջ��ŵ���С��λ������tsPointer����������Ӧ����tsPointerΪ׼��
-  ��Ҫ���Ҷ�ջ�йصĲ����޸�֮��
+!* [Bug] 堆栈存放的最小单位数据是tsPointer，所以量度应该以tsPointer为准。
+  需要查找堆栈有关的操作修改之！
 
-~ [CVS] rename file��ʵ���ϲ�����Ķ�cvs�ֿ��е��ļ�����ֻ���ڱ���cvs����Ŀ¼��������һ��rename�ļ������ظı���ļ���
-  ��˸������ڴ��ύһ������ǰһ�����ļ�������ô��cvs�ֿ��У����� xxxxx_1.pas.v��������
-  ��Ϊ�Ҳ��������ɾ�����ļ���������һ���汾�ı仯�����أ���
+~ [CVS] rename file，实质上并不会改动cvs仓库中的文件名，只是在本地cvs隐藏目录中添加了一个rename文件，记载改变的文件名
+  因此改名后，在次提交一个改名前一样的文件名，那么在cvs仓库中，会变成 xxxxx_1.pas.v，来区分
+  因为我不懂错误的删除了文件，丢掉了一个版本的变化！呜呜！！
 
 2007-5-12 7:57
 + pure pascal interpreter: TurboInterpreter.pas
-  ��ʵĿǰ��˵��ʼ������̫��Ҫ��
-  ��Ҫ�������ڽű��ڵ���Delphi�ĺ�����
-  ��������ͨ����ֻ�������漰test1.tf, test2.tf�ű��ġ�
+  其实目前来说初始化并不太重要！
+  重要的是能在脚本内调用Delphi的函数！
+  基本测试通过，只测试了涉及test1.tf, test2.tf脚本的。
 
 * [Bug] the ModuleName is not saved to the file.
-  �����Ƿ���Ҫ TurboModule.FName field ���� ModuleName(�ظ�)
+  考虑是否需要 TurboModule.FName field 保存 ModuleName(重复)
 !* [Bug] ModuleParent is not set or convert to related or absolute address!
 
 2007-5-11 7:06
 * [AppDomain] AppDomain.Create(aMemory: TCustomTruboModule = nil);
   if aMemory is not nil then the AppDomain will create one and maintain it.
-  �������ɽ�������AppDomain ��ʼ��ĳ��ģ�����Ӱ����AppDomain��
-  �����Ҿ��ã�������VMָ����Ū�ȽϺã�
+  这样，可建立单独AppDomain 初始化某个模块而不影响主AppDomain。
+  不过我觉得，还是在VM指令里弄比较好！
 
 !* [Bug] Need resolve the address for the loaded module!
   how to decide whether resolve the address of the moudle, after load the module?
-  1. ִ��ǰ�ж�
-     ִ��cctor��ʼ��ģ��ǰ
-  2. ���غ����˭���صģ��ͺ�˭��״̬һ��(ֻҪ����Ϊ����ģ��� IsAddrResolved ����ֵ����û������)��
-     IsAddrResolved Ӧ����Ϊ�ڲ����ԣ��������к�Ͳ��ܸı䣡
-!+ ִ��cctor��ʼ��ģ���cdtor�⹹�ͷ�ģ��
-   ��ʼ��cctor(Type Initializer): ִ��ʱ  �涨���������е��ø����cctor��ֻ���Ǹ������Լ��ģ�
-     �����ڰ�����ص�����³�ʼ��ģ��
-       ���ص�ʱ��
-     ������Ԥ�ȼ��ص�����³�ʼ��ģ��
-       LoadUsedModules��
-   cdtor(FInit): ֹͣ����ǰ���ͷ�ģ���ڴ�ǰ��������ʱ��æ�ġ�
-!+ �����̲�����Ϣ����MetaInfo��
-  !+ ����Delphi�ڲ�����,�ⲿDLL����
+  1. 执行前判定
+     执行cctor初始化模块前
+  2. 加载后根据谁加载的，就和谁的状态一致(只要不人为更改模块的 IsAddrResolved 属性值，就没有问题)。
+     IsAddrResolved 应该作为内部属性，而且运行后就不能改变！
+!+ 执行cctor初始化模块和cdtor解构释放模块
+   初始化cctor(Type Initializer): 执行时  规定不能在其中调用父类的cctor，只能是负责处理自己的！
+     当处于按需加载的情况下初始化模块
+       加载的时候？
+     当处于预先加载的情况下初始化模块
+       LoadUsedModules？
+   cdtor(FInit): 停止运行前或释放模块内存前【可以暂时不忙的】
+!+ 将过程参数信息放入MetaInfo，
+  !+ 调用Delphi内部过程,外部DLL过程
   !+ uTurboSystemModule.pas
-     ϵͳģ��,ȫ����Delphi�ĺ�����ɡ�
+     系统模块,全部由Delphi的函数组成。
   
-!+ �ڻ����Ϲ��� MeBrainScript
-  �����ҵ��뷨����ôһ��ģ������һ�������������ݿ����ˡ�
-  ���ԣ��ֶ�Ҳ��ȫ�����������ݿ��С���ģ����������˶����ı��ؾֲ�������
-  ���ܰ��� MeBrainScript ��������:
-  Action /��/ѧ/��/��@�༭()[: Integer]
-    'Class /��/ѧ/��/��/   'Owner
-    '�ֲ�����
+!+ 在基础上构造 MeBrainScript
+  按照我的想法，那么一个模块变成了一个动作放于数据库中了。
+  属性，字段也是全部保存在数据库中。而模块变量则变成了动作的本地局部变量！
+  可能俺的 MeBrainScript 就是这样:
+  Action /文/学/记/日@编辑()[: Integer]
+    'Class /文/学/记/日/   'Owner
+    '局部变量
     Var i: Integer;
   End Action
-  �Ծ�����ģ��(Ҳ��Action)��
+  自举引导模块(也是Action)：
   Action /SYS@Main
   End Action
-  ���д��壬�¼��Ĵ�����
-  ���������б��֣����壩��Ҳ����û�У�
-  ����еĻ����������
-  ����һ��blob���ڴ�Ŵ��壿�������dfm��ʽ��
-  Ȼ��������ڽű��з��ʴ���Ŀؼ����Լ���ϵ�¼����ű�����ġ�
+  还有窗体，事件的处理？
+  动作可以有表现（窗体），也可以没有！
+  如果有的话，放在哪里？
+  在用一个blob用于存放窗体？窗体就用dfm格式。
+  然后如何能在脚本中访问窗体的控件？以及联系事件到脚本里面的。
 
 
 2007-5-10 15:04
-~ �޸����� TCustomTurboModule Ȼ����ΪTurboScript�����
-  ���������ڴ�Ĵ��ͬ�� TCustomTurboModule�� ����ͬ������ TurboAccessor ���ܵ�������
-  ˼�������½���ʵ��:
+~ 修改提炼 TCustomTurboModule 然后作为TurboScript类机构
+  各个类在内存的存放同于 TCustomTurboModule， 并且同样放在 TurboAccessor 中受到管理。
+  思考：当新建类实例:
     ClassPointer: TCustomTurboModule
     Records: ....
-  ��� TCustomTurboModule ��Free����ô��Щ��ʵ����ô�죿
+  如果 TCustomTurboModule 被Free，那么这些类实例怎么办？
 
 * [Bug] CustomExecutor.LoadUsedModules
   when address is not resolved the module.name is related address.
-* �� TCustomTurboModule ����ȡ�� GlobalOptions ָ�롣GlobalOptions ���������ط�; AppDomain 
-   Executor ����GlobalOptionsָ��ָ��AppDomain�� GlobalOptions.
-* [X86Interpreter] ����ʹ�� ECX ���� GlobalOptions ��
-  �����̵����ٶ�����
+* 从 TCustomTurboModule 类中取缔 GlobalOptions 指针。GlobalOptions 放在两个地方; AppDomain 
+   Executor 增加GlobalOptions指针指向AppDomain的 GlobalOptions.
+* [X86Interpreter] 增加使用 ECX 保存 GlobalOptions ！
+  近过程调用速度提升
 
 * [Bug] tsrun.dpr memory leak found when type: tstrun -d
 
 2007-5-2 18:04
-~ ���� FreePascalҲ�� {$MINENUMSIZE 4} ������������Ĭ����4����delphiĬ��Ϊ1.
-  ������Ƶ���ö�����ͣ������Ǽ������ͣ���
-  �������� FPC ֧�����֣�< 32��Ԫ�ص��� һ��DWordʵ�֣�> 32��Ԫ�ص���8��Dwordʵ�֡�
-  ��Delphi���� <8 ����byte, <16��word, <32 ��dword.
-  Ϊ�˱��ּ����ԣ���ò�Ҫ��FPCʹ�ü������ͣ�
+~ 发现 FreePascal也有 {$MINENUMSIZE 4} 参数，不过它默认是4，而delphi默认为1.
+  这个控制的是枚举类型！！不是集合类型！！
+  集合类型 FPC 支持两种，< 32个元素的用 一个DWord实现，> 32个元素的用8个Dword实现。
+  而Delphi则是 <8 的用byte, <16用word, <32 用dword.
+  为了保持兼容性，最好不要在FPC使用集合类型！
 !* [Bug] [FPC]
    ParamList.DelimitedText := Trim(Copy(vOptionName, j, Length(vOptionName)-j));
-   �� {$Message 'dsfsdfaf GOOD!'}
-   ���������У����һ��Ϊ "!" ����һ������������� {$Message 'dsfsdfaf GOOD!!'}��û�����⣡��
+   当 {$Message 'dsfsdfaf GOOD!'}
+   被分作两行，最后一行为 "!" 多了一个！而如果这样 {$Message 'dsfsdfaf GOOD!!'}则没有问题！！
 
 
 2007-4-29 17:33
-* IsAddrResolved ������� �������ı����ڴ棡
+* IsAddrResolved 将其放入 数据区的保留内存！
    TTurboModuleFlag = (tfAddrResolved, tfInited);
-   TTurboModuleFlags = set of TTurboModuleFlag; //tsInt,��ð����е�set������32λ�� {$MINENUMSIZE 4} �ҵ��� freePascal {$PACKENUM 1} ,������Ҳ����ʹ�� {$MINENUMSIZE 4}��
-* TTurboAppDomain.iReset ���ж��Ƿ����ڱ���̬���Ӷ������Ƿ����� IsAddrResolved Ϊ�档
+   TTurboModuleFlags = set of TTurboModuleFlag; //tsInt,最好把所有的set都扩成32位。 {$MINENUMSIZE 4} 找到了 freePascal {$PACKENUM 1} ,哈，它也可以使用 {$MINENUMSIZE 4}。
+* TTurboAppDomain.iReset 中判定是否是在编译态，从而决定是否设置 IsAddrResolved 为真。
 
 2007-4-28 21:15
 * TCustomTurboModule
     + ResolveAddress method //convert the addr from related to absolute.(internal method)
     + UnResolveAddress method //convert the addr from absolute to related(internal method)
-���ƶ���AppDomain��ģ������Ƿ���Ҫ Resolve address Ӧ�ô����ж�?
-��Ҫ��ס���Ǽ��غ���û�� Resolve �ġ�
+将移动到AppDomain后，模块加载是否需要 Resolve address 应该从来判断?
+需要记住的是加载后是没有 Resolve 的。
 
 2007-4-24 8:40
-!* ׼���� TCustomTurboModule ����ȡ�� GlobalOptions ָ�롣GlobalOptions ���Է��������ط�; AppDomain or Executor.
+!* 准备从 TCustomTurboModule 类中取缔 GlobalOptions 指针。GlobalOptions 可以放在两个地方; AppDomain or Executor.
   * remove the Status property to AppDomain
     + ResolveAddress method //convert the addr from related to absolute.(internal method)
     + UnResolveAddress method //convert the addr from absolute to related(internal method)
     + property IsAddrResolved read FIsAddrResolved write SetIsAddrResolved;
 
 * rename TurboInterpreter.pas to TurboX86Interpreter.pas
-~  �����нṹ�����µĲ���ִ�ж��AppDomain��
-  1. �����߳�֮��AppDomain��ȫ�������� ���ع����� ���� AppDomain������ÿ�� AppDomain װ���ģ����ȫ��������Ӱ�졣
-  2. ���ڵ�ģ���ڴ�ӳ��Ľṹ�ǣ�ÿһ��ģ���������ж���һ������ GlobalOptions ��ָ�룺
-     1. ����ȥ����ָ�룬Ҳ���ǲ���������
-     2. ��ִ��Զ�̣��ⲿģ�飩����ǰ�����ж��Ƿ���ⲿģ������ִ�У��������������ִ�б�־Ϊ�� �� GlobalOptions ָ�롣
+~  再现有结构条件下的并发执行多个AppDomain：
+  1. 各个线程之间AppDomain完全独立，将 加载管理器 放入 AppDomain，这样每个 AppDomain 装入的模块完全独立互不影响。
+  2. 现在的模块内存映像的结构是，每一个模块数据区中都有一个保存 GlobalOptions 的指针：
+     1. 可以去掉该指针，也就是不放在这里
+     2. 在执行远程（外部模块）调用前，先判断是否该外部模块正在执行，如果空闲则设置执行标志为真 和 GlobalOptions 指针。
 
-�Ҿ�����õ�ѡ����Ǵ�ģ�����������ȡ�� GlobalOptions ָ�롣
+我觉得最好的选择就是从模块的数据区中取缔 GlobalOptions 指针。
 
 2007-4-23 9:42
 + CVS Tag: Build_1_0_0_0
 
 2007-4-22 14:22
-* [Bug] ִ�� Console.Write ��������IO���󣬷�������Ϊ����write���̵�ʱ����ԭ����ESP��ĳ��λ��ȡ���ݣ������µ�ESP�����ˣ��������ݴ��󣬲�����ǰ��ô������ָô����أ�
-  ��ʱ����취�ǻָ�Delphi�Ķ�ջ��������û����ҵ�Delphi�����ڶ�ջ�д���Щɶ��Ȼ�����編���ơ�
-  �����ҵ������Ĵ���ԭ���ˣ�ESPָ���ַ���ԣ�������8�ı�������������ȴ�ǵ��������ǻ���ָ�����ģ����RETָ�����������
-  �޸� AppDomain.iReset �Լ� ���� ParameterStackSize, �� ReturnStackSize���Ե�����ģ�
+* [Bug] 执行 Console.Write 语句出错，IO错误，发现是因为调用write过程的时候会从原来的ESP的某个位置取数据，俺用新的ESP代替了，所以数据错误，不过以前怎么不会出现该错误呢？
+  临时解决办法是恢复Delphi的堆栈，不过最好还是找到Delphi到底在堆栈中存了些啥，然后我如法炮制。
+  哈，找到真正的错误原因了，ESP指针地址不对，必须是8的倍数，但是现在却是单数，不是基于指针对其的，造成RET指令工作不正常。
+  修改 AppDomain.iReset 以及 设置 ParameterStackSize, 和 ReturnStackSize属性的那里的：
   with FGlobalOptions do
   begin
     Integer(_SP) := Integer(ParamStackBase) + ParamStackSize * SizeOf(tsInt);
     Integer(_RP) := Integer(ReturnStackBase) + ReturnStackSize * SizeOf(Pointer);
   end;
 
-* [Bug] Memory Leak, ������������ģ���ʱ����֣������� TCustomTurboModule.RequireModule������������⣺
+* [Bug] Memory Leak, 当加载其它的模块的时候出现！发现是 TCustomTurboModule.RequireModule函数里面的问题：
   //Result := GTurboModuleManager.Require(aModuleName, TTurboModuleClass(ClassType), GlobalOptions, True); 
-  �޸ĳ��˹̶�����һ��ģ���ࣺTCustomTurboModule
-  TTurboModuleClass(ClassType)�� ����������ģ����AppDomain������˳����ڴ�й¶��
-  һ���ģ��û�� GlobalOptions �����ģ�������������˸�ֵ�����Ƕ���AppDomain �������Լ��� GlobalOptions���������ж�ջ�ڴ潨������
+  修改成了固定建立一般模块类：TCustomTurboModule
+  TTurboModuleClass(ClassType)： 这样创建的模块是AppDomain！！因此出现内存泄露！
+  一般的模块没有 GlobalOptions 参数的，因此在里面做了赋值，但是对于AppDomain ，则有自己的 GlobalOptions并且里面有堆栈内存建立！！
 
 
 2007-4-20 20:25
-* [TFCC] compiler ����ͨ����
-!* ��Ҫ�޸� tsrun ʹ���µ� TurboAppDomain����������
-   ��Ϊ�µķ�ʽ�Ѿ��� memModule ��ִ�����ֿ��ˣ�ͨ��AppDomain�������ڴ�ģ���ִ������
+* [TFCC] compiler 编译通过。
+!* 需要修改 tsrun 使用新的 TurboAppDomain类来做！！
+   因为新的方式已经将 memModule 和执行器分开了，通过AppDomain来管理内存模块和执行器！
 
 
 2007-4-19 8:17
 !+ uTurboCompilerConsts.pas
-  �� uTurboConsts.pas �б������йصĳ����Ĵ��з��뿪��
-* �Ѿ������󲿷ֵĺ������ֶη��뵽�� TCocoRGrammar �У����� ProcessGrammarComment.
+  将 uTurboConsts.pas 中编译器有关的常量的从中分离开。
+* 已经将绝大部分的函数和字段放入到了 TCocoRGrammar 中，除了 ProcessGrammarComment.
 
 
 2007-4-14 11:40
-~ ���Ȼ��Ǽ򻯴���������Ҫ�� TCocoRGrammar ���õķ���ֱ�ӷ��� CocoBase.pas ���Ժ��ٶ���һ��Class.
-  ���᱾�汾�Ŀ������󣬲��������µĹ��ܣ�������һ��ֻ��Ϊ����β���������ĸ������ԵĿ����ˡ�
+~ 首先还是简化处理，将需要在 TCocoRGrammar 公用的方法直接放在 CocoBase.pas 中以后再独立一个Class.
+  冻结本版本的开发需求，不再增加新的功能，所有这一切只是为了收尾。方便后面的各种语言的开发了。
 
 
 2007-4-7
-~ ���뽫���๲�еķ�������CocoBase.pas �� TCocoRGrammar ���У�
-  ���߽����е��ֶΣ�����ȫ������һ�������ࣨ��Object���С�
-  ����һ���������޸� TCocoRGrammar �������࣬�����Ӱ������������:
+~ 必须将基类共有的方法放入CocoBase.pas 的 TCocoRGrammar 类中！
+  或者将共有的字段，方法全部放入一个辅助类（或Object）中。
+  还有一个方法，修改 TCocoRGrammar 的派生类，让它从俺想的类中派生:
     TCocoRGrammar = Class(TTurboBaseGrammar)
 * TCocoRGrammar Class [CocoBase.pas]
   + procedure PrintStr(S : String); //write string to compiler console or output.
   + procedure PrintStrLn(S : String);
 + [uTurboCompilerUtils.pas]
   + TTurboCompilerHelper = object
-      //�ռ�ÿһ������������Ҫ�Ĳ���������
+      //收集每一个编译器都需要的参数，方法
 
 2007-3-24 8:05
-~ ������ʵ����������
-    �������ࣺ�����еĹ������
-    ������ʵ����������ǵ�ǰ��������ʵ����ÿһ��������ʵ����һ����������������ʵ����
-  ���磺
-    ͬһʱ�䣬��˵����ɽ���촩���Ǻ��·�����˵����ɽ���촩���ǰ��·���
-    ��ʵ��Դ��  ˭���ף��Լ�����;������̸���������ص㣬ʱ��
-                �� talk to me
-    ����ʵ�Ŀ��Ŷ�(��ɽ���촩���Ǻ��·�)��=�׵Ŀ��Ŷ�(ƽ�����Ŷ�)
+~ 推理机实例驱动规则集
+    规则集是类：将所有的规则放入
+    推理机实例：保存的是当前推理的事实集，每一个推理机实例有一个独立的推理的事实集。
+  例如：
+    同一时间，甲说，张山今天穿的是红衣服；乙说，张山今天穿的是白衣服。
+    事实来源：  谁（甲，自己），途径（交谈，看），地点，时间
+                甲 talk to me
+    该事实的可信度(张山今天穿的是红衣服)：=甲的可信度(平均可信度)
 
 2007-3-3 21:24
-~ TTurboGlobalOptions ȫ�ֲ����ñ�������CPU���ڲ���Ҫ�Ĵ�������λ�á�
+~ TTurboGlobalOptions 全局参数好比是虚拟CPU的内部重要寄存器所在位置。
 
 2007-2-21 16:35
 + TTurboPreservedDataMemory.ModuleHandle: TCustomTurboModule
-  ��Ϊ RequireModule ���� YCustomTurboModule �ķ�����
+  因为 RequireModule 是在 YCustomTurboModule 的方法。
 
 6:27 2007-2-20
 + TTurboGlobalOptions.Executor
@@ -1347,7 +1347,7 @@ RegisterTypeFromStream();
   end;
 
 * TurboAppDomain.ExecutorClass set property to change the GlobalOptions.Executor
-~ Executor��Ҫһ��Memory(TurboModule)ָ�룬�����AppDomain����Ҫʵ�ֶ��̵߳Ļ����Ƚ��鷳��
+~ Executor需要一个Memory(TurboModule)指针，如果在AppDomain下需要实现多线程的话，比较麻烦。
 
 2007-2-18
   TTurboGlobalOptions = record  //do not use the packed.
@@ -1360,10 +1360,10 @@ RegisterTypeFromStream();
     ReturnStackSize: tsUInt; //bytes
     //if halt with errHalt then the ReturnStackBottom will be the Old RSP.
     ReturnStackBottom: Pointer;
-    PC: Pointer; //program counter: ��PCֻ�е����н���ǰ��TODO,��λ��ʱ�򣩺��˳���Żᱻ���á�ֻ����ʱ���档
-    SP: Pointer; //the Parameter Stack(or data stack) Pointer, ͬ�ϣ���ʱ����
-    RP: Pointer; //return stack pointer(TOS). ͬ�ϣ���ʱ����
-    //{:  �ŵ�ϵͳ��Ԫ���У� �ô�����ֲ�Ծ٣�ȱ�����ٶȱ����ɡ�
+    PC: Pointer; //program counter: 该PC只有当运行进入前（TODO,复位的时候）和退出后才会被设置。只是临时保存。
+    SP: Pointer; //the Parameter Stack(or data stack) Pointer, 同上，临时保存
+    RP: Pointer; //return stack pointer(TOS). 同上，临时保存
+    //{:  放到系统单元库中？ 好处是移植自举，缺点是速度变慢吧。
     ErrorAddr: Pointer;
     ErrorProc: Pointer;
     AssertErrorProc: Pointer;
@@ -1374,16 +1374,16 @@ RegisterTypeFromStream();
   end;
 
 2007-2-7
-!* ��SP,PC,Executor ��ָ���ƶ��� GlobalOptions. ��ִ�����泹�׽�ź��
-  ��Ҫ�� XPInterceptor������һ���Ĵ������� GlobalOptions�� ��ʵ���Խ���ǰִ�е�ģ���ַҲ�ŵ� GlobalOptions�������Ϳ��Բ������ӼĴ����ˡ�
+!* 将SP,PC,Executor 等指针移动到 GlobalOptions. 将执行引擎彻底解藕。
+  需要在 XPInterceptor中增加一个寄存器保存 GlobalOptions？ 其实可以将当前执行的模块基址也放到 GlobalOptions，这样就可以不必增加寄存器了。
 
 2007-2-5
-* TurboExecutor ������TurboModule������
-Ҫִ�У�����Ҫ�ڴ澵��ִ�е����ݾ����ڴ澵�� ���÷���ĺô��������߳�ִ�У�
-����ʹ��������ʽ��Executor����ͨ��cast����ʵ�֣�����ǰ���������಻�����µ��ֶΣ���
-�������ִ�����棬��ô�����ÿ��ִ��������Ϊsingleton������Ļ�����ô��α����߳�ִ�У�
-�������singleton�Ļ������Խ�ÿһ��ִ������ʵ������һ��AppDomain�ϵ�ִ�����档.
-  + OnReset �¼����Ա㵱����ģ�鵽�ڴ��ʱ��executor�л�������Լ���ָ�� DataMem.Executor := Self.
+* TurboExecutor 彻底于TurboModule分离了
+要执行，必须要内存镜像，执行的内容就是内存镜像。 不用分离的好处：利于线程执行？
+对于使用其它方式的Executor可以通过cast对象实现（不过前提是派生类不能有新的字段）。
+如果分离执行引擎，那么如果将每种执行引擎视为singleton单件类的话，那么如何保障线程执行？
+如果不是singleton的话，可以将每一个执行引擎实例视作一个AppDomain上的执行引擎。.
+  + OnReset 事件，以便当加载模块到内存的时候，executor有机会更新自己的指针 DataMem.Executor := Self.
 TTurboMemoryModule =
   CodeArea: Pointer;  //FMemory
   DataArea: Pointer;  //FDataMem
@@ -1393,24 +1393,24 @@ TTurboProgram = //one TurboProgram means one AppDomain
   GlobalOptions: TTurboGlobalOptions;
   Executor: TTurboExecutor;
 end;
-!? RequreModule ���������� MemoryModule �ķ������� Executor �ķ�����
-!+ ȷ�� Unload ������ʱ��û��ִ������ִ�У�
-!+ ���Ҫ������ʱ���޸Ĵ�����������������ô����ȷ��ͬһʱ��ֻ����һ��ִ���������޸ġ�
+!? RequreModule 到底是属于 MemoryModule 的方法还是 Executor 的方法？
+!+ 确保 Unload 发生的时候没有执行器在执行！
+!+ 如果要在运行时候修改代码区或数据区，那么必须确保同一时刻只能有一个执行器可以修改。
 
 2007-2-2
-~  ���뽫ִ������Ӵ����ڴ澵���з������
+~  我想将执行引擎从代码内存镜像中分离出来
 
 2007-2-1
-!���¹���˳�� ��ʱ��æʵ�������б�����ʽ(Variables...),����λ��Ԥ����
-  1. �� StaticClass
-  2. ���ⲿ���ô����з����������������
-   !+ LastWordRefEntry �ⲿ�ķ���
-   !+ LastVariableRefEntry �ⲿ�ı���
-   !+ LastTypeInfoRefEntry �ⲿ������
+!定下工作顺序： 暂时不忙实现数组列表的形式(Variables...),不过位置预留。
+  1. 拆开 StaticClass
+  2. 将外部引用从其中分离出来单独，链表
+   !+ LastWordRefEntry 外部的方法
+   !+ LastVariableRefEntry 外部的变量
+   !+ LastTypeInfoRefEntry 外部的类型
 
 2007-1-31
 * TTurboPreservedDataMemory 
-  * �����һЩ�ֶε�������˳��
+  * 里面的一些字段调整了下顺序
 
 2007-1-28
 * rename TCustomTurboModule.Parent to TCustomTurboModule.Owner
@@ -1419,39 +1419,39 @@ end;
 2007-1-26
 TurboBlock -> TurboStaticClass -> TurboModule
                               |-> TurboClass
-TurboBlock: Statement Block. ����ֻ�д��룡��������Ŀ���ǹ����ݿ��еĹ����ã��ù���Ҳ�ܵ�����������ݿ��С�
-Ҳ����˵ Aceesor �������������֧�� TurboBlock, TurboStaticClass , TurboModule �ļ��أ�
+TurboBlock: Statement Block. 里面只有代码！抽象该类的目的是供数据库中的过程用，让过程也能单独存放在数据库中。
+也就是说 Aceesor 加载引擎必须能支持 TurboBlock, TurboStaticClass , TurboModule 的加载！
 
 2007-1-24
-!* ��Module�б������(LoadFromStream, SaveToStream)�ŵ�Accessor�С����ã����Ƿ��ڸ��Ե����У���Ϊ����ʽ����
-!+ ֻ��Module�ϲŸ��� RefList������һ��������������ⲿ�Ļ��զŪ������û��Ū��
-�������������Ļ�������ͨ��Owner���ӡ�
+!* 将Module中保存机制(LoadFromStream, SaveToStream)放到Accessor中【不用，还是放在各自的类中，作为流格式】。
+!+ 只有Module上才该有 RefList，这样一来在上面的引用外部的汇编咋弄？好像没法弄了
+类如果单独保存的话？可以通过Owner连接。
 
 2007-1-19
-������Ϊ�������ѵ㣺
-  �౾���������ڴ棬ֻ��ģ�����
-  ģ������
-  ��Ӧ������ΪMetaInfo��
-�����MM�У�ʹ��Object������һ�������ࣨ������ʵ����Object�������������ļ���,Ȼ�����еĴӸ������������ǹؼ����õ���Class
-�������ߵ�һ���ȫ����Class, TObject ����û�������κ��ֶΣ�ֻ��VMT������ˡ�������1��DWORD����ָ��VMT���ˡ�
-���ǲ��ð죬���ǽ� TCustomTurboModule ����Ķ������������� TTurboModuleInfo(object) �С�
+将类作为基本，难点：
+  类本身不分配内存，只有模块才能
+  模块是类
+  类应该是作为MetaInfo类
+如何在MM中，使用Object，建立一个基本类（该类其实就是Object），不出现在文件中,然后所有的从该类派生，但是关键字用的是Class
+唉，或者第一版就全部用Class, TObject 基类没有增加任何字段，只是VMT表变大了。不过第1个DWORD总是指向VMT表了。
+还是不好办，还是将 TCustomTurboModule 里面的东西抽点出来放在 TTurboModuleInfo(object) 中。
 
 2007-1-9
-~ ����һ��idea ti attach the script to the exe:
+~ 又有一个idea ti attach the script to the exe:
   Ref/GDataOnFile.pas
-  ԭ���ǽ��ļ�������β����Ȼ���������ֽ�������һ����ʶ�ṹ�����磺
+  原理是将文件附加在尾部，然后在最后的字节上添加一个标识结构，比如：
   TTurboFileTailer = packed record
-    MagicId: array [0..3] of char; //��ʶ�� MeFT
-    HeaderOffset: Longword; //ƫ���������ļ���ǰλ�ÿ�ʼ�ģ�ָ�����ӵ��ļ���Host�ļ���λ�ã� PhyPosition= PositionOf(TurboFileTailer) - HeaderOffset;
+    MagicId: array [0..3] of char; //标识： MeFT
+    HeaderOffset: Longword; //偏移量，从文件当前位置开始的，指出附加的文件在Host文件的位置： PhyPosition= PositionOf(TurboFileTailer) - HeaderOffset;
   end;
 
 2007-1-5
 * the re-struct MetaInfo.Name from PShortString to PChar.
 
 2006-12-25
-~ ������Ҫʹ��List���ṹ��ţ���CLR���ƣ����������ṹ�����ڴ涯̬��������Խ����ṹ�ĵ�һ��Ԫ����Ϊ��̬�����������㡾��ʱ��æʵ�֡���
-  ��Ϊ����Ҫ����ʵ�֣����ֶΡ��������ද̬�󶨵����ݿ⡣
-~ ���������е�����ȫ�����ǿ����࣬��CLRһ�������� static ��ĸ��
+~ 决定主要使用List表结构存放，和CLR类似，放弃链表结构；在内存动态扩充类可以将表结构的第一个元素作为动态扩充的链接起点【暂时不忙实现】，
+  因为我主要是想实现，将字段、方法、类动态绑定到数据库。
+~ 决定将所有的数据全部都是看作类，和CLR一样，引入 static 类的概念：
   Module is static class
   Package(Assembly) is static class derived from Module.
 ~ P1.dpr
@@ -1471,32 +1471,32 @@ TurboBlock: Statement Block. ����ֻ�д��룡��������Ŀ���ǹ����ݿ��еĹ����ã��
   Debug+Optimal- IDE: 190
 
 2006-12-24
-~ CLRģ����ص��ڴ��������ι��������ַ�ռ�� ��2�ܡ�
-����һ������ĳ�����͵�ʱ�򣬸�����Meta��Ϣͨ�������๹����(.cctor)���ŷ����ڴ�ռ䡣
-~ ���ĳ��򼯣�����ͨModuleһ����ֻ�����������������ļ����ݱ������һ��Module�ļ�����������ͨmodule�ļ�����չ����һ���� Lib.
-  ����Ҫ�����򼯷ֳ��������򼯽���MOdule�����嵥���Լ������������������������ǻ���һ�����ˣ��ؼ�����Ҫ������MetaData�Ľṹ��
-  �������ַ�����Ų��õ���PChar��ʽ����Ҳ׼�����ã���Ϊ����255�Ų����������ơ�
-~ ����ͨ�õ����ݽṹ�������е�Meta��Ϣ��һ�¡���CLR��ʹ�õ���IMAGE_DATA_DIRECTORY�Ľṹװ�����е����ݵģ�
+~ CLR模块加载到内存后，它是如何管理代码地址空间的 【2周】
+当第一次引用某个类型的时候，根据其Meta信息通过调用类构筑器(.cctor)，才分配内存空间。
+~ 俺的程序集：与普通Module一样，只不过编译器将几个文件内容编译成了一个Module文件，但是与普通module文件的扩展名不一样： Lib.
+  还是要将程序集分出来，程序集将比MOdule多了清单，以及程序集自身的描述。腰部还是混在一起算了，关键还是要整理出MetaData的结构。
+  它的在字符串存放采用的是PChar形式，我也准备采用，因为可能255放不下类型名称。
+~ 构造通用的数据结构，让所有的Meta信息都一致。在CLR中使用的是IMAGE_DATA_DIRECTORY的结构装载所有的数据的，
 
 * Compiler Switch: 
   + LoadOnDemand directive
-    �Ƿ�Ԥ�ȼ��أ����õģ�ģ�飬���ǰ���Ҫ���أ������ű����õ�ģ��Ĺ��̵�ʱ���ȥ���أ�
+    是否预先加载（引用的）模块，还是按需要加载（仅当脚本调用到模块的过程的时候才去加载）
     Syntax    {$L+|-} or {$LoadOnDemand ON|OFF}
     Default:  {$LoadOnDemand OFF}
-    ע�⣺�򿪰�����صĺô�������ű�û��ִ�е�ĳ��ģ��Ĺ���ʱ�����ģ�鲻�����ڴ��У�������ģ���ļ����Բ����ڣ����ܽ�ʡ�ڴ棬����Ӱ����Ч�ʡ�
+    注意：打开按需加载的好处是如果脚本没有执行到某个模块的过程时不会该模块不会在内存中（甚至该模块文件可以不存在），能节省内存，但是影响了效率。
 
 
 2006-12-21
-!+ �������VM����ֱ��Ƕ��Exe����������ֱ��ִ�У���������ʽ��
-  1����ִ�����棨EE������DLL�У�ͨ������DLL�ĺ����� CorExeMain(const aExeFileName: string; const pCmdLine: PChar);
-  2��ִ������ֱ����Exe�У�
-  ����ʵ�֣���VM��ֱ�ӷ�����Դ����(.script). ��Ҫ��дһ��Exe stubʵ����������.��ʵ�ַ�ʽ2
+!+ 讲编译的VM代码直接嵌入Exe，这样可以直接执行，有两种形式：
+  1、讲执行引擎（EE）放入DLL中，通过调用DLL的函数： CorExeMain(const aExeFileName: string; const pCmdLine: PChar);
+  2、执行引擎直接在Exe中！
+  本次实现，将VM块直接放入资源节中(.script). 需要编写一个Exe stub实现上述功能.先实现方式2
   tsrun.exe
-    ������ͼװ����Դ�������Ӳ��У�û���ҵ����ϣ�UpdateResource����ֻ����win2000���ϵİ汾�ã�ֻ��װ���½ڣ���װ��
-    ��������Ҳ����У�����û���ļ�����
-    �ҵ�ֱ��������Դ�������ˣ��� XNResourceEditor\ResourceUtils\Source\�µģ� unitPEFile.pas��unitResourceDetails.pas
-    EurekaLog 5 ���������ļ��ϲ�����һ����ȡ����һЩ���ܣ��Ҹĳ��� uTurboPE.pas
-    const cScriptResType = 'SCRIPT'; //��Դ���Լ���Դ�����������д
+    首先试图装入资源（看样子不行，没有找到资料，UpdateResource函数只有在win2000以上的版本用，只有装入新节）中装入
+    不行则查找参数行，看有没有文件名。
+    找到直接添加资源的资料了，在 XNResourceEditor\ResourceUtils\Source\下的： unitPEFile.pas，unitResourceDetails.pas
+    EurekaLog 5 将这两个文件合并成了一个，取消了一些功能，我改成了 uTurboPE.pas
+    const cScriptResType = 'SCRIPT'; //资源名以及资源类型名必须大写
     WriteResourceInStream(vExeStream, 'MAIN', vData.Memory, vData.Size, cScriptResType);
     ReadResourceToStream('t.exe', scriptStream, 'MAIN', cScriptResType);
     
@@ -1504,173 +1504,173 @@ TurboBlock: Statement Block. ����ֻ�д��룡��������Ŀ���ǹ����ݿ��еĹ����ã��
 2006-12-18
 !+ uTurboPEImage.pas
  This unit contains various classes and support routines to read/write the contents of portable executable (PE) files. 
-�ҵ�Ŀ�ģ����ɱ�׼��PE�ļ��������׼��PE�ļ�������ʵ�ֽ�ģ�������Դ�Σ�����򵥣�Ȼ���дһ��DLL�� tsCoreEE.dll��Ȼ����׮�д�����ø�DLL���ִ�С�
+我的目的：生成标准的PE文件，读入标准的PE文件。首先实现将模块放入资源段，这最简单，然后编写一个DLL： tsCoreEE.dll，然后在桩中打入调用该DLL入口执行。
   TTurboPE = object
   protected
   public
   end;
 
 2006-12-17
-����ģ��׼����Ϊ��ģ���ģ��
-��ģ����Ǵ����嵥��ģ�顣
-Ȼ�����ʵ��Table
+俺的模块准备分为主模块和模块
+主模块就是带有清单的模块。
+然后就是实现Table
 
 2006-12-16
-~ Namespace ����AppDomain�Լ�ģ��Ĺ�ϵ
-���Namespaceֻ��һ�ֽṹ�Ļ�����ô��ζ��ÿһ���̶�������װ��ͬ����ϵͳ�ڿ㡣�˷ѣ�
-��Ŀǰ�ҵ�ģ���ʵ�ֲ�Ҳ����ˣ����׼��ʵ��ϵͳ��Ԫ��
+~ Namespace 语句和AppDomain以及模块的关系
+如果Namespace只是一种结构的话，那么意味着每一进程都将独立装入同样的系统内裤。浪费？
+现目前我的模块的实现不也是如此，如果准备实现系统单元。
 
-����ģ��׼����Ϊ��ģ���ģ��
-��ģ����Ǵ����嵥��ģ�顣
+俺的模块准备分为主模块和模块
+主模块就是带有清单的模块。
 
-tsrun test.tpc: ռ���ڴ�Working Set 2.052M
-.net hello ռ���ڴ�Working Set 4.752M
+tsrun test.tpc: 占用内存Working Set 2.052M
+.net hello 占用内存Working Set 4.752M
 
 2006-12-15
 ~ downlaod some perfect CLI e-books:
-  Addison.Wesley.The.Common.Language.Infrastructure.Annotated.Standard.eBook-DDU.chm ��ʵ���� Ecma ������֯�ø���
+  Addison.Wesley.The.Common.Language.Infrastructure.Annotated.Standard.eBook-DDU.chm 其实就是 Ecma 但是组织得更好
   Inside Microsoft .NET IL Assembler.CHM
   Applied.Microsoft.NET.Framework Programming.pdf
   Customizing the Microsoft dot NET Framework Common Language Runtime.chm
-~ �������͵�˼�����뵽�ַ������뵽���ã�Ϊɶ����Ҫ����Ӧ�ÿ������û��Լ�ѡ���Ƿ���Ҫ��
+~ 关于类型的思索，想到字符串，想到引用，为啥必须要引用应该可以让用户自己选择是否需要：
   Array = ComplexType
     
     BaseElementType: TypeInfo;
   end;
-  SimpleArray  = û�����ü����Ķ�̬���鶨��
-  SimpleString    = SimpleArray of Char; //û�����ü������ַ�������
+  SimpleArray  = 没有引用计数的动态数组定义
+  SimpleString    = SimpleArray of Char; //没有引用计数的字符串定义
 
 2006-12-14
-~ �Լ�����ƻ�
-    ����ڿ�CLI�ܹ�������CLI���������룬�Ͱ��ļܹ����ƣ����������ջ�������ģ�黯��֧�ְ������ģ�飬ģ����Բ��ڱ�������Ȼ����ģ�����Ȱ���ϸ�£��������˳���ģ�飨assembly����ģ�飬���������һ��ģ�顣���˼��Ĳ�֮ͬ�����ڣ�
-    CLI����������ִ�л���ֻ����JITter(��ʱ������)������û�п��ǽ�����ִ�С�
-    CLI��ǿ���ͻ��ģ����еı��������Ͷ�������Meta��Ϣ֧�֡�
-    CLI��VEE֧���������ջ���
-    �������VM����Ϊ��������
-    ���еĹ���ȫ�Ƿ�������δ����࣬��������ģ�飿��
-    �ƻ���
+~ 自己事务计划
+    最近在看CLI架构，发现CLI的许多设想，和俺的架构类似，都是面向堆栈虚拟机，模块化，支持按需加载模块，模块可以不在本机，当然它的模块分类比俺的细致，它区分了程序集模块（assembly）和模块，而我则就是一种模块。设计思想的不同之处在于：
+    CLI设想的虚拟机执行机构只能是JITter(即时编译器)，根本没有考虑解释器执行。
+    CLI是强类型化的，所有的变量和类型都必须有Meta信息支持。
+    CLI的VEE支持垃圾回收机制
+    将类放在VM中作为基本类型
+    所有的过程全是方法【如何处理类，类是特殊模块？】
+    计划：
     
-    �ص��������ģ��ܹ������ʽ�� ��1�ܡ�
-    ģ����ص��ڴ��������ι��������ַ�ռ�� ��2�ܡ�
-    ���¹���TurboScript��ģ��ܹ� ��2�ܡ�
-    ��������ַ�ռ������2�ܡ�
-    �ű����غ����е���Ե�ַȫ���ض�λ�ɾ��Ե�ַ������ AddressResolver AddressBinding��1�ܡ�
-    ���������ͣ����ʵ��
-    ��ֵָ���������֮��ֵת��
-    �����쳣��������������������������������ʵ������Delphi���쳣���������ơ�
-    ���Ͷ�������ĺ��ڰ󶨻���
+    重点分析它的模块架构，以资借鉴 【1周】
+    模块加载到内存后，它是如何管理代码地址空间的 【2周】
+    重新构造TurboScript的模块架构 【2周】
+    解决代码地址空间管理【2周】
+    脚本加载后将所有的相对地址全部重定位成绝对地址，构造 AddressResolver AddressBinding【1周】
+    分析类类型，如何实现
+    赋值指令和在类型之间值转换
+    错误异常处理机构【必须独立，方便更换，初期实现类似Delphi的异常错误处理机制】
+    类型对象变量的后期绑定机制
     
-    ������������һ��Ѱ���
+    唉，事情真是一大堆啊。
 
-~ ��λ����ƻ�
+~ 单位事务计划
 
 
-~ ģ�飬���򼯺�AppDomain��Application Domain��
-���򼯾���DLL��Exe������һ��RVA��������ڵ�ַ��
-ģ��(Module)��������ǰ�ĵ�Ԫ�����ڷָͬ��������ͣ��Լ���Դ(resource, ��Դ��¼�����ַ�����ͼ���Լ��������ݣ�����ֻ����Ҫ��ʱ��Żᱻ�����ڴ�)�����͵�Meta��ϢҲ��ģ���һ���֡�
+~ 模块，程序集和AppDomain（Application Domain）
+程序集就是DLL或Exe（多了一个RVA主程序入口地址）
+模块(Module)类似于以前的单元，用于分割不同的类和类型，以及资源(resource, 资源记录就是字符串，图象以及其它数据，他们只在需要的时候才会被调入内存)。类型的Meta信息也是模块的一部分。
 
-��Ȼģ���ְ������͵�Meta��Ϣ�����ͼ��ϵͳ�Ϳ������Ͼ�̬�Ͷ�̬��������IL���е�ʱ��ִ�л����ܵ�֪
-���б�������������Meta��Ϣ����Ȼ����ִ������ʱ�̵����ͼ�顪���ⱻ��֮Ϊ reflection(���ĺ���Ϊ�������������ͣ����͵�Ӱ��)��
+既然模块种包含类型的Meta信息，类型检查系统就可以联合静态和动态技术。当IL运行的时候，执行环境能得知
+所有变量参数的类型Meta信息，自然就能执行运行时刻的类型检查――这被称之为 reflection(它的含义为解释自描述类型，类型的影子)。
 
-���ģ���ļ����Ա����ӳ�һ������(assembly)���ڳ����϶���һ���嵥��manifest�������������ó����Լ�ģ����б���һ������ڣ����������Ͷ����б���˽��ģ���й��������ͣ�������嵥������һ��ģ���ϣ�
-�ڸ�ģ���ϵĹ��������Ͳ�������ڵ������Ͷ����б��ϣ�
+多个模块文件可以被链接成一个程序集(assembly)。在程序集上多了一个清单（manifest），用来描述该程序集以及模块的列表，一个主入口，导出的类型定义列表（私有模块中公开的类型）。这份清单被放在一个模块上，
+在该模块上的公开的类型不会出现在导出类型定义列表上！
 
-������CLI��������(deployment managed)�ĵ�λ�������ǿ����õ�������������������ܶ�̬�󶨵��ô��롣
-  * �����Ƕ�������������Ӽ����������±��롣
-  * �����Ƕ�������
-  * �����ܱ���������
-  * ���򼯵�����API�ܺ�������������Ľ�����
+程序集是CLI发布管理(deployment managed)的单位。程序集是可重用的软件组件。程序集甚至能动态绑定调用代码。
+  * 程序集是独立的软件组件子集，无须重新编译。
+  * 程序集是定制软件
+  * 程序集能被独立发布
+  * 程序集导出的API能和其它组件完美的交互。
 
-�������ļ�ϵͳ������PE(portable executable)��ʽ��š�
+程序集在文件系统中是用PE(portable executable)格式存放。
 
-һ�����򼯽������ص�һ��Application Domain(AppDomain)��ִ�У� �ⲿ���õ��������򼯽���ͬ��ͬһAppDomain�����С�
-���仰˵��AppDomain �����򼯾ۼ���һ��ʵ�����չ��ܡ�
-ÿһ��AppDomain������һ����CLIִ����������ĵ�ַ�ռ䡣���еĵ�ַ���ý�ȷ��ʵ��ͬһ��AppDomain�С�
-CLI��ַ�ռ����в�εģ�AppDomain �ܱ�������һ��CLI��ַ�ռ䡣
-CLI��ַ�ռ���Ա����Ե���Ϊ��OS�еĽ��̵�ַ�ռ䣨������Rotor CLI������������ÿһ����ַ�ռ䶼����ȷ�ĵ�ַ�߽硣
+一个程序集将被加载到一个Application Domain(AppDomain)中执行？ 外部引用的其它程序集将在同样同一AppDomain下运行。
+换句话说，AppDomain 将程序集聚集在一起，实现最终功能。
+每一个AppDomain定义了一个由CLI执行引擎管理的地址空间。所有的地址引用将确保实在同一个AppDomain中。
+CLI地址空间是有层次的：AppDomain 能被加载入一个CLI地址空间。
+CLI地址空间可以被概略的认为是OS中的进程地址空间（至少在Rotor CLI中是这样）。每一个地址空间都有明确的地址边界。
 
-ÿһ��CLI��ַ�ռ���԰������AppDomain�� ����һ��AppDomain����ϵͳ���򼯣���һ��AppDomain������������AppDomain�����ĳ��򼯡�
-ֻ��CLI������(the supervision of the CLI)���ܿ�ԽAppDomain�ĵ�ַ�ռ���ʽ��н�����AppDomain֮��Ľ���ͨѶ��ͨ��Զ��(Remoting)���ͼ�����
-��ɡ�ͬ���Ļ��Ʊ����ڿ�Խ��ַ�ռ䣬��ӿں�OS IPC.
+每一个CLI地址空间可以包含多个AppDomain： 其中一个AppDomain就是系统程序集，另一个AppDomain包含与其他与AppDomain共享的程序集。
+只有CLI管理器(the supervision of the CLI)才能跨越AppDomain的地址空间访问进行交互。AppDomain之间的交互通讯是通过远程(Remoting)类型检查机制
+完成。同样的机制被用于跨越地址空间，如接口和OS IPC.
 
-ģ�飬���򼯣�AppDomain�͵�ַ�ռ䣨address space���Ĺ�ϵ�ǣ�ģ���Ǳ�������������С�ĵ�Ԫ�ļ�����һ����n��ģ����ɳ��򼯣������ǽ��зַ���
-��С��Ԫ�ļ��������������һ��AppDomain��ִ�С����AppDomain���ڵ�����ַ�ռ���ִ�С�
+模块，程序集，AppDomain和地址空间（address space）的关系是，模块是编译器建立的最小的单元文件，由一个或n个模块组成程序集，程序集是进行分发的
+最小单元文件，程序集能组合在一个AppDomain下执行。多个AppDomain能在单个地址空间下执行。
 
-���ʡ�������������򼯹��̵ĵ��ã���ζ����Ҫ�����µ�VirtualExecutionEngine?,��ջ��Щȫ����Ҫ�µģ���
+【问】如果对其它程序集过程的调用，意味着需要开辟新的VirtualExecutionEngine?,堆栈这些全部都要新的？？
 
-ע��
-Common Language Infrastructure (CLI) ͨ�����Ի�����֯
+注：
+Common Language Infrastructure (CLI) 通用语言基础组织
 
 2006-12-11
 * TCustomTurboModule
   + FMaxMemorySixe
   + FMaxDataMemorySize
   -1 means the max size is equ used memory size when save the module stream 
-  ��ֻ�ǵ��ɱ�־�ã��ڱ����ʱ���ж����Ƿ�-1����Ǿͽ�Լ�ڴ档
+  我只是当成标志用，在保存的时候判断下是否-1如果是就节约内存。
 
 
 2006-12-7
-~ ��Ҫ��д��ֵ���
-!+ ģ���д��Ƕ��ģ��ָ� import XXX ��ָ�XXXģ��ϲ������У�
-  + ImportModules: string; ���������кϲ�������ģ�����ƣ��ö��ŷָ�.  ,XXX1,XXX2,XXX3,
-    Ȼ���޸Ĳ���ģ��ķ�����
-  + ���ֳ����ʱ���õĵ�Ԫ�������﷨���Ŷ��ᱻ���롿��������ʱ���õĵ�Ԫ��ֻ�й�����ʹ�õĲŻᱻ���롿��
-~ �ҵ��û���������ڹҽ�����ȫ�ֲ����ϣ�����ô���ʣ�
+~ 需要编写赋值语句
+!+ 模块编写，嵌入模块指令， import XXX 该指令将XXX模块合并到其中！
+  + ImportModules: string; 包括了所有合并进来的模块名称，用逗号分隔.  ,XXX1,XXX2,XXX3,
+    然后修改查找模块的方法。
+  + 划分出设计时间用的单元【所有语法符号都会被编译】，和运行时间用的单元【只有公开的使用的才会被编译】。
+~ 我的用户错误处理入口挂接是在全局参数上，该怎么访问？
 
 2006-12-6
-+ ������дAssert��������
-  ���Ա�д��ϣ�����������ʾ������Ϣ��������Ϊ�ٵ�ʱ��Ӧ�ø�Ϊ����Ϊ�ٵ�ʱ����ʾ��Ϣ������ִֹ�С�
-  �Ѿ�������������Ϊ�ٴ���������ʱ�����errAssertionFailed��Ȼ����ִֹ�С�
-  ���쳣������ɺ󣬾͸��Ǵ��� EAssertionFailed exception �ˡ�
-* TurboForthCompiler ���̵���֧�������ĸ�ʽ Assert(False, 'helo'); �����Զ�ת��������ѹ������������á�������һ����ջ�����ڶ����Ǵ�ջ�����������ơ�
-  ����ͨ��
-~ ���쿪ʼŪ�쳣���ơ�
++ 继续编写Assert错误处理。
+  断言编写完毕，不过俺是显示断言信息，当断言为假的时候。应该改为断言为假的时候显示信息，并终止执行。
+  已经改正！当断言为假触发，运行时间错误errAssertionFailed，然后终止执行。
+  当异常机制完成后，就该是触发 EAssertionFailed exception 了。
+* TurboForthCompiler 过程调用支持这样的格式 Assert(False, 'helo'); 编译自动转换，首先压入参数，最后调用。参数第一个是栈顶，第二个是次栈顶，依此类推。
+  测试通过
+~ 明天开始弄异常机制。
  
 2006-12-5
-+ TFCC ��FPC�±���ͨ����������Ҫ���ģ��ҷ���FPC�ļ��������ƺ����õ�Int32������Byte!!
-~ [FPC] 2.0.4 �л�����ʹ�� [EAX+TRec.F] ����ʽ�������� [EAX].TRec.F! ���ߵĽ����һ�£� FPC �� Self ָ������ESI��
++ TFCC 在FPC下编译通过，不过需要更改，我发现FPC的集合类型似乎是用的Int32而不是Byte!!
+~ [FPC] 2.0.4 中汇编最好使用 [EAX+TRec.F] 的形式而不是用 [EAX].TRec.F! 两者的结果不一致！ FPC 的 Self 指针是用ESI！
 
 2006-12-4
-~ ���ˣ�֤ʵCLR�Ĺ��̵��õĲ��������ߵ�������ջ��
-  ���ɣ�C#�Զ��ж��˲���ջ���ߴ磬���� .MaxStack �Ĵ�С��
+~ 查了，证实CLR的过程调用的参数传递走的是数据栈。
+  怀疑，C#自动判断了参数栈最大尺寸，建立 .MaxStack 的大小。
 
 2006-12-3
-+ TurboForthCompiler ���̵���֧�������ĸ�ʽ Assert(False, 'helo'); ��һ����ջ�����ڶ������ַ������������ơ�Ȼ��������Զ�ת��Ϊ��
++ TurboForthCompiler 过程调用支持这样的格式 Assert(False, 'helo'); 第一个是栈顶，第二个是字符串，依此类推。然后编译器自动转换为：
   push 'Hello'
   push False
   Call Assert
-~ ���ʹ�þ��Ե�ַ���ֲ����Ļ�ַ�ı�ķ������Ǿ���������ʱ�̶̹�סMaxCodeSize�����ݵı仯��Χ���ܳ���MaxCodeSize��
+~ 如何使用绝对地址而又不担心基址改变的方法：那就是在运行时刻固定住MaxCodeSize，内容的变化范围不能超过MaxCodeSize！
 
 2006-12-2
-~ �쳣���ƣ�����Delphi���쳣����
-~ �Ƿ�ÿ���Ƕ�뵥Ԫ�ˣ���������ϵͳ��Ԫ���ܳ�����
-  ������ģ�飺һ�������нű�����ֻ��һ��������ģ�飬������ģ�齫�Զ�Ƕ�� System ��Ԫ��
-  ����������������.
-* TTurboGlobalOptions: �Ժ���Щ��������ϵͳ��Ԫ�ġ�
+~ 异常机制，分析Delphi的异常机制
+~ 是否该考虑嵌入单元了，这样俺的系统单元才能出来。
+  主程序模块：一个可运行脚本有且只有一个主程序模块，主程序模块将自动嵌入 System 单元。
+  初期灭有这样复杂.
+* TTurboGlobalOptions: 以后这些参数放入系统单元的。
   + ErrorAddr: Pointer;
   + ErrorProc: Pointer;
   + AssertErrorProc: Pointer;
   + IOResult: tsInt; //The built-in I/O routines use InOutRes(ult) to store the value that the next call to the IOResult standard function will return. 
-+ Compiler Switch: û���ӣ�COCO PRAGMAS���ܴ���ע���У�����ʱ��������Ϊ��ѡ�����ͷ����
++ Compiler Switch: 没法子，COCO PRAGMAS不能存在注释中，我暂时将参数作为可选项放在头部。
   + Assert directives
     Syntax	{$C+} or {$C-}
             {$ASSERTIONS ON} or {$ASSERTIONS OFF}
     Default	{$C+}
             {$ASSERTIONS ON}
     Scope	  Local
-    ��Delphi���ƣ�����رգ��򲻻����Assert���̡�
-    Ҫ��ʹ�ö��ԣ�����ʹ�ò����������������룬���ӹ��̲�����Ȼ���룬����: �����Assert(False, 'helo'); �Զ�����ɣ�
+    和Delphi类似，如果关闭，则不会编译Assert过程。
+    要想使用断言，必须使用参数，可以这样编译，增加过程参数，然后翻译，比如: 将语句Assert(False, 'helo'); 自动翻译成：
       Push False; Push 'Helo'; CALL Assert
   + MESSAGE directive
     Syntax    {$MESSAGE  HINT|WARN|SYNTAX|SYMANTIC 'text string' }
     Examples: {$MESSAGE 'Boo!'}                   emits a hint 
   + MaxCodeSize directive
     Syntax    {$MaxCodeSize  Size[KB|MB] }
-    ע�⣺�������Program|Unit֮��
+    注意：必须放在Program|Unit之后
   + MaxDataSize directive
     Syntax    {$MaxDataSize  Size[KB|MB] }
 
-�������ҵ��˿���ͨ��InternalGrammarComment �¼�����ע�ͣ�
+哈，我找到了可以通过InternalGrammarComment 事件拦截注释：
   InternalGrammarComment := ProcessGrammarComment;
 procedure T-->Grammar<--.ProcessGrammarComment(Sender : TObject; CommentList : TCommentList);
 var
@@ -1681,191 +1681,191 @@ begin
   //Process Compiler Options here
   SetCompilerOption...
 end;
-�㶨,����ָ����Ե���д�ˣ�֧�����¼��ָ�ʽ��
+搞定,这下指令可以到处写了！支持如下几种格式：
   {$CompierDirective[+|-] param1, param2, ...., paramN}
   {$CompierDirective [ON|OFF] param1, param2, ...., paramN}
 
 
 2006-12-1
-������ɽ�atg����ļ򵥵���ֲ���﷨���������鷳��������Ҫ�ģ����˻�������ĥ�쳣���ƣ���ʱ��æ��д�﷨�����ȸ�����Щ��˵����������������
-�������� 
-  ForthCompiler �����﷨��
-    ProgramSymbol.Compile; ����
-      ���ȱ��������̣���ʵ����ForthCompiler�����﷨����ʱ���Ѿ������ˡ�
-      Ȼ���ǹ��̣����� Published �Ĺ��̲�����û�����ö��������ڴ档
-      Ȼ���������ͳ�����
-      ������������Ϣ��
-      ����ڽ����ַ��λ ResolveRefs��
-~ ���������ˣ������Word�Ĺ�����ָ��ֱ�ӱ����ڴ棬��ô����ĵ�ַ���þ���һ�����⣡���뽫ָ��ҲתΪ���Ź�����
-  ����һ���취���ǽ����������Wordֱ��ѹ�����ڴ�����������ַ��Ȼ�Ͷ������ˣ�Ȼ������������Ż�������
-  ���⽨��һ���ڴ������ڴ�����
-  �����ģ����ھͲ�����ô�࣬ȫ��ֱ��ѹ�룡�Ժ�������ĥ����﷨����
+今天完成将atg里面的简单的移植到语法树【遇到麻烦，反正都要改，算了还是先折磨异常机制，暂时不忙慌写语法树，等更成熟些再说，俺看了书再来】
+编译流程 
+  ForthCompiler 建立语法树
+    ProgramSymbol.Compile; 编译
+      首先编译主过程：事实上在ForthCompiler建立语法树的时候已经编译了。
+      然后是过程：对于 Published 的过程不管有没有引用都将编入内存。
+      然后编译变量和常量：
+      最后编译类型信息：
+      最后在解决地址空位 ResolveRefs。
+~ 碰到问题了，如果将Word的过程体指令直接编入内存，那么里面的地址引用就是一个问题！必须将指令也转为符号管理。
+  还有一个办法就是将定义的所有Word直接压入主内存区，这样地址自然就都存在了，然后如果定义了优化参数，
+  另外建立一个内存区，在处理！
+  管它的，现在就不管这么多，全部直接压入！以后再来折磨这个语法树。
 
 2006-11-30
 ~TODO: 
-  ��atg����ļ򵥵���ֲ���﷨��
-  ������ȡ�ʵ��ķ�������
-  ʵ��Delphi���Ƶ��쳣����
-  ʵ���ַ�������
-  ʵ���ֶΣ����������ڰ󶨡����̣����������ڰ�
+  将atg里面的简单的移植到语法树
+  整理提取适当的方法名称
+  实现Delphi类似的异常机制
+  实现字符串处理
+  实现字段（变量）后期绑定、过程（方法）后期绑定
     GetBindingField PString, GetBindingMethod PString
-    Ȼ����ָ����л�Ҫ����ģ�����ͣ������Ƿ�����ģ������ǰ׺���ֶ���ǰ
-  ��˼���࣬��ν������Ǵ�������ݿ��е��ࡾ���������֪ʶ��
+    然后在指令处理中还要根据模块类型，决定是否添加模块名称前缀在字段名前
+  构思宏类，所谓宏类就是存放于数据库中的类【抽象出来的知识】
 
-~ �����ʶ��
-  ���Է�Ϊ��ʶ��������룬�ͱ�ʶ�������ñ��롣
-  ���������ַ��������⣬û�б��壡
-  �����ı�����Ǳ����������ڵ�ַ�ռ䣬���ñ������ǽ������ݵ�ַ����������ڴ档
-  ���̵ı�����ǹ��̵Ĵ��룬���ñ�����ǽ����̵���ڵ�ַ���뵽ָ�����ڴ档
-  ���뱾��ķ�����
-    CompileTo() ����ʶ��������루���ӵ�����ָ����ģ�顣
-    ReferenceTo(aMem: Pointer): ����ʶ�����ñ��루���ӵ�����ָ���ĵ�ַ��ע������뱣֤���㹻�Ŀռ����ɸõ�ַ��
+~ 编译标识符
+  可以分为标识符本体编译，和标识符的引用编译。
+  常量除开字符串常量外，没有本体！
+  变量的本体就是变量数据所在地址空间，引用编译则是将该数据地址编入代码区内存。
+  过程的本体就是过程的代码，引用编译就是将过程的入口地址编译到指定的内存。
+  编译本体的方法：
+    CompileTo() 将标识符本体编译（添加到）到指定的模块。
+    ReferenceTo(aMem: Pointer): 将标识符引用编译（添加到）到指定的地址，注意你必须保证有足够的空间容纳该地址。
 
 2006-11-27
-* [BUG] FastMM4 �����µ�11-09��4.74�汾�����һ���ڴ�й©��û�У�
-* TurboForthExpr.atg �����޸�ʹ���﷨����
+* [BUG] FastMM4 俺更新到11-09号4.74版本，最后一个内存泄漏就没有！
+* TurboForthExpr.atg 初步修改使用语法树。
 + TTurboPreservedDataMemory.ModuleOptions: TTurboScriptOptions;
 + TTurboScriptOptions.soTypeSafety
-  ��ģ�������������ʱ�򣬱�������ǿ�ư����б�ʶ���ĵ�������Ϣ(RTTI)�����ڴ档
-~ ��Ҫ����һ���﷨������ע���ñ�ʶ����Ҫ����RTTI��Ϣ��ע�����ģ����soTypeSafety��
-  ��ô������û�и��﷨������ǿ�Ʊ���RTTI��Ϣ���ͽ� Typed ��.
+  当模块有这个参数的时候，编译器将强制把所有标识符的的类型信息(RTTI)编入内存。
+~ 需要增加一个语法，用来注明该标识符需要编入RTTI信息。注：如果模块有soTypeSafety，
+  那么不管有没有该语法，都将强制编入RTTI信息。就叫 Typed 吧.
   : [Public] [Typed] Word1;
   Var [Public] [Typed] Variable1;
-~ ����Ҳ���ҪSimpleType����ô����Σ���ҪTypeInfo. �����һ���Ҫ����������ȫ��������С�
-  ���� System ��Ԫ��������Delphi�������а����뷽ʽ���ߴ���С������ͨ���뷽ʽ��
-  Use System, XX; //��DLL���÷�ʽ ����Ƕ��
-  Imports System, XX; //��Ƕ�뷽ʽ������System ��ԪĬ����Ƕ�뷽ʽ��������ȷָ����
+~ 如果我不需要SimpleType，那么该如何？需要TypeInfo. 这样我还需要将基本类型全部联入才行。
+  打造 System 单元？考虑象Delphi那样，有包编译方式【尺寸最小】和普通编译方式。
+  Use System, XX; //是DLL调用方式 不会嵌入
+  Imports System, XX; //是嵌入方式。对于System 单元默认是嵌入方式，除非明确指定。
   ProgramSymbol -> ModuleSymbol
 
-~ �������͵�Size���й̶���С�����ͣ���Int32�ȣ��зǹ̶���С�����ͣ����С�
-���ڷǹ̶���С�����ͣ���Ҫ����ʵ������ȷ������ʵ�Ĵ�С��
-  SizeOfVar(Var), SizeOfType.��ô��ȡ�����ԣ���TypeInfo�����ӷ�����
+~ 关于类型的Size，有固定大小的类型，如Int32等，有非固定大小的类型：序列。
+对于非固定大小的类型，需要变量实例才能确定其真实的大小。
+  SizeOfVar(Var), SizeOfType.怎么提取公用性？在TypeInfo中添加方法：
   function Size(aVariable: Pointer): tsUInt;
-  ���Ҫ�����û��Զ����������Ҳ����ˣ���ô�ͱ���ʹ���鷽�����������ô���Ҿ��ò��ǣ��ҿ���ר�Ŷ�һ���û��Զ������͵��࣬Ȼ��
-  �ڸ���������һ����̬Size������
+  如果要想在用户自定义的类型中也能如此，那么就必须使用虚方法，这是真的么？我觉得不是，我可以专门定一个用户自定义类型的类，然后
+  在该类中添加一个静态Size方法。
 
 2006-11-26
-* CALLFAR ָ��ֱ��ָ�� TurboModuleInfo, ������ModuleEntry.
-* ���������ʹ������������ͨ��������Code��ֻ�д��룡
-~ ģ�顢�ࡢ��ʵ�� ������
-  ģ�����ֱ��ʹ�ã��಻�ܡ���ʵ����ÿһ�����ݶ����½��ġ����Դ���������и��ơ���������������
-  �Ƿ�����ʵ�������ݴӶ����½��������Ǵ�DataMemory�и��ƣ���������һ���������˸��Ӷȡ�����̿డ�����Ǽ򵥵�ɣ���DataMemory����ΪMetaDataҲ�������ֶ����ݡ���
-  ���к͹��̵����𣿹��̵� Parent ��ģ����ࡣ����û��ֻ�д�������û��������������˵�ǹ��ø��׵����������Meta���ݣ�
-    Ҳ����˵�����̲��ܶ�����ģ�������ڡ�
-  ģ���������ǣ�����ģ�顾����ģ�����һ�����̡�mtFunction�� ���� mtModule�� ��ģ�顾����ģ�����һ���ࡿmtClass�� ģ����ʵ��������ģ�����һ��ʵ����mtObject
-  mtFunction: �� mtProgram ���ƣ�����MUST HAVE Parent. ��ͨ��LastWordEntry�������ϵġ�
-              �ţ���LastModuleEntry��Ҳ�У�����Ӧ������LastModuleEntry�м��أ�Ȼ�����úø�����Ϣ���������Free��������Free��
-              ���Ĺ������CFA�͹���InitProc�ϣ�FinalProcû���á�
+* CALLFAR 指令直接指向 TurboModuleInfo, 而不是ModuleEntry.
+* 将数据区和代码独立，测试通过，现在Code区只有代码！
+~ 模块、类、类实例 的区别
+  模块可以直接使用，类不能。类实例的每一个数据都是新建的【可以从类的数据中复制】，共享代码区。
+  是否考虑类实例的数据从堆中新建，而不是从DataMemory中复制，不过这样一来又增加了复杂度【俺编程苦啊，还是简单点吧，将DataMemory既作为MetaData也包括类字段数据】？
+  还有和过程的区别？过程的 Parent 是模块或类。过程没有只有代码区，没有数据区（或者说是公用父亲的数据区存放Meta数据）
+    也就是说，过程不能独立于模块或类存在。
+  模块类别可以是：过程模块【整个模块就是一个过程】mtFunction； 容器 mtModule； 类模块【整个模块就是一个类】mtClass； 模块类实例【整个模块就是一个实例】mtObject
+  mtFunction: 和 mtProgram 类似，但是MUST HAVE Parent. 是通过LastWordEntry链表挂上的。
+              嗯，在LastModuleEntry中也有，所以应该是在LastModuleEntry中加载，然后设置好父亲信息，如果父亲Free则必须跟着Free。
+              它的过程入口CFA就挂在InitProc上，FinalProc没有用。
   mtModule:
-* [Bug] TCustomTurboModule.NotifyModuleFree() ��Parent�ͷź󣬶���û�и��ű��ͷš�
+* [Bug] TCustomTurboModule.NotifyModuleFree() 当Parent释放后，儿子没有跟着被释放。
   
 * [Bug] Memory Leask: 
-  TCustomTurboModule.FModuleUnloadNotifies �����ͷ�
-  [uTurboAccessor] FTurboModuleMgr �����ͷ�
-  [uTurboAccessor] TTurboModuleAccessorList �����Accessor �����ͷš�
-~ �ȹ�����򵥵��﷨����
-  ����Word����ΰ��ջ�����ͷ�۰����漰���������У�
-  ��������ռ��������壬�漰�����������̵�ַ�Ķ�λ���⡣�������õ�ģ�顢������ַ
-  �ɴ�һ��������Ϊһ��Module��
-   Ȼ������ù��̱��õ��ٸ��ơ�
-   ��ô���ñ�����������ν����
-   �����﷨���е���ֻ��Ҫ���������,������������ģ��ġ��������CustomTurboModule�����֣�
-   �����ڻ����û�й��̵ľֲ����������Կ��Բ��ܡ�
+  TCustomTurboModule.FModuleUnloadNotifies 忘记释放
+  [uTurboAccessor] FTurboModuleMgr 忘记释放
+  [uTurboAccessor] TTurboModuleAccessorList 里面的Accessor 忘记释放。
+~ 先构建最简单的语法树：
+  对于Word该如何把握还真是头疼啊。涉及到的问题有：
+  如果单独空间编译过程体，涉及到的其它过程地址的定位问题。还有引用的模块、变量地址
+  干脆一个过程作为一个Module：
+   然后如果该过程被用到再复制。
+   那么引用变量的问题如何解决？
+   对于语法树中的我只需要分配代码区,而数据区则公用模块的。该如何在CustomTurboModule中体现？
+   由于在汇编中没有过程的局部变量，所以可以不管。
    TTurboWordSymbol= 
-     Parent: ModuleSymbol; ����yӵ������Module
+     Parent: ModuleSymbol; 就是y拥有它的Module
      Word: TCustomTurboModule;
    TTurboModuleSymbol=
      Module: TCustomTurboModule;
 
 2006-11-25
-* �������ʹ��������Ҫ�븴�ô��뻹����Ҫ��
-    �����ڴ����������������ĵ�ַ����Ӧ�����������б���������ĵ�ַ��
-    ��Ȼ������һ���ٶȱ�Ȼ�ή�͡������ٶȲ��ή�ͣ���������õ�������ר�ŵļĴ�������IP����
-    �����еĲ�������������������ô��������û��ͷ�ṹ�ˣ�ȫ�����Ǵ��룡�����ڴ������п��ٿռ���Ϊ���ٱ���������Ϊ�������Ǹ��õģ�
-    ֻ�����������п��ٿռ���Ϊ���ٱ�������
-- TTurboPreservedCodeMemory ����ȫ���ƶ��� TTurboPreservedDataMemory��
+* 数据区和代码独立，要想复用代码还必须要：
+    不能在代码区保存数据区的地址，而应该在数据区中保存代码区的地址！
+    当然，这样一来速度必然会降低【错误，速度不会降低，这个很少用到，我由专门的寄存器负责IP】。
+    把所有的参数都放入数据区，那么代码区就没有头结构了，全部都是代码！不能在代码区中开辟空间作为快速变量区，因为代码区是复用的！
+    只能在数据区中开辟空间作为快速变量区。
+- TTurboPreservedCodeMemory 参数全部移动到 TTurboPreservedDataMemory。
 
-~ �淶���� TTurboVisibility :
-  fvHidden: ֻ���ɱ�ģ����ã������ã��ù��̲��ᱻ���ӵ�LastWordEntry�У�û��Name��Ϣ��
-  fvPrivate: ֻ���ɱ�ģ����ã������ã��ù��̻ᱻ���ӵ�LastWordEntry�У�һ��û��Name��Ϣ��
-  fvProtected: ֻ���ɱ�ģ���Լ��Ӹ�ģ�����ģ����ã�Զ���ã��ù��̻ᱻ���ӵ�LastWordEntry�У�һ��û��Name��Ϣ��
-  fvPublic: ����ģ����ɵ��ã�Զ���ã��ù��̻ᱻ���ӵ�LastWordEntry�У�һ��û��Name��Ϣ��
-  fvPublished: ����ģ����ɵ��ã�Զ���ã��ù��̻ᱻ���ӵ�LastWordEntry�У���Name��Ϣ��
-~ ���ģ��������ӹ���
-  Word(����):
-    fvProtected..fvPublished ��ȫ���ᱻ���룻 
-    fvHidden..fvPrivate,û�����õģ����ᱻ���롣
-  ������������ ֻ��ʹ�õ��ĲŻᱻ������ģ�顣
+~ 规范汇编的 TTurboVisibility :
+  fvHidden: 只能由本模块调用，近调用，该过程不会被连接到LastWordEntry中！没有Name信息。
+  fvPrivate: 只能由本模块调用，近调用，该过程会被连接到LastWordEntry中！一般没有Name信息。
+  fvProtected: 只能由本模块以及从该模块的子模块调用，远调用，该过程会被连接到LastWordEntry中！一般没有Name信息。
+  fvPublic: 任意模块均可调用，远调用，该过程会被连接到LastWordEntry中！一般没有Name信息。
+  fvPublished: 任意模块均可调用，远调用，该过程会被连接到LastWordEntry中！有Name信息。
+~ 汇编模块编译链接规则：
+  Word(过程):
+    fvProtected..fvPublished 的全部会被编译； 
+    fvHidden..fvPrivate,没有引用的，不会被编译。
+  常量，变量： 只有使用到的才会被编译入模块。
 
-!+ ����Ҫ��дһ����򵥵��ܲ�������Ƭ�εı�������
-  �ܱ��볣����������֪���̡�
+!+ 俺需要编写一个最简单的能产生代码片段的编译器。
+  能编译常量变量和已知过程。
   TTurboWordSymbol.Compile(const Src: string);
 
   TTurboModelSymbol(TTurboWordSymbol.Parent)
 
-�﷨���㶨�󣬾͸�Ū���ݿ����
+语法树搞定后，就该弄数据库对象。
 
 2006-11-24
-~ ���������ʹ�������ĺô���
-  1�������ⲿ����ֻ��Ҫ���������������ô��������ɣ�
+~ 将数据区和代码独立的好处：
+  1、建立外部对象，只需要复制数据区，公用代码区即可！
   
-  ���ڷ�ɢ�����ݿ��еĶ���ķ�����ֻҪ����������鵽���࣬���������ˡ�
-  ��ʱ��˼����������������Ȼ���������﷨����˵��
+  对于分散在数据库中的对象的方法，只要从子类逐个查到父类，就是重载了。
+  暂时不思考对象，首先整理，然后建立基本语法树在说。
 
 2006-11-21
-~ ���� JIT ��ʹ�������ǿ��еģ������ڴ���ͷ�������������ɡ�
-!* �����е�TXXXRntry �޸ĳ����µĽṹ��
+~ 关于 JIT 即使编译器是可行的，保留内存区头部和数据区即可。
+!* 将所有的TXXXRntry 修改成如下的结构：
   TTurboWordEntry = record
     prior: PTurboWordEntry;
     Value: TTurboWordInfo;
   end;
-!* �� DataMemory ����ΪMetaData,��ʾר���������Meta���ݣ����˶�ǲ��İɣ��ַ�����Щ��������ġ�
- ����������ôȡ�أ���
-!* ��������Щ�Ƶ� DataMemory�С�
+!* 将 DataMemory 改名为MetaData,表示专门用来存放Meta数据？算了额还是不改吧，字符串这些都在里面的。
+ 但是名称怎么取呢？？
+!* 将以下这些移到 DataMemory中。
    TTurboPreservedDataMemory = packed record
     InitializeProc: Pointer; //it is the offset address of the FMemory
-    FinalizeProc: Pointer; //�����ģ��Ļ�
+    FinalizeProc: Pointer; //如果是模块的话
     //last Used(import) module entry.
     LastModuleEntry: PTurboModuleEntry;
-    //�����ֵĺ���������ָ�����һ��������ڡ�
+    //有名字的函数链表，指向最后一个函数入口。
     LastWordEntry: PTurboWordEntry;
-    //�����ֵı�������
+    //有名字的变量链表
     LastVariableEntry: PTurboVariableEntry;
-    //RTTI TypeInfo ����
+    //RTTI TypeInfo 链表
     LastTypeInfoEntry: PTurboTypeInfoEntry;
     //reserved: array [SizeOf() ] of byte; 
    end;
-~ ����VMT�����鷽���������������ӵ���ʽ�������õı�����ʽ��������ʽ���ٶȿ죬�����޷���̬�����µ��鷽������
-  ����ע���ˣ����������뵽DynamicMethod��������Ҫ��̬���ӵķ����������ö�̬��������Delphi���ƣ��ٺ������ͽ����
-  �ٶȺͶ�̬���ӵ����⡣
+~ 关于VMT表，虚方法表，到第用连接的形式，还是用的表的形式，表的形式，速度快，但是无法动态添加新的虚方法～～
+  我有注意了，哈哈，我想到DynamicMethod，凡是需要动态添加的方法，就是用动态方法，和Delphi类似，嘿嘿这样就解决了
+  速度和动态添加的问题。
 
 
 2006-11-15
-~ ʹ���������������ڿ���������ʱ�̿��ٵ������µĹ��̵�ģ������ؾ������������б��룬���������������ٶȡ�
-  ����ʣ�µ�������Ǳ���ʱ�̵�Meta��Ϣ������ʱ�̵�Meta��Ϣ�Ĳ��ص㲻һ������δ�����
+~ 使用链表的意义在于可以在运行时刻快速的添加新的过程到模块而不必惊动编译器进行编译，这样极大的提高了速度。
+  现在剩下的问题就是编译时刻的Meta信息和运行时刻的Meta信息的侧重点不一样，如何处理？
   TTurboMetaInfo = object //for typecast the memory.
   TTurboSymbol = class //for compiler
-    FMetaInfo: PTurboMetaInfo; //ͨ�����ӵ���ʽ
+    FMetaInfo: PTurboMetaInfo; //通过连接的形式
   end;
 
-���������Լ�Ϊʲô��Type�������￨ס��ԭ�򣬻�����Delphi������ʹ�ã������Լ��ű�������ʹ����������Ŀ�ģ�
-!+ ������Type�йص�ָ���TurboMetaInfo��ΪDelphiд�ı�����ⲿ��Delphi��ʹ�á�
-   Ȼ���𲽹��ɵ�ʹ�ýű���д���������ٺ١�
+终于明白自己为什么在Type定义这里卡住了原因，混淆了Delphi编译中使用，和让自己脚本本身能使用类型两个目的！
+!+ 定义于Type有关的指令，将TurboMetaInfo作为Delphi写的编译或供外部【Delphi】使用。
+   然后逐步过渡到使用脚本来写编译器。嘿嘿。
    VarType (var-addr -- varTypeAddr)
-   ������Ϊɶ��Ҫ��дTypeMetainfo������Ϊ�������Ҫ�������﷨������Ҫ��������~~~�ݲ���ָ��ʵ�֣�
+   现在我为啥需要编写TypeMetainfo，是因为编译的需要，建立语法树的需要！！所以~~~暂不管指令实现！
 
 
-~ ʹ���ⲿ�����������ñ���������ʱ�󶨵�: var [external] myvar��
+~ 使用外部变量来表述该变量是运行时绑定的: var [external] myvar。
 
-!+ uTurboMetaInfo.pas  [��XXXEntry ��������ݷ��뵽����Ԫ]
+!+ uTurboMetaInfo.pas  [将XXXEntry 里面的数据分离到本单元]
   the turboScript basic metadata for type, constants etc.
-������ַ���ȫ��ʹ��ƫ����ָ��PShortString!
-�Ƿ�����virtual ������Ҳ����ʹ�ö�̬���������Ļ������뱣����һ���ֶ�ָ��VMT, ���ұ�����װ���Ըõ�ַ�ض�λ��������þ�û��VMT����
-�Ȳ��ܣ�����ȥ������Ҫ������
-  //��������������ͣ����е��û���չ���ͣ�ȫ������������Ļ������������ģ���
+里面的字符串全部使用偏移量指向PShortString!
+是否启动virtual 方法，也就是使用动态对象，这样的话，必须保留第一个字段指向VMT, 而且必须在装入后对该地址重定位。如果不用就没有VMT表！
+先不管，做下去，看需要而定！
+  //定义最基本的类型，所有的用户扩展类型，全部都是由下面的基本类型派生的！！
   TTurboTypeKind = ();
   TTurboMetaInfoRec = record
-    VMT: Pointer; //ʹ�ö�̬����
+    VMT: Pointer; //使用动态方法
     TypeKind:  TTurboTypeKind;
     Name: PShortString;
   end;
@@ -1878,18 +1878,18 @@ end;
 
 2006-11-13
 !+ uTurboSymbols
-  TTurboMetaData: in fact the symbols are the metaData. ����Ҿ��û�������Ϊ TurboSymbol �ɡ�
+  TTurboMetaData: in fact the symbols are the metaData. 最后我觉得还是命名为 TurboSymbol 吧。
   TTurboType = Class: the abstract turboScript base type.
   TTurboConstant = 
   TTurboVaraible = Class(TTurboConstant)
   
 !+ uTurboTypes
-~ ���¹滮�������ڴ棺
-  �ڴ���䣺
-    ��������Ϊ�����֣�ǰ�沿��Ϊϵͳ������������ģ�������ע��ϵͳ����������ú�Ͳ��ܸı䣡�������±��롣
-    ����������Ϊ��MetaData����������������������Ϣ��ģ��������ֶΡ����ַ���������
-  �ļ����У�
-    MetaData�ֶ� �������MetaData�����е�ƫ������GlobalOptions ΪMetaData��С��Executor Ϊ�����������е�ƫ������
+~ 重新规划保留区内存：
+  内存分配：
+    代码区分为两部分，前面部分为系统数据区，保存模块参数。注意系统数据区编译好后就不能改变！除非重新编译。
+    更改数据区为：MetaData数据区，用来保存类型信息，模块变量【字段】，字符串常量。
+  文件流中：
+    MetaData字段 保存的是MetaData在流中的偏移量。GlobalOptions 为MetaData大小。Executor 为代码区在流中的偏移量。
   TPreservedCodeMemory = packed record
     MetaData: Pointer; //point to the data memory.
     GlobalOptions: PTurboGlobalOptions;
@@ -1897,21 +1897,21 @@ end;
     //##abondoned:this Module unique Index in this program, allocated by compiler.
     //##ModuleIndex: Integer;
     ModuleType: TTurboModuleType;
-    UsedMemory: tsInt; //ʵ��ʹ�õĴ�С
-    MemorySize: tsInt; //����������Ĵ�С
+    UsedMemory: tsInt; //实际使用的大小
+    MemorySize: tsInt; //分配代码区的大小
   end;
   
-  //ģ�� MetaData ������ǰ���ڴ����
+  //模块 MetaData 数据区前端内存分配
   TTurboMetaData = record
     InitializeProcEntry: PTurboProcEntry; //it is the offset address of the FMemory
-    FinalizeProcEntry: PTurboProcEntry; //�����ڴ���unload֮ǰ������������ڵĻ���
+    FinalizeProcEntry: PTurboProcEntry; //当从内存中unload之前被调用如果存在的话。
     //last Used(import) module entry.
     LastModuleEntry: PTurboModuleEntry;
-    //�����ֵĺ���������ָ�����һ��������ڡ�
+    //有名字的函数链表，指向最后一个函数入口。
     LastWordEntry: PTurboWordEntry;
-    //�����ֵı�������
+    //有名字的变量链表
     LastVariableEntry: PTurboVariableEntry;
-    //RTTI TypeInfo ����
+    //RTTI TypeInfo 链表
     LastTypeInfoEntry: PTurboTypeInfoEntry;
   
   end;
@@ -1926,7 +1926,7 @@ end;
     TypeInfo: PTurboType;
   end;
 
-//������
+//废弃：
 PackageInfoTable: see system.pas:
   PackageInfo = ^PackageInfoTable;
   PackageInfoTable = packed record
@@ -1943,13 +1943,13 @@ PackageInfoTable: see system.pas:
 
 
 2006-11-12
-!+ ������������������ͣ�
-  ����;��˵�� Type, Contant, Variable, Statement
-  ��Type��˵�� Integer, Float, String, Array, Record  //, Sequence(����)
-  ���������Щ�������MetaType���Ҳ���������ʱ�̶����µ���������.
-  ����ֻ��һ�ֳ��ԣ��ݻ���˼��
+!+ 定义最基础的数据类型：
+  按用途来说： Type, Contant, Variable, Statement
+  按Type来说： Integer, Float, String, Array, Record  //, Sequence(序列)
+  分析清楚这些最基本的MetaType，我才能在运行时刻定义新的数据类型.
+  【这只是一种尝试，暂缓构思】
   TypeDef
-    Sequence = Type //Ҳ��������͸÷����������
+    Sequence = Type //也许这个类型该放入基本类型
     Grammar:
       '[' Element {, Element} ']'.
 
@@ -1962,7 +1962,7 @@ PackageInfoTable: see system.pas:
     Grammar:
       'IF' BoolVar:Identity 'THEN' DoThenStatementBlock:StatementBlock  'ELSE' DoElseStatementBlock:StatementBlock
     end;
-  ���Ͷ���:
+  类型定义:
     Integer(Ordinal): Int8(1byte), Int16(2Byte), Int32(4Byte), Int64(8Byte); 
              UInt8(unsigned 8-bit integer), UInt16, UInt32, UInt64, 
              Boolean, Char(1Byte), WideChar(2Byte)
@@ -1970,31 +1970,31 @@ PackageInfoTable: see system.pas:
   Float: float32(Single), float64(Double).
   String:
   
-!+ ��˼�﷨��(=���� TypeInfo):
-  �﷨�ṹ���ǵ������ͣ������������﷨�ṹ�е�һ�֣�
-~ �Ķ��� CLR��չPE�ṹ���� �󣬷�������ȫ���Բο� metadata�е�#~����heap����ʵ���ҵ���������
-  �����������е������ַ�����������һ�����У�Ч�ʣ���Ȼ�����е�ʱ��϶��Ǹöѵ�ƫ������
+!+ 构思语法树(=就是 TypeInfo):
+  语法结构不是等于类型，而是类型是语法结构中的一种！
+~ 阅读了 CLR扩展PE结构分析 后，发觉我完全可以参考 metadata中的#~流【heap】来实现我的类型流！
+  不过它把所有的名称字符串单独放入一个堆中，效率？当然在流中的时候肯定是该堆的偏移量。
 
 2006-11-11
 * TTurboVMInstruction prefix from in to op
-~ �Ƿ����еĿ���ָ�ʹ��ƫ�Ƶ�ַ��CLR����ȫ����ƫ������
-  ��ʱ���ܰɣ�
-!+ TTurboAddressRelocator�� �������뵽�ˣ����Խ��ض�λ���ܷŵ� TPreservedCodeMemory ���棬�Ǻ����������
-   ��������ַ�ض�λ��
-     �����ء�Call ��ַ
-     �����ء�������ַ
-   ��������ַ�ض�λ��
-     Ϊ���ܹ�������ʱ�̶�̬���������ͺͷ������̣����Խ����͡����������Ƚṹ�����������������ҵ���Ҫ���Ŀ���Ǳ���ʱ�̵��ٶ�
-     �����Ǹ���Ҫ������ʱ�����ӹ��̿϶���΢��Щ��
-     ��2006-11-12�������������£���ʵ���Բ�����������ʽ�����ڱ���ʱ�̶�������͹��̿������������ʽ�ڴ�����ǰ��ȷ������������������ʵ�����ɲ����������Ͷ����������������ɡ�
-                   Ȼ������ʱ�����ӵ����͹��̣�������С�
-                   ����Ȼ������һ����Data����û�б�Ҫ�����ˣ���Ϊģ�����Ҳ������������������ʽ�̶��ڴ�������������ʱ�̵��±�����ֻ�ڶ��С�
+~ 是否所有的控制指令都使用偏移地址？CLR就是全部用偏移量！
+  暂时不管吧！
+!+ TTurboAddressRelocator： 哈，我想到了，可以将重定位功能放到 TPreservedCodeMemory 上面，呵呵我真聪明。
+   代码区地址重定位：
+     【本地】Call 地址
+     【本地】变量地址
+   数据区地址重定位：
+     为了能够在运行时刻动态添加新类型和方法过程，所以将类型、过程链表等结构放在数据区。另外我的主要设计目的是编译时刻的速度
+     所以那个需要在运行时候添加过程肯定稍微慢些。
+     【2006-11-12】今天又想了下，其实可以不用链表的形式，对于编译时刻定义的类型过程可以用数组的形式在代码区前面确定下来，这样代码区实际上由参数区，类型定义区，代码区构成。
+                   然后，运行时刻添加的类型过程，放入堆中。
+                   很显然，这样一来，Data区就没有必要存在了，因为模块变量也可以用这样的数组形式固定在代码区。而运行时刻的新变量则只在堆中。
         
 
 2006-11-8
-* ���������������
-  * ���µ����ļ��ṹ
-    �����������ڴ��������棬��������ƫ���� �� SizeOf(StreamHeader) + UsedMemory + 1��
+* 分离代码区数据区
+  * 重新调整文件结构
+    将数据区放在代码区后面，数据区的偏移量 ＝ SizeOf(StreamHeader) + UsedMemory + 1。
   + TCustomTurboModule.DataMemory
   + TPreservedCodeMemory.Data
   * TCustomTurboModule
@@ -2006,130 +2006,130 @@ PackageInfoTable: see system.pas:
     + AllocDataSpace, GrowData, AddXXXToData
   * TX86Interpreter
     CallFar, EmitString, EmitLString, FetchXXX, StoreXXX
-!* ��������VMָ�
-!+ ����ʱ�̽�ָ���еı�����Ե�ַ��Ϊ���Ե�ַ
+!* 重新整理VM指令集
+!+ 运行时刻将指令中的变量相对地址变为绝对地址
    + GetTurboInstructionLength(aOp: TTurboInstruction): Byte;
    + TTurboAddressRelocator
      + TranslateYoRelated
      + TranslateYoAbsoluted
 
 2006-11-7
-~ ��x86ASM��TEST :  AND imm8 with AL; set SF, ZF, PF according to result
-* [Bug] ForthCompiler: ���ڶ���Ϊ>= Protected �ĵ��ʣ���Ҫʹ��Զ���ã�
-* [Bug] ForthCompiler: LastModuleEntry ���������ˡ�
-* [Bug] �����㷨�д��������ʱ�����޷��������ݣ�
-* [TurboModule]  ���ھ����� CPU States �Ƶ�ȫ�ֲ����У�
-~ TurboScript �ӹ���ģ��֮���VM DLLԶ����Ч��
-  : Add external 'test'; //�ú�������һ�ļ��С�
-  �������ʱ�䣺1082 <�����ʹ��Cache����ÿ�ζ�Ҫ���ң�2676>
-  ʹ�õ��ǰ�����ؼ�����Ҳ���ǽ����ú��������õ�ʱ��ż��أ�Ȼ�����Cache����������ĵ��þ����ڴ��д�����
-* [TurboModule] ����soLoadOnDemand�������ܣ������Ƿ�ʹ�ܰ�����أ���װ���ʱ���жϣ����û��ʹ�ܰ�����أ��������ʱ��DLLװ�롣
-  Ҫ����ģ����Ҳ������������أ���
+~ 【x86ASM】TEST :  AND imm8 with AL; set SF, ZF, PF according to result
+* [Bug] ForthCompiler: 对于定义为>= Protected 的单词，需要使用远调用！
+* [Bug] ForthCompiler: LastModuleEntry 忘记连接了。
+* [Bug] 对齐算法有错误，造成有时变量无法存入数据！
+* [TurboModule]  终于决定将 CPU States 移到全局参数中！
+~ TurboScript 子过程模块之间的VM DLL远调用效率
+  : Add external 'test'; //该函数在另一文件中。
+  结果运行时间：1082 <如果不使用Cache功能每次都要查找：2676>
+  使用的是按需加载技术，也就是仅当该函数被调用的时候才加载，然后加上Cache技术，后面的调用就在内存中处理。
+* [TurboModule] 加上soLoadOnDemand参数功能，控制是否使能按需加载，在装入的时候判断，如果没有使能按需加载，就在这个时候将DLL装入。
+  要不在模块上也加入这个参数呢？？
 ~ TODO:
-  * ���������������
-  * ���ӵ�ַ�ض�λ���������ڷǱ���״̬ʱ����ַΪ���Ե�ַ���������������е�����ָ�룩�������л�������״̬��ʱ���ַΪ��Ե�ַ��
-    * �޸� X86Interpreter, ��Ӧ�µľ��Ե�ַ�������ٶ��ֽ�������
-  * TypeInfo: ����������ͣ����Ͷ���
-  * �������ڰ󶨣�Word���ڰ�
-  * ��д���������������﷨�����ɴ��룬���������ڵ�ֱ�����ɡ�
-    * �ƶ�Word�������ͣ�������ʵ�ֶԹ��̲������﷨��飩
-  * DLL Զ���ã� Host Զ����
-  * �ƶ���ĵײ�淶
-  * �ƶ��쳣��������
-  * �ƶ��߼����Թ淶
-  С����
-    * ���Ƶ�Ԫ��ʼ����ֹ������
-    * ���ӱ��뿪�أ�(Max)MemSize; (Max)ParamStackSize, (Max)ReturnStackSize, (Max)DataSize
-      �и�����������ļ���Ҳ�ж��壬��������������Ϊ׼���������ļ������������ļ���
+  * 分离代码区数据区
+  * 增加地址重定位器，当处于非编译状态时，地址为绝对地址（包括代码数据中的所有指针）。而当切换到编译状态的时候地址为相对地址。
+    * 修改 X86Interpreter, 适应新的绝对地址，这样速度又将提升。
+  * TypeInfo: 抽象基本类型，类型定义
+  * 变量后期绑定，Word后期绑定
+  * 改写汇编编译器，采用语法树生成代码，而不是现在的直接生成。
+    * 制定Word参数类型（这样能实现对过程参数的语法检查）
+  * DLL 远调用， Host 远调用
+  * 制定类的底层规范
+  * 制定异常处理机制
+  * 制定高级语言规范
+  小任务：
+    * 完善单元初始和终止过程链
+    * 增加编译开关：(Max)MemSize; (Max)ParamStackSize, (Max)ReturnStackSize, (Max)DataSize
+      有个问题如果在文件里也有定义，到底是以命令行为准，还是以文件，我想是以文件！
 
 2006-11-6
-!* [Bug] !Tick �������⣬ֵû���ܱ����ȥ��
-* [VM] Forth DLL ���ó�������ͨ����
-* [Bug] ʹ��Unit��ʱ�� ȫ�ֲ��� ���� ��Ҫ���ã���
-* [Bug] ForthCompiler ����Published �Ķ���ĵ���Ӧ������ExitFar!
-  Ϊ�����øò���������ֻ����Executor�������󣡣�
+!* [Bug] !Tick 出现问题，值没有能保存进去！
+* [VM] Forth DLL 调用初步测试通过！
+* [Bug] 使用Unit的时候 全局参数 忘记 需要设置！！
+* [Bug] ForthCompiler 对于Published 的定义的单词应该是用ExitFar!
+  为了设置该参数，还是只有让Executor创建对象！！
 ~ ModuleFileAccessor
-  ���Ҫ����֧������Module���ƣ� Module1.SubModule1.SubModule2����ô����Ҫ��
-    BasePath: ����ָ����Ŀ�Ŀ�Ļ���RootĿ¼��ͬʱ��Ҫ���ӱ��뿪��: "-Base:"�������ڱ��뵥Ԫ��ʱ��ָ���õ�Ԫ��BaseĿ¼��
-    SysPath: ����ָ��TurboScriptϵͳ��RootĿ¼
-  ����˳��Ϊ����BasePath,����SysPath. ����BasePath�Ϳ�������SysPath�е����ݡ�
-  Ϊ�˲��ԣ��Ȳ�����Щ��ֻʵ��flat Modules.
-~ ע��ModuleEntry�еĵ�Ԫȫ��������ʵ����Ҫ���õĵ�Ԫ��������Щֱ��Ƕ��ĵ�Ԫ������ʱ�����ǲ������ڵġ�
-  ��������ʵ�ĵ�Ԫ��������DLL����Module.Parant������û���ô��ģ�����Ŀ����Ϊֱ��Ƕ����ṩ����Ƕ�뵽�����
-  ��Ȼ����Ǿ�����ν�ˣ�������Accessor ���𴴽�Module��
-~ [��˼����] ��FastPrint�ؼ���������ܹ��༭¼��Ľ������ϵͳ��
+  如果要考虑支持树型Module名称： Module1.SubModule1.SubModule2，那么必须要有
+    BasePath: 用于指明项目的库的基本Root目录，同时需要增加编译开关: "-Base:"，用来在编译单元的时候指明该单元的Base目录。
+    SysPath: 用于指明TurboScript系统的Root目录
+  搜索顺序为先找BasePath,再找SysPath. 这样BasePath就可以重载SysPath中的内容。
+  为了测试，先不管这些，只实现flat Modules.
+~ 注意ModuleEntry中的单元全部都是真实的需要引用的单元，对于那些直接嵌入的单元在运行时刻中是并不存在的。
+  而对于真实的单元（类似于DLL），Module.Parant属性是没有用处的（它的目的是为直接嵌入的提供到底嵌入到哪里）。
+  既然如此那就无所谓了，还是让Accessor 负责创建Module。
+~ [奇思妙想] 将FastPrint控件包改造成能够编辑录入的界面设计系统。
 
 2006-11-5
-* ModuleAccessor ��Ҫ��֪������һ��Executor Class,Ҫ���Ұ���������ӻ�ȥ��
-  * RequireModule ����һ������:
+* ModuleAccessor 需要得知是用哪一种Executor Class,要不我把这个责任扔回去？
+  * RequireModule 增加一个参数:
    + aModuleClass: TTurboModuleClass
-   �����ƺ����а�������ֻ��������һ����TurboModule���𴴽�������Create�Ĳ����޷����ã�����
+   这样似乎不行啊，还是只能让上面一级（TurboModule负责创建，否则Create的参数无法设置！！）
 * [ForthCompiler]
   + display error infomations on the console.
   + the switch options: -ge : generate the deatil error list file (*.lst)
 
 2006-11-4 
-~ ���ں��ڰ󶨣��ڲ�ʵ�ֵĳ��������Ƿ���һ��aBindingHandle��Ȼ�������handle.  FindVarBinding('aVarName'�� aBindingHandle�� pValue); 
-   SetVarBinding(aBindingHandle) //�������޸ġ�
-   ���������黹���Բο�CLR��ʵ�֣�������ҵ��Ļ���
-~ �쳣�����ñ�����ʽ��������Ƕ�׶�ջ����ʽ������쳣�������̣��������ĺô��ǣ�ִ�е�ʱ�����ڶ�ջ��ѹ�봦�����̣��ӿ�ִ���ٶȣ�ȱ���Ǵ�������ʱ�򣬲���ٶ�����
-  + ȫ�ֲ����м��� ExceptionProcessor: ָ���ģ����쳣�������ĵĵ�ַ���õ�ַΪ"System"��Ԫ�Ĺ���ƫ�Ƶ�ַ,Ҳ���õ�ַΪ���Ե�ַ��������Ԫ�ڳ�ʼ����ʱ�����ø�Ϊ�׵�������
-  + TurboWrodEntry�м��� ExceptionProcessBlock �ֶ�ָ������������ʱ�����ת������ȥ���иô����쳣����������Ƕ���쳣��ΰ죿��Ƕ���쳣ȫ��д��ÿ��У���ע�����ص���ֹ��ַ���ɡ�
-    try.finally �� try..except����ͬ�����ǲ����쳣��
-    try.finally ִ�����finally ��������������쳣,����finally���������˳����̣�
-    try..except ִ�����except ���������û��raise���ᴥ���쳣��������������ִ�У�
-  ��ע�⣺����õ��ʲ���WordEntry����ô���޷������쳣������
-~ ����Զ���ã���ֻʵ��  Forth, stdcall, pascal ���֣�stdcall, pascal���ڲ���ȫ���ڶ�ջ���Ը�������Ҫ֪�������ĸ�����ֻ��Ҫ֪�����޷���ֵ�Լ�����ֵ�Ĵ�С��
-~ ���ڿ����ԣ��������򣬰��� published, public, ... ��˳���������� published �ܱ������ҵ���
-~ ������������̴�ģ���з����������ݿ��У��ƺ�������ɢ���������������쳣������ʵ�֡��Ҿ��ÿ��Խ�ģ�������ԭ�Ӷ��������磺ĳ��������ж�����ĳģ������ж�����ĳ����������ԭ�Ӷ����������д�š�
-  ���Ǳ���ֿ���ţ�ԭ�����£�
-  1����������ʱ�̶Ըù��̶�̬���ӹ��̣��������Ĳ��������޸ġ�
-~ �Ƿ���Ҫ��CLRһ�����������������������ڴ�����ֻ����ʱ��������ͨ�� Ldc.1 ..ldc.5 ��ָ��ֱ�ӷ��ʡ�
-  ��ȷ�б�Ҫ�����ɣ�������ȫ�Ǵ���֮�󣬱��ڵ�ַ�ض�λ������ַȫ����ɾ��Ե�ַ�����ܾ�������ߣ������ǽ��͡���Ȼ�������������ܵ�����ʧ��
-  �����������ģ�鶼��Сģ�飬����Ҳ̸������ʧ���ٵ����⡣
-~ �ڶ����ⲿword��ʱ��������ָ�word��module���ͣ���
+~ 关于后期绑定，内部实现的初步设想是返回一个aBindingHandle，然后操作该handle.  FindVarBinding('aVarName'， aBindingHandle， pValue); 
+   SetVarBinding(aBindingHandle) //变量被修改。
+   不过，建议还可以参考CLR的实现，如果能找到的话。
+~ 异常：采用表的形式，而不是嵌套堆栈的形式来存放异常处理过程，这样做的好处是：执行的时候不用在堆栈中压入处理过程，加快执行速度，缺点是错误发生的时候，查表速度慢。
+  + 全局参数中加上 ExceptionProcessor: 指向该模块的异常处理中心的地址【该地址为"System"单元的过程偏移地址,也许该地址为绝对地址由主程序单元在初始化的时候设置更为妥当？】。
+  + TurboWrodEntry中加上 ExceptionProcessBlock 字段指明当错误发生的时候该跳转到哪里去进行该处的异常处理？但是嵌套异常如何办？？嵌套异常全部写入该块中，并注明拦截的终止地址即可。
+    try.finally 和 try..except的异同：都是捕获异常。
+    try.finally 执行完成finally 的语句照样触发异常,跳过finally后面的语句退出过程；
+    try..except 执行完成except 的语句后，如果没有raise不会触发异常，后面的语句照样执行；
+  【注意：如果该单词不在WordEntry上那么就无法进行异常处理】
+~ 关于远调用，先只实现  Forth, stdcall, pascal 三种，stdcall, pascal由于参数全部在堆栈所以根本无需要知道参数的个数，只需要知道有无返回值以及返回值的大小。
+~ 关于可视性，将其排序，按照 published, public, ... 的顺序排列这样 published 能被最先找到！
+~ 发现如果将过程从模块中分离存放在数据库中，似乎过于零散，这样不便于我异常处理的实现。我觉得可以将模块设想成原子动作表（如：某对象的所有动作，某模块的所有动作，某动作的所有原子动作），集中存放。
+  还是必须分开存放，原因如下：
+  1、便于运行时刻对该过程动态添加过程（动作）的参数，和修改。
+~ 是否需要象CLR一样，将数据区独立出来？在代码区只有临时数据区，通过 Ldc.1 ..ldc.5 等指令直接访问。
+  的确有必要，理由：代码区全是代码之后，便于地址重定位。将地址全部变成绝对地址后，性能绝对是提高，而不是降低。当然在启动性能上受到了损失。
+  不过我这里的模块都是小模块，所以也谈不上损失多少的问题。
+~ 在定义外部word的时候如何区分该word的module类型？？
   : Public Word external ["moduleName" [Lib|DLL|Host]] [stdcall|pascal|forth] [name "procname"] [index 1];
 !* ModuleEntry.
   + Revision:
   + BuildDate TitmeStamp
-  �������ڱ����ʱ��ʹ�õ�Ԫ�Ĺ��̵�ƫ����ֱ�ӱ����˴����У����Ա����жϵ�Ԫ�İ汾�����ڣ������õ�Ԫ���ı����Զ����±��룬ȡ�����µ�ƫ������
-!+ [ForthCompiler] ��Ҫ����ʹ�� RequireModule(),Ȼ��ȡ�ù��̵�ƫ������
-  + ��Ҫ��� TurboFileAccessor.
-~ �����ⲿ���õ�ʵ�֣�������������
-  1������ CallExternal PTurboWordEntry ָ�� ���������ⲿ�����������ڸ�ָ���н���
-  1���ڱ���ʱ�̷ֱ������ͬ���ⲿ�������ͣ�Ȼ�������Ӧ����ָ�
+  由于我在编译的时候将使用单元的过程的偏移量直接编入了代码中，所以必须判断单元的版本和日期，这样该单元被改变后会自动重新编译，取得最新的偏移量。
+!+ [ForthCompiler] 需要加上使用 RequireModule(),然后取得过程的偏移量。
+  + 需要完成 TurboFileAccessor.
+~ 关于外部调用的实现，我有两个方案
+  1、建立 CallExternal PTurboWordEntry 指令 这样具体外部函数的类型在该指令中解析
+  1、在编译时刻分别解析不同的外部函数类型，然后产生对应调用指令。
 
 2006-11-3
-* [BUG] [ForthCompiler] ��Ϊ����Objectʹ����string������ȴû�г�ʼ��object�ڴ棬�ڶԸ�ֵ��string��ֵ�ĳ������ش��󣡣���ΪShortstring���ɡ�
-* [BUG] [ForthCompiler] Int64, Integer ����ı�������AlignMem.
+* [BUG] [ForthCompiler] 因为我在Object使用了string，但是却没有初始化object内存，在对赋值该string赋值的出现严重错误！！改为Shortstring即可。
+* [BUG] [ForthCompiler] Int64, Integer 这类的变量必须AlignMem.
 * [VM] reanme TTurboWordEntry packed record to TTurboWordBlock object!
 + [VM] !TICK:: store tickcount to variable address directly. (int64Addr -- )
 + [VM] StoreInt(!), StoreInt64(!i8), StoreByte(!i1), StoreWord(!i2)
 + [VM] FetchInt(@), FetchInt64(@i8), FetchByte(@i1), FetchWord(@i2)
-* [VM] �޸�ָ���Ϊ Byte ������ Int32�����������ڴ���ֻ��256���ֽڣ�������ָ��ֻ��255������Ŀǰʹ���˴��100�������Ҫ���� CLR
-  ������޶���
+* [VM] 修改指令长度为 Byte 而不是 Int32，这样保留内存区只有256个字节，最大基本指令只有255个，现目前使用了大概100多个，需要根据 CLR
+  做最后修订。
 
 ~ packed record
-  ֻ�ж������ Pointer, Integer, Int64, string �Ż���롣shortstring���Ͳ���������롣
+  只有对里面的 Pointer, Integer, Int64, string 才会对齐。shortstring类型不会产生对齐。
 !* change the TTurboWordEntry record to TTurboWordBlock object
-  �����Ҿ�����������ϵ�ַ�ض�λ������ģ��ȵĹ��̡�
+  这样我就能在上面加上地址重定位到其它模块等的过程。
   ?!* Name to PPackedShortString;
-~ ��64λ�Ļ�����ͬ������ʹ��32λָ�룡�����Ҳ�������64λ��ָ�룬ָ����ൽ48λ��
+~ 在64位的机器上同样可以使用32位指针！！而且并不存在64位的指针，指针最多到48位！
 
 2006-11-2
 * [ForthCompiler]
-  + @Tick : push the QueryPerformanceCounter: int64 to stack. [��ʱָ��]
+  + @Tick : push the QueryPerformanceCounter: int64 to stack. [临时指令]
   + i8+: add int64
   + i8-: sub int64  (i1 i2 -- int64= i2`-i1)
 
 2006-11-1
 ~ TASK
-  + [ForthCompiler] ��� Word �ṹ:
+  + [ForthCompiler] 完成 Word 结构:
     + FWords: array of PTurboWordEntry;
     + FUsedModules: array of PTurboModuleEntry;
     + extend Define Word 
       WordDefine : [WordVisibility] WordName ("external" FORTHCALL|STDCALL|PASCAL|REGISTER|FASTCALL) |CodeParts ;
-        ע�⣬Ĭ��Ϊ ForthCall,�����ĵ��������ⲿDLL���ã�����>Protected��ForthCall�Ĺ��̣�ȫ��ʹ��Զ���á�
+        注意，默认为 ForthCall,其它的调用则是外部DLL调用！对于>Protected的ForthCall的过程，全部使用远调用。
       : [WordVisibility] WordName 
         ExternalWord
         |WordPart
@@ -2141,68 +2141,68 @@ PackageInfoTable: see system.pas:
         |FastCall
         |DefaultCall //the default forth call.
       
-      StdCall ��"STDCALL" ExternalWordPart.
+      StdCall ＝"STDCALL" ExternalWordPart.
       ExternalWordPart = Identity 
         "Name" Identity
         |"Index" Integer
       .
 
-    + ����Զ����
-    + ���VMָ����� CallEntry WordEntry
-    + ���DLL����
+    + 测试远调用
+    + 完成VM指令：调用 CallEntry WordEntry
+    + 完成DLL调用
 
-~ ���ڵ�ַ���ڴ������ĵ�ַΪ���ƫ�Ƶ�ַ����ʹ���ڴ����ĵ�ַΪ���Ե�ַ����ֲ��������ַ�������
+~ 关于地址，在代码区的地址为相对偏移地址，而使用内存分配的地址为绝对地址（如局部变量的字符串）。
 
-CLR �ļ�ʹ�������Ż��úܺã�����������ӷ�������:
+CLR 的即使编译器优化得很好，至少在这个加法运算上:
     CFA := 300;
     QueryPerformanceCounter(tBegin);
     CFA:= CFA+300;
     CFA:= CFA+300;
     ....
     CFA:= CFA+300;
-  ��ʹ��JIT�����ģ�
+  他使用JIT编译后的：
   MOV ESI, 300  BE2C010000
   ADD ESI, 300  81C62C010000
   ...
   ADD ESI, 300
-  Delphi ����ģ�
+  Delphi 编译的：
   MOV EBX, 300  BB2C010000
   ADD EBX, 300  81C32C010000
 
-  ��Delphi�����һ����ֻ��ʹ�õļĴ�����һ��������Ϊɶʱ������ô�󣿣�.net = 15; delphi=60;
-  �����ڴ���ǿ�ƽ�EBX�ĳ�ESI�����Ǻ�EBXһ����ʱ�䡣��ֻ��˵��CLR�ڼ�ʱ�����ʱ�������Ż� �� 300*XXX;��Ȼ��������ô�졣
+  和Delphi编译的一样，只是使用的寄存器不一样，但是为啥时间差别这么大？？.net = 15; delphi=60;
+  我在内存种强制将EBX改成ESI发现是和EBX一样的时间。这只能说明CLR在即时编译的时候做的优化 ＝ 300*XXX;不然不可能这么快。
 
-EUPHORIA �ű�����������ģ���������Ϸ�����С������õ��Ǻ������ƵĽű�ִ�л���!�������������������ƺ�û���жϵİ취����TurboScript��ÿִ��һ��ָ��ǰ��Ҫ����Ƿ���Ҫֹͣ�������Ǳ����ʱ��������ָ������ĺ��Ĵ���д�ü�ֱ�����˿��ġ�
-��������ҵĿ죬�ҵ�TurboScriptҪ������0.25��(����ָ��ִ��)����1/74 = 0.01351(EUPHORIA)  1/98 = 0.01020(TurboScript), 1351:1020��
-�ٲ��������ĵ����ӹ��̵�Ч�ʣ�1/522 = 0.0019157; TurboScript: 1/157 =  0.006369. 19157/63690 �ٺ٣����ĵ����ӳ����Ч�ʼ�ֱ�����ߵ�����ȥ�ˣ������ҵ����ӹ��̵��ٶȱ�����70%��.
-EUPHORIA �ű�:
+EUPHORIA 脚本引擎才是最快的，多用于游戏开发中。它采用的是和我类似的脚本执行机构!但是在它的运行器中似乎没有中断的办法，而TurboScript则每执行一个指令前都要检查是否需要停止，除非是编译的时候插入调试指令。【它的核心代码写得简直不是人看的】
+因此它比我的快，我的TurboScript要比它慢0.25倍(虚拟指令执行)。【1/74 = 0.01351(EUPHORIA)  1/98 = 0.01020(TurboScript), 1351:1020】
+再测试下它的调用子过程的效率：1/522 = 0.0019157; TurboScript: 1/157 =  0.006369. 19157/63690 嘿嘿，俺的调用子程序的效率简直比它高到哪里去了！～！我调用子过程的速度比它快70%倍.
+EUPHORIA 脚本:
 function iAdd(integer a, integer b)
   return a+b
 end function
---��ʱ��ʼ
+--计时开始
 count = 300
 iAdd(count, 300)
 ...
 iAdd(count, 300)
---��ʱ����
+--计时结束
 
-TurboScript�ű�
+TurboScript脚本
 : Add +;
---��ʱ��ʼ
+--计时开始
 300
 300 Add
 ...
 300 Add
---��ʱ����
+--计时结束
 
 2006-10-31
-* [Bug] ��Զ������Ϊ����һ����ĵ��ã���Ҫ����Ӱ�졣
-  Ҳ����˵����һ�����״̬�ʹ�������ȫ�����ģ�
-  ��Ȼ������Ψһ�ź����ǣ����ú��޷���֪����ʵ����̬��
-  ����֮��ֻ�в���ջ�ͷ���ջ�ǹ����ġ�����ȫ�ֲ�������
-!+ ȫ�ֲ���������״̬���Ͳ���ջ��С�Ȳ������룬�������ܼ���Զ���õĸ��Ʋ���������Ҳ�ܽ��ֹͣ״̬��
+* [Bug] 将远调用作为对另一程序的调用，不要互相影响。
+  也就是说，另一程序的状态和错误是完全独立的！
+  当然这样的唯一遗憾就是：调用后无法得知其真实运行态。
+  他们之间只有参数栈和返回栈是共享的。还有全局参数区。
+!+ 全局参数区，将状态，和参数栈大小等参数纳入，这样才能减少远调用的复制操作。而且也能解决停止状态。
   TTurboGlobalOptions = record  //do not use the packed.
-    //States: TTurboProcessorStates; //�����������ٶȻ��½�
+    //States: TTurboProcessorStates; //如果放在这里，速度会下降
     LastErrorCode: TTurboProcessorErrorCode;
     ParamStackBase: Pointer;
     ParamStackSize: Integer; //bytes
@@ -2212,34 +2212,34 @@ TurboScript�ű�
     ReturnStackBottom: Pointer;
   end;
   
-~ �����ù��̵�������ģ�
-  �Լӷ�Ϊ���� 
-  ������� : Add +; ��ֱ�ӵ��� "+" ����ָ��Ƚϣ�
-  "+" ָ����ٶȣ� 1 (1/100)
-  Add ���̵��õ��ٶ� ��  0.568 (1/176)
-  �ٶ��½���43.2��[100-56.8].
-  ����΢�Ż����£�Add ���̵��õ��ٶ� �� 0.613(1/163)�� �ٶ�����������ָ���ٶȵ�61.3%,�½���38.7�� ��û���Ż�ǰ�ȣ��ٶ�������4.5%.
+~ 近调用过程的性能损耗：
+  以加法为例： 
+  定义过程 : Add +; 与直接调用 "+" 虚拟指令比较：
+  "+" 指令的速度＝ 1 (1/100)
+  Add 过程调用的速度 ＝  0.568 (1/176)
+  速度下降了43.2％[100-56.8].
+  俺稍微优化了下，Add 过程调用的速度 ＝ 0.613(1/163)， 速度现在是虚拟指令速度的61.3%,下降了38.7％ 和没有优化前比，速度提升了4.5%.
 
 2006-10-26
-!+ ��Ԫ��ʼ��(Init)and Final ����Ҫ�ı��������ʽ���ӵ�һ��ִ�У����ǵ����һ����
-  Ŀ�ģ�������Щû���Լ����ڴ��ģ�飬�������Լ��ĳ�ʼ�����̵ģ�ҲҪִ�а���
+!+ 单元初始化(Init)and Final 过程要改变成链表形式，从第一个执行，加是到最后一个。
+  目的：对于那些没有自己的内存的模块，但是有自己的初始化过程的，也要执行啊。
   PTurboWordLink = ^TTurboWordLink;
   TTurboWordLink = packed record
     Next: PTurboWordLink;
     Word: PTurboWordEntry;
   end;
 
-!* ���ڷ���wordEntry�ϵ�ȫ�����ǽ����ã�Ӧ����Զ���òŶԡ������õ�ֻ��˽��word,����WordEntry�ϵ�visibility in [<=fsPrivate]��
+!* 现在放在wordEntry上的全部都是近调用，应该是远调用才对。近调用的只有私有word,或在WordEntry上的visibility in [<=fsPrivate]。
 
 2006-10-25
-���ڴ���RTTI��Ϣ�����ӷ�ʽ���������ú�VM����ָ��ͬ���ķ�ʽ������ֵС�ڱ�����Ϊ�����ͳ���(TTurboSimpleType)������Ϊ���ƫ�Ƶ�ַ��
-ʹ�� Delphi��Ԫ TypInfo �� TTypeData��ֻ������������� PPTypeInfo ���͵��ֶα��������˵���ġ�
+在内存中RTTI信息的链接方式，决定采用和VM机器指令同样的方式，当数值小于保留区为简单类型常量(TTurboSimpleType)，否则为相对偏移地址。
+使用 Delphi单元 TypInfo 的 TTypeData。只不过里面的所有 PPTypeInfo 类型的字段变成了上述说明的。
 
 + uTurboTypes.pas
-  ר�Ŵ��� �����ڴ棬����װ��MeTypes.
+  专门处理 读入内存，创建装载MeTypes.
   //Create PMeProcType and load 
   LoadMeProcTypeFrom(aProcTypeData: PTurboProcTypeData): PMeProcType;
-  ��Ȼֻ��һ�����̣���ô������ʱ����TurboExecutorһ��
+  既然只有一个过程，那么还是暂时放在TurboExecutor一起。
 
 
 
@@ -2247,7 +2247,7 @@ TurboScript�ű�
 + Function RemoveModuleTypes(aModuleName: string)
   //remove registered types of this module
 * call RemoveModuleTypes function when module is unloaded.
-2. �Ƿ񻺴�ProcType��Ҳ���Ƿŵ�ע�������б��У��Ȳ����棺
+2. 是否缓存ProcType，也就是放到注册类型列表中，先不缓存：
   vProcType :=  getProcType(const Buffer):PMeProcType;
   New(vProc, Create);
   vProc.InitFrom(vProcType);
@@ -2268,7 +2268,7 @@ TurboScript�ű�
     Str: array [1..Len] of char;default;
   end;
 
-  AnsiString �� ^ TAnsiString.Str;
+  AnsiString ＝ ^ TAnsiString.Str;
   TAnsiString = packed record
     RefCount: Integer;
     Len: LongWord;
@@ -2277,18 +2277,18 @@ TurboScript�ű�
   end;
 
 2006-10-23
-~  ��ʼŪ TypeInfo,
+~  开始弄 TypeInfo,
 * TCustomModule
   + RegisteredTypes: TMeTypes;
 + [uTurboConsts] TStaticMemoryStream
-�������ͣ��������������õĲ���Ҫ�������С�������ֻ������ͺ��Զ������������С�
-�����п���ͨ�� ���ֵĴ�С�����֣��磺 >=0 �ǻ������ͣ�>0 ������ָ���Զ������͵�ƫ�Ƶ�ַ��
-�������Ͳ��ǻ�������
+基本类型：基本类型是内置的不需要放入流中。如何区分基本类型和自定义类型在流中。
+在流中可以通过 数字的大小来区分，如： >=0 是基本类型，>0 的则是指向自定义类型的偏移地址。
+过程类型不是基本类型
 
-��������: TTurboType
+基本类型: TTurboType
 
-��������ʽ: �ٺ٣��ҿ��԰���Delphi RTTI ���ڴ��ʽ���а���TypInfoEx.pas��
-TuroType: integer; //>=0 �ǻ������ͣ�>0 ������ָ���Զ������͵�ƫ�Ƶ�ַ��
+定义流格式: 嘿嘿，我可以按照Delphi RTTI 的内存格式进行啊（TypInfoEx.pas）
+TuroType: integer; //>=0 是基本类型，>0 的则是指向自定义类型的偏移地址。
 
 ProcType Stream:
   Kind: TMethodKind
@@ -2299,68 +2299,68 @@ ProcType Stream:
       ParamType: Integer;
       ParamName: Packed ShortString;
   end;
-  [ResultType: integer] //����Ǻ���
+  [ResultType: integer] //如果是函数
 
-1. ��Ҫ������װ��BufferToMeType
-2. �Ƿ񻺴�ProcType
-3. ֻ����һ��RegisteredTypes �������е����ͣ�Ȼ��ͨ��
-  ��������Ϊ�� ModuleName.TypeName ������
-  ��Ȼֻ��һ����ô�Ϳ���ʹ��MeType��ȫ��GRegisteredTypes��������
+1. 需要函数来装入BufferToMeType
+2. 是否缓存ProcType
+3. 只建立一个RegisteredTypes 管理所有的类型？然后通过
+  类型名称为： ModuleName.TypeName 来区分
+  既然只用一个那么就可以使用MeType的全局GRegisteredTypes变量！！
 
-�Զ������͵��������ڣ�����ģ����������ڡ�
-���ڰ󶨵����Ͳ����������������⡣
+自定义类型的生存周期：就是模块的生存周期。
+后期绑定的类型不存在生存周期问题。
 
-~ ������ν����������ҵ�֪ʶ���ݿ�
-ģ������ͷ���֪ʶ���У�
-  ģ������͵Ĺ�ϵ�� krCollection
+~ 考虑如何将类型纳入我的知识数据库
+模块和类型放入知识库中：
+  模块和类型的关系： krCollection
 
-���ȣ�
-  ģ����������͹��̵�ȫ�����ݱ�����һ���ֶΣ��൱���ļ�����������ݿ��У���
-  ģ����������ݱ���ɢ��ÿһ�����ͣ����̱��ֱ����ڲ�ͬ���ֶ���(��ʱ����Щ����ȫ���Ǻ��ڰ󶨵�)��
+粒度：
+  模块里面的类型过程等全部内容被放入一个字段（相当于文件存放在了数据库中）。
+  模块里面的内容被拆散，每一个类型，过程被分别存放在不同的字段中(这时候，这些东西全部是后期绑定的)。
 
 2006-10-21
-~ ����һ���µ����� Seed: �����ص��ǿ����Զ����µ��﷨�ṹ(for ��䣬while����)������������������Ū�������ġ�
+~ 发现一种新的语言 Seed: 它的特点是可以自定义新的语法结构(for 语句，while语句等)，它的自身就是这样弄出来来的。
   http://seed7.sourceforge.net
-~ �����Ͽ��˿����� ECMA standard common intermediate language CIL��Ҳ����Dot.net ��CLR Microsoft Intermediate Language (MSIL)�� ��ʵ�֣�
-  ��˼·�Ͱ��Ĳ�࣬���������ջ��֧�ֺ��ڰ󶨣�����֮Ϊ����refelection��,metadata������ʱ��������Ϣ������֪���Ƿ������еĶ��У������Լ����壬�������������safecode����ô�ͱ���֪��meta��Ϣ���������ܷ�ֹ����Ƿ����ݣ�����managed code һ����metainfo,�������û�У���
-  �Ҹ���Ȥ���ǣ�������ôʵ�ֲ�ͬ��С��pushָ��ģ�����load����
-  ���еĶ��������࣬��ʵ����ʵ��Ҳ������ô���⣬ģ�飽�࣬����˵����Ҫ�����Լ�����������ǲ�����FMemory��ַָ��(�ҷ���EDI�е�)���Ͳ�һ��VMT���ˡ�
-  �����е��ҵ��Ƕ���ʵ������������֣����ⶨ���Ӧ���Ƕ�����࣡�����Ƕ���ʵ����
-!+ �����ⲿ������ TTurboWordEntry CFA������ݣ�
-  �ⲿ�Ķ��壺 ģ���ⲿ��Forth�������ɴӵ���Լ����������������(MainApp)�еĺ�������DLL�еĺ�����
+~ 在网上看了看关于 ECMA standard common intermediate language CIL（也就是Dot.net 的CLR Microsoft Intermediate Language (MSIL)） 的实现，
+  其思路和俺的差不多，都是面向堆栈，支持后期绑定（它称之为反射refelection）,metadata（运行时刻类型信息，还不知道是否是所有的都有，还是自己定义，不过如果想做到safecode，那么就必须知道meta信息，这样才能防止传入非法数据，我想managed code 一定有metainfo,最多名称没有）。
+  我感兴趣的是，它是怎么实现不同大小的push指令的（它叫load）。
+  所有的东西都是类，其实俺的实现也可以这么理解，模块＝类，至于说必须要传递自己这个参数，那不就是FMemory基址指针(我放在EDI中的)，就差一个VMT表了。
+  不过有点乱的是对象实例和类如何区分？我这定义的应该是对象的类！而不是对象实例。
+!+ 定义外部函数的 TTurboWordEntry CFA域的内容：
+  外部的定义： 模块外部的Forth函数（可从调用约定看出）；在宿主(MainApp)中的函数；在DLL中的函数。
    PModuleEntry:
    PFunctionIndex:
    FunctionName: PTPackedString
-   //��������
-   //���������б�: Size InRegister(���Ϊ0��ʾҪѹ���ջ������Register and FastCallʹ��)
+   //参数个数
+   //参数描述列表: Size InRegister(如果为0表示要压入堆栈，该域供Register and FastCall使用)
    
-   ����ֵ���ͣ��ޣ���EAX�У���EAX:EDX�У��ڸ���С��ջ�У�
-   �����֪ÿһ���������ͣ����ܾ���ѹ���ջ�Ĳ�������Щ��������register���á�
-!* [CustomModule] ���ڱ���״̬��ʱ�򣬲�����ַ�任��
-!+ ���� CPU ʶ��Ļ�������:
+   返回值类型＝无，在EAX中；在EAX:EDX中；在浮点小数栈中；
+   必须获知每一个参数类型，才能决定压入堆栈的参数是那些，尤其是register调用。
+!* [CustomModule] 当在编译状态的时候，不作地址变换。
+!+ 虚拟 CPU 识别的基本类型:
    Address
-   Integer(int1, int2, int4(32λ), int8(64λ), nativeInt)
+   Integer(int1, int2, int4(32位), int8(64位), nativeInt)
    Float
    String
 - [FullSpeedFeature] From TTurboX86Interpreter
 !* TTurboCodeFieldStyle = (cfsFunction, cfsHostFunction, cfsDLLFunction);
   cfsFunction: 
-    published-protectd Function ��ͳһ�����ⲿ����Foth��������ʽ�� ModuleAddr FunctionAddr
-    ��privated ������˽�к�����ֻ����ģ����ʹ�á�
+    published-protectd Function 就统一采用外部调用Foth函数的形式： ModuleAddr FunctionAddr
+    而privated 的则是私有函数，只能在模块内使用。
   cfsHostFunction, cfsDLLFunction: 
     PModuleEntry: Pointer;
     Index: Integer; -1 means non-index visits.
     Name: PChar; //the function name in the DLL/Host.
-* TTurboModuleEntry: ��������
+* TTurboModuleEntry: 对其扩充
   + ModuleType: mtLib, mtHost, mtDLL
   * Module: Pointer:
       DLL Module(mtDLL): it's the DLL handle.
       ForthLib module(mtLib): loaded the instance of TCustomTurboModule.
-      Host Module(mtHost): �������host��ĺ�����ģ����֯�Ͳ��ã�����͸����һ��������������
+      Host Module(mtHost): 如果不把host里的函数按模块组织就不用，否则就该设计一个新类来处理。
       nil means not assigned(or loaded).
-�ⲿDLL/Host����ִ���������£�
-���� TTurboWordEntry�� TTurboExteralWordPFA.PModuleEntry��� ModuleHandle,��� ModuleHandle �� nil ��ôװ�ظ�DLL,
-������α����д��
+外部DLL/Host函数执行流程如下：
+根据 TTurboWordEntry的 TTurboExteralWordPFA.PModuleEntry获得 ModuleHandle,如果 ModuleHandle ＝ nil 那么装载该DLL,
+还是用伪代码写：
 if TTurboExteralWordPFA.ProcAddr = nil then
 begin
   with TTurboExteralWordPFA.PModuleEntry do
@@ -2374,83 +2374,83 @@ end;
 DLLExecutor.Params := ParamStack()
 DLLExecutor.ParamTypes
 DLLExecutor.Run(ProcAddr);
-���仰˵���ù��̵Ĳ�������Ҳ����ע�ᣡ��
-�ұ���ʹ�þ�̬���󣬷����ֹ�������VMTָ��̫�ۡ�
-������ô˵��ҪαmeTypes�������͵ı��棬װ�������ơ�
-�������ģ�����ǲ���Ҫ�ظ���������ģ�����ͬһ���ⲿ��������
-��������û�а취�����飬ֻ��������������ģ�����DLL��
+换句话说，该过程的参数类型也必须注册！！
+我必须使用静态对象，否则手工逐个填充VMT指针太累。
+或者这么说需要伪meTypes添加类型的保存，装载流机制。
+如果我在模块内那不是要重复，如果多个模块调用同一个外部函数？？
+不过这是没有办法的事情，只能这样，你必须把模块想成DLL。
 
 
 2006-10-20
-+ [ASM] ���峣��������
-  ����ͨ��
-  ����δ��ʵ�ֳ�������ʽ�ĺϲ���
-  �����������
-  �����������
-  ��ʱ��ʵ�� PushByte, pushWord ָ�ȫ����PushIntָ�����ʽʵ�֡�
-+ �ڲ�����ָ��(Ҳ�������հ汾��ɾȥ)��
-  �Ȱ������ⲿ������ͨ��ָ���ú���Щ���ò����ˡ�
-  + .S(aStr: pShortString); (aStr -- ) ע��õ�ַ����Ե�ַ�� Addr + Integer(FMemory)
++ [ASM] 定义常量，变量
+  编译通过
+  不过未能实现常量表达式的合并。
+  常量测试完毕
+  变量测试完毕
+  暂时不实现 PushByte, pushWord 指令，全部以PushInt指令的形式实现。
++ 内部过程指令(也许在最终版本中删去)：
+  等俺调用外部函数的通用指令搞好后，这些就用不着了。
+  + .S(aStr: pShortString); (aStr -- ) 注意该地址是相对地址＝ Addr + Integer(FMemory)
   + .LS(aStr: pAnsiString); (aStr -- )
 
-!* ������ʱ�������ڴ棬�п��ܻᷢ��FMemory���ƶ������ʱ�����õ��Ǿ��Ե�ַ���ͻ��������
-  ��Ӧ�ø��ݱ���״̬���ڱ����ʱ��ȫ��ʹ����Ե�ַ����
+!* 当编译时候增加内存，有可能会发生FMemory的移动，这个时候，我用的是绝对地址，就会出错！！
+  我应该根据编译状态，在编译的时候全部使用相对地址！！
   
-!+ [ASM] Imports XXX,XXX2; ����ָ����Խ�����Դ����Ԫ���뵽ֱ�ӣ��൱�� Include.
-!+ [ASM] Uses XXX. XXX; ��Ԫ����ָ��൱���о�Ҫʹ�õ�DLL������
+!+ [ASM] Imports XXX,XXX2; 导入指令，可以讲其它源程序单元导入到直接，相当于 Include.
+!+ [ASM] Uses XXX. XXX; 单元链接指令，相当于列举要使用的DLL表！！
 
 
-* [Bug]  f�����ڶ�̬����� Object ��ʹ�� ���ַ��� Name ��¼���ִ���Ī���������ָ����
-  �ĳ�ShortString,��������
+* [Bug]  f发现在动态数组的 Object 中使用 长字符串 Name 记录出现错误，莫名奇妙的乱指！！
+  改成ShortString,后正常。
   TTurboSimpleConst = object
   public
     Name: ShortString;
 
   TTurboSimpleVar = object(TTurboSimpleConst)
   FVars: array of TTurboSimpleVar;
-  ���name �� string ��ô�ͳ��������ˣ�
+  如果name 是 string 那么就出怪事情了：
   var
     ss: string = '';
   : Add + ;
-  ���ʱ�򱨸� Add ���ظ��ģ�������FVars�����һ����Name�����׵�ԭ��
-  �����ˣ�����ֱ��������¼ ��ֵ�������Ͳ�����Name���ַ����������ӣ������ǲ������ԭ��
-  tmd,���л���ͬ���Ĵ��󣡣�
+  这个时候报告 Add 是重复的，发现是FVars中最后一个的Name域乱套的原因。
+  明白了，我是直接整个记录 赋值，这样就不能让Name的字符串引用增加，看看是不是这个原因。
+  tmd,不行还是同样的错误！！
   
 
-~ [Coco/R] SynError ���������쳣�˳������ǽ���ǰ�������List���������룡��
+~ [Coco/R] SynError 并不引起异常退出，而是将当前错误记入List，继续编译！！
 
 
 2006-10-19
-~ ��Ҫ֪��Delphi����ô�����������ַ�����ֵ�������ġ�
-  ���Ƚ������ַ��������ڴ������ڳ��������棩��Ȼ��ָ���ַ������ڵ�ַ������һ���������临�Ƶ������У���
-  �ڰ���һ�λ�����޷�ʵ�������Ķ�������ֻ����Ƕ�롣���仰˵������ǳ���������������ڴ濪�ٿռ䡣
+~ 需要知道Delphi是怎么处理将常量字符串赋值给变量的。
+  首先将常量字符串放入内存区域（在程序的最后面）。然后指明字符串所在地址，调用一个函数将其复制到变量中！！
+  在俺的一次汇编中无法实现这样的东东！！只能是嵌入。换句话说，如果是常量定义就立即在内存开辟空间。
 
-  Delphi��ȫ�ֱ������ڳ���ĺ���
+  Delphi的全局变量放在程序的后面
   
-AnsiString: ���� 
+AnsiString: 常量 
 '0123456789'
-$FFFF(���ü���) $000A(�ַ�Count)  '0123456789' $00 (�������г������ڴ��ж���Aligned),�հ״���00��䡣
+$FFFF(引用计数) $000A(字符Count)  '0123456789' $00 (它的所有常量在内存中都是Aligned),空白处用00填充。
 
 2006-10-18
-~  EMIT, #'' ָ��Ϊ��ʱ������!!
-* �޸��� TTurboProgram ��CustomExecutor������.
-  Ȼ�� ������ ExecutorClass ʹ��ǰ���븳ֵ!
-  ��Executor ��Visibility ��Ϊ˽��, ����ʹ��Program ���ڴ�
-* TCustomTurboModule  : �� StoredInParent ��ʱ��Ҫ�ͷ��ڴ�. 
-  �����Ƿ�ҪClearMemory������??
-  ��Ҫ,��StoredInParent ʱ��,��������ڴ�!!��Ϊ�ڴ��Ǹ��׵�! 
-  ���ж���StoredInParent ��,Unload ����������,��Ϊ�Ѿ�װ�뵽������,�����Ǹ���ж��..
+~  EMIT, #'' 指令为临时测试用!!
+* 修改了 TTurboProgram 从CustomExecutor派生了.
+  然后 增加了 ExecutorClass 使用前必须赋值!
+  将Executor 的Visibility 作为私有, 这样使用Program 的内存
+* TCustomTurboModule  : 当 StoredInParent 的时候不要释放内存. 
+  不过是否要ClearMemory起作用??
+  不要,当StoredInParent 时候,不能清除内存!!因为内存是父亲的! 
+  还有对于StoredInParent 的,Unload 不会起作用,因为已经装入到父亲了,除非是父亲卸载..
 + uTurboSymbols
-  ׼��ʹ��
+  准备使用
 
 2006-10-17
-+ Varaible define: ȫ�ֱ�������.
++ Varaible define: 全局变量定义.
 + const define
 
-������Ϊ: 
-  ȫ�ֱ���: �ڴ���ռ��ڷ����,����LastVariableEntry
-  �ֲ�����: ������ջ�Ϸ����,�˳���ʱ���ͷ�.
-  �ѱ���: ʹ��GetMem�����,�������ַ���.
+变量分为: 
+  全局变量: 在代码空间内分配的,放在LastVariableEntry
+  局部变量: 在数据栈上分配的,退出的时候释放.
+  堆变量: 使用GetMem分配的,多用于字符串.
 
 - TCustomTurboModule.TIB
 
@@ -2461,35 +2461,35 @@ $FFFF(���ü���) $000A(�ַ�Count)  '0123456789' $00 (�������г������ڴ��ж���Alig
 + #'123'(-- 43 42 41) push the reverse string to parameter stack.
 
 2006-10-15
-  �ļ���չ������:
+  文件扩展名定义:
     *.tf  Turbo Forth(ASM) Script Source
 
 tfcc.exe : Turbo Forth Command line Compiler.
 
-ģ���������ļ�������.
+模块名称由文件名决定.
 
 !+ uTurboModuleFileAccessor
 
-+ tsrun.dpr �������:
-  ����ʾִ�н������ջ�򷵻�ջ������,��������ݵĻ�.
++ tsrun.dpr 初步完成:
+  能显示执行结果数据栈或返回栈的内容,如果有内容的话.
 
-!+ ���ӹ��̵�֧��.
+!+ 增加过程的支持.
 :Word ;
  
 2006-10-14
-  �ļ���չ������:
+  文件扩展名定义:
     *.tpc Turbo Script program Compiled
     *.tcu Turbo Script unit Compiled 
     *.ts  Turbo Script Source
  tscc.exe : Turbo Script Command line Compiler
  tsrun.exe <filename>: Turbo Script command line intercepter.
-* �޸��� coco/R delphi ,ʹ�������ڿ���ļ��е��Զ������ɵ��ļ���.ʹ�ÿ��� $M"ModuleName"
+* 修改了 coco/R delphi ,使得我能在框架文件中的自定义生成的文件名.使用开关 $M"ModuleName"
 
 2006-10-13
 ~ [COCO/R]
-  ��λ�õ�ǰ�ķ��������ַ���!
-  ʹ�� TParser.LexString ����
-  ����:
+  如何获得当前的分析处的字符串!
+  使用 TParser.LexString 函数
+  例子:
 
 SQLName <var aName : string> 
       =
@@ -2501,31 +2501,31 @@ AssertStatement<Parent: TnxSqlNode; var Assertion: TnxSqlRootNode>              
     "ASSERT" "TABLE" SQLName<TableName>                                         (. TnxSqlAssertion(Assertion).TableName1 := TableName; .)
     "=" "TABLE" SQLName<TableName>                                              (. TnxSqlAssertion(Assertion).TableName2 := TableName; .)
 
-  {} ��ʾ 0�� �������.
+  {} 表示 0个 或任意个.
 2006-10-12
-~  heap ʹ��Delphi��heap����Ӧ�ĺ������ַ�������Ҳʹ��Delphi�ġ�
+~  heap 使用Delphi的heap和相应的函数，字符串管理也使用Delphi的。
 
 2006-10-11
-!+ ����������,��д������Ա�����.
-   ֧�ֵ�����: Byte, Word, DWord, Integer, Char, ShortString, AnsiString
-   ��֧���Զ�������
-   ��������������Delphi�Ľṹ,�����������ڻ���.
+!+ 定义汇编语言,编写汇编语言编译器.
+   支持的类型: Byte, Word, DWord, Integer, Char, ShortString, AnsiString
+   不支持自定义类型
+   决定采用类似于Delphi的结构,而不是类似于汇编的.
    
-   [���] ������ [������]
-   [[Published] ���] DB [��ֵ[,��ֵ,��ֵ]] //Ԥ��Byte �����Ľ���������� 
-   [���] DW [��ֵ] //Ԥ����
-   [���] DDW [��ֵ] //Ԥ��˫�� 
-   [���] DSS ['�ַ�����ֵ'|Length] //Ԥ�����ַ��� 
-   [���] DS ['�ַ�����ֵ'] //Ԥ��AnsiString�ַ��� 
+   [标号] 操作码 [操作数]
+   [[Published] 标号] DB [初值[,初值,初值]] //预留Byte 发布的将联入变量表 
+   [标号] DW [初值] //预留字
+   [标号] DDW [初值] //预留双字 
+   [标号] DSS ['字符串初值'|Length] //预留短字符串 
+   [标号] DS ['字符串初值'] //预留AnsiString字符串 
    :[Published] DefinedWord 
    ;
 
-  ������Delphi��:
+  类似于Delphi的:
   Lib aName;
   Const aConstName = Value;
   [Published] Var aVarName: Type [= InitValue];
   : [Published] DefinedWord
-     [���] ������ [������]
+     [标号] 操作码 [操作数]
   ;
   
   initilization
@@ -2533,133 +2533,133 @@ AssertStatement<Parent: TnxSqlNode; var Assertion: TnxSqlRootNode>              
   End. //lib 
 
 2006-10-9
-~ [�﷨��] 
-  �����ģ��,���ȱ���ʹ�õ�ģ���б�(UsedModules)
-  ������Ҫ������ЩTypes��Ϣ(�Ѿ�������RTTI, �����Ƕ�̬�󶨵�����)�����ڴ� TTurboTypeSymbolList.Compile;
+~ [语法树] 
+  如果是模块,首先编译使用的模块列表(UsedModules)
+  首先需要编译有些Types信息(已经发布的RTTI, 并不是动态绑定的类型)进入内存 TTurboTypeSymbolList.Compile;
   {$TYPEINFO ON}, {$DynamicBinding ON}
-  ���ű�����������ͳ��������ڴ�.�����$TYPEINFO ON,���Ҹ�����Ҳ�Ƿ�������ô�ñ���������ָ��Ҳ������,�������ֻ�б����Ƿ�����,��ô��ֻ��TMeTypeKind��ֵ������ָʾ���������; ��̬�󶨵ı�����������ڴ�!
-  ���ű����ӹ���,�������StoredInParent���ҷ�����Ϊ@@__Initilization__@@ �� @@__Finalization__@@ �Ĺ�������Ե�ַ���뱣���ڴ�!
-  �������ǹ���,��ô�ͱ����Լ�,�����ģ��,��ô�ͱ�����ģ��.
+  接着编译变量和类型常量进入内存.如果是$TYPEINFO ON,并且该类型也是发布的那么该变量的类型指针也被编入,否则如果只有变量是发布的,那么将只是TMeTypeKind的值被编入指示其基本类型; 动态绑定的变量不会编入内存!
+  接着编入子过程,如果不是StoredInParent并且发现名为@@__Initilization__@@ 和 @@__Finalization__@@ 的过程则将相对地址连入保留内存!
+  最后如果是过程,那么就编译自己,如果是模块,那么就编译子模块.
 
-~ Դ�����ļ������ݿ��ͬ������?
-  ��ͨ���﷨����������������ʱ��,������ݿ���Ч,�Ƿ���Ҫ������ͬ�������ݿ���?
-  ����Ҫ�ڴ�ʱ��,�ṩһ������,�ڱ���ɹ���,���ø÷����Ϳ��Ա��浽���ݿ���.
-  ��ʵ���Ǹ���AccessorMgr�ϵ�Ĭ��Accessorָ��DBAccessor,Ȼ��save ����.
+~ 源程序文件与数据库的同步问题?
+  当通过语法树产生虚拟机器码的时候,如果数据库有效,是否需要将它们同步到数据库中?
+  不需要在此时吧,提供一个方法,在编译成功后,调用该方法就可以保存到数据库中.
+  其实就是更改AccessorMgr上的默认Accessor指向DBAccessor,然后save 即可.
 
 2006-10-5
-* ������� uTurboCompiler �﷨�� 
+* 继续设计 uTurboCompiler 语法树 
 
 2006-10-4
-~ ����˽��Module, ��ô��Module ʵ�����ǲ����ڱ��ϲ���Parent
+~ 对于私有Module, 那么该Module 实际上是不存在被合并到Parent
 
 2006-10-2
-+ ����﷨����
-   TTurboWord = Class(TCustomTurboModule); //�û��Զ��嵥��
-     Words: TTurboWordList; //Ƕ���ӹ���
-     Parent: TTurboWord; //ͬ��. nil means root.
++ 设计语法树类
+   TTurboWord = Class(TCustomTurboModule); //用户自定义单词
+     Words: TTurboWordList; //嵌套子过程
+     Parent: TTurboWord; //同上. nil means root.
      Variables: TTurbovariableList
      Symbols: TTurboTypeList;
-     //���ݱ��뿪�ؽ���Щ�б�����������Memory. ���������ģ���AccessorΪDBAccessor,��ô��ֻ��ʹ�ú��ڰ󶨵���ʽ����.
-     //���������ģ��ı��뿪��Ҫ�����ֱ�
+     //根据编译开关将这些列表的类编译进入Memory. 比如如果该模块的Accessor为DBAccessor,那么就只能使用后期绑定的形式编译.
+     //还有如果该模块的编译开关要求函数分别
      procedure Compile; 
 
    TTurboModule = Class(TTurboWord)
-     Childs: TTurboModuleList; //�� Parser ʹ��!
+     Childs: TTurboModuleList; //被 Parser 使用!
      UsedModules: TList;
-   //TTurboVMWord = Class(TCustomTurboSymbol); //������ֻ�в�������Ҳ�����ؿ��ǻ����롣
+   //TTurboVMWord = Class(TCustomTurboSymbol); //机器码只有操作符。也许不必考虑机器码。
    TTurboOpCode
 
 2006-9-29
 * [uTurboAccessor]
   * rename  uTurboScriptAccessor to uTurboAccessor
-  * RegisterAccessor ����Module��������
+  * RegisterAccessor 放入Module管理器了
   + GTurboModuleManager
 * rename uTurboScriptConsts to uTurboConsts
 
-֪ͨ(�ͷ�֪ͨ,ж��֪ͨ)�Ƿ�����ΪAOP ���ܼ���?�����ڵ�AOP�ǻ��������ӹ��ܵ�,���仰˵,ͬһ��Ĳ�ͬʵ��������ͬ����AOP����.
-֪ͨ����: ������ʵ����ĳ�¼�������ʱ��,֪ͨԤ���˸��¼��Ķ���ʵ��.
+通知(释放通知,卸载通知)是否能作为AOP 功能加入?我现在的AOP是基于类添加功能的,换句话说,同一类的不同实例将共享同样的AOP对象.
+通知定义: 当对象实例的某事件发生的时候,通知预定了该事件的对象实例.
 
-�������ұ��뽫����ʵ����AOP�����������ó���,��Ȼ��Ǻ(���ò���Feature�����־�������һ��ʵ��):
-  TMeCustomInstanceFeature = ����ʵ����AOP������,��������Ϊÿһ����ʵ�������µ�����.
-  ���߽�����Class�Ľ���������: TMeCustomFeatureClass
-  ����һ�����������޸�VMT, ����Object��¼�Ĵ�С,�����ҾͿ��Դ�Ÿ���������.���������Ļ�,����ҪС��,��ע��ǰ�������κ��Ѿ�������ע�����!
+看样子我必须将基于实例的AOP功能类早日拿出来,不然够呛(不得不在Feature上区分具体是那一个实例):
+  TMeCustomInstanceFeature = 基于实例的AOP功能类,这样可以为每一对象实例添加新的属性.
+  或者将基于Class的叫做功能类: TMeCustomFeatureClass
+  还有一个方法就是修改VMT, 增加Object记录的大小,这样我就可以存放附加数据了.不过这样的话,必须要小心,在注入前不能有任何已经创建的注入对象!
   TMeNotificationFeature = Class(TMeCustomInstanceFeature)
   end;
 
 
 2006-9-28
-!+ ��ֲ��MeScript
-!+ ����������е�ģ����: uTurboCompiler.pas
+!+ 移植到MeScript
+!+ 构造编译器中的模块类: uTurboCompiler.pas
    TTurboModule = Class(TCustomTurboModule)
-     Childs: TTurboModuleList; //�� Parser ʹ��!
-     Parent: TTurboModule; //ͬ��. nil means root.
+     Childs: TTurboModuleList; //被 Parser 使用!
+     Parent: TTurboModule; //同上. nil means root.
      UsedModules: TList;
      Words: TTurboWordList;
      Variables: TTurbovariableList
      Symbols: TTurboTypeList;
-     //���ݱ��뿪�ؽ���Щ�б�����������Memory. ���������ģ���AccessorΪDBAccessor,��ô��ֻ��ʹ�ú��ڰ󶨵���ʽ����.
-     //���������ģ��ı��뿪��Ҫ�����ֱ�
+     //根据编译开关将这些列表的类编译进入Memory. 比如如果该模块的Accessor为DBAccessor,那么就只能使用后期绑定的形式编译.
+     //还有如果该模块的编译开关要求函数分别
      procedure Compile; 
-     //�ŵ�TCustomTurboExecutor��:
+     //放到TCustomTurboExecutor中:
      //property LastWordEntry: PTurboWordEntry;
      //property LastVariableEntry: PTurboVariableEntry;
    TCustomTurboWord = Class(TCustomTurboSymbol);
-   TCustomTurboVMWord = Class(TCustomTurboWord); //������ֻ�в�������Ҳ�����ؿ��ǻ����롣
-   TTurboWord_JMP = Class(TCustomTurboWord); //�»��߿�ʼ��ΪVM ������.
-  ����������׼����uMeTypes��.
+   TCustomTurboVMWord = Class(TCustomTurboWord); //机器码只有操作符。也许不必考虑机器码。
+   TTurboWord_JMP = Class(TCustomTurboWord); //下划线开始的为VM 机器码.
+  至于类型我准备用uMeTypes的.
 
 2006-9-27
-!+ ����TurboScript�쳣�������Ļ���
+!+ 建立TurboScript异常处理中心机制
 
-���� Delphi �쳣�������Ļ���
-�����Ľ�������ұ�������ɶ�������ʹ�����,���ܽ���,���Ƿ���SysUtils��Ԫ��..
+分析 Delphi 异常处理中心机制
+分析的结果就是我必须在完成对象等类型处理后,才能进行,它是放在SysUtils单元中..
 
-+ ��˼���� TurboModuleAccessor �ܹ� in uTurboScriptAccessor.pas
++ 构思出了 TurboModuleAccessor 架构 in uTurboScriptAccessor.pas
 
-~ �뷨��ֱ�ӵ���Delphi����,�����Ϳ���ֱ����Delphi���쳣��������.ֱ����������,�������Բο���������Ļ��.
-��ʼ��˼�﷨��(����������֮���)
+~ 想法简化直接调用Delphi函数,这样就可以直接用Delphi的异常处理机制.直接用是做梦,不过可以参考编译产生的汇编.
+开始构思语法树(独立于语言之外的)
 
 2006-9-25
 + TurboModule Stream Header
-!+ ��˼ TurboModuleAccessor �ܹ�
-* [VM] �޶� EnterFar ModuleIndex cfa-addr ��Ϊ MemBase-addr(��һģ����ڴ��ַ) cfa-addr
-- [VM] ���� ModuleIndex ���ƣ���Ϊ��ϣ���ҵĽű�(Program)�ܹ����ڴ��в��й��������Ҿ�����Լ�ڴ棺�Ҳ��õ���һ��Moduleֻ���ڴ��д���һ�ݿ�����
-  ����Ȼ��ͨ��Program ModuleIndex�ǲ�ͬ�ġ����Է��� ModuleIndex, ת��ʹ�� LastModuleEntry-addr
+!+ 构思 TurboModuleAccessor 架构
+* [VM] 修订 EnterFar ModuleIndex cfa-addr 改为 MemBase-addr(另一模块的内存基址) cfa-addr
+- [VM] 放弃 ModuleIndex 机制，因为我希望我的脚本(Program)能够在内存中并行工作，并且尽量节约内存：我采用的是一个Module只在内存中存在一份拷贝。
+  而显然不通的Program ModuleIndex是不同的。所以放弃 ModuleIndex, 转而使用 LastModuleEntry-addr
 + [VM] CALLFAR PTurboModuleEntry cfa-addr: if PTurboModuleEntry = nil means it's self, do not lookup.  
 + TCustomTurboObject: FreeNotification
 
 2006-9-23
-~ װ�������������Ĵ�С��Ϊ UsedMemory.
-��Executorִ�нű�ǰ���������������У�
- ���ϣ���������ϴ�û����ɵĵط������ͱ��뱣�� SP, RSP ��ջָ�루���뱣���ڴ棿��.
- �����ҵĶ�ջ�������������õģ�Ϊ�˿��ٽ������ݣ������Զ�ջָ���п��ܱ����ģ���޸ġ����������ջָ��ʹﲻ��Ŀ�ġ�
- //����ջָ�롢����ջָ�������Ϊ0����ô���벻�����á�
-   û�����⣬���ڲ�ִ�У�һ��ģ�������һ��ģ��ĺ���������Ӱ�졣���Ǵ�Delphi�е���ģ�麯������ִ����һ��ģ���к������͡���
-   �뷢ֻ������ TProgram �е���ִ�У�ÿ��ִ����ϣ����뽫��ջָ�봫�ݸ�TProgram.
-   ��TProgram ����ֹ�ű�ִ�У��������ÿһ��Executor,������״̬��������TProgram���� root Executor���������ǵ����ģ��,
-������Delphi�е��ýű������������������ã��ܹ�������ֻ��Ҫ��֤����ջָ�뼴�ɡ�������ջ�����ǵ��ԣ����򲻱�Ҫ��
+~ 装入后的流，以流的大小作为 UsedMemory.
+在Executor执行脚本前，必须做的事情有？
+ 如果希望，接着上次没有完成的地方做，就必须保留 SP, RSP 堆栈指针（放入保留内存？）.
+ 但是我的堆栈，是整个程序公用的（为了快速交换数据）。所以堆栈指针有可能被别的模块修改。这样保存堆栈指针就达不到目的。
+ //数据栈指针、返回栈指针如果不为0，那么必须不能设置。
+   没有问题，从内部执行（一个模块调用另一个模块的函数），无影响。但是从Delphi中调用模块函数后，在执行另一个模块中函数，就～～
+   想发只允许从 TProgram 中调用执行，每次执行完毕，必须将堆栈指针传递给TProgram.
+   在TProgram 中终止脚本执行，必须遍历每一个Executor,设置其状态。不妨将TProgram看作 root Executor，其他则是导入的模块,
+怎样在Delphi中调用脚本函数，可以连续调用，能够持续。只需要保证数据栈指针即可。而返回栈除非是调试，否则不必要。
 
-��Executor ���� Import Modules(uses)�� ʹ�õ�ģ���еĺ���������ChildModules(��������ƺ�ֻ�ڱ����ʱ��������)��
-//��ƽ��������ֻ��Program�ϲŴ���ChildModules(TList �㼯����װ���),����װ���Moduleʵ�����ڸô�����λ�Module��ֻ�������á�
-�����ChildModulesʵ���Ͼ��� Import Modules �������������ܣ�ʵ��ֻ����һ���ط����ڣ�
+在Executor 上有 Import Modules(uses)： 使用到模块中的函数。还有ChildModules(不过这个似乎只在编译的时候有意义)。
+//扁平化处理，只有Program上才存在ChildModules(TList 汇集所有装入的),所有装入的Module实例放在该处。层次化Module名只供查找用。
+这里的ChildModules实际上就是 Import Modules 啊！！反正不管，实例只能有一个地方存在！
 
 2006-9-22
-~ ���� ����� States ������һ���ֽڣ���ô�ٶȽ���������1��
-  MOV BL, mem �ٶ�Ҫ���� MOV DX, mem��������1����
+~ 发现 如果将 States 控制在一个字节，那么速度将近会提升1倍
+  MOV BL, mem 速度要快于 MOV DX, mem，将近快1倍。
 
 ~ Used Modules(Import Section):
   LastModuleEntry: Pointer; //last Used module entry.
-  LastWordEntry: Pointer;   //������ЩPointer�������FMemory�ĵ�ַ(��װ����Ƿ�����װ���߶Ըõ�ַ�ض�λ��)
+  LastWordEntry: Pointer;   //所有这些Pointer都是相对FMemory的地址(当装入后是否考虑由装入者对该地址重定位？)
   //Import Module Entry
   TTurboModuleEntry = packed record
-    PriorModule: Pointer; //��Ե�ַָ��
+    PriorModule: Pointer; //相对地址指针
     ModuleIndex: integer;
     Module: TCustomTurboExecutor; //nil means not assigned(or loaded).
     Name: ShortString; //packed string, full module name with path.
   end;
-  ��ʱ�����ǵ�ַ�ض�λ��������Ϊ���Fmemory�ĵ�ַ���ڡ�
-  �����ҷ����Լ����ѵֵ�ס�������ջ��ض�λ����������ٶȡ���ô�ұ��뿼�ǣ��ض�λ�����������
-  ����װ�ص��ڴ����Ҫ�ض�λ�����뱣�浽�ļ��������ط���Ҳ��Ҫ�����Ե�ַתΪ��Ե�ַ��
+  暂时不考虑地址重定位，总是作为相对Fmemory的地址存在。
+  但是我发现自己很难抵挡住这样的诱惑，重定位后可以提升速度。那么我必须考虑，重定位函数放在那里？
+  代码装载到内存后，需要重定位，代码保存到文件或其它地方，也需要将绝对地址转为相对地址。
   RelocateTurboMem(RelatedAddrToAbsoluteAddr)
   procedure TurboConvertAddrRelatedToAbsolute(const Mem: Pointer);
   asm
@@ -2667,35 +2667,35 @@ AssertStatement<Parent: TnxSqlNode; var Assertion: TnxSqlRootNode>              
   procedure TurboConvertAddrAbsoluteToRelated(const Mem: Pointer);
 
 2006-9-21
-* ʹ�� �Ĵ�����Ϊ״̬�Ĵ��������ǵ��²�������ָ����ʱֹͣ�����ԣ��ڽ�״̬�Ĵ������뱣���ڴ��У���������������ֹͣ�ˡ�EBX ������ʱ�Ĵ�����
+* 使用 寄存器作为状态寄存器，但是导致不能命令指令随时停止，所以，在将状态寄存器放入保留内存中，这样，就能命令停止了。EBX 成了临时寄存器。
 
-~ ��û��ȡ�õ�ǰִ�е�ַ��x86ָ�
-  �𣺲��ܣ�ֻ��ͨ��Call ���ȡ�á�
-+ [VM] ���� register calling��delphi��д�ĺ�����
+~ 有没有取得当前执行地址的x86指令？
+  答：不能，只能通过Call 间接取得。
++ [VM] 调用 register calling（delphi）写的函数：
   CallReg: register
   CallPascal: pascal
   CallStd: stdcall
   CallFast : fastcall
-  ���׼���������Ǿͱ���Ҫ֪��������Ҫ�������������ܴ�����ջ��ȡ����Ҫ�ĸ�����Ҳ��������Ҫ��֪ProcType, �������Ϣ�ǣ�ParamCount(��IntegerΪ��λ�ģ��������������ϵĲ�������)
-  CallReg Addr, CallReg ��һ���������� Addr Ϊ�ú���ע����������ַ��
+  如何准备参数？那就必须要知道过程需要几个参数，才能从数据栈中取出需要的个数。也就是我需要得知ProcType, 必须的信息是：ParamCount(以Integer为单位的，不是真正意义上的参数个数)
+  CallReg Addr, CallReg 有一个操作数。 Addr 为该函数注册后的索引地址。
 
-~ ���������� TProgram ��ע��ã������� Executor ��ע����أ������� Executor ��ע��ã����ں��ڰ󶨵ģ��Ǿ�����ν�ˣ��������ɷ��ӡ�
-  ע��ĺ����ṹ�� TTurboRegisteredFunctionRec = packed Record //�ϲ������ LastWordEntry �С�
-  ParamCount: Integer; //��IntegerΪ��λ�ģ��������������ϵĲ�������
+~ 外来函数在 TProgram 上注册好，还是在 Executor 上注册好呢？还是在 Executor 上注册好，至于后期绑定的，那就无所谓了，可以自由发挥。
+  注册的函数结构： TTurboRegisteredFunctionRec = packed Record //合并后放在 LastWordEntry 中。
+  ParamCount: Integer; //以Integer为单位的，不是真正意义上的参数个数
   CallingStyle: TCallingConvension;
-  TypeInfo: Pointer; //nil means no RTTI info.: ʵ������һ�������FMemory�ĵ�ַ��
+  TypeInfo: Pointer; //nil means no RTTI info.: 实际上是一个相对于FMemory的地址。
 
-+ [VM] ����������ģ��ĺ���ʱ���Ƿ���Ҫ�����ֳ���
-  ����EDI(FMemory)��ESI(PC:Program Counter)��Ҫ���档��ջ�ǹ��ã�����Ҫ���档������delphiд�ġ�
-  �����ҷ��ص�ʱ����β��ܷ��أ�
-  �ش�����Far word, �� near word, ����˽�й��̣�ֻ�ڱ�ģ������Ч�������� near word(Ĭ��, Enter, Exit); �����ܱ�����ģ����ʵĹ���
-  �����far word(EnterFar, ExitFar).
-  �����ⲿ���̣����õ�VM���룺 EnterFar module-index cfa-address�� Ҳ����˵������near ���ã�ֻ��Ҫֱ��д�µ�ַ�����Ƕ���Far���þͱ���ҪOpCode + OpRands
-  �ڱ����ڴ������� Index, ��������ModuleIndex,���������Լ��ڲ�����EnterFar���Ͳ���Ҫȥ����ģ���ַ��.
-  �����ForthDLL�����ӷ�ʽ���ã�
++ [VM] 当调用其他模块的函数时候，是否需要保存现场？
+  至少EDI(FMemory)和ESI(PC:Program Counter)需要保存。堆栈是共用，不需要保存。除非是delphi写的。
+  但是我返回的时候？如何才能返回？
+  回答：增加Far word, 和 near word, 对于私有过程（只在本模块内有效），采用 near word(默认, Enter, Exit); 对于能被其他模块访问的过程
+  则采用far word(EnterFar, ExitFar).
+  对于外部过程，调用的VM代码： EnterFar module-index cfa-address， 也就是说，对于near 调用，只需要直接写下地址，但是对于Far调用就必须要OpCode + OpRands
+  在保留内存区增加 Index, 用来保存ModuleIndex,这样对于自己内部调用EnterFar，就不必要去查找模块地址了.
+  这就是ForthDLL的链接方式调用！
 
 iVMEnterFar:
-�ڷ���ջ�б���EDI(�ɵ� FMemory ��ַ), ���� ModuleIndex ����ģ���ڴ��ַ������ҵ�������EDI���µ� FMemory ��ַ,Ȼ��װ��ú����ĵ�ַ�������ͺ�VMEnterһ���ˣ�תȥVMEnter��
+在返回栈中保存EDI(旧的 FMemory 基址), 根据 ModuleIndex 查找模块内存基址，如果找到就设置EDI成新的 FMemory 基址,然后装入该函数的地址，其它就和VMEnter一样了，转去VMEnter。
 
   PUSH EDI
   LODSD
@@ -2739,35 +2739,35 @@ iVMExitFar:
   JMP iVMNext
 
 2006-9-20
-+ ����ʵ�� TTurboX86Interpreter ����������
-  !+ û�е���ִ�� ({$Define TurboScript_Stepping_Supports})
-  !+ ����ջ������ջû������жϡ� {$Define TurboScript_DataStack_Overflow_Inspect} {$Define TurboScript_ReturnStack_Overflow_Inspect}
-  !+ �ڴ�û������ж� {$Define TurboScript_Memory_Overflow_Inspect}
-~ ���ڿ�������ָ�����ת�Ƶ�ַ�Ƿ�������ջ�л��ǲ������У�
-  ��ͨ�ˣ�JMPָ������������ڴ��У�GOTOָ�������������ջ�У�����GOTO�Ĳ���ֻ�Ǿ��Ե�ַ��
++ 基本实现 TTurboX86Interpreter 解释器核心
+  !+ 没有单步执行 ({$Define TurboScript_Stepping_Supports})
+  !+ 返回栈＆数据栈没有溢出判断。 {$Define TurboScript_DataStack_Overflow_Inspect} {$Define TurboScript_ReturnStack_Overflow_Inspect}
+  !+ 内存没有溢出判断 {$Define TurboScript_Memory_Overflow_Inspect}
+~ 关于控制流程指令：到底转移地址是放在数据栈中还是操作数中？
+  想通了，JMP指令操作数放在内存中，GOTO指令操作数在数据栈中，而且GOTO的参数只是绝对地址。
   GetBindingVar(str-addr -- addr) return the variable address(real absolute address). nil means not found.
-  GetBindingWord(str-addr -- callingConvention addr) callingConvention �Ǳ�����word�ĵ�������
-  CallBinding (callingConvention addr -- ) ���ڸú�������������ģ���У����Ըõ�ַΪ��ʵ��ַ��
+  GetBindingWord(str-addr -- callingConvention addr) callingConvention 是表明该word的调用类型
+  CallBinding (callingConvention addr -- ) 由于该函数可以在其它模块中，所以该地址为真实地址。
 
 2006-9-14
-~�������ջ������ջʹ��ȫ���ڴ棬�ô����Ƕ��ִ�������Թ������ݣ��������Ƕ��ִ�������ܲ���ִ�С�
- Ҳ����ִ�������滹Ӧ��һ���࣬�����Ϳ��Թ�������ջ������ջ�ڴ��Լ�������������������ϾͿ��Բ���ִ�С�
- ������ʲô���أ� TTurboProgram:
+~如果参数栈＆返回栈使用全局内存，好处就是多个执行器可以共享数据，坏处就是多个执行器不能并行执行。
+ 也许在执行器上面还应有一个类，这个类就可以管理参数栈＆返回栈内存以及参数，这样在这个类上就可以并行执行。
+ 这个类叫什么好呢？ TTurboProgram:
    TTurboProgram: Execute
 
-��ס�����X86��ջ�� ѹ�����ǵ�ַ���٣��������ǵ�ַ���ӣ�ESP����ָ��ջ����
+记住这里的X86堆栈： 压入则是地址减少，弹出则是地址增加，ESP总是指向栈顶。
 When an item is pushed onto the stack, the processor decrements the ESP
 register, then writes the item at the new top of stack. When an item is popped off the stack, the
 processor reads the item from the top of stack, then increments the ESP register
 
 2005-7-19
-* ���������ַ�������Ӷ���ָ��!!����ô��������ô��!!
+* 决定不在字符串后面加对齐指令!!是怎么样就是怎么样!!
 
-�ֹ����ٲ��ԣ�
-PC: CPU������ָ��
-IP: FORTH������ָ��
+手工跟踪测试：
+PC: CPU的运行指针
+IP: FORTH的运行指针
 
-���ú��Ĵʻ㣺iVMNext, ִ�е�ǰIP.
+调用核心词汇：iVMNext, 执行当前IP.
 (IP) -> W  fetch memory pointed by IP into "W" register
               ...W now holds address of the Code Field(CFA)
 
@@ -2778,29 +2778,29 @@ IP+2 -> IP advance IP, just like a program counter
 JMP (X)     jump to the address in the X register
 
 2005-7-18
-�ò������Ƿ���д�Ľ�������ȷ����
-* [Bug] ����������󣡣�
+该测试下是否我写的解释器正确！！
+* [Bug] 修正编译错误！！
 
-Win32Forth ������ջ���õ�����������ļ���:
-����ջʹ�õ���Hardwareջ������ʹ��EBX��Ϊʵ��ջ����
+Win32Forth 的数据栈采用的是我所设想的技巧:
+数据栈使用的是Hardware栈，不过使用EBX作为实际栈顶。
 
 EBX    <-- TOS Data
-����ջ <-- �ڶ�������
+数据栈 <-- 第二个数据
 
 (a b -- )
 EBX = a
-b is in  ����ջ.
+b is in  数据栈.
 
 TIB: Text Input Buffer
 
-�޸�FORTH���������ڴ�ӳ��Ľṹ:
-FORTH��������ʼ����ʱ���ȷ�����ڴ棺
+修改FORTH解释器的内存映象的结构:
+FORTH解释器初始化的时候，先分配的内存：
 [cTIBLengthOffset]TIBLength: DWORD (#TIB=1)
 [cToINOffset]>IN:DWORD(the current TIB index)
-[cTIBOffset]TIB(1024 Byte):ԭ���ڴ棡
+[cTIBOffset]TIB(1024 Byte):原有内存！
 
-�Ӵ���װ��:
-[cLastWordEntryOffset]LastWordEntry: DWORD(PForthWord); ָ��ó����Ԫӵ�еĵ������
+从磁盘装入:
+[cLastWordEntryOffset]LastWordEntry: DWORD(PForthWord); 指向该程序或单元拥有的单词入口
 
 cTIBLengthOffset = 0;
 cToINOffset = cTIBLengthOffset + SizeOf(Integer);
@@ -2808,15 +2808,15 @@ cTIBOffset = cToINOffset + SizeOf(Integer);
 cMAXTIBCount = 1024; //Bytes
 cLastWordEntryOffset = cTIBOffset + cMAXTIBCount;
 
-�����е���ˣ���Ȼ������ĵ�ַ�����ƫ��������ô���еĵ�ַ��Ӧ���ǲŶԣ�
-���@��FORTH�ʻ㣬Ҳ��ȡ�����ƫ������
-�����Ҫ��ȡ���Ե�ַ���ⲿ��ַ�������ݣ�Ӧ�ý���ר�ŵķǱ�׼�ʻ���������
-���ԣ�����д��һЩ�ʻ�Ҫ�ģ���
+我又有点昏了，既然我这里的地址是相对偏移量，那么所有的地址都应该是才对！
+因此@等FORTH词汇，也是取的相对偏移量！
+如果需要存取绝对地址（外部地址）的数据，应该建立专门的非标准词汇来处理！
+所以，我所写的一些词汇要改！！
 
-���⣺��TIB��Ϊ�̶��Ļ���������FORTH�ڴ��У�������SP-FORTH �������1024���ֽڣ���
+另外：将TIB作为固定的缓冲区放入FORTH内存中，不错（SP-FORTH 分配的是1024个字节）。
 spf_parser.f
 
-������ϵͳ��ʵ�ֵĺ��Ĵʻ�:
+必须在系统中实现的核心词汇:
 spf_defkern.f
 CODE _CREATE-CODE
 CODE _CONSTANT-CODE
@@ -2825,7 +2825,7 @@ CODE _SLITERAL
 CODE _CLITERAL-CODE
 CODE _USER-VALUE
 
-���Ϊ: spf_forthproc.f
+其次为: spf_forthproc.f
 @, !, DUP, LAST-CFA, ALLOT, DP, HERE, LAST, ",", 
 
 6.1.2450 WORD 
@@ -2859,10 +2859,10 @@ It' for the input buffer process(TIB).
 ;
 
 2005-7-17
-��ʼ����Ĵʻ㡣
+开始搞核心词汇。
 
 2005-7-15
-�������������ַ�����FORTH��,�������Ƕ��ǻ�����ַ�߽磨����Pointer�Ĵ�С���㣩��
+现在我有两种字符串在FORTH中,并且它们都是会对齐地址边界（基于Pointer的大小计算）：
 ShortString: (ByteCount)PChar
 String: (IntCount)PChar
 
@@ -2884,72 +2884,72 @@ begin
 end;
 
 
-�����趨���ʽṹ��
-ɾ�������ڿ������趨��ֻ�е���������
-���ڿⲻ�ڴ˴�������
-Ҳ����˵LibEntry �����Forth Word Entry.
+重新设定单词结构：
+删除掉关于库名的设定。只有单词链表。
+至于库不在此处处理。
+也就是说LibEntry 变成了Forth Word Entry.
 
-�ļ�ͷ:
+文件头:
 MagicWord: 'SUPER4TH'
-//���� TYPE(TSuperForthFileType): �ǳ��򣬻��ǿ�
-NAME��StrLen(Byte): string
-�汾�ţ�DWORD
-���ڣ�DWORD(The Data field indicates the number of calendar days since the start of the calendar (the number of days since 1/1/0001 plus one).)
-����ջ��С�� DWORD��0��ʾĬ�ϡ�
-����ջ��С�� DWORD��0��ʾĬ�ϡ�δ�ã�ʹ��ϵͳ�ķ���ջ��
+//类型 TYPE(TSuperForthFileType): 是程序，还是库
+NAME：StrLen(Byte): string
+版本号：DWORD
+日期：DWORD(The Data field indicates the number of calendar days since the start of the calendar (the number of days since 1/1/0001 plus one).)
+参数栈大小： DWORD，0表示默认。
+返回栈大小： DWORD，0表示默认。未用，使用系统的返回栈。
 
-װ���ڴ��ӳ��:
-LibEntry: DWORD(PForthWord); ָ��ó����Ԫӵ�еĵ������
+装入内存的映象:
+LibEntry: DWORD(PForthWord); 指向该程序或单元拥有的单词入口
 
-��ΪҪ��������ջ�е�����,����,SP����ָ�룬����ָ����ˣ�
-�����Զ�̬��������ν����ʱ�����ö�̬���顣
+因为要传递数据栈中的数据,所以,SP该是指针，可以指向别人！
+不过对动态数组无所谓！暂时就先用动态数组。
 
 2005-7-12
-~ �������Ӻ͵��������Ľű��еĵ��ʵ����⡣
+~ 关于连接和调用其它的脚本中的单词的问题。
 
-���õĵ�Ԫ�б���������˵����
+调用的单元中必须对其进行说明：
 ImportWord WordName LibName
 
-������һ�����򣨵�Ԫ����ʹ�ö����൥�ʵĽṹ��
-���ҵ�FORTH�жԳ���͵�Ԫ�������֣��Ժ��ͳ��Ϊ
-��Ԫ������ڵ�Ԫ�д���Main�ĵ��ʣ���ô����ûָ��
-Word��Execute,�ͻ�ִ��Main������ʡ�
+放弃在一个程序（单元）中使用多个库多单词的结构。
+在我的FORTH中对程序和单元不加区分，以后就统称为
+单元，如果在单元中存在Main的单词，那么调用没指定
+Word的Execute,就会执行Main这个单词。
 
-ֻ�б��浽�ļ��вŴ���:MagicWord, UnitName
-�����в�����(Ϊ�˷����ҽ�VMCodeֱ��д�����ݿ�)
+只有保存到文件中才存在:MagicWord, UnitName
+在流中不存在(为了方便我将VMCode直接写入数据库)
 
-���ڷǱ���Ԫ�Ĵʵķ��ࣺ
-Forth �ʻ�
+对于非本单元的词的分类：
+Forth 词汇
 Delphi
 DLL
 
 2005-7-11
-+ FORTH���������Ĵʻ�:
++ FORTH解释器核心词汇:
   VMFillMem
 
 2005-7-8
-+ FORTH���������Ĵʻ�:
++ FORTH解释器核心词汇:
   Enter
   Exit
   Next
 
 2005-7-7
-���� delphi������˵�������·�����ڴ��ܴ��������ƶ��ÿ�ĵ�ַ���ܷ��µĵط���
-���ƶ��󣬳��������ƫ�����������ֵ��е�CFA��ַ��ȫ�����������ǶԾ��Ե�ַ���е�ַ�ض�λ��
-�������������״̬����ô�����Ѿ�ѹ���ջ�ľ��Ե�ַ��Ҳ�������
+按照 delphi帮助所说，当重新分配的内存块很大，它将会移动该块的地址到能放下的地方！
+当移动后，除非是相对偏移量，否则字典中的CFA地址将全部出错！除非对绝对地址进行地址重定位。
+另外如果在运行状态，那么对于已经压入堆栈的绝对地址，也会出错。
 
-���ԣ����뽫��������ݷֿ��źã����߾�ֻ�в��ù̶���С���ڴ�顣
-��ʱ���ù̶��ڴ�飬��Ϊ���ĵ��ʶ���PFA����Ȼ��Ҫ�������ж�̬���ӵ��ʵ�Ӧ�ñϾ���������
+所以，必须将程序和数据分开才好，或者就只有采用固定大小的内存块。
+暂时采用固定内存块，因为它的单词都是PFA。当然需要在运行中动态添加单词的应用毕竟是少数。
 
-��Ȼ��������еĵ�ַȫ���������ƫ������ַ����ô�Ͳ�����ڵ�ַ�ض�λ����������һ�����ٶ�
-��Ȼ����һ����Ӱ�졣
+当然，如果所有的地址全部都是相对偏移量地址，那么就不会存在地址重定位。但是这样一来，速度
+必然会受一定的影响。
 
-���ҵĽ�����ʵ���У���ջ�ķ��������ϵ����ģ�ѹջ��������ջ��ָ������ָ��δ�õ�Ԫ�ء�
-����ʹ�õĵ�ַȫ���������ƫ������ַ.
+在我的解释其实现中，堆栈的方向是向上递增的（压栈），它的栈顶指针总是指向未用的元素。
+并且使用的地址全部都是相对偏移量地址.
 
-��������Ҫ��������ָ��:
-1. IP ����ָ�������ָ��
-2. PC FORTH��PFA��������ָ��
+解释器需要两个运行指针:
+1. IP 机器指令的运行指针
+2. PC FORTH的PFA解释运行指针
 
 type
   TmMethod = procedure of object;
@@ -2968,36 +2968,36 @@ begin
 end;
 
 2005-7-6
-���Cast �����е�Ԫ�أ�
+如何Cast 数组中的元素：
 aLongWord := PLongWord(@Array[3])^
 PForthLibEntry := PForthLib(@Array[3])
 
 
-����ͨ�ˣ�FORTH���ڴ��е���֯�����Ը��ݲ�ͬ�ص����ʵ�ַ�ʽ��ͬ����ͬ��
-�����ļ�ӳ������κ�ʵ�ֶ�������һ���ģ�
-���ļ��е���֯��
+我相通了，FORTH在内存中的组织，可以根据不同地点具体实现方式不同而不同。
+但是文件映像对于任何实现都必须是一样的！
+在文件中的组织：
 MagicWord: 'SUPER4TH'
 
-���� TYPE(TSuperForthFileType): �ǳ��򣬻��ǿ�
-NAME��StrLen(Byte): string
-�汾�ţ�DWORD
-���ڣ�DWORD(The Data field indicates the number of calendar days since the start of the calendar (the number of days since 1/1/0001 plus one).)
-����ǳ���
-  ����ջ��С�� DWORD��0��ʾĬ�ϡ�
-  ����ջ��С�� DWORD��0��ʾĬ�ϡ�δ�ã�ʹ��ϵͳ�ķ���ջ��
-����ǿ⣺
-  ����ջ��С�� DWORD��0��ʾĬ�ϡ�δ��
-  ����ջ��С�� DWORD��0��ʾĬ�ϡ�δ�ã�ʹ��ϵͳ�ķ���ջ��
+类型 TYPE(TSuperForthFileType): 是程序，还是库
+NAME：StrLen(Byte): string
+版本号：DWORD
+日期：DWORD(The Data field indicates the number of calendar days since the start of the calendar (the number of days since 1/1/0001 plus one).)
+如果是程序：
+  参数栈大小： DWORD，0表示默认。
+  返回栈大小： DWORD，0表示默认。未用，使用系统的返回栈。
+如果是库：
+  参数栈大小： DWORD，0表示默认。未用
+  返回栈大小： DWORD，0表示默认。未用，使用系统的返回栈。
 
-LibEntry: DWORD; ָ��ó����Ԫӵ�еĵ��ʿ����
-  PriorLibEntry: DWORD(Pointer) �ļ��е����ƫ����
+LibEntry: DWORD; 指向该程序或单元拥有的单词库入口
+  PriorLibEntry: DWORD(Pointer) 文件中的相对偏移量
   LibNameLen: Byte
   LibName: array [0..LibNameLen] of char, the last char is #0
-  LastWord: DWORD(Pointer) //the last word. ��Ϊ����һ��ֻ����priorǰ�ƶ��ĵ���������
+  LastWord: DWORD(Pointer) //the last word. 因为它是一个只能向prior前移动的单向链表。
 
-������:
-    PriorWord: DWORD(Pointer); //ǰһ������ 0 means Ϊ��ǰ�档�ļ��е����ƫ����
-    Precedence: Byte; //���ȼ�, 0=low, 1=high equals 1 for an IMMEDIATE word
+单词链:
+    PriorWord: DWORD(Pointer); //前一个单词 0 means 为最前面。文件中的相对偏移量
+    Precedence: Byte; //优先级, 0=low, 1=high equals 1 for an IMMEDIATE word
     //1=True; 0=False; Smudge bit. used to prevent FIND from finding this word
     //this can be extent to private, protected, public, etc
     Visibility: Byte; 
@@ -3006,23 +3006,23 @@ LibEntry: DWORD; ָ��ó����Ԫӵ�еĵ��ʿ����
     ParamFieldLength: DWORD
     NameLen: Byte
     Name: array [0..NameLen] of char, the last char is #0
-    //CFA: DWORD //��ʵ����ֱ��ָ���ĳ�����ʵ�PFA�������Ǹ����ʵ�PFA����ֱ��ִ�еĻ�������ѡ�
+    //CFA: DWORD //其实就是直接指向的某个单词的PFA，不过那个单词的PFA就是直接执行的机器码而已。
                //CFA = ParameterFields[0]
     ParameterFields: array [0..PFLen-1] of integer(DWORD);
 
-����Ϊ�ļ��е���֯��
+以上为文件中的组织。
 _______________________________
-  ���ڴ�����֯:
+  在内存中组织:
   TForthLib = packed record
     Name: string; //1 DWord(Pointer)
-    PLastWord: PForthWord; //the last word. ��Ϊ����һ��ֻ����priorǰ�ƶ��ĵ���������
+    PLastWord: PForthWord; //the last word. 因为它是一个只能向prior前移动的单向链表。
   end;
   //TForthWords = array of TForthWord;
   PForthWord = ^ TForthWord;
   TForthWord = packed record //ITC (Indirect Threaded Code)
-    PriorWord: PForthWord; //ǰһ������ -1 means Ϊ��ǰ�档
+    PriorWord: PForthWord; //前一个单词 -1 means 为最前面。
     Name: String;
-    Precedence: Byte; //���ȼ�, 0=low, 1=high equals 1 for an IMMEDIATE word
+    Precedence: Byte; //优先级, 0=low, 1=high equals 1 for an IMMEDIATE word
     //1=True; 0=False; Smudge bit. used to prevent FIND from finding this word
     //this can be extent to private, protected, public, etc
     Visibility: Byte; 
@@ -3031,22 +3031,22 @@ _______________________________
     //ParameterFields: array of PForthWord; //the first PFA is CFA.
   end;
 
-���ڱ�����FORTH��CFA��Ҫ�ر��ע����Ϊ��ԭʼ��ITC����ģʽ�У�CFAֱ��ָ�����ִ�еĻ������ַ��
-�������ҵı�����FORTH���������Ѿ������FORTH����������CFA��ִ������Host�У���ô�ͱ���Ըõ�ַ�����ض�λ��
-��ô�������CFA����Host or VM����
-��FORTH Word ͷ�ṹ������ CodeFieldStyle ���ԣ�
+对于编译型FORTH，CFA需要特别关注。因为在原始的ITC运行模式中，CFA直接指向的是执行的机器码地址。
+而对于我的编译型FORTH，当加载已经编译的FORTH虚拟机后，如果CFA的执行码在Host中，那么就必须对该地址进行重定位。
+那么如何区分CFA（在Host or VM）？
+在FORTH Word 头结构中增加 CodeFieldStyle 属性：
 cfsHost: the CF is in Host, so the CFA is the index No for the Host. Must fix.
 cfsFORTH: the CF is in FORHT, so the CFA is the offset address of the FORTH, no need to fix.
 
 2005-7-5
-�ֵ����ṹ��
-1���ֵ����������������ֵ��
-  ���ļ��е���֯:
+字典区结构：
+1、字典索引区：包含的字典库
+  在文件中的组织:
   LibNameLen: Byte;
   LibName: array [0..LibNameLen-1] of char
-  LastWordOffset: Integer; //�ÿ�����һ�����ʵ�ƫ����.
+  LastWordOffset: Integer; //该库的最后一个单词的偏移量.
 
-  ���ڴ�����֯:
+  在内存中组织:
   TForthLibs = array of TForthLib;
   TForthLib = packed record
     Name: String[31]; //32 bytes
@@ -3055,42 +3055,42 @@ cfsFORTH: the CF is in FORHT, so the CFA is the offset address of the FORTH, no 
   TForthWords = array of TForthWord;
   PForthWord = ^ TForthWord;
   TForthWord = packed record //ITC (Indirect Threaded Code)
-    PriorWord: PForthWord; //ǰһ������ -1 means Ϊ��ǰ�档
+    PriorWord: PForthWord; //前一个单词 -1 means 为最前面。
     Name: String[31]; //32 bytes
     State: Word; //include Precedence bit(equals 1 for an IMMEDIATE word), Smudge bit(the 2nd bit used to prevent FIND from finding this word.)
     CallStyle: Word;
     ParameterFields: array of PForthWord; //the first PFA is CFA.
   end;
-  �����������ڴ���֯���������������������ٶ�̫����
-  ���ǲ��÷���һ���̶���С���ڴ�������Ϊ�ֵ���(ͳһ����Memory��)��
+  放弃这样的内存组织，清晰倒是清晰，但是速度太慢！
+  还是采用分配一个固定大小的内存区域作为字典区(统一放在Memory区)。
 
-ע��
-  1. ���ڷǻ�����,�ù��������Ƿ��в�����ֲ�����,������push EBP; MOV EBP, ESP�Ķ���!
-     Ҳ����˵�������ʹ��һ��Ĺ���,�Ͳ��ܽ�ϵͳ��ջ��Ϊ����ջʹ�ã�
+注：
+  1. 对于非汇编过程,该过程无论是否有参数或局部变量,都会有push EBP; MOV EBP, ESP的动作!
+     也就是说如果我想使用一般的过程,就不能将系统堆栈作为参数栈使用！
 
 2005-7-4
-Ϊ�˱������¼����ַ��ȫ���������ƫ������
+为了避免重新计算地址，全部采用相对偏移量！
 
-�ʻ�����ݽṹ��
-Core �ʻ�: ��������� �������û�ࣩʵ�ֵġ�����ģ�
-System �ʿ⣺ ��Core�ʻ�Ϊ������д�ģ���ȻҲ�����û��ʵ�֣�����Ϊ�˿���ֲ�ԣ��������ʵ�ַ�ʽ���С�
+词汇的数据结构：
+Core 词汇: 虚拟机器码 （或者用汇编）实现的。必须的！
+System 词库： 以Core词汇为基础编写的，当然也可以用汇编实现，不过为了可移植性，最好两种实现方式都有。
 
-��ô��֯Unit��
-����һ��Unitָ�룬�����ڴʻ�ָ��CP, Context, Last, Current:
+怎么组织Unit？
+增加一个Unit指针，类似于词汇指针CP, Context, Last, Current:
 
-��֮Ϊ�ֵ���(��ʻ���),���ǵ�����һ���ռ������б��ڴ���������ALLOT����ռ䡣
+称之为字典区(或词汇区),这是单独的一个空间区域，有别于代码区，由ALLOT分配空间。
 
 
 2005-7-2
-��ITC�����£����еĵ������ݶ��ǵ�ַ(ָ���������ʵ�CFA�ĵ�ַ)�����Ա�����һ���򵥵Ľ���������ʵ�Ʋ��Ͻ��ͣ���Ϊ�����ʵ�����תָ������Ƕ�뵽���������ˡ�Enter, Exit, Next����ִ�С�
-ͨ��CFAָ����ʵ�Ļ���ִ���롣
-ֻ���������û�����ĵ��ʣ�For all colon(ð��) definitions���У�������ڵ�������"Enter",���ڵ�������"Exit"��
+在ITC机制下，所有的单词内容都是地址(指向其他单词的CFA的地址)。所以必须有一个简单的解释器（其实称不上解释，因为它把适当的跳转指令早已嵌入到代码流中了“Enter, Exit, Next”）执行。
+通过CFA指向真实的机器执行码。
+只不过对于用户定义的单词（For all colon(冒号) definitions）中，它的入口单词总是"Enter",出口单词总是"Exit"。
 
-ע�⣺
-  * Enter �ֵ�FORTH�ϳ��� DOCOL or DOCOLON�������Ǳ��浱ǰIP��Ȼ����ת��PFA�е���һ������ִ�С�
-  * Exit ��fig-Forth �б����� ;S�������ǻָ������IP��Ȼ����ת��ȥ��
-  * Next �����û����ʻ�ϵͳ���ʶ��е�,���ڵ��ʵ����.
-  * PFA:  Parameter Field address, �û����ʵĶ����壨�������ݣ���
+注意：
+  * Enter 又的FORTH上称作 DOCOL or DOCOLON。作用是保存当前IP，然后跳转到PFA中的下一个单词执行。
+  * Exit 在fig-Forth 中被称作 ;S。作用是恢复保存的IP，然后跳转回去。
+  * Next 无论用户单词或系统单词都有的,用在单词的最后.
+  * PFA:  Parameter Field address, 用户单词的定义体（单词内容）。
 
 (IP) -> W  fetch memory pointed by IP into "W" register
               ...W now holds address of the Code Field(CFA)
@@ -3101,7 +3101,7 @@ IP+2 -> IP advance IP, just like a program counter
               ...X now holds address of the machine code 
 JMP (X)     jump to the address in the X register
 
-Enter ��α����
+Enter 的伪流程
 (the address of the Forth word just entered is kept in W. SEE NEXT)
 
 PUSH IP to Reutrun Stack
@@ -3109,34 +3109,34 @@ ADD W, 3     //Parameter Field address -> W
 MOV IP, W
 NEXT
 
-Exit ��α����
+Exit 的伪流程
 POP IP From RS
 NEXT
 
-NEXT ��α����
+NEXT 的伪流程
 (IP) -> W  fetch memory pointed by IP into "W" register
               ...W now holds address of the Code Field(CFA)
 IP + 2 -> IP //(assuming 2-byte addresses in the thread)
 (W) -> X  // the machine code address of CFA in W
 JMP (X)
 
-����8086���Ż���
+关于8086的优化：
    AX = W         DI = scratch
    BX = TOS       SI = IP
    CX = scratch   BP = RSP
    DX = scratch   SP = PSP
 
 Enter:
-  XCHG SP,BP  //��ϵͳ��ջָ��FORTH����ջ, ע�⣬�����ϵͳ��ջ��Ϊ����ջ��ָ��Ͳ���!
-  PUSH SI     //��IPָ��ѹ��FORTH����ջ
-  XCHG SP, BP //��ԭ, ע�⣬�����ϵͳ��ջ��Ϊ����ջ��ָ��Ͳ���!
-  ADD AX, 3   //Parameter Field address -> W �Ҿ���Ӧ���Ǽ�2�Ŷ�!!! ADD AX, SizeOf(Pointer)
+  XCHG SP,BP  //将系统堆栈指向FORTH返回栈, 注意，如果我系统堆栈作为返回栈该指令就不必!
+  PUSH SI     //将IP指针压入FORTH返回栈
+  XCHG SP, BP //还原, 注意，如果我系统堆栈作为返回栈该指令就不必!
+  ADD AX, 3   //Parameter Field address -> W 我觉得应该是加2才对!!! ADD AX, SizeOf(Pointer)
   NEXT
 
 Exit:
-  XCHG SP,BP  //��ϵͳ��ջָ��FORTH����ջ, ע�⣬�����ϵͳ��ջ��Ϊ����ջ��ָ��Ͳ���!
-  POP SI     //��IPָ��ѹ��FORTH����ջ
-  XCHG SP, BP //��ԭ, ע�⣬�����ϵͳ��ջ��Ϊ����ջ��ָ��Ͳ���!
+  XCHG SP,BP  //将系统堆栈指向FORTH返回栈, 注意，如果我系统堆栈作为返回栈该指令就不必!
+  POP SI     //将IP指针压入FORTH返回栈
+  XCHG SP, BP //还原, 注意，如果我系统堆栈作为返回栈该指令就不必!
   NEXT
 
 Next:
@@ -3149,14 +3149,14 @@ Next:
     LODSW   // (SI) -> AX  means (IP) -> W, IP++
     JMP AX  // JMP (W)
 
-== ����Ҫ AND wonderful DOES> ��� ==
-FORTH ���ʶ����Body���������ֹ��ɵģ�CF(Code Field) and PF(Parameter Field).
+== 最重要 AND wonderful DOES> 语句 ==
+FORTH 单词定义的Body是由两部分构成的：CF(Code Field) and PF(Parameter Field).
  * The Code Field is the "action" taken by this Forth word, and the Parameter Field is the data on which it acts.
  * The Code Field is a subroutine call, and the Parameter Field is parameters that are included "in-line" after the call. (The assembly language programmer's view.)
  * The Code Field is the single "method" for this "class" of words, and the Parameter Field contains the "instance variables" for this particular word. (The object-oriented programmer's view.) 
 
-Code Field��������һ����������PF���������ʼ��ַ. CF������������PFA�����ݣ��ǵ��ʣ��������������ʻ�����ȵȡ�
-FORTHԤ�������¼���Code Field���̡�
+Code Field过程总有一个参数――PF参数域的起始地址. CF过程用来解释PFA的内容，是单词，常量，变量，词汇表，等等。
+FORTH预定了以下几种Code Field过程。
 
 ||    Code Field  || Parameter Field || 
 ||    routine     || contents        ||                
@@ -3165,85 +3165,85 @@ FORTHԤ�������¼���Code Field���̡�
 ||    DOVAR       || a storage location for data  ||
 ||    DOVOC       || vocabulary info (varies by implementation) ||
 
-ͨ��DOES>��䣬����ʵ���Լ���Code Field���̡������ҿ��Ժ����׵�ͨ������Code Field����ʵ�ֶ�Delphi�����Լ�stdcall,fastcall�ȵȹ��̵ĵ��á�
+通过DOES>语句，可以实现自己的Code Field过程。这样我可以很容易的通过扩充Code Field过程实现对Delphi过程以及stdcall,fastcall等等过程的调用。
 
 
 2005-7-1
 uForthCore_80386.pas
-������������.������ö�ջ,��ô�Ͳ��ܵ�����ջ�Ĵ�С��.��������ν.�͵����Ծٺ���.������������ֱ��ʹ��Delphi�Ĺ��̡�
-��Ϊ��෽������ʼ����һ��Ĭ�ϲ���������ʼ�ջ�����ڴ���Push EBP�������Է�����ֻ�ú�����ķ�ʽ��ʵ�ֺ��Ĵʻ㡣
+包含纯汇编过程.如果公用堆栈,那么就不能调整堆栈的大小了.不过无所谓.就当是自举好了.而且这样可以直接使用Delphi的过程。
+因为汇编方法将会始终有一个默认参数（这样始终会有入口代码Push EBP），所以放弃，只用函数库的方式来实现核心词汇。
 
 
-80386 �� EBP�е��÷�����Ϊ��ջ�Ŀ��ָ�룬���ٷ��ʶ�ջ����е���ĳ��������
+80386 中 EBP中的用法是作为堆栈的框架指针，快速访问堆栈框架中的中某个参数。
 
-Delphi��ǰ�������������ڣ�EAX, EDX, ECX�У��������Ĳ������մ����ҵ�˳������ѹ���ջ.
+Delphi的前面三个参数放在：EAX, EDX, ECX中！接下来的参数按照从左到右的顺序依次压入堆栈.
 
 function Test(const a: integer; const b: string; const c: TRec; const ok: integer; e: integer = 0): integer;
-asm {push EBP; MOV EBP, ESP} //delphi �����Ĵ���
-end {POP EBP; RET};//delphi �����Ĵ���
+asm {push EBP; MOV EBP, ESP} //delphi 建立的代码
+end {POP EBP; RET};//delphi 建立的代码
 
-�����ӳ�����ʶ�ջ�Ĳ���
+进入子程序访问堆栈的参数
 
-[EBP+$04]��ΪCALL ָ��ѹ��ĵ�ǰIP�������ص�ʱ���á�
-[EBP]��Ϊ�ڽ�����ӹ��̵�ʱ��Delphiѹ��ľɵ�EBPֵ�����˳����ӹ��̵�ʱ����Զ��ָ���ע��������̴��ڲ�����ʱ��Ż�ѹ��ɵ�EBP
+[EBP+$04]：为CALL 指令压入的当前IP，供返回的时候用。
+[EBP]：为在进入的子过程的时候Delphi压入的旧的EBP值！当退出该子过程的时候会自动恢复。注意仅当过程存在参数的时候才会压入旧的EBP
 
-��ջ�еĵ�һ������(���ǲ����������һ������e): [EBP+$08]
-��ջ�еĵڶ�������(���ǲ������е����ڶ�������ok): [EBP+$0C] 
-��
+堆栈中的第一个参数(就是参数表中最后一个参数e): [EBP+$08]
+堆栈中的第二个参数(就是参数表中倒数第二个参数ok): [EBP+$0C] 
+：
 
-ע: 
-  1. ����ǻ�෽��,��ô���һ������ʼ���Ǹö���ʵ���ĵ�ַ(�����෽���������Ǹ����VMT���ĵ�ַ)��
-  2. ���ڷǻ�����,�ù��������Ƿ��в�����ֲ�����,������push EBP; MOV EBP, ESP�Ķ���!Ҳ����˵�����ʹ��һ��Ĺ���,
-     �Ͳ��ܽ�ϵͳ��ջ��Ϊ����ջʹ�ã�
+注: 
+  1. 如果是汇编方法,那么最后一个参数始终是该对象实例的地址(对于类方法而言则是该类的VMT表的地址)。
+  2. 对于非汇编过程,该过程无论是否有参数或局部变量,都会有push EBP; MOV EBP, ESP的动作!也就是说如果我使用一般的过程,
+     就不能将系统堆栈作为参数栈使用！
 
-�ʻ�����ݽṹ��
-Core �ʻ�: ��������� �������û�ࣩʵ�ֵġ�����ģ�
-System �ʿ⣺ ��Core�ʻ�Ϊ������д�ģ���ȻҲ�����û��ʵ�֣�����Ϊ�˿���ֲ�ԣ��������ʵ�ַ�ʽ���С�
+词汇的数据结构：
+Core 词汇: 虚拟机器码 （或者用汇编）实现的。必须的！
+System 词库： 以Core词汇为基础编写的，当然也可以用汇编实现，不过为了可移植性，最好两种实现方式都有。
 
 
 2005-6-30
-�Ҷ�FORTH�����룺
-����ִ�л��ƶ��ɲ��ã��������԰���Delphi Regiser, stdcall, fastcall�ȵ��ⱻ�������÷�ʽ��
-�����Ӻ���ʽ�����޵�����Ϣ״̬������������Ϣ��Published�ĳ��⣩��ֻ����ʹ�õ��Ĺ��̡�
-���ʰ��տ����ķ�ʽ������֯���Ե��ʵĴ��볡�����ݽ������䡣�ڵ���״̬����ԭʼ��FORTH���ܻ������ƣ�ͳһ��ITC����ִ�У���
-�������ʵĴ��볡�����ݶ��˵��÷�ʽ��ָ��һ�¸�ͬ����CFA���Լ�������˵����
-��ʵ�����ƽ�����,Ȼ����ת��ʵ�ֻ�����.
+我对FORTH的设想：
+几种执行机制都可采用，甚至可以包括Delphi Regiser, stdcall, fastcall等等这被称作调用方式。
+在连接后（正式发布无调试信息状态）消除名字信息（Published的除外），只包括使用到的过程。
+单词按照库名的方式分类组织。对单词的代码场的内容进行扩充。在调试状态下与原始的FORTH构架基本类似（统一用ITC机制执行）！
+不过单词的代码场的内容多了调用方式、指向一下个同名的CFA域、以及参数的说明。
+先实现类似解释性,然后在转向实现机器码.
 
-  ������Forth������������������
+  完整的Forth缓存器有下列六个。
   PSP:Parameter Stack(or data stack) Pointer
   TOS:Top Of Stack
   RSP:Return Stack Pointer
   IP :Interpreter Pointer
   UP :User Pointer
   W  :Working register
-  ����������������moving forthԭ���ڳ�ΪX����������������A(Addressing)��������
-  �������������������ܡ�
-  PSP,TOS��Ϊ���ݶ�ջ��ػ�������PSPΪ�������ݶ�ջָ֮������
-    ��TOSΪ���ݶ�ջ���˻�����������Ϊ���ݶ�ջ�������󣬵�ֻ��һ�������ڡ�
-    ����������������CPU֮�У��м������ݴ��������á�
-  RSP��Ϊ�������֮���ض�ջָ������
-  IP ��ִ��Forth word��֮��ַ������������ָ���´�ִ����Ϊ�Σ����������ֵ���ء�
-  UP ��ʹ���߹����û�������Ϊ����������û�������ָ��task����������¼��Task�����Ϣ��
-  W  �����������û������������ֵ䶯���������á�
+  另有其它缓存器，moving forth原文内称为X缓存器，亦有人用A(Addressing)缓存器。
+  以下描述各缓存器功能。
+  PSP,TOS：为数据堆栈相关缓存器，PSP为管理数据堆栈之指针器。
+    而TOS为数据堆栈顶端缓存器，主因为数据堆栈动作量大，但只有一个进出口。
+    若将顶端数据留在CPU之中，有加速数据处理的作用。
+  RSP：为程序呼叫之返回堆栈指针器。
+  IP ：执行Forth word用之地址缓存器，用以指向下次执行字为何，其运作和字典相关。
+  UP ：使用者管理用缓存器，为多任务管理用缓存器，指向task作用区。记录其Task相关信息。
+  W  ：辅助工作用缓存器，辅助字典动作或运算用。
 
-FORTH���룺���ǲ���������Ĺ��̡�
-FORTH��ִ�У�
-  ��ʼ��
-  ���ݲ�ͬ��ִ�л���ִ�С���ѡITC��ʽ��
+FORTH编译：就是插入代码流的过程。
+FORTH的执行：
+  初始化
+  根据不同的执行机制执行。我选ITC方式。
 
-ע�⣺���ҵ����������TOSʵ���Ͼ��� ParameterStackSize.
+注意：在我的虚拟机器中TOS实质上就是 ParameterStackSize.
 
-��������ڴ��е���֯��
+代码的在内存中的组织：
 
 |Address of CFA|Address of CFA|....|NEXT
 
 2005-6-16
-��ʵ����򵥵ı����͵Ľű�ִ������
-   ֻ��ȫ�ֱ�����ִ���壨�������㣬��ֵ����ʾ����
-   ����Ҫ����֧�ֵ��������ͣ�������Բο� 2004-12-14��
+！实现最简单的编译型的脚本执行器：
+   只有全局变量，执行体（四则运算，赋值，显示）。
+   还需要定义支持的数据类型，其余可以参考 2004-12-14。
 
 2005-3-4
-���о���Ҫʵ�ֵ�Forth���Ĵʻ㣡
+！列举需要实现的Forth核心词汇！
 
 2005-1-12
 Flowchart:
@@ -3252,31 +3252,31 @@ Flowchart:
     if Assigned(aFormator) then
     else raise ESuperExecutor.Create(RSInvalidPEFormat);
 2004-12-23
-1������PE�ļ�ͷ��ʽ
-  ������ķ�������
-  ����PE�ļ�ӳ����
-  Ҳ�����Ƕ���ģ��: ���룬���ݼ��ϡ�
-2������ִ�����෽������
-3������������෽������
+1、定义PE文件头格式
+  定义类的方法属性
+  俺的PE文件映像定义
+  也许考虑定义模块: 代码，数据集合。
+2、定义执行器类方法属性
+3、定义编译器类方法属性
 
 19:33 2004-12-14
-����ƻ���
-1��VM������: װ��VM�룬��VM���ɻ�����ֱ�����С���������һ�¾ͽ���˴����ض������⡣
-���������������򻮷֣���
-  ������ CodeArea : ������д��롣
-  ������ DataArea : ���ȫ�ֱ�����
+任务计划：
+1、VM运行器: 装入VM码，将VM码变成机器码直接运行。这样翻译一下就解决了代码重定向问题。
+定义数据区域（区域划分）：
+  代码区 CodeArea : 存放运行代码。
+  数据区 DataArea : 存放全局变量。
 
-  ����ջ ReturnStack: ������ϵͳջ
-  ����ջ DataStack: Intel CPU ��������ջ,ֻ��ģ�⣿���Ĵ�����������Ϊ����ջ��
+  返回栈 ReturnStack: 就是用系统栈
+  数据栈 DataStack: Intel CPU 上无数据栈,只有模拟？将寄存器串起来作为数据栈？
     EAX  : 1 POP Stack
     EDX  : 2
     ECX  : 3
-    //EBX  : 4 ע�� EBX ��Delphi������
-    ����,ջ������õ����Ĵ���: EAX, EDX, ECX���ɣ�Ȼ���������ݷ���ϵͳջ������������ݷ�������ջ���п��ܻ��ƻ�����ջ���ݣ���α�������
-    ���ˣ����ǵ�������һ����������Ϊ���ݶ�ջ������EBX��Ȼ��EBX��Ϊ���ݶ�ջָ�롣EBX=0 ջ��
-    ����ͬ����ջ���ã�����ESP����ջ�Ǽ���һֱ��0��������ջEBXָ��������һֱ��EBP����ʵ�������ESP�Ͳ����������ˣ�ͬ��ESP�������EBX��ôҲ�Ͳ����ټ��٣���
+    //EBX  : 4 注： EBX 是Delphi保留。
+    决定,栈顶由最常用的三寄存器: EAX, EDX, ECX构成，然后其他数据放入系统栈！如果其他数据放入数据栈，有可能会破坏返回栈数据，如何保护？！
+    算了，还是单独开辟一个数据区作为数据堆栈。备份EBX，然后将EBX作为数据堆栈指针。EBX=0 栈底
+    可以同返回栈共用，不过ESP的入栈是减少一直到0，而数据栈EBX指针是增加一直到EBP（其实如果碰到ESP就不能再增加了！同样ESP如果碰到EBX那么也就不能再减少）。
 
-����ʵ�ֵĻ���ָ�:
+定义实现的基本指令集:
     inAdd, //Add(n1+n2=n) n1 n2 -- n
     inSub, //subtract(n1-n2=n) n1 n2 -- n
     inInc, //add 1(n1+1=n) n1 1 -- n
@@ -3322,141 +3322,141 @@ Flowchart:
 
 _______________________________
 
-�������Ľű�������TurboScript
-ԭ����ΪLuna �����ģ��һ���Ϊ��Luna�����ɱ�մմ��ϲ������֪�����ˣ����Ĵ��ˣ����������Ľű�����Ӧ���� EUPHORIA ��
-����Ҫ��������Ϸ�еĽű����棬�������Դ���ˡ�
+世上最快的脚本引擎与TurboScript
+原来以为Luna 是最快的，我还在为比Luna快若干倍沾沾自喜，现在知道错了，大大的错了，世界上最快的脚本引擎应该是 EUPHORIA 。
+它主要被用于游戏中的脚本引擎，最近开放源码了。
  
-���Ľ��������õ��Ǻ��ҵ�TurboScript���ƵĽű�ִ�л���!���������Ľ��������ƺ�û���ṩ�жϡ���ͣ�������������Ǳ����ʱ��������ָ���TurboScript����ÿִ��һ��ָ��ǰ��Ҫ����Ƿ���Ҫֹͣ��������������TurboScript���ԭ��ɣ��������ĺ��Ĵ���ʵ����̫�Ѷ��ˣ����������˶��ģ�ע�����١�ֱ������ָ������Ч�ʱȽϣ�TurboScript������0.25��������ֵ�ø��˵������ĵ����ӹ��̵�Ч�ʱ� TurboScript ��̫���ˣ������ӹ��̵�Ч��TurboScript������70%�����������ҵĲ��Է�����
+它的解释器采用的是和我的TurboScript类似的脚本执行机构!但是在它的解释器中似乎没有提供中断、暂停的渠道，除非是编译的时候插入调试指令，而TurboScript则在每执行一个指令前都要检查是否需要停止。我想这是它比TurboScript快的原因吧，不过它的核心代码实在是太难读了，根本不是人读的，注释又少。直接虚拟指令运行效率比较，TurboScript比它慢0.25倍。不过值得高兴的是它的调用子过程的效率比 TurboScript 慢太多了，调用子过程的效率TurboScript比它高70%倍。下面是我的测试方法：
  
-ȫ������ QueryPerformanceCounter �߾��ȼ�����
+全部采用 QueryPerformanceCounter 高精度计数。
 
-����ָ��򵥲��Լӷ����㣻�ܹ�����2017���ӷ�ָ���볣��ֱ����ӣ� 300*2017=605100
+测试指令：简单测试加法运算；总共测试2017个加法指令与常数直接相加， 300*2017=605100
  
-�����ӣ�
-x86���:
-  ;��ʱ��ʼ
+整数加：
+x86汇编:
+  ;计时开始
   MOV EBX, 300  BB2C010000
   ADD EBX, 300  81C32C010000
-  ..... --- �ܼ� 2017 ��
+  ..... --- 总计 2017 次
   ADD EBX, 300  81C32C010000
-  ;��ʱ����
+  ;计时结束
  
-�������ʱ�䣺60
+结果运行时间：60
  
-EUPHORIA �ӷ�ָ��˳��ִ��Ч�ʲ��Խű�������������������ֻ�� integer, û�����õ�С�����ͣ�ֻ��ʹ��atomģ�⡣��
-  --��ʱ��ʼ
+EUPHORIA 加法指令顺序执行效率测试脚本：【的内置数字类型只有 integer, 没有内置的小数类型，只能使用atom模拟。】
+  --计时开始
     count = 300
     count +=300
-    ..... --- �ܼ� 2017 ��
+    ..... --- 总计 2017 次
     count +=300
-  --��ʱ����
+  --计时结束
  
-�������ʱ�䣺74 ���������ţ�ֻ�Ȼ����18.9%����
+结果运行时间：74 【难以置信，只比汇编慢18.9%倍】
  
-Lua Script �ű���������Luaû���������ͣ�������������ֻ��һ�֣�Double����
-  (��ʱ��ʼ)
+Lua Script 脚本：【错误，Lua没有整数类型，它的数字类型只有一种：Double。】
+  (计时开始)
   local count = 300
   count = count + 300
-    ..... ���ܼ� 2017 �Σ�
+    ..... （总计 2017 次）
   count = count + 300
-  (��ʱ����)
+  (计时结束)
 
-��Lua5.0.2���������ʱ�䣺110 ��Lua5.1�汾����ʱ��Ϊ��120 ��
+【Lua5.0.2】结果运行时间：110 【Lua5.1版本运行时间为：120 】
 
-TurboScript ASM �ű���
-  (��ʱ��ʼ)
+TurboScript ASM 脚本：
+  (计时开始)
   300
   300 +
-    ..... ���ܼ� 2017 �Σ�
+    ..... （总计 2017 次）
   300 +
-  (��ʱ����)
+  (计时结束)
  
-�������ʱ�䣺98 ���Ȼ����38.8%��,���������Ż����ڵ�����ʱ���Ѿ���87���Ȼ����31.0%������ ���ҽ�һ��ȡ��CPUStates(�ж���ֹ��־λ)���ԣ�����ʱ���Ȼ�ͻ�����ˣ�61����
+结果运行时间：98 【比汇编慢38.8%倍,经过初步优化现在的运行时间已经是87（比汇编慢31.0%倍）； 当我进一步取消CPUStates(判断终止标志位)测试，运行时间居然和汇编差不多了：61！】
  
 
-�ӹ��̵���Ч�ʲ���
-x86 ��� �ӹ��̵���Ч�ʲ��Խű�:
+子过程调用效率测试
+x86 汇编 子过程调用效率测试脚本:
 function add(a,b: integer): integer;
 asm
   mov EAX, a
   add EAX, b
 end;
---��ʱ��ʼ
+--计时开始
   asm
     mOV EAX, 300
     MOV EDX, 300    CALL ADD
-    ..... ���ܼ� 2017 �Σ�
+    ..... （总计 2017 次）
     MOV EDX, 300    CALL ADD
---��ʱ����
-�������ʱ�䣺126
+--计时结束
+结果运行时间：126
  
-EUPHORIA �ӹ��̵���Ч�ʲ��Խű�:
+EUPHORIA 子过程调用效率测试脚本:
 function iAdd(integer a, integer b)
   return a+b
 end function
---��ʱ��ʼ
+--计时开始
 count = 300
 count = iAdd(count, 300)
-..... --- �ܼ� 2017 ��
+..... --- 总计 2017 次
 count = iAdd(count, 300)
---��ʱ����
+--计时结束
  
-�������ʱ�䣺522 ���Ȼ�����˽�75.9%������TurboScript ����������70%����
+结果运行时间：522 【比汇编慢了近75.9%倍，比TurboScript 近调用慢近70%倍】
 
  
-Lua Script �ű���
+Lua Script 脚本：
 function iAdd(a, b)
   return a+b
 end function
-  (��ʱ��ʼ)
+  (计时开始)
   local count = 300
   count = iAdd(count, 300)
-    ..... ���ܼ� 2017 �Σ�
+    ..... （总计 2017 次）
   count = iAdd(count, 300)
-  (��ʱ����)
+  (计时结束)
 
-��Lua5.0.2���������ʱ�䣺1270 ��Lua5.1�汾����ʱ��Ϊ��1820 ��
+【Lua5.0.2】结果运行时间：1270 【Lua5.1版本运行时间为：1820 】
 
-TurboScript �ӹ��̽�����Ч�ʲ���
+TurboScript 子过程近调用效率测试
 : Add +;
---��ʱ��ʼ
+--计时开始
 300
 300 Add
-..... ���ܼ� 2017 �Σ�
+..... （总计 2017 次）
 300 Add
---��ʱ����
-�������ʱ�䣺157��ֻ�Ȼ����19.7�����������ֽڴ��������ٶ�������ʧ������������ʱ�䣺169��
+--计时结束
+结果运行时间：157【只比汇编慢19.7％倍，改用字节代码流后速度略有损失，现在是运行时间：169】
 
-TurboScript �ӹ���ģ���ڵ�Զ����Ч��
-�������ʱ�䣺184��Ҳֻ�Ȼ��������
+TurboScript 子过程模块内的远调用效率
+结果运行时间：184【也只比汇编稍慢】
 
-TurboScript �ӹ���ģ��֮���VM DLLԶ����Ч��
-: Add external 'test'; //�ú�������һ�ļ��С�
-���ð�����ؼ����Ľ������ʱ�䣺1082�����ȶ��ǻ���1082-8828�� <�����ʹ��Cache����ÿ�ζ�Ҫ���ң�2676-9980>
-ʹ�õ��ǰ�����ؼ�����Ҳ���ǽ����ú��������õ�ʱ��ż��أ�Ȼ�����Cache����������ĵ��þ����ڴ��д�����
-ʱ��ԶԶ��������������Ϊ�����ļ���ȥ�˾��󲿷�ʱ��
-��ʹ�ð�����ؼ���������Ԥ�ȼ���ģ�飺
-�������ʱ�䣺202  <�����ʹ��Cache����ÿ�ζ�Ҫ��������ʱ�䣺1790>
+TurboScript 子过程模块之间的VM DLL远调用效率
+: Add external 'test'; //该函数在另一文件中。
+启用按需加载技术的结果运行时间：1082【不稳定徘徊在1082-8828】 <如果不使用Cache功能每次都要查找：2676-9980>
+使用的是按需加载技术，也就是仅当该函数被调用的时候才加载，然后加上Cache技术，后面的调用就在内存中处理。
+时间远远长于其它，是因为加载文件耗去了绝大部分时间
+不使用按需加载技术，而是预先加载模块：
+结果运行时间：202  <如果不使用Cache功能每次都要查找所花时间：1790>
 
-ԭ��lua ������ͳһ��double ʵ�ֵ����֣�������EUPHORIA ����������ȴֻ��������Ȼ����� atom ���Ӧ������variant���޷��ȡ�ֻ�бȱȿ������ǽ����������еĿպ��ˡ�
+原来lua 引擎是统一用double 实现的数字！不过，EUPHORIA 的数字类型却只是整数，然后就是 atom 这个应该算是variant，无法比。只有比比看看他们解释器的运行的空耗了。
 
-�Ի������Ϊȫ�٣��պ�Ϊ0�������ֵ��
+以汇编运行为全速，空耗为0，计算比值！
 
-double ��ม��ӷ�ֱ��ִ�е�ʱ�䣺 70
-double ��ม��ӷ����̵���ִ�е�ʱ�䣺 80
+double 汇编浮点加法直接执行的时间： 70
+double 汇编浮点加法过程调用执行的时间： 80
 
-ֱ�� VMָ�� ִ�У�
-EUPHORIA �պģ� 100-81.08=18.92
-Lua  �պģ� 100-63.64=36.36
+直接 VM指令 执行：
+EUPHORIA 空耗： 100-81.08=18.92
+Lua  空耗： 100-63.64=36.36
 
-VM ���̵��ã�
-EUPHORIA �պģ� 100-24.14=75.86
-Lua  �պģ� 100-6.30=93.7
+VM 过程调用：
+EUPHORIA 空耗： 100-24.14=75.86
+Lua  空耗： 100-6.30=93.7
 
-������ô˵��EUPHORIA��Lua ������Ŀǰ�ű������ٶ����ģ���Ȼ���ǲ��ص���в�ͬ��ͨ���ٶȱȽϣ����Կ���������Ȼ�����������ܿռ䡣
+不管怎么说，EUPHORIA和Lua 都是是目前脚本引擎速度最快的，当然他们侧重点各有不同。通过速度比较，可以看出他们依然还有提升性能空间。
 
 _______________________________
-EUPHORIA �����ű�
+EUPHORIA 完整脚本
 		   ---------------------------
 		   -- Prime Sieve Benchmark --
 		   -- "Shootout" Version    --
@@ -3565,8 +3565,8 @@ if getc(0) then  -- wait for key press
 end if
 
 _______________________________
-Lua ���Խű�
-���� Lua ��֧�� int64 �����Ҳ��ò���ΪLua���ӹ���:
+Lua 测试脚本
+由于 Lua 不支持 int64 所以我不得不先为Lua添加过程:
 
 program mLua;
 {$APPTYPE CONSOLE}
@@ -3674,8 +3674,8 @@ begin
  end;
 end;
 
-Lua �ű���
-����������������������������������������������������������������
+Lua 脚本：
+――――――――――――――――――――――――――――――――
 function iAdd(a, b)
   return a + b
 end
@@ -3691,4 +3691,4 @@ print("hello world, from Lua!\n")
 showCount()
 print("\nthe resut:")
 print(count)
-����������������������������������������������������������������
+――――――――――――――――――――――――――――――――

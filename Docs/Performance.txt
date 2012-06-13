@@ -1,156 +1,156 @@
 <Include("Claim")/>
-=>���ߣ�Riceball LEE>=
+=>著者：Riceball LEE>=
 
-Summary: ���ｫ�������������Ľű�����Ľ�����ִ��Ч�� ����  EUPHORIA, Lua���Լ���д��TurboScript����������ԭ�͡�Ҳ���ῪԴ����
+Summary: 这里将评测世界上最快的脚本引擎的解释器执行效率 ――  EUPHORIA, Lua，以及俺写的TurboScript解释器核心原型【也许会开源】。
 
-== ���� ==
-
-
-�����ű�����Ч�ʣ����ڷ�JITterִ�еĽ����ͽű���˵��������������ִ��Ч�ʾ��Ǻ��ĵĺ��ģ��ؼ�֮�ؼ��ˡ�
-������֪�����͵��ٶ����ڱ����ԭ����ǣ���Ϊ����һ������ָ����뾭�����Ͳ���ִ�С�Ҫ����߽�������
-���ܣ���Ȼ��Ҫ�������̽��͵Ĺ��̡�������͵Ĺ��̾��ǿպ��ˣ�Ҳ��������ƽʱ˵���������ù�����ˣ�����
-���Ա���ִ�е��ٶ���Ϊ�պ�Ϊ0��������Ϊ��׼���Խ�������Ч�ʽ��бȽϡ�
-
-��ʲôָ���������أ�����һ����򵥵������ӷ����㣬������ӣ���������ű�����֧�ֵġ����ڻ�����ִ���ٶ�
-̫�죬���ֻ�ظ�ִ�м��Σ��������ø����ܼ�����Ҳ�޷���ʱ���������ｫ�ظ�ִ��2017�μӷ�ָ���300�ۼӣ�
-���Ϊ300*2017������ȫ������ QueryPerformanceCounter �߾��ȼ�����
-
-�ڽ�����ֱ��ִ��VMָ���Ч��֮�����ǻ�������½�����ִ�й��̵��õ�Ч�ʣ��Ͼ���ʵ��Ӧ���д󲿷ֶ���ִ�е�
-���̵��ã��������鷽��ʵ������Ȼ�ǹ��̣���Ȼ�����鷽��Ҫ���������Ҫ�ȵ�����ͨ�����������ͽ��ӷ�ָ��ŵ��ӹ�
-���У��Ϳ��Բ����ˡ�
-
-��ʵ����ű����涼��ʵ��һ����ָ����ô���ܾ�ȷ�Ŀ����������Ŀպ��ˡ�
+== 引言 ==
 
 
-== �ٶ�Ч��ͼ ==
+衡量脚本引擎效率，对于非JITter执行的解释型脚本来说，解释器本身的执行效率就是核心的核心，关键之关键了。
+总所周知，解释的速度慢于编译的原因就是，因为多了一道工序，指令必须经过解释才能执行。要想提高解释器的
+性能，自然是要尽量缩短解释的过程。这个解释的过程就是空耗了，也就是我们平时说的做的无用功。因此，这里
+将以编译执行的速度视为空耗为0，以它作为基准，对解释器的效率进行比较。
 
-��ͼ��x86���Ϊ��׼���㡣��ͼ�����ǿ��Կ�����EUPHORIA��������ֱ��ָ��ִ���������������ߣ��ﵽ��x86ָ��
-ִ���ٶȵ�73%��Ҳ����˵���Ŀպ�ֻ��27%��
+用什么指令来测试呢，就挑一个最简单的整数加法运算，两数相加，绝大多数脚本都该支持的。由于机器码执行速度
+太快，如果只重复执行几次，就算是用高性能计数器也无法计时，所以这里将重复执行2017次加法指令，以300累加，
+结果为300*2017。测试全部采用 QueryPerformanceCounter 高精度计数。
+
+在解释器直接执行VM指令的效率之后，我们还想测试下解释器执行过程调用的效率，毕竟在实际应用中大部分都是执行的
+过程调用（方法，虚方法实际上依然是过程，当然由于虚方法要查表所以又要比调用普通过程慢）。就将加法指令放到子过
+程中，就可以测试了。
+
+其实如果脚本引擎都能实现一个空指令那么就能精确的看出解释器的空耗了。
+
+
+== 速度效率图 ==
+
+该图以x86汇编为基准计算。从图中我们可以看出，EUPHORIA解释器在直接指令执行这块运行性能最高，达到了x86指令
+执行速度的73%，也就是说它的空耗只有27%。
 
   ScriptPerformance.gif
   [[Image:./ScriptPerformance-3.gif|thumb|none|95%|]]
 
 
-ʵ���� Lua ����Floatʵ�ֵ����������㣬��������������ʵ���У���ʵ���ڲ�ֻ�и������ͣ�������ִ����ռ�����ơ�
-��EUPHORIA�����ڲ�ר��ʵ�����������ͣ�������ֵ�������û��ר��ʵ�ָ��������ˣ�ʣ�µľ�ȫ������atom���ͽ�
-������ġ���������ӷ���ִ��Ч�ʻ���������ļܹ����й�ϵ������Lua�ӹ��̵��õ�Ч��̫�ͣ�Ӧ�û��кܴ�������ء�
+实际上 Lua 是用Float实现的整数的运算，在它的数字类型实现中，其实在内部只有浮点类型，所以在执行上占了劣势。
+而EUPHORIA则在内部专门实现了整数类型，不过奇怪的是它就没有专门实现浮点类型了，剩下的就全部是用atom类型进
+行扩充的。所以这个加法的执行效率还和虚拟机的架构大有关系。另外Lua子过程调用的效率太低，应该还有很大提升余地。
 
-���ڰ���TurboScript�ܹ����������� CLR �ļܹ����������ջ��32λ�����������ռ�˲��ô��ݲ����ı��ˣ��ټ���
-TurboScript�������������ø߶��Ż���x86Ƕ����д�ģ�����TurboScript���������и����ܵ�ԭ��
+至于俺的TurboScript架构则是类似于 CLR 的架构――面向堆栈的32位虚拟机，所以占了不用传递参数的便宜，再加上
+TurboScript解释器则又是用高度优化的x86嵌入汇编写的，这是TurboScript解释器运行高性能的原因。
 
-�����ǲ��Խű��Լ������
+后面是测试脚本以及结果。
 
-== ֱ��ָ��ִ��Ч�ʲ��� ==
+== 直接指令执行效率测试 ==
 
-=== x86����׼Ч�� ===
+=== x86汇编基准效率 ===
 <code>
-  ;��ʱ��ʼ
+  ;计时开始
   MOV EBX, 300  BB2C010000
   ADD EBX, 300  81C32C010000
-  ..... --- �ܼ� 2017 ��
+  ..... --- 总计 2017 次
   ADD EBX, 300  81C32C010000
-  ;��ʱ����
+  ;计时结束
 </code>
  
-�������ʱ�䣺54�� ��������Ϊ���������׼������Ϊ�ٶ�Ϊ = 100��; �պ�Ϊ0%
+结果运行时间：54； 这里以其为整数运算基准，视其为速度为 = 100％; 空耗为0%
 
 <code>
-  ;��ʱ��ʼ
+  ;计时开始
   a := 300.00001;
   b := 300.00001;
   asm 
     FLD a   //push a to st(0)
     FADD b
-  ..... --- �ܼ� 2017 ��
+  ..... --- 总计 2017 次
     FADD b
     FSTP a
   end;//}
-  ;��ʱ����
+  ;计时结束
 </code>
  
-�������ʱ�䣺67�� ��������Ϊ���������׼������Ϊ�ٶ�Ϊ = 100��; �պ�Ϊ0%
+结果运行时间：67； 这里以其为浮点运算基准，视其为速度为 = 100％; 空耗为0%
 
-=== Lua Script �ű� ===
+=== Lua Script 脚本 ===
 <code>
-  (��ʱ��ʼ)
+  (计时开始)
   local count = 300
   count = count + 300
-    ..... ���ܼ� 2017 �Σ�
+    ..... （总计 2017 次）
   count = count + 300
-  (��ʱ����)
+  (计时结束)
 </code>
 
-Lua�ڲ�������Int���ͣ���������ȫ����Double����С�������������� x86����ӷ�����ָ��Ƚϡ�
+Lua内部不存在Int类型，所有数字全部是Double浮点小数，所以这里于 x86浮点加法运算指令比较。
 
-[Lua5.0.2] QueryPerformanceCount: 110; ��x86ִ���ٶȵ�61%���պ�Ϊ39%
-[Lua5.1 ] QueryPerformanceCount: 120;  ��x86ִ���ٶȵ�56%���պ�Ϊ44%
+[Lua5.0.2] QueryPerformanceCount: 110; 是x86执行速度的61%；空耗为39%
+[Lua5.1 ] QueryPerformanceCount: 120;  是x86执行速度的56%；空耗为44%
 
 
-=== EUPHORIA �ӷ�ָ��˳��ִ��Ч�ʲ��Խű� ===
+=== EUPHORIA 加法指令顺序执行效率测试脚本 ===
 <code>
-  --��ʱ��ʼ
+  --计时开始
     count = 300
     count +=300
-    ..... --- �ܼ� 2017 ��
+    ..... --- 总计 2017 次
     count +=300
-  --��ʱ����
+  --计时结束
 </code>
  
-�������ʱ�䣺74 ����x86ִ���ٶȵ�73%���պ�Ϊ27%
+结果运行时间：74 ；是x86执行速度的73%；空耗为27%
 
-=== paxCompiler �ӷ�ָ��˳��ִ��Ч�ʲ��Խű� ===
+=== paxCompiler 加法指令顺序执行效率测试脚本 ===
 <code>
-  //��ʱ��ʼ
+  //计时开始
   Result := 300;
   Result := Result + 300;
-    ..... ���ܼ� 2017 �Σ�
+    ..... （总计 2017 次）
   Result := Result + 300;
-  //(��ʱ����
+  //(计时结束
 </code>
  
-�������ʱ�䣺286����x86ִ���ٶȵ�19%���պ�Ϊ81%
+结果运行时间：286；是x86执行速度的19%；空耗为81%
 
 Notes:
 paxCompiler 1.4: 
   PaxCompiler1.RegisterHeader(0, 'function QueryPerformanceCounter(var a: Int64):Boolean;stdcall;', @QueryPerformanceCounter);
-  �ڽű���ֱ��ע�� QueryPerformanceCounter�������ǲ���ȡ�÷���ֵ��
+  在脚本中直接注册 QueryPerformanceCounter函数后但是不能取得返回值。
 
 
 
-=== TurboScript �ű� ===
+=== TurboScript 脚本 ===
 <code>
-  //��ʱ��ʼ
+  //计时开始
   300  //Push 300 to the data stack.
   300 +
-    ..... ���ܼ� 2017 �Σ�
+    ..... （总计 2017 次）
   300 +
-  //(��ʱ����
+  //(计时结束
 </code>
  
-�������ʱ�䣺87����x86ִ���ٶȵ�62%���պ�Ϊ38%
-���½����: 83��
-PurePascalEngine����ʱ��: 153
-PurePascalEngine(FPC)����ʱ��: 469
+结果运行时间：87；是x86执行速度的62%；空耗为38%
+最新结果是: 83；
+PurePascalEngine运行时间: 153
+PurePascalEngine(FPC)运行时间: 469
 
-== �ӹ��̵��õ��ٶȱ�ƴ ==
+== 子过程调用的速度比拼 ==
 
-=== x86 ��� �ӹ��̵���Ч�ʻ�׼���Խű� ===
+=== x86 汇编 子过程调用效率基准测试脚本 ===
 <code>
 function add(a,b: integer): integer;
 asm
   mov EAX, a
   add EAX, b
 end;
---��ʱ��ʼ
+--计时开始
   asm
     mOV EAX, 300
     MOV EDX, 300    CALL ADD
-    ..... ���ܼ� 2017 �Σ�
+    ..... （总计 2017 次）
     MOV EDX, 300    CALL ADD
---��ʱ����
+--计时结束
 </code>
 
-�������ʱ�䣺126
+结果运行时间：126
 
 <code>
 function add: double;
@@ -158,128 +158,128 @@ asm
   Fadd b
 end;
 
---��ʱ��ʼ
+--计时开始
   a := 300.00001;
   b := 300.00001;
   asm 
     FLD a
     CALL ADD
-    ..... ���ܼ� 2017 �Σ�
+    ..... （总计 2017 次）
     CALL ADD
     FSTP a
---��ʱ����
+--计时结束
 </code>
 
-�������ʱ�䣺76 
+结果运行时间：76 
 
-=== Lua Script �ű� ===
+=== Lua Script 脚本 ===
 <code>
 function iAdd(a, b)
   return a+b
 end function
-  (��ʱ��ʼ)
+  (计时开始)
   local count = 300
   count = iAdd(count, 300)
-    ..... ���ܼ� 2017 �Σ�
+    ..... （总计 2017 次）
   count = iAdd(count, 300)
-  (��ʱ����)
+  (计时结束)
 </code>
 
-��Lua5.0.2�� ����ʱ�䣺1270����x86ִ���ٶȵ�10%���պ�Ϊ90%
-��Lua5.1 ��  ����ʱ�䣺1820����x86ִ���ٶȵ�7%���պ�Ϊ93%
+【Lua5.0.2】 运行时间：1270；是x86执行速度的10%；空耗为90%
+【Lua5.1 】  运行时间：1820；是x86执行速度的7%；空耗为93%
 
 
-=== EUPHORIA �ӹ��̵���Ч�ʲ��Խű� ===
+=== EUPHORIA 子过程调用效率测试脚本 ===
 <code>
 function iAdd(integer a, integer b)
   return a+b
 end function
---��ʱ��ʼ
+--计时开始
 count = 300
 count = iAdd(count, 300)
-..... --- �ܼ� 2017 ��
+..... --- 总计 2017 次
 count = iAdd(count, 300)
---��ʱ����
+--计时结束
 </code>
  
-�������ʱ�䣺522����x86ִ���ٶȵ�24%���պ�Ϊ76%
+结果运行时间：522；是x86执行速度的24%；空耗为76%
 
-=== paxCompiler �ӹ��̵���Ч�ʽű� ===
+=== paxCompiler 子过程调用效率脚本 ===
 <code>
 function Add(const a,b: integer): integer;
 begin
   Result := a + b;
 end;
 
-  //��ʱ��ʼ
+  //计时开始
   Result := 300;
   Result := Add(Result, 300);
-    ..... ���ܼ� 2017 �Σ�
+    ..... （总计 2017 次）
   Result := Add(Result, 300);
-  //(��ʱ����
+  //(计时结束
 </code>
  
-�������ʱ�䣺410����x86ִ���ٶȵ�31%���պ�Ϊ69%
-(���Ӻ�����Ч�ʺ�ִ�мӷ������Ч�ʲ�ࣺ401)
+结果运行时间：410；是x86执行速度的31%；空耗为69%
+(空子函数的效率和执行加法计算的效率差不多：401)
 
-=== TurboScript �ӹ��̽�����Ч�ʲ��� ===
+=== TurboScript 子过程近调用效率测试 ===
 <code>
 : Add +;
-//--��ʱ��ʼ
+//--计时开始
 300
 300 Add
-..... ���ܼ� 2017 �Σ�
+..... （总计 2017 次）
 300 Add
-//--��ʱ����
+//--计时结束
 </code>
-�������ʱ�䣺169����x86ִ���ٶȵ�75%���պ�Ϊ25%
-���½����: 164����x86ִ���ٶȵ�76%���պ�Ϊ24%
-PurePascalEngine����ʱ��: 310
-PurePascalEngine(FPC)����ʱ��: 963
+结果运行时间：169；是x86执行速度的75%；空耗为25%
+最新结果是: 164；是x86执行速度的76%；空耗为24%
+PurePascalEngine运行时间: 310
+PurePascalEngine(FPC)运行时间: 963
 
-=== TurboScript �ӹ���ģ��֮���VM DLLԶ����Ч�� ===
+=== TurboScript 子过程模块之间的VM DLL远调用效率 ===
 <code>
-: Add external 'test'; //�ú�������һ�ļ��С�
-//--��ʱ��ʼ
+: Add external 'test'; //该函数在另一文件中。
+//--计时开始
 300
 300 Add
-..... ���ܼ� 2017 �Σ�
+..... （总计 2017 次）
 300 Add
-//--��ʱ����
+//--计时结束
 </code>
 
-���ð�����ؼ����Ľ������ʱ�䣺1082�����ȶ��ǻ���1082-8828��
-ʹ�õ��ǰ�����ؼ�����Ҳ���ǽ����ú��������õ�ʱ��ż��أ�Ȼ�����Cache����������ĵ��þ����ڴ��д�����
-ʱ��ԶԶ��������������Ϊ�����ļ���ȥ�˾��󲿷�ʱ��
-�����ð�����ؼ���������Ԥ�ȼ���ģ�飺
-�������ʱ�䣺202  <�����ʹ��Cache����ÿ�ζ�Ҫ��������ʱ�䣺1790>
-���½����: 191
-PurePascalEngine����ʱ��(Ԥ�ȼ���): 423
-PurePascalEngine(FPC)����ʱ��(Ԥ�ȼ���): 1517
+启用按需加载技术的结果运行时间：1082【不稳定徘徊在1082-8828】
+使用的是按需加载技术，也就是仅当该函数被调用的时候才加载，然后加上Cache技术，后面的调用就在内存中处理。
+时间远远长于其它，是因为加载文件耗去了绝大部分时间
+不启用按需加载技术，而是预先加载模块：
+结果运行时间：202  <如果不使用Cache功能每次都要查找所花时间：1790>
+最新结果是: 191
+PurePascalEngine运行时间(预先加载): 423
+PurePascalEngine(FPC)运行时间(预先加载): 1517
 
-=== TurboScript ����DLL�ӹ��̵ĵ���Ч�� ===
+=== TurboScript 调用DLL子过程的调用效率 ===
 <code>
-//�ú�����DLL�ļ��С�
+//该函数在DLL文件中。
 :Add(const a: Integer; const b: Integer): Integer 
   external 'dlltest.dll' DLL REGISTER Name 'AddCalc';
 
-//--��ʱ��ʼ
+//--计时开始
 300
 300 Add
-..... ���ܼ� 2017 �Σ�
+..... （总计 2017 次）
 300 Add
-//--��ʱ����
+//--计时结束
 </code>
 
-���ð�����ؼ����Ľ������ʱ�䣺144584�����ȶ��ǻ���138322-219230�� �Ż���: 16648-17100(����29556)
-�����ð�����ؼ���������Ԥ�ȼ���ģ�飺 129625(ż������130000) �Ż���: 5003-5520(ż��7954)
-PurePascalEngine����ʱ��(Ԥ�ȼ���): 4733-4847; LoadOnDemand: 16617-17242(29035)
+启用按需加载技术的结果运行时间：144584【不稳定徘徊在138322-219230】 优化后: 16648-17100(很少29556)
+不启用按需加载技术，而是预先加载模块： 129625(偶尔上了130000) 优化后: 5003-5520(偶尔7954)
+PurePascalEngine运行时间(预先加载): 4733-4847; LoadOnDemand: 16617-17242(29035)
 
 
 
-== ��վ ==
+== 网站 ==
  * Lua: http://www.lua.org
  * EUPHORIA: http://www.rapideuphoria.com
- * TurboScript: [������]
+ * TurboScript: [建造中]
  
-== ���Խű��ͳ������� ==
+== 测试脚本和程序下载 ==
