@@ -1,195 +1,195 @@
-CIR(Common Intermediate Language (CIL))����
+CIR(Common Intermediate Language (CIL))分析
 
-����ջ��
-����֮Ϊ evaluation stack�� ����ջ������ݵ���С��λ��4�ֽڵ�32λ������
+数据栈：
+它称之为 evaluation stack， 数据栈存放数据的最小单位是4字节的32位整数。
 
-���ļӷ�ָ��ֻ��һ����ʽ����˵�����ļӷ�ָ������������Ǻ���Լ���ģ���������һ�������ɼӷ���ָ������ݱ���Ҫ�����������ˣ�
-CLR ���Ҷ���һ�����������ڴ��ݹ��̵Ĳ�����
+它的加法指令只有一种形式，这说明它的加法指令的数据类型是后期约束的，不过这样一来，构成加法的指令的数据必须要有数据类型了！
+CLR 比我多了一个参数表用于传递过程的参数。
 
-CLR ʵ��������new: newarr(����һ��1ά����), newobj.
+CLR 实现了两个new: newarr(创建一个1维数组), newobj.
 
 = CLI Architecture =
 The Common Language Infrastructure (CLI) provides a specification for executable code and the execution environment (the Virtual Execution System, or VES) in which it runs.
 
 The general CLI architecture as it relates to supporting mobile code, specifically
 including
- *  ��������
-    * �߳�
-    * ��̬�� classes, assemblies, and application domains.
-    * �ֲ�ʽ�ļ�����
-    * ��������
+ *  虚拟机设计
+    * 线程
+    * 动态绑定 classes, assemblies, and application domains.
+    * 分布式文件加载
+    * 保护机制
     * CTS(Common Type System) - Self-describing type system
     * Cross assembly method/member function invocation
     * Side-by-side execution (simultaneous support for separate versions of the same component)
-    * Managed and unmanaged code interoperability(Эͬ��������)
- *  Դ���Զ��� Source language independence
- *  ��������汾���� Software component version management
- *  �����ַ�ģʽ The software deployment model
- *  ��ȫ���� Security mechanisms that address the mechanism that allows such general distribution of mobile code
- *  CLI ͨѶ���� CLI communication mechanisms
+    * Managed and unmanaged code interoperability(协同工作能力)
+ *  源语言独立 Source language independence
+ *  软件组件版本管理 Software component version management
+ *  软件分发模式 The software deployment model
+ *  安全机制 Security mechanisms that address the mechanism that allows such general distribution of mobile code
+ *  CLI 通讯机制 CLI communication mechanisms
 
 
-== ģ��(Module) ==
-ģ��(Module)��������ǰ�ĵ�Ԫ�����ڷָͬ��������ͣ��Լ���Դ(resource, ��Դ��¼�����ַ�����ͼ���Լ��������ݣ�����ֻ����Ҫ��ʱ��Żᱻ�����ڴ�)�����͵�Meta��ϢҲ��ģ���һ���֡�
-CLR �ĳ�������ģ�鹹�ɵģ�CLR ģ����һ�������ݣ��ֽ�������ͨ�������ļ�����ʽ�����ڱ����ļ�ϵͳ��Web�������ϡ�
+== 模块(Module) ==
+模块(Module)类似于以前的单元，用于分割不同的类和类型，以及资源(resource, 资源记录就是字符串，图象以及其它数据，他们只在需要的时候才会被调入内存)。类型的Meta信息也是模块的一部分。
+CLR 的程序集是由模块构成的，CLR 模块是一种流数据（字节流），通常是以文件的形式存在于本地文件系统或Web服务器上。
 
-��Ȼģ���ְ������͵�Meta��Ϣ�����ͼ��ϵͳ�Ϳ������Ͼ�̬�Ͷ�̬��������IL���е�ʱ��ִ�л����ܵ�֪
-���б�������������Meta��Ϣ����Ȼ����ִ������ʱ�̵����ͼ�顪���ⱻ��֮Ϊ reflection(���ĺ���Ϊ�������������ͣ����͵�Ӱ��)��
+既然模块种包含类型的Meta信息，类型检查系统就可以联合静态和动态技术。当IL运行的时候，执行环境能得知
+所有变量参数的类型Meta信息，自然就能执行运行时刻的类型检查——这被称之为 reflection(它的含义为解释自描述类型，类型的影子)。
 
-��namespace ���ɡ�
-namespace ֻ��C#�ȸ߼�����Ϊ�����ú���д�������Ʒ�������ĸ����CLR�в������ڡ�
-���ԣ�������һ��namespace�����Ϳ����ڲ�ͬ�ĳ����У�����ͬһ��������Ҳ���ܰ�����ͬ��namespace��
-�� C#�� namespace ָ��ֻ��ָʾC#������ΪԴ������ֵ�ÿ����������ǰ����namespace����ǰ׺���������Լ��ٱ����Ա��¼������
+【namespace 解疑】
+namespace 只是C#等高级语言为了引用和书写对象名称方便引入的概念，在CLR中并不存在。
+所以，从属于一个namespace的类型可能在不同的程序集中，而在同一个程序集中也可能包括不同的namespace。
+在 C#中 namespace 指令只是指示C#编译器为源代码出现的每个类型名称前附加namespace名称前缀，这样可以减少编程人员的录入量。
 
-CLR�а�����������󳤶ȶ���1024��
+CLR中包和类名的最大长度都是1024。
  
-== ����(Assembly) ==
-����(Assembly)��������һ��ģ�飬����(Assembly)��ģ��(Module)����������ڶ���һ��ά���嵥 manifest ��������������Щ���򼯣���������Щģ���ļ�����������Щ���ͣ�����ģ���еģ����Լ�����������������
+== 程序集(Assembly) ==
+程序集(Assembly)本身就是一个模块，程序集(Assembly)和模块(Module)间的区别，在于多了一个维护清单 manifest 【描述引用了哪些程序集，包含了那些模块文件，导出了哪些类型（其它模块中的），以及对自身的描述】。
 
-���ģ���ļ����Ա����ӳ�һ������(assembly)���ڳ����϶���һ���嵥��manifest�������������ó����Լ�ģ����б���һ������ڣ����������Ͷ����б���˽��ģ���й��������ͣ�������嵥������һ��ģ���ϣ�
-�ڸ�ģ���ϵĹ��������Ͳ�������ڵ������Ͷ����б��ϣ�
+多个模块文件可以被链接成一个程序集(assembly)。在程序集上多了一个清单（manifest），用来描述该程序集以及模块的列表，一个主入口，导出的类型定义列表（私有模块中公开的类型）。这份清单被放在一个模块上，
+在该模块上的公开的类型不会出现在导出类型定义列表上！
 
-������CLI��������(deployment managed)�ĵ�λ�������ǿ����õ�������������������ܶ�̬�󶨵��ô��롣
-  * �����Ƕ�������������Ӽ����������±��롣
-  * �����Ƕ�������
-  * �����ܱ���������
-  * ���򼯵�����API�ܺ�������������Ľ�����
+程序集是CLI发布管理(deployment managed)的单位。程序集是可重用的软件组件。程序集甚至能动态绑定调用代码。
+  * 程序集是独立的软件组件子集，无须重新编译。
+  * 程序集是定制软件
+  * 程序集能被独立发布
+  * 程序集导出的API能和其它组件完美的交互。
 
-�������ļ�ϵͳ������PE(portable executable)��ʽ��š����õĳ����ǰ�����صģ����仰˵��ֻ�е����õ��ó��򼯵ĺ���������֮�󣬸ó��򼯲Żᱻ���أ�
-  ���򼯼�����(assembly loader)������ CLI ������(downloader)���ظó���
-    CLI ������ ��������˳���Ӧ�ó���Ŀ¼����Ŀ¼�������ļ�CacheĿ¼��������URL��װ�ء�
+程序集在文件系统中是用PE(portable executable)格式存放。引用的程序集是按需加载的，换句话说，只有当调用到该程序集的函数或类型之后，该程序集才会被加载：
+  程序集加载器(assembly loader)将调用 CLI 下载器(downloader)加载该程序集
+    CLI 下载器 根据搜索顺序从应用程序目录，子目录，本地文件Cache目录，或网络URL中装载。
 
-Jeffer������˵���嵥Ԫ���ݱ�����һ������ExportedTypesDef�ı������ж��������еĵ���������Ŀ���������ڲ鿴���ļ����򼯵�ʱ��ȴû�з���Ԫ���ݵ�����ExportedTypes�Ķ��塣��������ϸ����һ��������ף�Ϊ�˽�ʡ�ļ��ռ䣬������Ԫ���ݶ���Ԫ���ݱ���������ĵ��������ǲ�����ExportedTypesDef�����ظ������ġ���Ҳ����˵��ֻ�е�һ���������ɶ��ģ����ļ���ɵ�ʱ������ģ���ļ��е��������ͲŻ��ڳ����嵥�б����塣ʹ�������ֶ��巽ʽ���൱���ڳ����嵥���ṩһ�����ҳ��������������͵���������CLR���ҳ���������ʱ��������ݳ����嵥 ExportdTypesDef���Ķ��壬����Ӧ��ģ���ļ����в��ҵ���Ҫ�����Ͷ��塣
+Jeffer的书中说，清单元数据表中有一份名叫ExportedTypesDef的表，其中定义了所有的导出类型条目。但是我在查看单文件程序集的时候却没有发现元数据当中有ExportedTypes的定义。后来又仔细看了一下书才明白，为了节省文件空间，所以在元数据定义元数据表中所定义的导出类型是不会在ExportedTypesDef表中重复出来的。这也就是说，只有当一个程序集是由多个模块块文件组成的时候，其它模块文件中导出的类型才会在程序集清单中被定义。使用了这种定义方式。相当于在程序集清单中提供一个查找程序中所定义类型的索引。当CLR查找程序集中类型时，它会根据程序集清单 ExportdTypesDef表的定义，在相应的模块文件当中查找到需要的类型定义。
 
-һ��.net����֧�����ְ汾��������ʹ�����Եķ�ʽ��Դ������ָ���ģ�Ȼ���ɱ�����/������������Ƕ�뵽.net�����У������ļ����������ְ汾�Ŷ�Ӧ���������ƺ�������������ʾ��
-AssemblyFileVersion�������������ʶ�İ汾�Ŷ�Ӧ��ͳWin32������ļ��汾�š�CLR��������ʹ�ô˰汾�š�
-AssemblyInformation�������������ʶ�İ汾�Ŷ�Ӧ��ͳWin32����Ĳ�Ʒ�汾�š�CLR��������ʹ�ô˰汾�š�
-AssemblyVersion��������Ա�ʶ�İ汾��ΪCLR������ʶ��İ汾�ţ�CLRͨ������汾����ȷ�����򼯵İ汾��
-������Ҫע����ǣ�AssemblyFileVersion��buildλ��fixλӦ����һ���ڴ����±����������ͬ�İ汾�ţ�������û����Դ˰汾��������һ�����汾��(��Major��Minor��ɵİ汾�ţ��ڳ��򼯵Ĳ�ͬ��
-��AssemblyVersion�汾������Ӧ����һ�����汾���ڹ̶�����ģ���ΪCLR��ʹ�ô˰汾����ȷ�����س��򼯵ġ�
+一个.net程序集支持三种版本，它都是使用特性的方式在源代当中指定的，然后由编译器/链接器将它们嵌入到.net程序当中（程序文件）。这三种版本号对应的特性名称和其作用如下所示：
+AssemblyFileVersion：这个特性所标识的版本号对应传统Win32程序的文件版本号。CLR本身并不使用此版本号。
+AssemblyInformation：这个特性所标识的版本号对应传统Win32程序的产品版本号。CLR本身并不使用此版本号。
+AssemblyVersion：这个特性标识的版本号为CLR本身所识别的版本号，CLR通过这个版本号来确定程序集的版本。
+这里需要注意的是，AssemblyFileVersion的build位和fix位应该是一个第次重新编译后都有所不同的版本号，程序的用户暨以此版本号来区分一个主版本号(由Major和Minor组成的版本号）内程序集的不同。
+而AssemblyVersion版本号则是应该在一个主版本号内固定不变的，因为CLR是使用此版本号来确定加载程序集的。
 
-== AppDomain�͵�ַ�ռ� ==
+== AppDomain和地址空间 ==
 
-һ�����򼯽������ص�һ��Application Domain(AppDomain)��ִ�С� �ⲿ���õ��������򼯽���ͬ��ͬһAppDomain�����С�
-���仰˵��AppDomain �����򼯾ۼ���һ��ʵ�����չ��ܡ�
-ÿһ��AppDomain������һ����CLIִ����������ĵ�ַ�ռ䡣���еĵ�ַ���ý�ȷ��ʵ��ͬһ��AppDomain�С�
-CLI��ַ�ռ����в�εģ�AppDomain �ܱ�������һ��CLI��ַ�ռ䡣
-CLI��ַ�ռ���Ա����Ե���Ϊ��OS�еĽ��̵�ַ�ռ䣨������Rotor CLI������������ÿһ����ַ�ռ䶼����ȷ�ĵ�ַ�߽硣
+一个程序集将被加载到一个Application Domain(AppDomain)中执行。 外部引用的其它程序集将在同样同一AppDomain下运行。
+换句话说，AppDomain 将程序集聚集在一起，实现最终功能。
+每一个AppDomain定义了一个由CLI执行引擎管理的地址空间。所有的地址引用将确保实在同一个AppDomain中。
+CLI地址空间是有层次的：AppDomain 能被加载入一个CLI地址空间。
+CLI地址空间可以被概略的认为是OS中的进程地址空间（至少在Rotor CLI中是这样）。每一个地址空间都有明确的地址边界。
 
-ÿһ��CLI��ַ�ռ���԰������AppDomain�� ����һ��AppDomain����ϵͳ���򼯣���һ��AppDomain������������AppDomain�����ĳ��򼯡�
-ֻ��CLI������(the supervision of the CLI)���ܿ�ԽAppDomain�ĵ�ַ�ռ���ʽ��н�����AppDomain֮��Ľ���ͨѶ��ͨ��Զ��(Remoting)���ͼ�����
-��ɡ�ͬ���Ļ��Ʊ����ڿ�Խ��ַ�ռ䣬��ӿں�OS IPC.
+每一个CLI地址空间可以包含多个AppDomain： 其中一个AppDomain就是系统程序集，另一个AppDomain包含与其他与AppDomain共享的程序集。
+只有CLI管理器(the supervision of the CLI)才能跨越AppDomain的地址空间访问进行交互。AppDomain之间的交互通讯是通过远程(Remoting)类型检查机制
+完成。同样的机制被用于跨越地址空间，如接口和OS IPC.
 
-ģ�飬���򼯣�AppDomain�͵�ַ�ռ䣨address space���Ĺ�ϵ�ǣ�ģ���Ǳ�������������С�ĵ�Ԫ�ļ�����һ����n��ģ����ɳ��򼯣������ǽ��зַ���
-��С��Ԫ�ļ��������������һ��AppDomain��ִ�С����AppDomain���ڵ�����ַ�ռ���ִ�С�
+模块，程序集，AppDomain和地址空间（address space）的关系是，模块是编译器建立的最小的单元文件，由一个或n个模块组成程序集，程序集是进行分发的
+最小单元文件，程序集能组合在一个AppDomain下执行。多个AppDomain能在单个地址空间下执行。
 
-���ʡ�1. ������������򼯹��̵ĵ��ã���ζ����Ҫ�����µ�VirtualExecutionEngine?,��ջ��Щȫ����Ҫ�µģ���
-  2. address space ����ô����ģ���������ɼ���AppDomain��ʲôʱ����Ҫ�½�����һ��address space��
-����
-2�������� һ��CLR Host���̾���һ��address space��Ȼ������� AppDomain�����ڸ�����������ν�ġ�AppDomain ʹ����������򼯵ġ����磺 ASP.Net ����  Microsoft SQL Server��
-ÿһ��AppDomain֮�䲻�ܱ˴�Ӱ�죬����ȫ�����ģ�������֤��AppDomain�İ�ȫ����������һ��AppDomain�г��˴��󣬶���Ӱ�쵽��һ��AppDomain.
+【问】1. 如果对其它程序集过程的调用，意味着需要开辟新的VirtualExecutionEngine?,堆栈这些全部都要新的？？
+  2. address space 是怎么构造的？最多能容纳几个AppDomain？什么时候需要新建另外一个address space？
+【答】
+2、基本上 一个CLR Host进程就是一个address space，然后建立多个 AppDomain，至于个数那是无所谓的。AppDomain 使用来隔离程序集的。比如： ASP.Net 或者  Microsoft SQL Server。
+每一个AppDomain之间不能彼此影响，是完全独立的，这样保证了AppDomain的安全！必须做到一个AppDomain中出了错误，而不影响到另一个AppDomain.
 
-ע��
-Common Language Infrastructure (CLI) ͨ�����Ի�����֯
+注：
+Common Language Infrastructure (CLI) 通用语言基础组织
 
 == Virtual Execution System(VES) ==
-VES��CLI DVM(�ֲ�ʽ�����)�����ࡣExecution Engine (EE) ����������ˣ������� MSCOREE (Microsoft Common Object Runtime EE �C a name that is left over from the commercial
-CLR code) �С�
-���õĳ��򼯿��Դ������κεط�������һ̨web�������ϣ���EE������װ��(Downloading)�ó��򼯵�ʱ�򣬽��������µ����飺
-  ����������֤
-  �������Ƿ���Ч
-  һ�и㶨�򽫳���װ�ص�AppDomain
-һ�����򼯱����ص�AppDomain,��ô��AppDomain�е��������뽫�ܷ��ʸó����еĹ�����Ա���ֶΣ���Ȼ����EE�ļල�¡�
-������ʱ�򣬳����е��ಢû�б��󶨵����룬ֻ�е��Ը���ĵ�����ķ�����ʱ��EE�Ż�ȥ�����ڳ����е�Ŀ���ಢ����
-װ����AppDomain��Ȼ��У��������ɣ��Ӹ����Meta��Ϣ����ȡĿ�����ϸ��˵����Ȼ��Build an appropriate call table data structure.
-����һ���������Ա��ʱ��������ʽ�����м���룬CLI ����ʹ��JIT������(JITter)���м���뷭��ɱ��ػ����룬Ȼ���´��ٴ�
-���õ�ʱ��ͻ�ֱ��ִ�б���õı��ػ����롣EE�������������ռ����ͽṹ���쳣��������
+VES是CLI DVM(分布式虚拟机)的心脏。Execution Engine (EE) 则是其核心了，代码在 MSCOREE (Microsoft Common Object Runtime EE – a name that is left over from the commercial
+CLR code) 中。
+引用的程序集可以存在于任何地方，比如一台web服务器上，当EE被请求装载(Downloading)该程序集的时候，将会做以下的事情：
+  检查调用者认证
+  检查程序集是否有效
+  一切搞定则将程序集装载到AppDomain
+一旦程序集被加载到AppDomain,那么在AppDomain中的其它代码将能访问该程序集中的公开成员和字段，当然上在EE的监督下。
+不过这时候，程序集中的类并没有被绑定到代码，只有当对该类的调用真的发生的时候，EE才会去查找在程序集中的目标类并将其
+装载入AppDomain，然后校验访问许可，从该类的Meta信息中提取目标类的细节说明，然后Build an appropriate call table data structure.
+当第一次引用类成员的时候，它的形式还是中间代码，CLI 总是使用JIT编译器(JITter)将中间代码翻译成本地机器码，然后当下次再次
+引用的时候就会直接执行编译好的本地机器码。EE还包括了垃圾收集器和结构化异常处理器。
 
-EE ִ�����̣�ͨ��һ����򵥵�������˵����
+EE 执行流程，通过一个最简单的主程序说明：
 static void Main() {
   Console.WriteLine("Hello");
 }
 
-�� Main ������ִ��ǰ��CLR��������б�Main�еĴ������õ����ͣ�CLR����Ϊ���е��������ͷ���һ���ڲ����ݣ��ڲ������а����˶���������е�ÿһ����������ڡ�
-ÿһ��������ڰ����˸÷�����ִ�е�ַ�������ڲ����ݳ�ʼ����ʱ��CLR��ÿһ�����ָ��һ���ڲ�������JITCompiler.
-ok, ��һ�ε���WriteLine������ʱ��ʵ������ JITCompiler ���������ã�JITCompiler ����֪�������÷�������һ�������ݴ����Self����ָ�룩��Ȼ�� JITCompiler
-�������ҳ��򼯵�MetaDataȡ�ø÷�����IL��Ȼ��У�鲢����IL��Ϊ����CPUָ�����ı���CPUָ����ڶ�̬������ڴ���У����� JITCompiler ������WriteLine��
-�ڲ����ݵķ�������滻�ɱ���õı���CPUָ��ִ����ڡ���� JITCompiler ������ת������ڴ�ִ�С�
+在 Main 方法被执行前，CLR将检测所有被Main中的代码引用的类型，CLR将会为所有的引用类型分配一块内部数据，内部数据中包含了定义的类型中的每一个方法的入口。
+每一个方法入口包含了该方法的执行地址，当该内部数据初始化的时候，CLR将每一个入口指向一个内部函数：JITCompiler.
+ok, 第一次调用WriteLine方法的时候，实际上是 JITCompiler 函数被调用，JITCompiler 函数知道被调用方法是哪一个（根据传入的Self对象指针），然后 JITCompiler
+函数查找程序集的MetaData取得该方法的IL，然后校验并编译IL成为本地CPU指令，编译的本地CPU指令被放在动态分配的内存块中，接着 JITCompiler 函数将WriteLine的
+内部数据的方法入口替换成编译好的本地CPU指令执行入口。最后， JITCompiler 函数跳转到该入口处执行。
 
-JITCompiler ��ŵı���CPUָ������Ӧ�õ���ֹ���Զ����ͷţ�����ʹ�� NGen.exe�������ٴ����е�ʱ����ôJITCompiler���ٴα��룬�����ͬʱ��������Ӧ��ʵ��
-��ôJITCompilerҲ�����ٱ���һ�Ρ��ٺ٣�������Ӧ�ó���󲿷ֵķ������붼ֻ������һ�Σ���ô���ٶ����ܽ���ú���⣬�����Ǵ���JITCompiler�Ż��������
-��������Ȼ�����Ӧ�ó����������д���ķ�������ֻ������һ�εģ���ֻ���������������
+JITCompiler 存放的本地CPU指令随着应用的终止而自动被释放（除非使用 NGen.exe），当再次运行的时候，那么JITCompiler将再次编译，如果你同时运行两个应用实例
+那么JITCompiler也将会再编译一次。嘿嘿，如果你的应用程序大部分的方法代码都只被调用一次，那么这速度性能将变得很糟糕，尤其是打开了JITCompiler优化的情况下
+更慢，当然大多数应用程序决不可能写出的方法代码只被调用一次的，这只能视作极端情况。
 
-���⣬�Һ���֪���ģ�IL(MetaData)���ص��ڴ���ʲôʱ��ʵ����ILֻ�е�JITCompiler�����ʱ�����Ҫ�����һֱ�������ڴ��Ǿ�̫�˷��ˡ�
+另外，我很想知道的，IL(MetaData)加载到内存是什么时候？实际上IL只有当JITCompiler编译的时候才需要，如果一直都放在内存那就太浪费了。
 
-=== �쳣�������� ===
+=== 异常保护机制 ===
 
 
-== Remoting ���� ==
-Remoting ������Ϊ��AppDomain֮�乵ͨ������������������һ��AppDomain�Ķ�����Ա��ʱ��Remoting��Ҫ�������ˡ�Remoting Ҳ������
-�ڵ�ַ�ռ�֮�乵ͨ��Remoting ���� MarshalByRefObject ����ʵ�ֵġ�
-����ʵ�ֻ������£�
-�������ˣ�Զ�̷��ʵĶ����� MarshalByRefObject �����ʵ����ͨ��ʹ�øû��࣬CLI��������ΪԶ�̶�����Real Proxy server Stub��
-�����������������ע�ᵽȫ�����ƿռ䣬Ȼ��׼��������ʱ�����ӣ����ͻ��������Զ�̶����ʱ������֧��RMI����
-ͨ����Channel������MarshalByRefObject����ʵ������ע�ᡣ
+== Remoting 机制 ==
+Remoting 机制作为在AppDomain之间沟通的桥梁，当你引用你一个AppDomain的对象或成员的时候，Remoting就要负责处理了。Remoting 也被用于
+在地址空间之间沟通。Remoting 是在 MarshalByRefObject 类中实现的。
+它的实现机制如下：
+服务器端：远程访问的对象是 MarshalByRefObject 子类的实例，通过使用该基类，CLI就有能力为远程对象建立Real Proxy server Stub，
+这个代理服务器将被注册到全局名称空间，然后准备好运行时间链接（当客户对象调用远程对象的时候用以支持RMI）。
+通道（Channel）对象被MarshalByRefObject子类实例化并注册。
 
-�ͻ��ˣ�ͨ����ʹ��ǰ������ע�ᡣ���ͻ�����Զ�̶���λ�ڿͻ��˵�͸������(Transparent Proxy)���������������������л���serializes����
-ͨ�����������͵���������
+客户端：通道在使用前必须先注册。当客户引用远程对象，位于客户端的透明代理(Transparent Proxy)被建立。将调用数据序列化（serializes）后
+通过代练被传送到服务器。
 
-�����ӣ�������ͬһ�����µĲ�ͬAppDomain֮��ĵ���ͨѶ��Ҳ�����ò����˰�����������������ǰ��AOʵ�ֵ�Զ�̵��ã�ֻ�������������ں�
-��ͨ�����߿�����������ݻ��о���
+看样子，就算是同一进程下的不同AppDomain之间的调用通讯，也是慢得不得了啊。这个不外乎就是以前的AO实现的远程调用，只不过被包裹在内核
+普通开发者看不到，这个暂缓研究。
 
-== ���򼯵ļ��غ�ִ�� ==
+== 程序集的加载和执行 ==
 
-���򼯼����������ҳ��򼯣��ҵ�������װ�ص������ߵ�AppDomain�У���װ��ǰ��������ʹ��Policy ManagerУ����Ӧ�İ�ȫȨ�ޣ�ȷ�������߱�����ʹ�øó��򼯡�
-����������(downloader)�ǳ��򼯼�������һ���֣����ڲ��ҳ��򼯣����������ص����أ�������򼯲��ڱ��أ����Ա�װ�أ������߿����������ļ���ָ�����ӵ�
-����λ�ã������ļ������Ӧ�ó�����ͬһĿ¼������ѭ���µ��������ڳ����ļ����󸽼���չ����.config�����磺 xxx.exe.config��Դ�����λ���ڣ�/clr/src/fusion��
-Ŀ¼�Ĳ���˳��Ҳ�����󡿣�
-  GACĿ¼
-  Ӧ��Ŀ¼
-  Ӧ����Ŀ¼
-  �����ļ��еĸ���λ��
+程序集加载器：查找程序集，找到将程序集装载到调用者的AppDomain中，在装载前加载器将使用Policy Manager校验相应的安全权限，确保调用者被允许使用该程序集。
+程序集下载者(downloader)是程序集加载器的一部分，用于查找程序集，并将其下载到本地（如果程序集不在本地），以便装载，开发者可以在配置文件中指定附加的
+下载位置，配置文件必须和应用程序在同一目录，并遵循如下的命名，在程序集文件名后附加扩展名“.config”，如： xxx.exe.config。源程序的位置在：/clr/src/fusion。
+目录的查找顺序【也许有误】：
+  GAC目录
+  应用目录
+  应用子目录
+  配置文件中的附加位置
 
-�����ҵ��������������������ļ��������ݸ���������������ʹ��Policy ManagerУ����Ӧ�İ�ȫȨ�ޣ�ȷ���������ڸû����������Լ��û���ִ�иó��򼯵����ɡ�
-Ȼ�󣬼���fusion�������򼯼��ص�AppDomain�����������������class loader����
+程序集找到后，下载器将程序集流（文件名）传递给加载器，加载器使用Policy Manager校验相应的安全权限，确保程序集能在该环境下运行以及用户有执行该程序集的许可。
+然后，继续fusion，将程序集加载到AppDomain，并调用类加载器（class loader）。
 
   nExitCode = _CorExeMain2(NULL, 0, pFileName, NULL, pCmdLine);                       //clr\src\tools\clix\clix.cpp:
-    result = CoInitializeEE(COINITEE_DEFAULT | COINITEE_MAIN);  //��ʼ������ִ������  //clr\src\vm\ceemain.cpp:
+    result = CoInitializeEE(COINITEE_DEFAULT | COINITEE_MAIN);  //初始化虚拟执行引擎  //clr\src\vm\ceemain.cpp:
     bRetVal = ExecuteEXE(pImageNameIn);
           SystemDomain::ExecuteMainMethod(hMod);    //clr\src\vm\assembly.cpp
           hr = ClassLoader::RunMain(pMeth, 1, &iRetVal, stringArgs); //clr\src\vm\clsload.cpp
-          Ȼ��Ū��һ���̣߳����߳�������
-             ARG_SLOT stackVar = ObjToArgSlot(StrArgArray); //�������װ�룿
-  ����clix�о����ԣ�Policy Manager�Լ�downloader��û�п�����
+          然后弄了一个线程，在线程里运行
+             ARG_SLOT stackVar = ObjToArgSlot(StrArgArray); //在这里才装入？
+  分析clix感觉不对，Policy Manager以及downloader都没有看到！
 
-=== ������� ===
-����׼��ִ�е�ʱ����������ͻᱻ���á��ⷢ���ڣ�
-  1�����򼯵�����ڵ㱻����
-  2������ִ�еĶ���������һ����δ���صĶ���
-����������ӳ����м��ظ����ȫ�����壬Ȼ��׼����Ӧ�Ķ���ʵ������
-  ����IL�Լ������MetaData
-  ׼��������ݽṹ(EEClass)
-  ������ʼ����ĵķ�����(MethodTable and Vtable)
+=== 类加载器 ===
+当类准备执行的时候类加载器就会被调用。这发生在：
+  1、程序集的主入口点被加载
+  2、正在执行的对象引用了一个从未加载的对象。
+类加载器将从程序集中加载该类的全部定义，然后准备相应的对象实例化：
+  复制IL以及该类的MetaData
+  准备类的数据结构(EEClass)
+  创建初始化类的的方法表(MethodTable and Vtable)
 
-== CLI�����ִ���ļ��ṹ ==
-��ʵ����PE�ļ��ṹ����������PE�ṹ�е�IMAGE_OPTIONAL_HEADER.DataDirectory[IMAGE_DIRECTORY_ENTRY_COM_DESCRIPTOR]����
-��CLR��IMAGE_COR20_HEADERͷ��Ȼ��_CorExeMain ׮�Լ�IL��metaData�������ַ��ȫ������.text���С�
+== CLI编译的执行文件结构 ==
+其实就是PE文件结构，不过利用PE结构中的IMAGE_OPTIONAL_HEADER.DataDirectory[IMAGE_DIRECTORY_ENTRY_COM_DESCRIPTOR]保存
+了CLR的IMAGE_COR20_HEADER头。然后将_CorExeMain 桩以及IL，metaData，导入地址表全部放在.text节中。
 
-RVA: ��������ַ��Relative Virtual Addresses��
+RVA: 相对虚拟地址（Relative Virtual Addresses）
 
 === MS-DOS Stub ===
-������ MS-DOS Stub: ������Dos��������ʾ�ó�����������DOS�µ���ʾ��
-���ļ�ƫ����0x3C��λ����ָ��PE ǩ��(signature) ��ָ��: 80 00 00 00,���� 0x80.
+首先是 MS-DOS Stub: 用于在Dos环境下显示该程序不能运行在DOS下的提示。
+在文件偏移量0x3C的位置是指向PE 签名(signature) 的指针: 80 00 00 00,就是 0x80.
 
-00000000h: 4D 5A 90 00 03 00 00 00 04 00 00 00 FF FF 00 00 ; MZ?........��..
+00000000h: 4D 5A 90 00 03 00 00 00 04 00 00 00 FF FF 00 00 ; MZ?..........
 00000010h: B8 00 00 00 00 00 00 00 40 00 00 00 00 00 00 00 ; ?......@.......
 00000020h: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 ; ................
-00000030h: 00 00 00 00 00 00 00 00 00 00 00 00 80 00 00 00 ; ............�...
+00000030h: 00 00 00 00 00 00 00 00 00 00 00 00 80 00 00 00 ; ............€...
 ...
-00000080h: 50 45 00 00 4C 01 03 00 92 38 84 45 00 00 00 00 ; PE..L...?�E....
+00000080h: 50 45 00 00 4C 01 03 00 92 38 84 45 00 00 00 00 ; PE..L...?凟....
 00000090h: 00 00 00 00 E0 00 0E 01 0B 01 06 00 00 04 00 00 ; ....?..........
 
-  _IMAGE_DOS_HEADER = record //���������̶���,�հᡣ
+  _IMAGE_DOS_HEADER = record //可以视作固定的,照搬。
     e_magic: Word;     // Magic number: "MZ"
     e_cblp: Word;      // Bytes on last page of file
     e_cp: Word;        // Pages in file
@@ -208,29 +208,29 @@ RVA: ��������ַ��Relative Virtual Addresses��
     e_oemid: Word;     // OEM identifier (for e_oeminfo)
     e_oeminfo: Word;   // OEM information; e_oemid specific
     e_res2: array [0..9] of Word;  // Reserved words
-    e_lfanew: Longint; // File address of new exe header �ļ�ƫ������0x3C
+    e_lfanew: Longint; // File address of new exe header 文件偏移量：0x3C
   end;
 
-PE ǩ��(signature) ������MS-DOS Stub,��4���ֽڣ�����Ϊ ��PE��Ȼ���������ֽ�0: 0x00004550
+PE 签名(signature) 紧接着MS-DOS Stub,是4个字节，内容为 “PE”然后是两个字节0: 0x00004550
   _IMAGE_NT_HEADERS = record
     Signature: DWORD;                      //PE signature: 0x00004550
     FileHeader: IMAGE_FILE_HEADER;         //The COFF header
-    OptionalHeader: IMAGE_OPTIONAL_HEADER; //The PE header. 32λͷ��64λͷ���в��죬CLRĿǰ�汾ͳһʹ��32λ�ṹ��
+    OptionalHeader: IMAGE_OPTIONAL_HEADER; //The PE header. 32位头和64位头略有差异，CLR目前版本统一使用32位结构。
   end;
 
-=== COFF ͷ ===
-�� PE ǩ��(signature) ֮���� COFF ͷ���������£�
+=== COFF 头 ===
+在 PE 签名(signature) 之后是 COFF 头，内容如下：
   _IMAGE_FILE_HEADER = record //JwaWinNT.pas
-    Machine: WORD;               //Ŀ����������ֶΣ��йܵ�IL�������ø��ֶ�Ϊ IMAGE_FILE_MACHINE_I386 (0x014C)
-    NumberOfSections: WORD;      //Section�ڵĸ�����Section�ڽ�����PEͷ
-    TimeDateStamp: DWORD;        //�ļ��Ĵ���ʱ��
-    PointerToSymbolTable: DWORD; //���ű����ļ�λ��ָ�룬���йܵ�IL��δ�ã�����0��
-    NumberOfSymbols: DWORD;      //���ű��ĵĸ��������йܵ�IL��δ�ã�����0�� �������λ���ڣ�0x90��
-    SizeOfOptionalHeader: WORD;  //PEͷ�Ĵ�С��
-    Characteristics: WORD;       //�ļ����Ա�ʾ������һ����йܴ����ִ���ļ�������Ϊ0x010E, DLL��0x210E.
+    Machine: WORD;               //目标机器类型字段，托管的IL代码设置该字段为 IMAGE_FILE_MACHINE_I386 (0x014C)
+    NumberOfSections: WORD;      //Section节的个数，Section节紧接着PE头
+    TimeDateStamp: DWORD;        //文件的创建时间
+    PointerToSymbolTable: DWORD; //符号表的文件位置指针，在托管的IL中未用，总是0。
+    NumberOfSymbols: DWORD;      //符号表的的个数，在托管的IL中未用，总是0。 （这里的位置在：0x90）
+    SizeOfOptionalHeader: WORD;  //PE头的大小。
+    Characteristics: WORD;       //文件属性标示。对于一般的托管代码可执行文件的属性为0x010E, DLL是0x210E.
   end;
 
-Ŀ����������ֶεĿ��ܵ�ֵ�Լ��������£�
+目标机器类型字段的可能的值以及含义如下：
   IMAGE_FILE_MACHINE_UNKNOWN   = 0;
   IMAGE_FILE_MACHINE_I386      = $014c; // Intel 386. For managed PE files, contents are applicable to any machine type.
   IMAGE_FILE_MACHINE_R3000     = $0162; // MIPS little-endian, 0x160 big-endian
@@ -261,55 +261,55 @@ PE ǩ��(signature) ������MS-DOS Stub,��4���ֽڣ�����Ϊ ��PE��Ȼ���������ֽ�0: 0x
   IMAGE_FILE_MACHINE_M32R      = $9041; // M32R little-endian
   IMAGE_FILE_MACHINE_CEE       = $C0EE;
 
-�ļ����Ա�ʶ��ֵ�Լ����壺
-  IMAGE_FILE_RELOCS_STRIPPED         = $0001; // Relocation info stripped from file. �йܴ��벻�����øñ�־Ϊ�档
-  IMAGE_FILE_EXECUTABLE_IMAGE        = $0002; // File is executable  (i.e. no unresolved externel references). �йܴ���������øñ�־Ϊ�档
-  IMAGE_FILE_LINE_NUMS_STRIPPED      = $0004; // Line nunbers stripped from file. �йܴ���������øñ�־Ϊ�档��Ϊ����Ƕ�������Ϣ��
-  IMAGE_FILE_LOCAL_SYMS_STRIPPED     = $0008; // Local symbols stripped from file. �йܴ���������øñ�־Ϊ�档
-  IMAGE_FILE_AGGRESIVE_WS_TRIM       = $0010; // Agressively trim working set �йܴ��벻�����øñ�־Ϊ�档
-  IMAGE_FILE_LARGE_ADDRESS_AWARE     = $0020; // App can handle >2gb addresses �йܴ��벻�����øñ�־Ϊ�档
-  IMAGE_FILE_BYTES_REVERSED_LO       = $0080; // Little endian. Bytes of machine word are reversed. �йܴ��벻�����øñ�־Ϊ�档
-  IMAGE_FILE_32BIT_MACHINE           = $0100; // 32 bit word machine.  ��ǰ�汾���йܴ������øñ�־Ϊ�档
+文件属性标识的值以及含义：
+  IMAGE_FILE_RELOCS_STRIPPED         = $0001; // Relocation info stripped from file. 托管代码不能设置该标志为真。
+  IMAGE_FILE_EXECUTABLE_IMAGE        = $0002; // File is executable  (i.e. no unresolved externel references). 托管代码必须设置该标志为真。
+  IMAGE_FILE_LINE_NUMS_STRIPPED      = $0004; // Line nunbers stripped from file. 托管代码必须设置该标志为真。因为不能嵌入调试信息。
+  IMAGE_FILE_LOCAL_SYMS_STRIPPED     = $0008; // Local symbols stripped from file. 托管代码必须设置该标志为真。
+  IMAGE_FILE_AGGRESIVE_WS_TRIM       = $0010; // Agressively trim working set 托管代码不能设置该标志为真。
+  IMAGE_FILE_LARGE_ADDRESS_AWARE     = $0020; // App can handle >2gb addresses 托管代码不能设置该标志为真。
+  IMAGE_FILE_BYTES_REVERSED_LO       = $0080; // Little endian. Bytes of machine word are reversed. 托管代码不能设置该标志为真。
+  IMAGE_FILE_32BIT_MACHINE           = $0100; // 32 bit word machine.  当前版本的托管代码设置该标志为真。
   IMAGE_FILE_DEBUG_STRIPPED          = $0200; // Debugging info stripped from file in .DBG file
-  IMAGE_FILE_REMOVABLE_RUN_FROM_SWAP = $0400; // If Image is on removable media, copy and run from the swap file.  �йܴ��벻�����øñ�־Ϊ�档
-  IMAGE_FILE_NET_RUN_FROM_SWAP       = $0800; // If Image is on Net, copy and run from the swap file.   �йܴ��벻�����øñ�־Ϊ�档
-  IMAGE_FILE_SYSTEM                  = $1000; // System File.   �йܴ��벻�����øñ�־Ϊ�档
+  IMAGE_FILE_REMOVABLE_RUN_FROM_SWAP = $0400; // If Image is on removable media, copy and run from the swap file.  托管代码不能设置该标志为真。
+  IMAGE_FILE_NET_RUN_FROM_SWAP       = $0800; // If Image is on Net, copy and run from the swap file.   托管代码不能设置该标志为真。
+  IMAGE_FILE_SYSTEM                  = $1000; // System File.   托管代码不能设置该标志为真。
   IMAGE_FILE_DLL                     = $2000; // File is a DLL.
-  IMAGE_FILE_UP_SYSTEM_ONLY          = $4000; // File should only be run on a UP machine   �йܴ��벻�����øñ�־Ϊ�档
-  IMAGE_FILE_BYTES_REVERSED_HI       = $8000; // Big endian. Bytes of machine word are reversed.  �йܴ��벻�����øñ�־Ϊ�档
+  IMAGE_FILE_UP_SYSTEM_ONLY          = $4000; // File should only be run on a UP machine   托管代码不能设置该标志为真。
+  IMAGE_FILE_BYTES_REVERSED_HI       = $8000; // Big endian. Bytes of machine word are reversed.  托管代码不能设置该标志为真。
  
-EXE �й��ļ����ļ������� 0x010E (IMAGE_FILE_EXECUTABLE_IMAGE �� IMAGE_FILE_LINE_NUMS_ STRIPPED �� IMAGE_FILE_LOCAL_SYMS_STRIPPED �� IMAGE_FILE_32BIT_ MACHINE). 
-DLL �й��ļ����ļ������� 0x210E (IMAGE_FILE_ EXECUTABLE_IMAGE �� IMAGE_FILE_LINE_NUMS_STRIPPED �� IMAGE_FILE_ LOCAL_SYMS_STRIPPED �� IMAGE_FILE_32BIT_MACHINE �� IMAGE_FILE_DLL).
+EXE 托管文件的文件属性是 0x010E (IMAGE_FILE_EXECUTABLE_IMAGE │ IMAGE_FILE_LINE_NUMS_ STRIPPED │ IMAGE_FILE_LOCAL_SYMS_STRIPPED │ IMAGE_FILE_32BIT_ MACHINE). 
+DLL 托管文件的文件属性是 0x210E (IMAGE_FILE_ EXECUTABLE_IMAGE │ IMAGE_FILE_LINE_NUMS_STRIPPED │ IMAGE_FILE_ LOCAL_SYMS_STRIPPED │ IMAGE_FILE_32BIT_MACHINE │ IMAGE_FILE_DLL).
 
-=== PE ͷ ===
-������COFFͷ�ľ���PEͷ�ˣ���������������ѡͷ������ʵ���϶���Exe��DLL�ļ���˵��ȴ���Ǵ��ڵġ�PEͷ�Ĵ�С���ǹ̶��ģ���������Ŀ¼�Ĵ�С������
-����������Ǹö������ļ�����������ĸ�����Ϣ����ʼ�ĵ�ַ�������Ķ�ջ�������ݶεĴ�С�ȵȡ�
+=== PE 头 ===
+紧接着COFF头的就是PE头了，尽管它被称作可选头，但是实际上对于Exe和DLL文件来说，却总是存在的。PE头的大小不是固定的，它由数据目录的大小决定。
+它会告诉我们该二进制文件怎样被载入的更多信息：开始的地址、保留的堆栈数、数据段的大小等等。
 
 00000098h: 0B 01 06 00 00 04 00 00 00 04 00 00 00 00 00 00 ; ................
 000000a8h: FE 22 00 00 00 20 00 00 00 40 00 00 00 00 40 00 ; ?... ...@....@.
 000000b8h: 00 20 00 00 00 02 00 00 04 00 00 00 00 00 00 00 ; . ..............
-000000c8h: 04 00 00 00 00 00 00 00 00 80 00 00 00 02 00 00 ; .........�......
+000000c8h: 04 00 00 00 00 00 00 00 00 80 00 00 00 02 00 00 ; .........€......
 
   _IMAGE_OPTIONAL_HEADER = record
     //
     // Standard fields.
     //
-    Magic: Word;               //ħ����ʶ��PE�����ļ���״̬��0x010B��ʾ32λPE�ļ����йܴ�������0x010B.
-    MajorLinkerVersion: Byte;  //�����������汾�ţ�MC++���ø��ֶ�Ϊ7��������˾�Ĵ�IL��������������Ϊ6��
-    MinorLinkerVersion: Byte;  //�������Ĵΰ汾��
-    SizeOfCode: DWORD;         //�ܴ�������Ĵ�С(.text),�йܴ���ֻ��һ����������
-    SizeOfInitializedData: DWORD; //�ܳ�ʼ�����ݽ����Ĵ�С(ͳ�����е����ݽ�����SizeOfRawData�ֶ�)����Ҫ��ʼ�������ݡ�
-    SizeOfUninitializedData: DWORD; //�ܲ���Ҫ��ʼ�������ݽ�����С(.bss),����������ռ�ô��̿ռ䣬ֻ��װ�غ���OS�����������ڴ�ռ䡣
-    AddressOfEntryPoint: DWORD;     //������ڵ�ַRVA �������йܴ��루DLL��Exe������ָ��CLR����׮��(���ļ�ƫ������0x0a8)
-    BaseOfCode: DWORD;              //�����ַRVA 
-    BaseOfData: DWORD;              //���ݻ�ַRVA 
+    Magic: Word;               //魔数标识该PE镜像文件的状态，0x010B表示32位PE文件，托管代码总是0x010B.
+    MajorLinkerVersion: Byte;  //链接器的主版本号，MC++设置该字段为7，其它公司的纯IL代码链接器设置为6。
+    MinorLinkerVersion: Byte;  //链接器的次版本号
+    SizeOfCode: DWORD;         //总代码节区的大小(.text),托管代码只有一个代码区。
+    SizeOfInitializedData: DWORD; //总初始化数据节区的大小(统计所有的数据节区的SizeOfRawData字段)，需要初始化的数据。
+    SizeOfUninitializedData: DWORD; //总不需要初始化的数据节区大小(.bss),该数据区不占用磁盘空间，只是装载后由OS加载器分配内存空间。
+    AddressOfEntryPoint: DWORD;     //代码入口地址RVA ，对于托管代码（DLL或Exe）总是指向CLR调用桩。(在文件偏移量：0x0a8)
+    BaseOfCode: DWORD;              //代码基址RVA 
+    BaseOfData: DWORD;              //数据基址RVA 
     //
     // NT additional fields.
     //
-    ImageBase: DWORD;              //ӳ���ļ���ַ,�ṩ�����������ļ������ȣ����ԣ������ַ����ILAsm�п���ʹ�� .imagebase <integer value> ָ��ָ����
-    SectionAlignment: DWORD;       //�ڴ��нڶ���ֵ����ֵ������ڵ���FileAlignment��Ĭ�����ڴ�ҳ��С�����磬�����ֵ��4096 ($1000)����ôÿ�ڵ���ʼ��ַ������4096�ı���
-    FileAlignment: DWORD;          //�ļ��нڶ���ֵ�����SectionAlignment��ֵС���ڴ�ҳ�Ĵ�С����ֵ����2��n�η�����512��64K�� FileAlignment ����ƥ�� SectionAlignment!
-                                   // .file alignment <integer value> ���磬�����ֵ��($200)����ôÿ�ڵ���ʼ��ַ������512�ı���
+    ImageBase: DWORD;              //映象文件基址,提供整个二进制文件的优先（线性）载入地址，在ILAsm中可以使用 .imagebase <integer value> 指令指定。
+    SectionAlignment: DWORD;       //内存中节对齐值，该值必须大于等于FileAlignment，默认是内存页大小。例如，如果该值是4096 ($1000)，那么每节的起始地址必须是4096的倍数
+    FileAlignment: DWORD;          //文件中节对齐值，如果SectionAlignment的值小于内存页的大小，该值则是2的n次方，从512～64K。 FileAlignment 必须匹配 SectionAlignment!
+                                   // .file alignment <integer value> 例如，如果该值是($200)，那么每节的起始地址必须是512的倍数
     MajorOperatingSystemVersion: Word;
     MinorOperatingSystemVersion: Word;
     MajorImageVersion: Word;
@@ -317,26 +317,26 @@ DLL �й��ļ����ļ������� 0x210E (IMAGE_FILE_ EXECUTABLE_IMAGE �� IMAGE_FILE_LINE
     MajorSubsystemVersion: Word;
     MinorSubsystemVersion: Word;
     Win32VersionValue: DWORD;
-    SizeOfImage: DWORD;            //ӳ���ļ���Ҫʹ�õ��ڴ�����
-    SizeOfHeaders: DWORD;          //��������ͷ���ܳ��ȣ���������Ŀ¼�ͽ�ͷ��ͬʱ����Ҳ�Ǵ��ļ��Ŀ�ͷ����һ�ڵ�ԭʼ���ݵ�ƫ������
-    CheckSum: DWORD;               //�����ļ���У���
-    Subsystem: Word;               //��ϵͳ: ��������,����̨����(Console), GUI,etc
-    DllCharacteristics: Word;      //����������0
-    SizeOfStackReserve: DWORD;     //������ջ�Ĵ�С,Ĭ����1M����û����������ռ�
-    SizeOfStackCommit: DWORD;      //��ʼʱָ��ջ��С,Ĭ����1ҳ��ʵ�ʷ���ռ�Ĵ�С��ͬʱҲ��ָ�������ӵ�������
-    SizeOfHeapReserve: DWORD;      //�����ĶѵĴ�С��Ĭ����1M����û����������ռ�
-    SizeOfHeapCommit: DWORD;       //��ʼʱָ���Ѵ�С,Ĭ����1ҳ��ʵ�ʷ���ռ�Ĵ�С��ͬʱҲ��ָ�������ӵ�������
-    LoaderFlags: DWORD;            //����������0
-    NumberOfRvaAndSize: DWORD;     //Number of entries in the DataDirectory array; at least 16. ���ܿ����ж���16��������Ŀ¼����һ�����������ֻ����16����
-    DataDirectory: array [0..IMAGE_NUMBEROF_DIRECTORY_ENTRIES - 1] of IMAGE_DATA_DIRECTORY;  //������16������Ŀ¼��
+    SizeOfImage: DWORD;            //映象文件将要使用的内存数量
+    SizeOfHeaders: DWORD;          //给出所有头的总长度，包括数据目录和节头。同时，它也是从文件的开头到第一节的原始数据的偏移量。
+    CheckSum: DWORD;               //磁盘文件的校验和
+    Subsystem: Word;               //子系统: 驱动程序,控制台程序(Console), GUI,etc
+    DllCharacteristics: Word;      //废弃，总是0
+    SizeOfStackReserve: DWORD;     //保留的栈的大小,默认是1M，并没有真正分配空间
+    SizeOfStackCommit: DWORD;      //初始时指定栈大小,默认是1页，实际分配空间的大小，同时也是指定的增加的数量。
+    SizeOfHeapReserve: DWORD;      //保留的堆的大小，默认是1M，并没有真正分配空间
+    SizeOfHeapCommit: DWORD;       //初始时指定堆大小,默认是1页，实际分配空间的大小，同时也是指定的增加的数量。
+    LoaderFlags: DWORD;            //废弃，总是0
+    NumberOfRvaAndSize: DWORD;     //Number of entries in the DataDirectory array; at least 16. 尽管可以有多于16个的数据目录但是一般编译器总是只产生16个。
+    DataDirectory: array [0..IMAGE_NUMBEROF_DIRECTORY_ENTRIES - 1] of IMAGE_DATA_DIRECTORY;  //保留的16个数据目录。
   end;
 
-ħ����ʶ��PE�����ļ���״̬��
+魔数标识该PE镜像文件的状态：
   IMAGE_NT_OPTIONAL_HDR32_MAGIC = $10b;
   IMAGE_NT_OPTIONAL_HDR64_MAGIC = $20b;
   IMAGE_ROM_OPTIONAL_HDR_MAGIC  = $107;
 
-��ϵͳ:
+子系统:
   IMAGE_SUBSYSTEM_UNKNOWN                 = 0; // Unknown subsystem.
   IMAGE_SUBSYSTEM_NATIVE                  = 1; // Image doesn't require a subsystem.
   IMAGE_SUBSYSTEM_WINDOWS_GUI             = 2; // Image runs in the Windows GUI subsystem.
@@ -351,44 +351,44 @@ DLL �й��ļ����ļ������� 0x210E (IMAGE_FILE_ EXECUTABLE_IMAGE �� IMAGE_FILE_LINE
   IMAGE_SUBSYSTEM_EFI_ROM                 = 13;
   IMAGE_SUBSYSTEM_XBOX                    = 14;
 
-DataDirectory ��IMAGE_NUMBEROF_DIRECTORY_ENTRIES ����һ�㶼��16��������Ŀ¼�����飬ÿһ������Ŀ¼�������Ϊ��
+DataDirectory 是IMAGE_NUMBEROF_DIRECTORY_ENTRIES 个（一般都是16个）数据目录表数组，每一个数据目录项的内容为：
   _IMAGE_DATA_DIRECTORY = record
-    VirtualAddress: DWORD;  //�ڵ�λ�ã���һ����Ե�ַ(RVA)�������ImageBase��ӳ���ļ���ַ����
-    Size: DWORD;            //�ڵĴ�С
+    VirtualAddress: DWORD;  //节的位置，是一个相对地址(RVA)，相对于ImageBase（映象文件基址）。
+    Size: DWORD;            //节的大小
   end;
 
-�Ѷ��������Ŀ¼������:
-    IMAGE_DIRECTORY_ENTRY_EXPORT (0)          ��������Ŀ¼���������DLL�ļ��ĵ�����������IL-codeδ�á�
-    IMAGE_DIRECTORY_ENTRY_IMPORT (1)          �������Ŀ¼�������DLL������CLRֻ��һ����ڣ�ָ��ִ������DLL�ĵ��ú���.
-    IMAGE_DIRECTORY_ENTRY_RESOURCE (2)        ��ԴĿ¼����IL-codeδ�á�
-    IMAGE_DIRECTORY_ENTRY_EXCEPTION (3)       �쳣Ŀ¼����IL-codeδ�á�
-    IMAGE_DIRECTORY_ENTRY_SECURITY (4)        ��ȫĿ¼������װ���ڴ�(IamgeFile)����ַ���ļ�ָ�벻��RVA��
-    IMAGE_DIRECTORY_ENTRY_BASERELOC (5)       ��ַ�ض�λ����
-    IMAGE_DIRECTORY_ENTRY_DEBUG (6)           ����Ŀ¼ - ���ݱ�������ء�����, �����������������Ϣ�������ڣ�����Ϊ�˴���һ�������Ľڡ�CLRδ�ã�ȫ��ֵ0��
-    IMAGE_DIRECTORY_ENTRY_COPYRIGHT (7)       �����ַ��� - һЩ����İ�Ȩ��Ϣ֮�ࡣ
-    IMAGE_DIRECTORY_ENTRY_GLOBALPTR (8)       ��ֵΪ0��Global pointer  RVA of the value to be stored in the global pointer register.��
-    IMAGE_DIRECTORY_ENTRY_TLS (9)             �̼߳��ֲ��洢Ŀ¼ ����������Ϊ��__declspec(thread)���ı���, Ҳ����ÿ�̵߳�ȫ�ֱ�����
-    IMAGE_DIRECTORY_ENTRY_LOAD_CONFIG (10)    ��������Ŀ¼ - �ṹ����;���ꡣ
-    IMAGE_DIRECTORY_ENTRY_BOUND_IMPORT (11)   ������Ŀ¼ - �μ�����Ŀ¼��������
-    IMAGE_DIRECTORY_ENTRY_IAT (12)            �����ַ�� - �μ�����Ŀ¼��������
+已定义的数据目录索引有:
+    IMAGE_DIRECTORY_ENTRY_EXPORT (0)          导出符号目录；大多用于DLL文件的导出函数。纯IL-code未用。
+    IMAGE_DIRECTORY_ENTRY_IMPORT (1)          导入符号目录；导入的DLL函数，CLR只有一个入口，指向执行引擎DLL的调用函数.
+    IMAGE_DIRECTORY_ENTRY_RESOURCE (2)        资源目录。纯IL-code未用。
+    IMAGE_DIRECTORY_ENTRY_EXCEPTION (3)       异常目录。纯IL-code未用。
+    IMAGE_DIRECTORY_ENTRY_SECURITY (4)        安全目录，不会装入内存(IamgeFile)，地址是文件指针不是RVA。
+    IMAGE_DIRECTORY_ENTRY_BASERELOC (5)       基址重定位表。
+    IMAGE_DIRECTORY_ENTRY_DEBUG (6)           调试目录 - 内容编译器相关。此外, 许多编译器将编译信息填入代码节，并不为此创建一个单独的节。CLR未用，全部值0。
+    IMAGE_DIRECTORY_ENTRY_COPYRIGHT (7)       描述字符串 - 一些随意的版权信息之类。
+    IMAGE_DIRECTORY_ENTRY_GLOBALPTR (8)       该值为0，Global pointer  RVA of the value to be stored in the global pointer register.。
+    IMAGE_DIRECTORY_ENTRY_TLS (9)             线程级局部存储目录 ；包含声明为“__declspec(thread)”的变量, 也就是每线程的全局变量。
+    IMAGE_DIRECTORY_ENTRY_LOAD_CONFIG (10)    载入配置目录 - 结构和用途不详。
+    IMAGE_DIRECTORY_ENTRY_BOUND_IMPORT (11)   绑定输入目录 - 参见输入目录的描述。
+    IMAGE_DIRECTORY_ENTRY_IAT (12)            输入地址表 - 参见输入目录的描述。
     IMAGE_DIRECTORY_ENTRY_DELAY_IMPORT (13);  Delay Load Import Descriptors
     IMAGE_DIRECTORY_ENTRY_COM_DESCRIPTOR (14) Common Language Runtime header address and size
     Reserved(15)
 
-=== ��ͷ�� ===
-��ͷ������PEͷ�� COFF ͷ�е� NumberOfSections �ֶζ����˽�ͷ����Ŀ��
-  _IMAGE_SECTION_HEADER = record //��40���ֽ�
-    Name: array [0..IMAGE_SIZEOF_SHORT_NAME - 1] of BYTE; //8���ֽڵ�ANSI string,�����ԡ�.����ͷ����.text. ����8λ��0���㡣
-                                                          //�����������8λ����ô���ƽ��������ַ�����������������ַ������е�ʮ�����ַ���ƫ��������"/"��ͷ��
-    Misc: TImgSecHdrMisc;  //�����ǽڵ�VirtualSize(unaligned size)����ֻ�ж�Ŀ���ļ�(.obj)����PhysicalAddress�����ﲻ�ܡ�
-    VirtualAddress: DWORD; //���׵�ַRVA  (.tezt:��$2000)
-    SizeOfRawData: DWORD;  //RawData�Ĵ�С��RawData��ָ��Ҫ��ʼ�������ݣ�����ֵ������FileAlignment���������������ֵС��VirtualSize,��ôʣ�µĽ�����0��
-    PointerToRawData: DWORD; //�ļ�ָ�룬���Ǵ��ļ��Ŀ�ͷ���������ݵ�һҳ��ƫ������������FileAlignment����������
-    PointerToRelocations: DWORD; //�ļ�ָ�룬ָ���ض�λ��ڵ���㣬���Ϊ0�������ýڲ���Ҫ�ض�λ��δ��ʼ��Ϊ0��
-    PointerToLinenumbers: DWORD; //δ��ʼ��Ϊ0��
-    NumberOfRelocations: WORD; //δ��ʼ��Ϊ0��
-    NumberOfLinenumbers: WORD; //δ��ʼ��Ϊ0��
-    Characteristics: DWORD; //�����ڵ�����,bits
+=== 节头表 ===
+节头表紧跟PE头后。 COFF 头中的 NumberOfSections 字段定义了节头的数目。
+  _IMAGE_SECTION_HEADER = record //共40个字节
+    Name: array [0..IMAGE_SIZEOF_SHORT_NAME - 1] of BYTE; //8个字节的ANSI string,节名以“.”打头，如.text. 不足8位以0补足。
+                                                          //如果节名长于8位，那么名称将被放于字符串表，这里就是在字符串表中的十进制字符串偏移量，以"/"打头，
+    Misc: TImgSecHdrMisc;  //这里是节的VirtualSize(unaligned size)，【只有对目标文件(.obj)才是PhysicalAddress。这里不管】
+    VirtualAddress: DWORD; //节首地址RVA  (.tezt:是$2000)
+    SizeOfRawData: DWORD;  //RawData的大小（RawData是指需要初始化的数据），该值必须是FileAlignment的整数倍！如果该值小于VirtualSize,那么剩下的将被填0。
+    PointerToRawData: DWORD; //文件指针，它是从文件的开头到节中数据第一页的偏移量，必须是FileAlignment的整数倍。
+    PointerToRelocations: DWORD; //文件指针，指向重定位入口的起点，如果为0，表明该节不需要重定位。未用始终为0。
+    PointerToLinenumbers: DWORD; //未用始终为0。
+    NumberOfRelocations: WORD; //未用始终为0。
+    NumberOfLinenumbers: WORD; //未用始终为0。
+    Characteristics: DWORD; //描述节的特性,bits
   end;
   TImgSecHdrMisc = record
     case Integer of
@@ -406,7 +406,7 @@ DataDirectory ��IMAGE_NUMBEROF_DIRECTORY_ENTRIES ����һ�㶼��16��������Ŀ¼�����
 000001e8h: 00 00 00 00 40 00 00 42 00 00 00 00 00 00 00 00 ; ....@..B........
 000001f8h: 00 00 00 00 00 00 00 00 EC 22 00 00 00 00 00 00 ; ........?......
 
-�ڵ����ԣ�
+节的特性：
   IMAGE_SCN_SCALE_INDEX = $00000001; // Tls index is scaled (.tls section only).
   IMAGE_SCN_CNT_CODE               = $00000020; // Section contains code.
   IMAGE_SCN_CNT_INITIALIZED_DATA   = $00000040; // Section contains initialized data.
@@ -429,52 +429,52 @@ The ILAsm compiler generates the following sections in a PE file:
 
 
 == Metadata ==
-Token �Ķ��壺 uint32, xxyyyyyy; xx�����ǵڼ�������0x70���⣬����#US������ yyyyyy�����ڱ��е���ţ�����index
+Token 的定义： uint32, xxyyyyyy; xx代表是第几个表（0x70除外，代表#US流）； yyyyyy代表在表中的序号，就是index
 
-CLR��ͷ�Լ���MetaData��IL, Resource�� ȫ������.text �ڣ�����ζ�ż��ص�ʱ�����е�Metadata��ȫ��װ���ڴ棬�ô����ǿ�����ϵͳ�ض�λ�ڴ档
-�����������ǲ���������ʽ��ţ�������룬���������˷��ڴ档���е� MetaData ��Ϣȫ���� IMAGE_COR20_HEADER.MetaData�ֶ�ָ��ĵ�ַ�У���
-��������� TClrMetadataHeader ��
+CLR的头以及其MetaData（IL, Resource） 全部放在.text 节，这意味着加载的时候所有的Metadata将全部装入内存，好处就是可以让系统重定位内存。
+不过由于它是采用流的形式存放，必须读入，这样反而浪费内存。所有的 MetaData 信息全部在 IMAGE_COR20_HEADER.MetaData字段指向的地址中，其
+入口内容是 TClrMetadataHeader 。
 
   IMAGE_COR20_HEADER = record
     // Header versioning
-    cb: DWORD;  //IMAGE_COR20_HEADER�ṹ�Ĵ�С��
-    MajorRuntimeVersion: WORD; //ִ�д˳�����������CLR�汾�š�
-    MinorRuntimeVersion: WORD; //ִ�д˳�����������CLR�汾�š�
+    cb: DWORD;  //IMAGE_COR20_HEADER结构的大小。
+    MajorRuntimeVersion: WORD; //执行此程序所需的最低CLR版本号。
+    MinorRuntimeVersion: WORD; //执行此程序所需的最低CLR版本号。
     // Symbol table and startup information
     MetaData: IMAGE_DATA_DIRECTORY;
-    Flags: DWORD; // ������CLRӳ���ִ������
-    EntryPointToken: DWORD; //��������ڵ㣬��һ��ָ��MethodDef���Ļ�File�������Token
+    Flags: DWORD; // 描述此CLR映像的执行属性
+    EntryPointToken: DWORD; //主程序入口点，是一个指向MethodDef表的或File表的入口Token
     // Binding information
     Resources: IMAGE_DATA_DIRECTORY;
     StrongNameSignature: IMAGE_DATA_DIRECTORY;
     // Regular fixup and binding information
-    CodeManagerTable: IMAGE_DATA_DIRECTORY; //������
-    VTableFixups: IMAGE_DATA_DIRECTORY;  //����ʹ��VTable��������C++ʹ�õģ�����ԭ��PE�ṹ�е��ض����
-    ExportAddressTableJumps: IMAGE_DATA_DIRECTORY; //������
+    CodeManagerTable: IMAGE_DATA_DIRECTORY; //不关心
+    VTableFixups: IMAGE_DATA_DIRECTORY;  //是由使用VTable的语言如C++使用的，类似原来PE结构中的重定向表
+    ExportAddressTableJumps: IMAGE_DATA_DIRECTORY; //不关心
     // Precompiled image info (internal use only - set to zero)
-    ManagedNativeHeader: IMAGE_DATA_DIRECTORY; //������
+    ManagedNativeHeader: IMAGE_DATA_DIRECTORY; //不关心
   end;
   _IMAGE_DATA_DIRECTORY = record
-    VirtualAddress: DWORD;  //�������
-    Size: DWORD;            //���ݴ�С
+    VirtualAddress: DWORD;  //数据入口
+    Size: DWORD;            //数据大小
   end;
 
-CLRӳ���ִ������:
-  COMIMAGE_FLAGS_ILONLY               = $00000001; //��CLR�����ɴ�IL�������
-  COMIMAGE_FLAGS_32BITREQUIRED        = $00000002; //��CLRӳ��ֻ����32λϵͳ��ִ��
-  COMIMAGE_FLAGS_IL_LIBRARY           = $00000004; //��CLRӳ������ΪIL�������ڵ�
-  COMIMAGE_FLAGS_STRONGNAMESIGNED     = $00000008; //��CLRӳ������strong name signature��
-  COMIMAGE_FLAGS_TRACKDEBUGDATA       = $00010000; //��CLRӳ������tracked debug data
+CLR映像的执行属性:
+  COMIMAGE_FLAGS_ILONLY               = $00000001; //此CLR程序由纯IL代码组成
+  COMIMAGE_FLAGS_32BITREQUIRED        = $00000002; //此CLR映像只能在32位系统上执行
+  COMIMAGE_FLAGS_IL_LIBRARY           = $00000004; //此CLR映像是作为IL代码库存在的
+  COMIMAGE_FLAGS_STRONGNAMESIGNED     = $00000008; //此CLR映像是有strong name signature的
+  COMIMAGE_FLAGS_TRACKDEBUGDATA       = $00010000; //此CLR映像是有tracked debug data
 
 
-  //ָ��MetaData��������ݣ���MetaData Header��
+  //指向MetaData的入口内容，是MetaData Header：
   TClrMetadataHeader = packed record
     Signature: DWORD;   // Magic signature for physical metadata : $424A5342.
-    MajorVersion: Word; // Major version, 1  Metadata��ʽ�İ汾��
+    MajorVersion: Word; // Major version, 1  Metadata格式的版本号
     MinorVersion: Word; // Minor version, 1
     Reserved: DWORD;    // Reserved, always 0
     Length: DWORD;      // Length of version string in bytes, say m.
-    Version: array [0..0] of Char; //UTF8��ʽ�ı��뻷���汾��
+    Version: array [0..0] of Char; //UTF8格式的编译环境版本号
     // UTF8-encoded version string of length m
     // Padding to next 4 byte boundary, say x.
     {
@@ -486,32 +486,32 @@ CLRӳ���ִ������:
     }
   end;
   TClrStreamHeader = packed record
-    Offset: DWORD; // Memory offset to start of this stream from start of the metadata root, �����Metadataͷ(PClrMetadataHeader)��ƫ����
+    Offset: DWORD; // Memory offset to start of this stream from start of the metadata root, 相对于Metadata头(PClrMetadataHeader)的偏移量
     Size: DWORD;   // Size of this stream in bytes, shall be a multiple of 4.
     // Name of the stream as null terminated variable length
     // array of ASCII characters, padded with \0 characters
-    Name: array [0..MaxWord] of Char; //���������б�Ҫ��
+    Name: array [0..MaxWord] of Char; //流的名字有必要？
   end;
 
 
-Metadata��ʵ�����ݣ���ͨ�����ɲ�ͬ��Stream����ġ����������ԶѵĽṹ������֯�����ļ���������װ���ڴ�
-���Ƕѡ�ʵ���Ͼ��ǰ������������������ֵø���ϸ�¡�
+Metadata的实际数据，是通过若干不同的Stream保存的。其中数据以堆的结构进行组织。在文件中是流，装入内存
+后是堆。实际上就是俺的数据区。不过它分得更加细致。
 
-Metadata�����������������#String, #Blob, #Guid,#US(User String)��#~��("#"�������ֵ�ǰ׺)��ÿ�����������ֻ�ܳ���һ�Σ�
-#US��#Blob����ʡ�ԡ�
+Metadata里最常见的有五种流，#String, #Blob, #Guid,#US(User String)和#~流("#"是流名字的前缀)。每种类型流最多只能出现一次，
+#US和#Blob流可省略。
 
-#String������һ���ַ����ѣ�Metadata�ڲ��õ��������ַ�������򷽷������ֵȵȶ���UTF8���뱣���ڴ˶��ڡ�
-���û����ַ������ַ�������������Unicode���뱣����#US(User String)���ڡ�
-ֵ��ע����ǣ�US����String���ڶ����ƽṹ��֯�ϲ�ͬ�����Ǻ��潫����ʱ����ϸ�ἰ��
+#String流就是一个字符串堆，Metadata内部用到的所有字符串如类或方法的名字等等都以UTF8编码保存在此堆内。
+而用户的字符串如字符串常量，则以Unicode编码保存在#US(User String)堆内。
+值得注意的是，US流和String流在二进制结构组织上不同，我们后面将分析时会详细提及。
 
-#Guid���Ǳ��������ʹ�õ���Guid�����飬������¼����Assembly��Module��MVID��
+#Guid流是保存程序中使用到的Guid的数组，定长记录。如Assembly中Module的MVID。
 
-#Blob����һ��ͨ�ô洢�ռ䣬����Guid���ַ����������������ʣ�µĶ������Զ�����������ʽ�������棬��PublicKey��������ֵ�ȵȡ�
-��Ч���ҵ��������з���ı�������
+#Blob流是一个通用存储空间，除了Guid和字符串以外基本上所有剩下的东西都以二进制数据形式放在里面，如PublicKey，常量的值等等。
+等效于我的数据区中分配的变量区。
 
-����Ҫ����#~������Ÿ���������Ϣ������Metadata������Ϣ��ŵĵط���#~���������������ű�(Table)����ʽ��֯��ÿ�ű��洢ĳһ�����Metadata��Ϣ��
-��MethodDef���洢���з�������Ϣ��ÿ�ű��������ɵ���(Row)���ÿ����n����(Column)��ÿ�д���һ����Ϣ����MethodDef����ÿһ��
-����һ��������RVA,���ͱ�־,����,Signature�ȵ���Ϣ��������ͨ�������������໥������������֯�ṹ�͹�ϵ���ݿ�����ơ�
+最重要的是#~流，存放各种类型信息，这是Metadata核心信息存放的地方。#~流物理上以若干张表(Table)的形式组织，每张表存储某一方面的Metadata信息，
+如MethodDef表存储所有方法的信息。每张表又由若干的行(Row)组成每行有n个列(Column)，每列代表一种信息，如MethodDef表中每一行
+都有一个方法的RVA,类型标志,名字,Signature等等信息。在其中通过各种索引来相互关联，整个组织结构和关系数据库很相似。
 
   PClrTableStreamHeader = ^TClrTableStreamHeader;
   TClrTableStreamHeader = packed record
@@ -520,83 +520,83 @@ Metadata�����������������#String, #Blob, #Guid,#US(User String)��#~��("#"����
     MinorVersion: Byte; // Minor version of table schemata, always 0
     HeapSizes: Byte;    // Bit vector for heap sizes. 
     Reserved2: Byte;    // Reserved, always 1
-    Valid: Int64;       // Bit vector of present tables, let n be the number of bits that are 1. 64bit����Чλͼ�б���ָ����������Щ���͵ı����ܹ�������64�����͵��б���
-    Sorted: Int64;      // Bit vector of sorted tables. ָʾ��Ӧ���б��Ƿ�����
+    Valid: Int64;       // Bit vector of present tables, let n be the number of bits that are 1. 64bit的有效位图列表，指出存在了哪些类型的表，总共可以有64种类型的列表。
+    Sorted: Int64;      // Bit vector of sorted tables. 指示对应的列表是否排序。
     // Array of n four byte unsigned integers indicating the number of rows
     // for each present table.
-    Rows: array [0..MaxWord] of DWORD; // ��Validλͼ���дӵ͵���λɨ�裬����һ�������ڣ���ɵ�Rows�л�ȡ�˱��м�¼������, Rows ����Ŀn��ʵ�ʴ��ڵı�����Ŀ����ŵ������Ǹñ��ļ�¼����
+    Rows: array [0..MaxWord] of DWORD; // 对Valid位图进行从低到高位扫描，发现一个表存在，则可到Rows中获取此表中记录的行数, Rows 的数目n是实际存在的表的数目。存放的内容是该表的记录数。
     //Rows: array [0..n-1] of DWORD;
-    //Tables: array // ʵ�ʱ����ݵĿ�ʼ������ǰ���Rows���ڵ�˳�����δ�ŵġ�һ��������һ������
+    //Tables: array // 实际表数据的开始，存放是按照Rows所在的顺序，依次存放的。一个表接着一个表。
   end;
 
-�������еı�ͨ��һ��64bit����Чλͼ����ʾ���������ÿ�����͵ı���һ����ţ����仰˵����������64�ֲ�ͬ�ı����ͣ���MethodDef���ı��
-��6�����Valid�ֶεĵ�6λ��1�����ÿ������ÿһ�У�����ʹ��һ��Ψһ��Token��ʾ����Token��һ��32bit�޷��������������һ���ֽڱ�ʾ����
-��ţ��������ֽڱ�ʾ���е������š���0x06000003��ʾ0x06����MethodDef���е�3�У���MyApp::Add�����Token������CLR��Ƶ��ʹ�ã���IL����
-���ú�����ʹ�ñ�������ʹ��Token����֮���ƵĻ���Coded Index���Ȼὲ������ʵ��ʱ��˵��������򼯵Ķ���Ҳ��һ�������ͣ�ֻ�������ļ�¼ֻ
-��һ����
+这里所有的表通过一个64bit的有效位图来表示表存在与否每种类型的表有一个编号，换句话说，最多可以有64种不同的表类型，如MethodDef表的编号
+是6，则第Valid字段的第6位置1。因而每个表的每一行，可以使用一个唯一的Token表示。此Token是一个32bit无符号整型数，最高一个字节表示表的
+序号，低三个字节表示表中的索引号。如0x06000003表示0x06表（MethodDef）中第3行（如MyApp::Add）这个Token概念在CLR中频繁使用，如IL代码
+调用函数、使用变量都是使用Token。与之类似的还有Coded Index，等会讲二进制实现时再说。比如程序集的定义也是一个表类型，只不过它的记录只
+有一个。
 
 
-��ƪ�ʼ�Ϊ���ڵ���ᣬ�Ҹо��Ƚ�ǳ�������ҵ���ҲӦ�û���һЩ������Щ���������Զ�Ԫ�����и����������ֽ���������
+此篇笔记为现在的体会，我感觉比较浅薄，而且当中也应该会有一些错误。这些问题留待以对元数据有更深的理解后现进行修正。
 
-1��  ��ΪԪ����
+1．  何为元数据
 
-Ԫ�����Ǳ�Ƕ�뵽�����ļ����е�һЩ������Ϣ��.Net PE�ļ��������嵽�������õ������Ͷ�����Ԫ����������Ӧ��������
+元数据是被嵌入到程序文件当中的一些描述信息，.Net PE文件中所定义到和所引用到的类型都会在元数据中有相应的描述。
 
-2��  Ԫ������ʲô��;
+2．  元数据有什么用途
 
-������λ���Jeffery����������Ķ�Ԫ������;�ľ���������
+以下这段话是Jeffery先生书里面的对元数据用途的精彩描述。
 
-l         Ԫ����ʡȥ��Դ�������ʱ��ͷ�ļ���������������Ϊ�ں���ʵ�����ͺͳ�Ա��IL�����ļ����У��Ѿ����������б����õ����ͺͳ�Ա����Ϣ������������ֱ�Ӵ��й�ģ���ж�ȡԪ�����������Щ��Ϣ��
+l         元数据省去了源代码编译时对头文件的依赖，这是因为在含有实现类型和成员的IL代码文件当中，已经包含了所有被引用的类型和成员的信息。编译器可以直接从托管模块中读取元数据来获得这些信息。
 
-l         vs.net��������Ԫ�������������Ǳ�д���롣�������ܸ�֪���Ծ���ͨ������Ԫ��������������ĳ�������ṩ����Щ�������Լ�����Щ��������Щ������
+l         vs.net可以利用元数据来辅助我们编写代码。它的智能感知特性就是通过分析元数据来告诉我们某个类型提供了哪些方法，以及以这些方法有哪些参数。
 
-l         CLR�Ĵ�����֤���̿�������Ԫ������ȷ�������ִ�С���ȫ���Ĳ�����
+l         CLR的代码验证过程可以利用元数据来确保代码仅执行“安全”的操作。
 
-l         ����Ԫ���ݣ����ǿ��Խ�һ��������ֶ����л���һ���ڴ���У�Ȼ��Զ�̴��͸���һ̨�������������Զ�̼������ִ�з����л����Ӷ����´������������״̬��
+l         利用元数据，我们可以将一个对象的字段序列化到一个内存块中，然后远程传送给另一台机器，最后再在远程计算机上执行反序列化，从而重新创建对象和他的状态。
 
-l         ����Ԫ���ݣ������ռ���Ҫ��׷�ٶ�����������ڡ������κζ��������ռ������ܹ�ͨ��Ԫ������ȷ���ö�������ͣ����ҿ��Ի�֪�ö������Щ�ֶ������������Ķ���
+l         利用元数据，垃圾收集器要吧追踪对象的生存周期。对于任何对象，垃圾收集器都能够通过元数据来确定该对象的类型，并且可以获知该对象的哪些字段引用了其它的对象。
 
 l
 
-3��  Ԫ��������
+3．  元数据种类
 
-.Net�е�Ԫ�������ɲ�ͬ�����ݱ����ɵġ�Ԫ���ݱ���.Net���б��ֳ�Ϊ���ࣨÿ���ж�����������Ƿֱ��ǣ�����Ԫ���ݱ�������Ԫ���ݱ������嵥Ԫ���ݱ���
+.Net中的元数据是由不同的数据表构成的。元数据表在.Net当中被分成为三类（每类有多个表），它们分别是，定义元数据表，引用元数据表还有清单元数据表。
 
-����Ԫ���ݱ�����������.Net PE�ļ�������������������͵ġ������ǳ����еĶ�����࣬�ṹ�ȵ�һ�е�������Ϣ�����ն�������ڶ���Ԫ���ݱ��С�
+定义元数据表是用来描述.Net PE文件本身所定义的数据类型的。在我们程序当中的定义的类，结构等等一切的类型信息，最终都会出现在定义元数据表中。
 
-�������ݱ���������.Net Pe���������õ����ⲿ���͡������ǳ��������õ�FCL���͡��Զ������ͣ�ע1���Լ����������͵Ķ��嶼��������������ݱ��ڡ�
+引用数据表用来描述.Net Pe当中所引用到的外部类型。在我们程序当中引用的FCL类型、自定义类型（注1）以及第三方类型的定义都会出现在引用数据表内。
 
-�嵥Ԫ���ݱ�����ڶ���Ԫ��Ԫ������Ԫ���ݱ���˵����һ��Ƚ������Ԫ���ݱ���������������������������Ϣ�����򼯵���������Ƕ�̬���ӿ⣬�ڳ����ڲ������źܶ�����Ͷ��壬�ڳ��򼯵��ⲿ��һ������Ա����ͨ������������򼯵ķ�ʽ��ʹ������������ṩ����Դ��Ȼ���붯̬���ӿ�����ͬ���ǣ������к���Ԫ���ݣ��ر����嵥���ݣ�����Ҳ��ʹ���򼯳�Ϊ��.Netƽ̨ʵ�ֽ���汾��ͻ�ͼ򵥲����е���Ҫ�������������ڳ��򼯵��嵥���������˳��򼯵İ汾��.Netƽ̨����������汾�ĳ���ͬʱ��װ��ͬһ̨������ϣ�����ִ�г���ʱ�����ݳ������󶨵ĳ��򼯰汾����ȷ��װ����򼯡�
+清单元数据表相对于定义元素元和引用元数据表来说，是一类比较特殊的元数据表，它的作用是用来描述程序集信息。程序集的理念很像是动态链接库，在程序集内部包含着很多的类型定义，在程序集的外部，一个程序员可以通过包含这个程序集的方式来使用这个程序所提供的资源。然而与动态链接库所不同的是，程序集中含有元数据（特别是清单数据），这也就使程序集成为了.Net平台实现解决版本冲突和简单部署中的重要基础。正是由于程序集的清单当中描述了程序集的版本，.Net平台才允许多个版本的程序集同时安装到同一台计算机上，并在执行程序时，根据程序所绑定的程序集版本来正确的装入程序集。
 
-�����������򼯵İ汾��Ϣ�Ժ󣬳��򼯵��嵥Ԫ���ݻ���Գ��򼯵�����һЩ������Ϣ������������Щ��Ϣ���������ж�ģ����������ļ������ã�һ�����򼯿����ɶ��ģ������������ļ����ɣ����������������ֻ�����ļ��Ż�����嵥���������а�������Դ���壬���г����е������͵Ķ��壨�����������Ϊ�˷���CLR�Գ����е������͵Ĳ��Ұɣ��Ͼ�һ�����򼯿��԰������ģ�飬���û��һ�����������Ļ����ڳ��򼯵��в��ҵ�ĳһ���ض����͵�Ч�ʻ��ܵ��ϴ��Ӱ�죩��
+除了描述程序集的版本信息以后，程序集的清单元数据还会对程序集的其它一些定义信息进行描述。这些信息包括程序集中对模块或者其它文件的引用（一个程序集可以由多个模块或者其它的文件主成，但是在这个程序集中只有主文件才会包含清单）、程序集中包含的资源定义，还有程序集中导出类型的定义（我想这可能是为了方便CLR对程序集中导出类型的查找吧，毕竟一个程序集可以包含多个模块，如果没有一个汇总索引的话，在程序集当中查找到某一个特定类型的效率会受到较大的影响）。
 
 
-������Jeffery�������Ϲܴ������Ƶ�������
+以下是Jeffery先生对拖管代码优势的论述。
 
-���Ӧ�ó�����һЩ���͵�CPU�����籼��4�������У�JIT�������ܹ���⵽���������������������Щ����CPU�ṩ������ָ��ı��ش��롣�����Ϲ�Ӧ�ó���ͨ��������Ϊ���������Сͨ�ù��ܼ��ϵ�CPUƽ̨��һ������ʹ������CPU�ṩ������ָ�����Щ����ָ���������ڽ��µ�CPU��ΪӦ�ó�������ܸߵ�����������ǰһ��ʱ���һ��ڳ���Ա��־�Ͽ�����intel����ʹ�����Լ���C++����������������Ĵ���������Լ�������CPU�ϻ�ö�ô�õ����ܡ���ʵIntel��ȫҲ����ΪJIT�����������Ż�������������Ҫ��.Netƽ̨�����Ƿ����������ֶ�JIT�����ڲ��ʽ֧�֣���
+如果应用程序在一些新型的CPU（比如奔腾4）上运行，JIT编译器能够检测到这种情况，并产生利用这些新型CPU提供的特殊指令的本地代码。而非拖管应用程序通过被编译为面向具有最小通用功能集合的CPU平台，一般会避免使用新型CPU提供的特殊指令。而这些特殊指令往往会在较新的CPU上为应用程序带来很高的性能提升（前一段时间我还在程序员杂志上看到了intel吹捧使用它自己的C++编译器所编译出来的代码会在它自己生产的CPU上获得多么好的性能。其实Intel完全也可以为JIT来做这样的优化工作，不过这要看.Net平台本身是否留出了这种对JIT类似于插件式支持）。
 
-JIT�������ܼ�⵽�������еĻ�����ĳЩ���Ƿ��ش���Ĳ������ԡ�����JIT�ͻὫ���಻�ᱻִ�еĴ����Ż���ȥ����ʹ��������ĸ�С��ִ���ٶȱ�ĸ��죨����һ��ʼ������ε�ʱ���ҶԴ˲������ţ���Ϊ�Ҹо�����һ�ֱ����ڵļ�����һ��ķ��Ϲܱ�����Ҳ�ǿ���ʵ�����ģ����ǵ��Ҷ���������һ�κ��ҵĹ������ת�䣩��
+JIT编译器能检测到正在运行的机器上某些总是返回错误的布尔测试。这样JIT就会将这类不会被执行的代码优化下去，以使代码量变的更小，执行速度变的更快（当我一开始读完这段的时候我对此并不相信，因为我感觉这是一种编译期的技术，一般的非拖管编译器也是可以实现它的，但是当我读完了下面一段后我的观念发生了转变）。
 
-��Ӧ�ó�������ʱ��CLR�ܹ��������������ִ�����������ѡ������½�IL��������Ϊ���ش��롣���ݹ۲쵽��ִ��ģʽ��������Ĵ�����Ա�������֯����߷�֧���Եĳɹ��ʣ�����һ����ô�����˷ݵļ�������һ�ֶԴ���������ʱ���ܻ��ķ�������������ּ����������˹����ܼ�������Ϊ����ҪCLR��������ʱ����ʵ�ʳ��ֵ�������Դ�����е������������������˹����ܼ������ڲ��ϵķ�չ�����У�����������Ҳ��������죬��������΢�����ܲ�����ʹ��һ���������ʵļ��������������ġ�һ�ֿ�������ĵ���Ҳ��������ķ�ʽ��΢����Ӧ���е�һЩ����ʱ������ʽ����Ϊ����������ʱ����ģʽ�⡱��Ȼ��CLR�ٸ������ģʽ��������ʱ�Դ������ƥ��͵�������δ����΢�����Բ��ϵ���չ����״�����ģʽ����ʹ�����Ż����Դﵽһ�ָ��õ�Ч������
+在应用程序运行时，CLR能够分析评估代码的执行情况，并有选择地重新将IL代码编译成为本地代码。根据观察到的执行模式，被编译的代码可以被重新组织以提高分支测试的成功率（这是一个多么令人兴份的技术啊，一种对代码在运行时智能化的分析与调整。这种技术类似于人工智能技术，因为它需要CLR根据运行时根据实际出现的情况来对代码进行调整，不过由于现在人工智能技术还在不断的发展过程中，而且其自身也并不完成熟，所以我想微软可能并不是使用一种智能性质的技术来完成这项工作的。一种可以想象的到，也可以理解的方式是微软将应用中的一些运行时调整方式归结成为“代码运行时调整模式库”，然后CLR再根据这个模式库在运行时对代码进行匹配和调整，在未来，微软可以不断的扩展和完状况这个模式库以使这种优化可以达到一种更好的效果）。
 
-�ض�Jeffery�����ġ�.Net��ܳ�����ơ��Ȿ�飬��������.Net��ĳЩ�ؼ�Ԫ�ص��ܽ���ĺ�ֵ�ö��߻�ζ��������Jeffer������Ԫ���ݸ�.NetӦ�ó���������Ƶ��ܽᡣ
+重读Jeffery先生的《.Net框架程序设计》这本书，发现他对.Net中某些关键元素的总结真的很值得读者回味。以下是Jeffer先生对元数据给.Net应用程序带来优势的总结。
 
-Ԫ����ʡȥ��Դ�������ʱ��ͷ�ļ���������������Ϊ�ں���ʵ�����ͺͳ�Ա��IL�����ļ����У��Ѿ����������б����õ����ͺͳ�Ա����Ϣ������������ֱ�Ӵ��й�ģ���ж�ȡԪ�����������Щ��Ϣ��
+元数据省去了源代码编译时对头文件的依赖，这是因为在含有实现类型和成员的IL代码文件当中，已经包含了所有被引用的类型和成员的信息。编译器可以直接从托管模块中读取元数据来获得这些信息。
 
-vs.net��������Ԫ�������������Ǳ�д���롣�������ܸ�֪���Ծ���ͨ������Ԫ��������������ĳ�������ṩ����Щ�������Լ�����Щ��������Щ������
+vs.net可以利用元数据来辅助我们编写代码。它的智能感知特性就是通过分析元数据来告诉我们某个类型提供了哪些方法，以及以这些方法有哪些参数。
 
-CLR�Ĵ�����֤���̿�������Ԫ������ȷ�������ִ�С���ȫ���Ĳ�����
+CLR的代码验证过程可以利用元数据来确保代码仅执行“安全”的操作。
 
-����Ԫ���ݣ����ǿ��Խ�һ��������ֶ����л���һ���ڴ���У�Ȼ��Զ�̴��͸���һ̨�������������Զ�̼������ִ�з����л����Ӷ����´������������״̬����������Jeffery��������ָ����ͨ��Ԫ���ݿ��Ի�ȡ������Ĳ��֣������������л���������Զ�̲�Զ�̵�û��ʲô��ϵ����
+利用元数据，我们可以将一个对象的字段序列化到一个内存块中，然后远程传送给另一台机器，最后再在远程计算机上执行反序列化，从而重新创建对象和他的状态（我想这里Jeffery先生可能指的是通过元数据可以获取到对象的布局，进而可以序列化它，而和远程不远程的没有什么关系）。
 
-����Ԫ���ݣ������ռ���Ҫ��׷�ٶ�����������ڡ������κζ��������ռ������ܹ�ͨ��Ԫ������ȷ���ö�������ͣ����ҿ��Ի�֪�ö������Щ�ֶ������������Ķ��������Ԫ���ݣ���
+利用元数据，垃圾收集器要吧追踪对象的生存周期。对于任何对象，垃圾收集器都能够通过元数据来确定该对象的类型，并且可以获知该对象的哪些字段引用了其它的对象（美妙的元数据）。
 
 
 
 C# 2.0 - Static Class
-������������������������ݽ���
+本文资料引用自李建忠先生的演讲稿
 
-C# 2.0 �ṩ�˾�̬�࣬��1.x������Ҫʵ�־�̬����Ҫʹ������Ĵ��롣
+C# 2.0 提供了静态类，在1.x中我们要实现静态类需要使用下面的代码。
 
 1.0
 public sealed class Class1
@@ -604,48 +604,48 @@ public sealed class Class1
   private Class1(){}
 }
 
-��C# 2.0�����ǿ���ʹ��static class���������ŵؽ��������⡣
+在C# 2.0中我们可以使用static class来更加优雅地解决这个问题。
 public static class Class1
 {
 }
 
-���Ƿ�����һ�£����˽���ʵ�ֻ��ơ�
+我们反编译一下，会了解其实现机制。
 .class public abstract auto ansi sealed beforefieldinit Program
  extends object
 {
 }
 
-ԭ������������������Ϊ abstract sealed����Ȼ���ܱ��̳б�ʵ�����ˡ�
-����C#�������������������ڴ�����ֱ������һ��abstract sealed���ͣ�����Ĵ����޷�ͨ�����롣
+原来编译器将该类声明为 abstract sealed，自然不能被继承被实例化了。
+但是C#编译器并不允许我们在代码中直接声明一个abstract sealed类型，下面的代码无法通过编译。
 public abstract sealed class Class1
 {
 }
 
-��̬�������
+静态类的限制
 
-1. ��̬�಻����ʵ����������
-2. ��̬�಻�����κ�ʵ����Ա��
-3. ��̬���ϲ���ʹ��abstract��sealed���η���
-4. ��̬��Ĭ�ϼ̳���System.Object��������ʽָ���κ��������ࡣ
-5. ��̬�಻��ָ���κνӿ�ʵ�֡�
-6. ��̬��ĳ�Ա������protected����protected internal���ʱ������η���
+1. 静态类不能有实例构造器。
+2. 静态类不能有任何实例成员。
+3. 静态类上不能使用abstract和sealed修饰符。
+4. 静态类默认继承自System.Object，不能显式指定任何其他基类。
+5. 静态类不能指定任何接口实现。
+6. 静态类的成员不能有protected或者protected internal访问保护修饰符。
 
-�����������²�һ�� MS ������Ա���뷨�����ǵ�Ŀ�������� abstract sealed class ��Ч������ȴΪ�����ϵ�ì�ܶ����ղ��ѣ��������һ�������Ľ����ʽ�����Ǿ�Ϊ C# 2.0 ������һ�� static �ؼ��֣������Ľ����������⡣ 
+让我们再来猜测一下 MS 开发人员的想法：他们的目的是想获得 abstract sealed class 的效果，但却为语义上的矛盾而苦恼不已，大家想获得一个优美的解决方式，于是就为 C# 2.0 新增了一个 static 关键字，完美的解决了这个问题。 
 
-Ҳ�����˻��ʣ�Ϊʲô���� static class = abstract class + static member limit ��Ҫ���� sealed �������أ������Ǽ̳�һ��ֻ�� static ��Ա���������дһ������ȫû������Ϊʲô��ô˵�أ���Ϊ static ��Ȼ��not virtual���̳���������ʲô���أ�
+也许有人会问：为什么不是 static class = abstract class + static member limit 而要加上 sealed 的限制呢？理由是继承一个只有 static 成员的类和重新写一个类完全没有区别。为什么这么说呢？因为 static 必然是not virtual，继承它又能有什么用呢？
 
-static class ����һ�����ƣ��Ǿ���ֻ�ܴ� System.Object �̳У�Ϊʲô����������ƣ����ɺ������ࡣ
+static class 还有一个限制，那就是只能从 System.Object 继承，为什么会有这个限制，理由和上面差不多。
 
-ÿÿ�ᵽ static �ؼ��֣��Ҿ������� static constructor����л MS �Ŀ�����Ա�ṩ����ô�õ�һ�����ԡ����� C# �ṩ�� static constructor ȴû���ṩ static destructor�������� Applied Microsoft .NET Framework Programming һ���� Jeffery Richter �������ṩ��һ���취����ͨ�� System.AppDomain.DomainUnload �¼�ȥ�ﵽͬ����Ч����
+每每提到 static 关键字，我就想起了 static constructor，感谢 MS 的开发人员提供了这么好的一个特性。但是 C# 提供了 static constructor 却没有提供 static destructor，不过在 Applied Microsoft .NET Framework Programming 一书中 Jeffery Richter 给我们提供了一个办法就是通过 System.AppDomain.DomainUnload 事件去达到同样的效果。
 
-ʹ�� static constructor Ҫע��ľ��������׳��κ��쳣���ᵼ�¸����������¼��� AppDoamin ֮ǰ���ٿ��ã�����Ҫ�ӱ�С�ģ����� static contructor �к�������������������������������ڱ�д�����ʱ��һ��Ҫ�������
+使用 static constructor 要注意的就是这里抛出任何异常都会导致该类型在重新加载 AppDoamin 之前不再可用，所以要加倍小心，另外 static contructor 中很容易有两个类型死锁的情况发生，在编写代码的时候一定要想清楚。
 
 
 CIL Instructions
 _________________________________________________
 Format                Assembly Format   Description
 0x00                  nop
-0x01                  break             �ϵ����ã�����������halt.
+0x01                  break             断点设置，我这里用作halt.
 0x02                  ldarg.0           load argument onto the stack
 0x03                  ldarg.1
 0x04                  ldarg.2
@@ -666,9 +666,9 @@ Format                Assembly Format   Description
 0x13<unsigned int8>   stloc.s indx      Pop a value from stack into local variable indx, short form.
 0x14                  ldnull            Push a null reference on the stack.
                                         [It might be thought that ldnull is redundant: why not use ldc.i4.0 or ldc.i8.0 instead? The answer is
-                                        that ldnull provides a size-agnostic null �C analogous to an ldc.i instruction, which does not exist. However,
+                                        that ldnull provides a size-agnostic null – analogous to an ldc.i instruction, which does not exist. However,
                                         even if CIL were to include an ldc.i instruction it would still benefit verification algorithms to retain the ldnull
-                                        instruction because it makes type tracking easier. ] agnostic ����֪��
+                                        instruction because it makes type tracking easier. ] agnostic 不可知的
                                           ldc.<type>: load numeric constant
 0x15                  ldc.i4.m1           Push -1 onto the stack as int32.
 0x15                  ldc.i4.M1           Push -1 of type int32 onto the stack as int32 (alias for ldc.i4.m1).
@@ -693,7 +693,7 @@ Format                Assembly Format   Description
 0x29<T>               calli callsitedescr Call method indicated on the stack with arguments described by callsitedescr.
 0x2A                  Ret                 Return from method, possibly with a value.
 0x2B<int8>            br.s target         Branch to target, short form. <unconditional branch>
-0x2C<int8>            brfalse.s target    Branch to target if value is zero (false), short form.   ��ջ��ֵ������ϣ��ʹӶ�ջ�Ƴ��ˣ����еķ�ָ֧�����ˡ�
+0x2C<int8>            brfalse.s target    Branch to target if value is zero (false), short form.   堆栈的值测试完毕，就从堆栈移出了！所有的分支指令都是如此。
 0x2D<int8>            brtrue.s target     Branch to target if value is non-zero (true), short form.
 0x2E<int8>            beq.s target        Branch to target if equal, short form.
 0x2F<int8>            bge.s target        Branch to target if greater than or equal to, short form.
@@ -721,8 +721,8 @@ Format                Assembly Format   Description
 0x42 bgt.un
 0x43 ble.un
 0x44 blt.un
-0x45<unsigned int32>  switch(t1, t2 �� tN) table switch based on value. Jump to one of n values. Stack:(Value -- )
-   <int32>�� <int32>                       The switch instruction implements a jump table. The format of the instruction is
+0x45<unsigned int32>  switch(t1, t2 … tN) table switch based on value. Jump to one of n values. Stack:(Value -- )
+   <int32>… <int32>                       The switch instruction implements a jump table. The format of the instruction is
                                            an unsigned int32 representing the number of targets N, followed by N int32 values
                                            specifying jump targets: these targets are represented as offsets (positive or negative)
                                            from the beginning of the instruction following this switch instruction.
@@ -759,7 +759,7 @@ Format                Assembly Format   Description
 0x64                  shr.un              <Only For Type-Safe value.>
 0x65                  neg                 <Only For Type-Safe value.>
 0x66                  not                 <Only For Type-Safe value.>
-0x67                 conv.i1               conv.<to type> �C data conversion. Convert to int8, pushing int32 on stack. (Value -- Result)
+0x67                 conv.i1               conv.<to type> – data conversion. Convert to int8, pushing int32 on stack. (Value -- Result)
 0x68                 conv.i2
 0x69                 conv.i4
 0x6A                 conv.i8
@@ -767,11 +767,11 @@ Format                Assembly Format   Description
 0x6C                 conv.r8
 0x6D                 conv.u4
 0x6E                 conv.u8
-0x6F<T>              callvirt method      call a method associated, at runtime, with an object (obj, arg1, �� argN -- Result<if any>)
+0x6F<T>              callvirt method      call a method associated, at runtime, with an object (obj, arg1, … argN -- Result<if any>)
 0x70                 cpobj
 0x71                 ldobj
 0x72                 ldstr
-0x73<T>              newobj ctor          create a new object   (arg1, �� argN -- obj)
+0x73<T>              newobj ctor          create a new object   (arg1, … argN -- obj)
                                           allocate an uninitialized object or value type and call ctor. Ctor is a metadata token (a methodref or methodef that must be marked as a constructor).
 0x74                 castclass
 0x75                 isinst
@@ -799,11 +799,11 @@ Format                Assembly Format   Description
 0x8B                 conv.ovf.u.un
 0x8C<T>              box typeTok             Convert a boxable value to its boxed form. (val -- obj)
                                              If typeTok is a value type, the box instruction converts val to its boxed form.
-                                             When typeTok is a non-nullable type (��1.8.2.4), this is done by creating a new
+                                             When typeTok is a non-nullable type (§1.8.2.4), this is done by creating a new
                                              object and copying the data from val into the newly allocated object. If it is
-                                             a nullable type, this is done by inspecting val��s HasValue property; if it is
+                                             a nullable type, this is done by inspecting val’s HasValue property; if it is
                                              false, a null reference is pushed onto the stack; otherwise, the result of boxing
-                                             val��s Value property is pushed onto the stack. If typeTok is a reference type,
+                                             val’s Value property is pushed onto the stack. If typeTok is a reference type,
                                              the box instruction does nothing.
 0x8D<T>              newarr etype            Create a zero-based, one-dimensional array  (numElems -- array)
 0x8E                 ldlen
@@ -909,18 +909,18 @@ TurboScript Extented Instructions:
 
 
 _________________________________________________
-C# 2.0 ֮ partial[1]
-���ߣ�����    ������Դ����վ�ղ�    �������3    ����ʱ�䣺2006-11-4     	
-           	�����壺С ��
-��������������Ȼ�������� VS.Net Whidbey �� .Net FrameWork 2.0 ���¹��ܣ�����ȴ���ڻ�����߱ȶ��˰���Ÿ�ȷ���ҵġ�Whidbey�����߸���ĸû���ô�������
+C# 2.0 之 partial[1]
+作者：佚名    文章来源：本站收藏    点击数：3    更新时间：2006-11-4     	
+           	【字体：小 大】
+常常看见大家在热火朝天的讨论 VS.Net Whidbey 和 .Net FrameWork 2.0 的新功能，而我却现在还在这边比对了半天才敢确定我的“Whidbey”这七个字母没有敲错。：（
 
-����ո��� VPC ��װ���� VS.Net 2005 Community Technology Preview�����ĺú�����һ�� .Net Framework 2.0 �� C# 2.0 ��Ϭ��֮����
+今天刚刚在 VPC 中装上了 VS.Net 2005 Community Technology Preview，决心好好体验一把 .Net Framework 2.0 和 C# 2.0 的犀利之处。
 
-���µ� VS.Net���½�һ�� WinForm Application�����Ͼͷ����˲�֮ͬ������������������ɵĴ��롱����ȥ�ˣ�InitializeComponent()����ȥ�ˣ�
+打开新的 VS.Net，新建一个 WinForm Application，马上就发现了不同之处：“窗体设计器生成的代码”哪里去了？InitializeComponent()那里去了？
 
-����Ƭ�̣��ŷ���ԭ������� partial �ؼ��ָ�Ĺ���
+端详片刻，才发现原来是这个 partial 关键字搞的鬼。
 
-partial �ؼ��ֵ������ǽ���� class ��Ϊ������֣��������Ὣ�������ƴ��һ��ȥ��
+partial 关键字的作用是将你的 class 分为多个部分，编译器会将多个部分拼到一起去。
 
 public partial class SampleClass
 ...{
@@ -936,7 +936,7 @@ public void MethodB()
 }
 }
 
-��
+和
 
 public class SampleClass
 ...{
@@ -949,17 +949,17 @@ public void MethodB()
 }
 
 
-�ǵȼ۵ġ�
+是等价的。
 
-�Ҳ�������������ֵĳ�����Ϊ�˽��������������������ɵĴ��롱������������ region��
+我猜想这个东西出现的初衷是为了解决掉：“窗体设计器生成的代码”这个令人讨厌的 region。
 
-��������˵�����Ŷӿ������������������Ҳ���е��ô���
+对我们来说，在团队开发当中这个东西或许也会有点用处。
 
-�ҹ۲���һ�����ɵ� IL ���룬ʹ�� partial ���ɵĴ��벢û��ʲô����ı�ǣ���˵�� partial ���������Ե����ԣ�CLR ��ȫ��֪����ô������Ĵ��ڣ���Ҳ����ζ�Ų�Ҫָ���� partial class ����Ϊ assembly ���� module ʲô��������������д�� partial class ȥ����ƴ�ӣ���ֻ���ڱ����ʱ�������á�
+我观察了一下生成的 IL 代码，使用 partial 生成的代码并没有什么特殊的标记，这说明 partial 纯粹是语言的特性，CLR 完全不知道这么个玩意的存在，这也就意味着不要指望将 partial class 编译为 assembly 或者 module 什么的再与其他的人写的 partial class 去进行拼接：它只能在编译的时候起作用。
 
-Ϊ�˿���һ�±���������������ĳһ�� partial class ����ʽָ�����࣬���ִ�����Ȼ�ܹ���ȷ��ͨ�����룬�������ᰴ��ĳһ����ʽָ���˸���� partial ���б��룬ֻ���ڶ�� partial ָ���˲�ͬ����ʱ�Żᱨ����ͬ���������� partial ָ��������ì�ܵ����η��Ļ�������ʱҲ�ᱨ���ġ�
+为了考验一下编译器，我试着让某一个 partial class 不显式指定父类，发现代码仍然能够正确的通过编译，编译器会按照某一个显式指定了父类的 partial 进行编译，只有在多个 partial 指定了不同父类时才会报错。同样，如果多个 partial 指定了自相矛盾的修饰符的话，编译时也会报错的。
 
-����˼���ǣ����ǻ�����д���������Ĵ��룺
+有意思的是，我们还可以写以下这样的代码：
 
 public partial class Sample
 ...{
@@ -980,7 +980,7 @@ public partial class SampleGrandson
 }
 }
 
-������Rustle Liu�� http://ms.mblogger.cn/rustle/ 
+刘敏（Rustle Liu） http://ms.mblogger.cn/rustle/ 
 
 _________________________________________________
 
