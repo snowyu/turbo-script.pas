@@ -1,7 +1,7 @@
 <Include("Claim")/>
 =>著者：Riceball LEE>=
 
-Summary: 这里将评测世界上最快的脚本引擎的解释器执行效率 ――  EUPHORIA, Lua，以及俺写的TurboScript解释器核心原型【也许会开源】。
+Summary: 这里将评测世界上最快的脚本引擎的解释器执行效率 ――  EUPHORIA, Lua，以及俺写的TurboScript解释器核心原型。
 
 == 引言 ==
 
@@ -51,14 +51,14 @@ TurboScript解释器则又是用高度优化的x86嵌入汇编写的，这是Tur
   ADD EBX, 300  81C32C010000
   ;计时结束
 </code>
- 
+
 结果运行时间：54； 这里以其为整数运算基准，视其为速度为 = 100％; 空耗为0%
 
 <code>
   ;计时开始
   a := 300.00001;
   b := 300.00001;
-  asm 
+  asm
     FLD a   //push a to st(0)
     FADD b
   ..... --- 总计 2017 次
@@ -67,7 +67,7 @@ TurboScript解释器则又是用高度优化的x86嵌入汇编写的，这是Tur
   end;//}
   ;计时结束
 </code>
- 
+
 结果运行时间：67； 这里以其为浮点运算基准，视其为速度为 = 100％; 空耗为0%
 
 === Lua Script 脚本 ===
@@ -95,7 +95,7 @@ Lua内部不存在Int类型，所有数字全部是Double浮点小数，所以�
     count +=300
   --计时结束
 </code>
- 
+
 结果运行时间：74 ；是x86执行速度的73%；空耗为27%
 
 === paxCompiler 加法指令顺序执行效率测试脚本 ===
@@ -107,11 +107,11 @@ Lua内部不存在Int类型，所有数字全部是Double浮点小数，所以�
   Result := Result + 300;
   //(计时结束
 </code>
- 
+
 结果运行时间：286；是x86执行速度的19%；空耗为81%
 
 Notes:
-paxCompiler 1.4: 
+paxCompiler 1.4:
   PaxCompiler1.RegisterHeader(0, 'function QueryPerformanceCounter(var a: Int64):Boolean;stdcall;', @QueryPerformanceCounter);
   在脚本中直接注册 QueryPerformanceCounter函数后但是不能取得返回值。
 
@@ -126,7 +126,7 @@ paxCompiler 1.4:
   300 +
   //(计时结束
 </code>
- 
+
 结果运行时间：87；是x86执行速度的62%；空耗为38%
 最新结果是: 83；
 PurePascalEngine运行时间: 153
@@ -161,7 +161,7 @@ end;
 --计时开始
   a := 300.00001;
   b := 300.00001;
-  asm 
+  asm
     FLD a
     CALL ADD
     ..... （总计 2017 次）
@@ -170,7 +170,7 @@ end;
 --计时结束
 </code>
 
-结果运行时间：76 
+结果运行时间：76
 
 === Lua Script 脚本 ===
 <code>
@@ -201,7 +201,7 @@ count = iAdd(count, 300)
 count = iAdd(count, 300)
 --计时结束
 </code>
- 
+
 结果运行时间：522；是x86执行速度的24%；空耗为76%
 
 === paxCompiler 子过程调用效率脚本 ===
@@ -218,7 +218,7 @@ end;
   Result := Add(Result, 300);
   //(计时结束
 </code>
- 
+
 结果运行时间：410；是x86执行速度的31%；空耗为69%
 (空子函数的效率和执行加法计算的效率差不多：401)
 
@@ -260,7 +260,7 @@ PurePascalEngine(FPC)运行时间(预先加载): 1517
 === TurboScript 调用DLL子过程的调用效率 ===
 <code>
 //该函数在DLL文件中。
-:Add(const a: Integer; const b: Integer): Integer 
+:Add(const a: Integer; const b: Integer): Integer
   external 'dlltest.dll' DLL REGISTER Name 'AddCalc';
 
 //--计时开始
@@ -281,5 +281,5 @@ PurePascalEngine运行时间(预先加载): 4733-4847; LoadOnDemand: 16617-17242
  * Lua: http://www.lua.org
  * EUPHORIA: http://www.rapideuphoria.com
  * TurboScript: [建造中]
- 
+
 == 测试脚本和程序下载 ==
