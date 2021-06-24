@@ -1,0 +1,285 @@
+<Include("Claim")/>
+=>著者：Riceball LEE>=
+
+Summary: 这里将评测世界上最快的脚本引擎的解释器执行效率 ――  EUPHORIA, Lua，以及俺写的TurboScript解释器核心原型。
+
+== 引言 ==
+
+
+衡量脚本引擎效率，对于非JITter执行的解释型脚本来说，解释器本身的执行效率就是核心的核心，关键之关键了。
+总所周知，解释的速度慢于编译的原因就是，因为多了一道工序，指令必须经过解释才能执行。要想提高解释器的
+性能，自然是要尽量缩短解释的过程。这个解释的过程就是空耗了，也就是我们平时说的做的无用功。因此，这里
+将以编译执行的速度视为空耗为0，以它作为基准，对解释器的效率进行比较。
+
+用什么指令来测试呢，就挑一个最简单的整数加法运算，两数相加，绝大多数脚本都该支持的。由于机器码执行速度
+太快，如果只重复执行几次，就算是用高性能计数器也无法计时，所以这里将重复执行2017次加法指令，以300累加，
+结果为300*2017。测试全部采用 QueryPerformanceCounter 高精度计数。
+
+在解释器直接执行VM指令的效率之后，我们还想测试下解释器执行过程调用的效率，毕竟在实际应用中大部分都是执行的
+过程调用（方法，虚方法实际上依然是过程，当然由于虚方法要查表所以又要比调用普通过程慢）。就将加法指令放到子过
+程中，就可以测试了。
+
+其实如果脚本引擎都能实现一个空指令那么就能精确的看出解释器的空耗了。
+
+
+== 速度效率图 ==
+
+该图以x86汇编为基准计算。从图中我们可以看出，EUPHORIA解释器在直接指令执行这块运行性能最高，达到了x86指令
+执行速度的73%，也就是说它的空耗只有27%。
+
+  ScriptPerformance.gif
+  [[Image:./ScriptPerformance-3.gif|thumb|none|95%|]]
+
+
+实际上 Lua 是用Float实现的整数的运算，在它的数字类型实现中，其实在内部只有浮点类型，所以在执行上占了劣势。
+而EUPHORIA则在内部专门实现了整数类型，不过奇怪的是它就没有专门实现浮点类型了，剩下的就全部是用atom类型进
+行扩充的。所以这个加法的执行效率还和虚拟机的架构大有关系。另外Lua子过程调用的效率太低，应该还有很大提升余地。
+
+至于俺的TurboScript架构则是类似于 CLR 的架构――面向堆栈的32位虚拟机，所以占了不用传递参数的便宜，再加上
+TurboScript解释器则又是用高度优化的x86嵌入汇编写的，这是TurboScript解释器运行高性能的原因。
+
+后面是测试脚本以及结果。
+
+== 直接指令执行效率测试 ==
+
+=== x86汇编基准效率 ===
+<code>
+  ;计时开始
+  MOV EBX, 300  BB2C010000
+  ADD EBX, 300  81C32C010000
+  ..... --- 总计 2017 次
+  ADD EBX, 300  81C32C010000
+  ;计时结束
+</code>
+
+结果运行时间：54； 这里以其为整数运算基准，视其为速度为 = 100％; 空耗为0%
+
+<code>
+  ;计时开始
+  a := 300.00001;
+  b := 300.00001;
+  asm
+    FLD a   //push a to st(0)
+    FADD b
+  ..... --- 总计 2017 次
+    FADD b
+    FSTP a
+  end;//}
+  ;计时结束
+</code>
+
+结果运行时间：67； 这里以其为浮点运算基准，视其为速度为 = 100％; 空耗为0%
+
+=== Lua Script 脚本 ===
+<code>
+  (计时开始)
+  local count = 300
+  count = count + 300
+    ..... （总计 2017 次）
+  count = count + 300
+  (计时结束)
+</code>
+
+Lua内部不存在Int类型，所有数字全部是Double浮点小数，所以这里于 x86浮点加法运算指令比较。
+
+[Lua5.0.2] QueryPerformanceCount: 110; 是x86执行速度的61%；空耗为39%
+[Lua5.1 ] QueryPerformanceCount: 120;  是x86执行速度的56%；空耗为44%
+
+
+=== EUPHORIA 加法指令顺序执行效率测试脚本 ===
+<code>
+  --计时开始
+    count = 300
+    count +=300
+    ..... --- 总计 2017 次
+    count +=300
+  --计时结束
+</code>
+
+结果运行时间：74 ；是x86执行速度的73%；空耗为27%
+
+=== paxCompiler 加法指令顺序执行效率测试脚本 ===
+<code>
+  //计时开始
+  Result := 300;
+  Result := Result + 300;
+    ..... （总计 2017 次）
+  Result := Result + 300;
+  //(计时结束
+</code>
+
+结果运行时间：286；是x86执行速度的19%；空耗为81%
+
+Notes:
+paxCompiler 1.4:
+  PaxCompiler1.RegisterHeader(0, 'function QueryPerformanceCounter(var a: Int64):Boolean;stdcall;', @QueryPerformanceCounter);
+  在脚本中直接注册 QueryPerformanceCounter函数后但是不能取得返回值。
+
+
+
+=== TurboScript 脚本 ===
+<code>
+  //计时开始
+  300  //Push 300 to the data stack.
+  300 +
+    ..... （总计 2017 次）
+  300 +
+  //(计时结束
+</code>
+
+结果运行时间：87；是x86执行速度的62%；空耗为38%
+最新结果是: 83；
+PurePascalEngine运行时间: 153
+PurePascalEngine(FPC)运行时间: 469
+
+== 子过程调用的速度比拼 ==
+
+=== x86 汇编 子过程调用效率基准测试脚本 ===
+<code>
+function add(a,b: integer): integer;
+asm
+  mov EAX, a
+  add EAX, b
+end;
+--计时开始
+  asm
+    mOV EAX, 300
+    MOV EDX, 300    CALL ADD
+    ..... （总计 2017 次）
+    MOV EDX, 300    CALL ADD
+--计时结束
+</code>
+
+结果运行时间：126
+
+<code>
+function add: double;
+asm
+  Fadd b
+end;
+
+--计时开始
+  a := 300.00001;
+  b := 300.00001;
+  asm
+    FLD a
+    CALL ADD
+    ..... （总计 2017 次）
+    CALL ADD
+    FSTP a
+--计时结束
+</code>
+
+结果运行时间：76
+
+=== Lua Script 脚本 ===
+<code>
+function iAdd(a, b)
+  return a+b
+end function
+  (计时开始)
+  local count = 300
+  count = iAdd(count, 300)
+    ..... （总计 2017 次）
+  count = iAdd(count, 300)
+  (计时结束)
+</code>
+
+【Lua5.0.2】 运行时间：1270；是x86执行速度的10%；空耗为90%
+【Lua5.1 】  运行时间：1820；是x86执行速度的7%；空耗为93%
+
+
+=== EUPHORIA 子过程调用效率测试脚本 ===
+<code>
+function iAdd(integer a, integer b)
+  return a+b
+end function
+--计时开始
+count = 300
+count = iAdd(count, 300)
+..... --- 总计 2017 次
+count = iAdd(count, 300)
+--计时结束
+</code>
+
+结果运行时间：522；是x86执行速度的24%；空耗为76%
+
+=== paxCompiler 子过程调用效率脚本 ===
+<code>
+function Add(const a,b: integer): integer;
+begin
+  Result := a + b;
+end;
+
+  //计时开始
+  Result := 300;
+  Result := Add(Result, 300);
+    ..... （总计 2017 次）
+  Result := Add(Result, 300);
+  //(计时结束
+</code>
+
+结果运行时间：410；是x86执行速度的31%；空耗为69%
+(空子函数的效率和执行加法计算的效率差不多：401)
+
+=== TurboScript 子过程近调用效率测试 ===
+<code>
+: Add +;
+//--计时开始
+300
+300 Add
+..... （总计 2017 次）
+300 Add
+//--计时结束
+</code>
+结果运行时间：169；是x86执行速度的75%；空耗为25%
+最新结果是: 164；是x86执行速度的76%；空耗为24%
+PurePascalEngine运行时间: 310
+PurePascalEngine(FPC)运行时间: 963
+
+=== TurboScript 子过程模块之间的VM DLL远调用效率 ===
+<code>
+: Add external 'test'; //该函数在另一文件中。
+//--计时开始
+300
+300 Add
+..... （总计 2017 次）
+300 Add
+//--计时结束
+</code>
+
+启用按需加载技术的结果运行时间：1082【不稳定徘徊在1082-8828】
+使用的是按需加载技术，也就是仅当该函数被调用的时候才加载，然后加上Cache技术，后面的调用就在内存中处理。
+时间远远长于其它，是因为加载文件耗去了绝大部分时间
+不启用按需加载技术，而是预先加载模块：
+结果运行时间：202  <如果不使用Cache功能每次都要查找所花时间：1790>
+最新结果是: 191
+PurePascalEngine运行时间(预先加载): 423
+PurePascalEngine(FPC)运行时间(预先加载): 1517
+
+=== TurboScript 调用DLL子过程的调用效率 ===
+<code>
+//该函数在DLL文件中。
+:Add(const a: Integer; const b: Integer): Integer
+  external 'dlltest.dll' DLL REGISTER Name 'AddCalc';
+
+//--计时开始
+300
+300 Add
+..... （总计 2017 次）
+300 Add
+//--计时结束
+</code>
+
+启用按需加载技术的结果运行时间：144584【不稳定徘徊在138322-219230】 优化后: 16648-17100(很少29556)
+不启用按需加载技术，而是预先加载模块： 129625(偶尔上了130000) 优化后: 5003-5520(偶尔7954)
+PurePascalEngine运行时间(预先加载): 4733-4847; LoadOnDemand: 16617-17242(29035)
+
+
+
+== 网站 ==
+ * Lua: http://www.lua.org
+ * EUPHORIA: http://www.rapideuphoria.com
+ * TurboScript: [建造中]
+
+== 测试脚本和程序下载 ==
