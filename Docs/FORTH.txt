@@ -1,13 +1,13 @@
 Turbo Script Assembly language Specification
 
-writen by riceball LEE
+Written by riceball LEE
 
 Feature:
-  * ƽ̨�޹أ����� Forth Virtual Machine Codes ָ���
-  * ����ִ�У����� TurboExecutor ���Ը��� VM codes ��ʱ����ɲ�ͬCPU����ʵָ�JITִ�У�������ֱ�����У���ͨ���߶��Ż��Ľ���ִ�е�Executor������(Ч��ֻ��ֱ��������0.3��)��
-  * TurboInterpreter�� �Խ��ͷ�ʽִ��VMCode�ǻ���x86 ���������Ż���ִ���ٶ�ֱ��C++��Delphi�ȸ߼��������ԡ�
-    * �����ڽű��е������������DLL�еĺ���(֧��Register, pascal, stdcall, cdecl, fastcall����Լ��)
-    * ����������������ýű��е���һ����!
+  * 平台无关：采用 Forth Virtual Machine Codes 指令集；
+  * 高速执行：各种 TurboExecutor 可以根据 VM codes 即时翻译成不同CPU的真实指令集JIT执行，或编译后直接运行，或通过高度优化的解释执行的Executor类运行(效率只比直接运行慢0.3倍)。
+  * TurboInterpreter： 以解释方式执行VMCode是基于x86 机器代码优化，执行速度直逼C++，Delphi等高级编译语言。
+    * 可以在脚本中调用宿主程序或DLL中的函数(支持Register, pascal, stdcall, cdecl, fastcall调用约定)
+    * 可以在宿主程序调用脚本中的任一过程!
 
 
 == Virtual Machine Specification ==
@@ -15,62 +15,62 @@ Feature:
 Virtual CPU: 32 bit
 States Register: CPU States Register 1 Byte.
 Common Registers: None
-Code-Memory: 
-Data-Memory: the metaInfo of the Code-memory, string cosntants and the module varaibles.
+Code-Memory:
+Data-Memory: the metaInfo of the Code-memory, string constants and the module variables.
 Stack: Parameter Stack and Return Stack.
-Global Options: 
-Heap: 
+Global Options:
+Heap:
 
-�����ô������ĵ�ַΪ���ƫ������ַ�����ϵ�Ϊ���Ե�ַ��
-�����ռ�: ģ������ĵ�ַΪ����������Ե�ַ���ַ��������ĵ�ַΪ����������Ե�ַ���������У��ַ�������̬���飩������GetMem����Ŀռ��ڶ��ϡ�
+在引用代码区的地址为相对偏移量地址，堆上的为绝对地址。
+变量空间: 模块变量的地址为数据区的相对地址；字符串常量的地址为数据区的相对地址；对象、序列（字符串，动态数组）变量、GetMem分配的空间在堆上。
 
-����������ַ�������û�����ü�����������Ȼ���𲽷�չ
-�ַ������������ü�����-1������_LStrAsg()�й涨��
-  * ������ü���С��0����ô���·�����ڴ沢�����ַ���
-  * ������ü�������0�����ͷ��ַ�����ռ�ÿռ䡣
+【最基本的字符串类型没有引用计数，嘻嘻。然后逐步发展
+字符串常量的引用计数是-1，而在_LStrAsg()中规定：
+  * 如果引用计数小于0，那么重新分配堆内存并复制字符串
+  * 如果引用计数等于0，则释放字符串所占用空间。
 
-  ����ģ��������������������ģ���ģ���������ô���ƹ������Ƿ����ġ�LStrAsg��������Ϊ�˱��⶯̬װ���ģ��ж�غ��ڴ治���ڡ�
-  LStrAsg�� ��������ϵģ���ַ���������LStrLAsg() ������ϵ�ֲ��ַ���������
-��
+  对于模块变量，如果是引用其它模块的模块变量，那么复制过程总是发生的【LStrAsg】，这是为了避免动态装入的模块卸载后内存不存在。
+  LStrAsg： 是用于联系模块字符串变量，LStrLAsg() 用于联系局部字符串变量。
+】
 
-== ģ�� ==
+== 模块 ==
 the Module Type(TTurboModuleType):
     @param mtFunction         the script function(word).
     @param mtHost             the module is in the host application, not really exists, only in ModuleRef
-    @param mtDLL              the DLL module����û����Ĵ��ڣ�ֻ����ModuleRef�б���DLL��Handle.
-    @param mtUnit             the unit only for compile-time, store all symbols��������Щ˽�еı����������͡�
-    @param mtLib              the runtime lib, it's the native DLL. 
+    @param mtDLL              the DLL module，并没有真的存在，只是在ModuleRef中保存DLL的Handle.
+    @param mtUnit             the unit only for compile-time, store all symbols，包括那些私有的变量方法类型。
+    @param mtLib              the runtime lib, it's the native DLL.
 
-== ģ���ڴ澵����� ==
-
-
-ģ���Ǳ������ļ�����С�ĵ�λ���Ǹ������ͺ����ļ��ϡ����õ���ģ�顣
-Ҳ���ڴ����С��λ��ֻ��ģ���ӵ�д���������������
-
-���Ƴ��Ȳ��ܳ���1023����Ϊ��PChar,����#0����Ϊ1024��
-
-ģ��������(FDataMemory)
-ģ��������ͷΪ TTurboPreservedDataMemory �ṹ������ָ���˴�������λ�ã���С�����ƣ�ģ�����͵ȵȡ�
-
-ģ�������(FMemory)
-
-ģ��ļ������̣�
-  LoadFromStream: ģ��������
-    ���ض�λ�����ݵ�ַ�����أ� FRelocatedDataAddresses.LoadFromStream(aStream); 
-    ���ض�λ���������ͱ����أ� FRelocatedDataTypes.LoadFromStream(aStream);
-    ��û��ע�����ͱ����ص�ʱ����ط��������� if not FRegisteredTypes.loaded.then Load FRegisteredTypes 
-    ������������ Load DataMem(������)
-    ���ش������� Load Mem(������)
+== 模块内存镜像详解 ==
 
 
-����C#�ı������﷨�ܺ�д���ͻ���࣬����дһ������C#�ġ�
-namespace MyCompany; //Ĭ�����ӵ�ǰ׺��
+模块是保存于文件的最小的单位，是各种类型函数的集合。引用的是模块。
+也是内存的最小单位，只有模块才拥有代码区和数据区。
+
+名称长度不能超过1023，因为是PChar,加上#0长度为1024。
+
+模块数据区(FDataMemory)
+模块数据区头为 TTurboPreservedDataMemory 结构，里面指明了代码区的位置，大小，名称，模块类型等等。
+
+模块代码区(FMemory)
+
+模块的加载流程：
+  LoadFromStream: 模块来自流
+    需重定位的数据地址表加载： FRelocatedDataAddresses.LoadFromStream(aStream);
+    需重定位的数据类型表加载： FRelocatedDataTypes.LoadFromStream(aStream);
+    当没有注册类型表加载的时候加载否则跳过： if not FRegisteredTypes.loaded.then Load FRegisteredTypes
+    加载数据区： Load DataMem(数据区)
+    加载代码区： Load Mem(代码区)
+
+
+发现C#的编译器语法很好写，和汇编差不多，就再写一个类似C#的。
+namespace MyCompany; //默认添加的前缀。
 
 module App.Module2
 {
   using App.Module1; //reference module.
   int32 M1;
-  typed static class TMyClass: TObject { //���û��typed ��ô����δ����أ�
+  typed static class TMyClass: TObject { //如果没有typed 那么该如何处理呢？
     int32 i; //this is a static field
     void aaa(); //this is a static method
     {
@@ -78,35 +78,35 @@ module App.Module2
   };
 }
 
-ģ���ļ���������Ĵ��û�б�Ȼ��ϵ�����������ģ����Ϊһ������� static �࣬��ôģ�����ͺ����ʹ���й��ˡ�
-���������ļܹ�Ҫ�ģ�Ҫ�¼� TCustomTurboStaticClass �࣬ TCustomTurboModule �Ӹ���������
-ʵ�����ⲻ����static class �� MetaDataô��������ʱ���ṹ����object metainfo����������ŵ�class.
+模块文件名称与类的存放没有必然联系。但是如果将模块作为一种特殊的 static 类，那么模块名就和类型存放有关了。
+这样，俺的架构要改，要新加 TCustomTurboStaticClass 类， TCustomTurboModule 从该类派生。
+实际上这不就是static class 的 MetaData么？唉，暂时将结构放入object metainfo，引擎机构放到class.
 
-��Ҫ��������ȡ�� TCustomTurboStaticClass ��:
-TCustomTurboStaticClass��
-����ʵ���������е��ֶΣ�����ȫ������static�ģ�
-StaticFields(Varaibles),Methods,TypeInfos
-��������¶�һ��һ��Class����β��ã��������Ȱ�˳�����β��֡�
-����ڵĲ��֣�
+我要将共性提取到 TCustomTurboStaticClass 中:
+TCustomTurboStaticClass：
+不能实例化，所有的字段，方法全部都是static的！
+StaticFields(Variables),Methods,TypeInfos
+如果里面新定一个一个Class，如何布置？管它的先按顺序依次布局。
+类入口的布局：
     Name: PChar;
     Flags: int32;
     Parent: Pointer;
     InitializeProc: Pointer; //cctor, it is the offset address of the FMemory
-    FinalizeProc: Pointer;   //cdtor ��ʵ���Է��ڷ������У��̶�ռ��ͷ����
-    //�����ֵĺ���������ָ�����һ��������ڡ� �����б�
+    FinalizeProc: Pointer;   //cdtor 其实可以放在方法表中，固定占用头两项
+    //有名字的函数链表，指向最后一个函数入口。 方法列表
     LastWordEntry: PTurboWordEntry;
-    //�����ֵı������� StaticFields            ��̬�ֶ��б�
+    //有名字的变量链表 StaticFields            静态字段列表
     LastVariableEntry: PTurboVariableEntry;
-    //RTTI TypeInfo ����                       ����Meta��Ϣ�б�
+    //RTTI TypeInfo 链表                       类型Meta信息列表
     LastTypeInfoEntry: PTurboTypeInfoEntry;
 
-�����ṹҪ�ģ��ĳ�����?��������ĳ����飬�����ʱ�����Щ�鷳����������д�룬���������(��Class End��ʱ��)д���ˣ�
-�����һ��nil��ָ������ʱ���û��Զ�����ֶη����ȣ�������������
+链表结构要改！改成数组?但是如果改成数组，编译的时候就有些麻烦，不能马上写入，而必须最后(当Class End的时候)写入了！
+最后留一个nil，指向运行时候用户自定义的字段方法等，这个变成链表。
 count [TTurboVariableInfo][TTurboVariableInfo]...nil //the last is nil, or Pointer to PTurboVariableEntry
-��Ҳʹ������token �ĸ��������ã�32λ��
-���λ������λ�����ǲ����û��Զ���ġ� Mask: $80000000  //cTurboTokenRuntimeDefinedMask = $80;
-�������λ����ߵ�һ���ֽڣ���������һ���б�, Mask: $7F000000 // cTurboTokenTypeMask = $7F;
-ʣ�µľ�������˰���Mask: cTurboTokenIdMask = $00FFFFFF
+俺也使用类似token 的概念来引用：32位。
+最高位：符号位决定是不是用户自定义的。 Mask: $80000000  //cTurboTokenRuntimeDefinedMask = $80;
+除开最高位的最高的一个字节：决定是哪一个列表, Mask: $7F000000 // cTurboTokenTypeMask = $7F;
+剩下的就是序号了阿，Mask: cTurboTokenIdMask = $00FFFFFF
 
 TTurboTokenRec = array [0..3] of byte; //the last is the tokenType.
 
@@ -117,26 +117,26 @@ TTurboMetaToken = object
   function GetIsRunTimeDefined: Boolean; {result := (FToken and cTurboTokenRuntimeDefinedMask) = cTurboTokenRuntimeDefinedMask; }
 end;
 
-�Ѷ�������÷ֿ��������Ͳ���ҪIsExternal�ֶ��ˡ�������������ֻ������ģ���С�correct!!
-TypeRef:��ʾ���Ͳ��ڱ�ģ��ġ�
+把定义和引用分开？这样就不需要IsExternal字段了。而且这样引用只存在于模块中。correct!!
+TypeRef:表示类型不在本模块的。
 
 TCustomTurboModule = Class(TCustomTurboStaticClass)
-������Static, ֻ��������ģ�������б����Լ�ģ��������˵����
+依旧是Static, 只不过多了模块引用列表，以及模块自身的说明。
 
 TCustomTurboClass = Class(TCustomTurboStaticClass)
-Fields(ʵ�������е��ֶ�), ����ʵ�������ܡ�
+Fields(实例化才有的字段), 多了实例化功能。
 
 
-== Forth�����������ļ������� ==
+== Forth代码区流（文件）镜像 ==
 
-��Forth�������ڴ澵��Ļ������������ļ�ͷ��ʽ��
+在Forth代码区内存镜像的基础上增加了文件头格式：
   TTurboModuleStreamHeader = packed record
     Id: array [0..cFORTHHeaderMagicIdLen-1] of char;
     Version: LongWord;
     BuildDate: TTimeStamp;
   end;
-���ڴ�������ݿ��е�ģ�����ƣ���������е�����Ϊ׼����ô�����ֵ�ʱ����鷳�ˣ���Ϊ��Full Name,���·���иı䣬���е�����ҲҪ�ģ���
-���������в���ģ�����ƣ�ģ��������Accessor����������
+对于存放于数据库中的模块名称，如果以流中的名称为准，那么改名字的时候就麻烦了，因为是Full Name,如果路径有改变，流中的名称也要改！！
+所以在流中不设模块名称，模块名称由Accessor单独处理！
 
 
 == Instruction Set ==
@@ -171,8 +171,8 @@ Stack: (ShortString(Msg), expr -- )
 
 ===== Error =====
 raise the Error of the specified ErrorCode and halt.
-����Ĵ�����ָ��ջ�����еȵı߽������Ч���ڴ�ָ���Լ�IO���󡣵���������ʱ�򣬵��� iVMError ����.
-���ô����ַΪ����ջ��ջ��.
+这里的错误，是指堆栈、序列等的边界错误、无效的内存指针以及IO错误。当错误发生的时候，调用 iVMError 过程.
+设置错误地址为返回栈的栈顶.
 
 Stack: (ErrorCode -- )
 
@@ -188,14 +188,14 @@ Stack: ( -- )
 =====  =====
 =====  =====
 
-== ������쳣�������� ==
+== 错误和异常处理机制 ==
 
-���汾ʵ�ֵ���Delphi�Ĵ����쳣�������ơ�
+本版本实现的是Delphi的错误异常处理机制。
 
-=== ���������� ===
-����Ĵ�����ָ��ջ�����еȵı߽������Ч���ڴ�ָ���Լ�IO���󡣵���������ʱ�򣬵��� iVMError ����.
-ʵ�������ֽ׶εļܹ��У�����ֱ���� iVMHalt �д��� ErrorCode����û��ͨ�� iVMError ִ�У�
-������, halt ָ����κβ�����! ֻ���ڲ����� _Halt���� ErrorCode ����.
+=== 错误处理机制 ===
+这里的错误，是指堆栈、序列等的边界错误、无效的内存指针以及IO错误。当错误发生的时候，调用 iVMError 过程.
+实际上在现阶段的架构中，俺是直接在 iVMHalt 中传递 ErrorCode，并没有通过 iVMError 执行！
+以修正, halt 指令不带任何参数了! 只有内部过程 _Halt才有 ErrorCode 参数.
   {System.pas}
   TRuntimeError = (reNone, reOutOfMemory, reInvalidPtr, reDivByZero,
   reRangeError, reIntOverflow, reInvalidOp, reZeroDivide, reOverflow,
@@ -214,7 +214,7 @@ Stack: ( -- )
 
 iVMError(ErrorCode: TRuntimeError);
 asm
-        AND     EAX,127    //�������λ
+        AND     EAX,127    //屏蔽最高位
         MOV     EDX,[ESP]
         JMP     ErrorAt
 end;
@@ -235,18 +235,18 @@ const
 begin
   errorCode := errorCode and 127;
   if Assigned(ErrorProc) then
-    ErrorProc(errorCode, ErrorAddr); //����ʵ���쳣�����Ĺؼ�����SysUtils�У�ͨ�����Ҹù��̵�ErrorHandler�������쳣 ��ָ���� ErrorAddr
+    ErrorProc(errorCode, ErrorAddr); //这是实现异常处理的关键，在SysUtils中，通过勾挂该过程到ErrorHandler，触发异常 在指定的 ErrorAddr
   if errorCode = 0 then
-    errorCode := InOutRes  //I/O Result 
+    errorCode := InOutRes  //I/O Result
   else if errorCode <= Byte(High(TRuntimeError)) then
     errorCode := reMap[TRunTimeError(errorCode)];
   RunErrorAt(errorCode, ErrorAddr);
 end;
 
-=== �쳣�������� ===
+=== 异常处理机制 ===
 <code>
 <sehBlock> ::=  <tryBlock> <sehClause> [<sehClause>*]
-<tryBlock> ::=   .try <label> to <label> 
+<tryBlock> ::=   .try <label> to <label>
                | .try <scopeBlock>
 <sehClause> ::=   catch <typeReference> <handlerBlock>  Catch all objects of the specified type.
                 | fault <handlerBlock>                  Handle all exceptions but not normal exit.
@@ -255,65 +255,65 @@ end;
 <handlerBlock> ::= handler <label> to <label>           Handler range is from first label to prior to second.
                    | <scopeBlock>                       <scopeBlock> is the handler block.
 </code>
- 
+
 Note: Control transfers into and out of try, catch, filter, and finally blocks cannot be performed by this instruction. (Such transfers are severely restricted and must use the leave instruction instead
 
 OpCodes.endFilter
-��ʽ    ����ʽ   ˵��
-FE 11   endfilter  SEH �쳣������ End filter �Ӿ䡣
+格式    汇编格式   说明
+FE 11   endfilter  SEH 异常处理的 End filter 子句。
 
-��ջת����Ϊ����Ϊ��
+堆栈转换行为依次为：
 
-   1.value �����͵���ջ�ϡ�
-   2.�Ӷ�ջ�е��� value��ִ�� endfilter ��������ת�Ƶ��쳣��������
+   1.value 被推送到堆栈上。
+   2.从堆栈中弹出 value；执行 endfilter 并将控制转移到异常处理程序。
 
-��ɸѡ�Ӿ䷵�� Value������������ int32 ������ֵ���ض�����֮һ������Ӧ��������ֵ֮һ��
-    * exception_continue_search ( value = 0)�����������쳣��������
-    * exception_execute_handler ( value = 1)����ʼ�쳣�����ĵڶ��׶Σ��ڴ˽׶����ڶ�λ���ɸѡ�Ӿ�����Ĵ�������ǰ���� finally �顣�ڷ��ֺ�ִ�д�������
+从筛选子句返回 Value（必须是类型 int32 并且是值的特定集合之一）。它应该是以下值之一：
+    * exception_continue_search ( value = 0)，继续搜索异常处理程序
+    * exception_execute_handler ( value = 1)，开始异常处理的第二阶段，在此阶段中在定位与此筛选子句关联的处理程序前运行 finally 块。在发现后，执行处理程序。
 
-��������ֵ������δָ���Ľ����
+其他整数值将生成未指定的结果。
 
-ɸѡ������ڵ㣨��÷������쳣������ʾ��������ɸѡ���Ĵ�������ǵ�һ��ָ�endfilter ָ����ɸѡ���Ĵ�����б��������һ��ָ���˶����κε���ɸѡ���飬ֻ����һ�� endfilter������ִ�� endfilter ָ��󣬿����߼������� CLI �쳣�������ơ�
+筛选器的入口点（如该方法的异常表中所示）必须在筛选器的代码块中是第一个指令。endfilter 指令在筛选器的代码块中必须是最后一个指令（因此对于任何单个筛选器块，只能有一个 endfilter）。在执行 endfilter 指令后，控制逻辑上流回 CLI 异常处理机制。
 
-����ͨ���쳣���ƣ������ܽ�����ת�Ƶ�ɸѡ�����С�����ͨ��ʹ�� throw ָ���ͨ��ִ�����յ� endfilter ָ������ܽ�����ת�Ƴ�ɸѡ���顣���ܽ� try ��Ƕ�뵽 filter ���ڡ������ filter ��������һ���쳣�����ػ���������ֵ 0 ( exception_continue_search )��
+除非通过异常机制，否则不能将控制转移到筛选器块中。除非通过使用 throw 指令或通过执行最终的 endfilter 指令，否则不能将控制转移出筛选器块。不能将 try 块嵌入到 filter 块内。如果在 filter 块内引发一个异常，将截获它并返回值 0 ( exception_continue_search )。
 
-����� Emit �������ؿ���ʹ�� endfilter �����룺
+下面的 Emit 方法重载可以使用 endfilter 操作码：
  * ILGenerator.Emit(OpCode)
 
 
 OpCodes.Endfinally
 
-�����ƴ��쳣��� fault �� finally �Ӿ�ת�ƻع������Խṹ (CLI) �쳣�������� 
+将控制从异常块的 fault 或 finally 子句转移回公共语言结构 (CLI) 异常处理程序。
 
-��ʽ
-	
+格式
 
-����ʽ
-	
 
-˵��
+汇编格式
+
+
+说明
 
 DC
-	
+
 
 endfinally
 
 endfault
-	
 
-�����쳣��� finally �� fault �Ӿ䡣
 
-��ָ��û�ж�ջת����Ϊ��
+结束异常块的 finally 或 fault 子句。
 
-Endfinally �� endfault ֪ͨ finally �� fault �Ӿ�Ľ������Ա��ջչ�������ڵ����쳣��������ǰ�������С�endfinally �� endfault ָ�����ת�ƻ� CLI �쳣���ơ��û���Ȼ��������������һ�� finally �Ӿ䣨����ܱ����Ŀ������˳�ָ���˳���������ܱ����Ŀ������쳣�˳����� CLI ��������һ�� finally �� fault�����߽����ڵ�һ���쳣�����ڼ�ѡ����쳣��������
+此指令没有堆栈转换行为。
 
-endfinally ָ��ֻ�����ڴʷ��ϳ����� finally ���ڡ��� endfilter ָ�ͬ����Ҫ��ÿ��� endfinally ָ������������ڸÿ��ڿ��Ծ��������������Ŀ�� endfinally ָ���Щ����ͬ�������� endfault ָ��� fault �顣
+Endfinally 和 endfault 通知 finally 或 fault 子句的结束，以便堆栈展开可以在调用异常处理程序前继续进行。endfinally 或 endfault 指令将控制转移回 CLI 异常机制。该机制然后在链中搜索下一个 finally 子句（如果受保护的块已由退出指令退出）。如果受保护的块已由异常退出，则 CLI 将搜索下一个 finally 或 fault，或者进入在第一遍异常处理期间选择的异常处理程序。
 
-����ͨ���쳣���ƣ�������Ʋ��ܱ�ת�Ƶ� finally���� fault���顣����ͨ��ʹ�� throw ָ���ִ�� endfinally���� endfault��ָ������ܽ�����ת�Ƴ� finally���� fault���顣�����ǣ������ܡ����롱finally���� fault������� finally���� fault������ִ�� Ret �� Leave ָ�
+endfinally 指令只可以在词法上出现在 finally 块内。与 endfilter 指令不同，不要求该块以 endfinally 指令结束，并且在该块内可以具有所需的任意数目的 endfinally 指令。这些限制同样适用于 endfault 指令和 fault 块。
 
-��ע�⣬endfault �� endfinally ָ���Ǳ����������Ƕ�Ӧ��ͬһ�����롣
+除非通过异常机制，否则控制不能被转移到 finally（或 fault）块。除非通过使用 throw 指令或执行 endfinally（或 endfault）指令，否则不能将控制转移出 finally（或 fault）块。尤其是，您不能“脱离”finally（或 fault）块或在 finally（或 fault）块内执行 Ret 或 Leave 指令。
 
-����� Emit �������ؿ���ʹ�� endfinally (endfault) �������Լ� ILGenerator ���� EndExceptionBlock��
+请注意，endfault 和 endfinally 指令是别名，即它们对应于同一操作码。
+
+下面的 Emit 方法重载可以使用 endfinally (endfault) 操作码以及 ILGenerator 方法 EndExceptionBlock。
 
     * ILGenerator.Emit(OpCode)
     * ILGenerator.EndExceptionBlock()
@@ -433,39 +433,39 @@ exitSEH:                           // back to normal
 
 == Type Fundamentals ==
 
-���ڻ�࣬���ǻ���˻���ԭ�ͺ��ࡾ��δʵ�֡���
+对于汇编，则是混和了基本原型和类【暂未实现】！
 
-���ϲ�߼������������е����Ͷ����ࡣ
+在上层高级语言那里所有的类型都是类。
 
-=== ��ʶ���Ŀɼ���Χ�� MetaInfo �Ŀ��� ===
-��ʶ�������������ԣ������������Ŀɼ���Χ��MetaInfo�Ķ�ѣ�
-  tvPrivate: �ñ�ʶ��˽�У�û�����֣�û�����ͣ�
-  tvPublic:�ñ�ʶ���������ӵ������С��߼�����ʹ�á�
-    pmNamed: �ñ�ʶ���������ӵ�������,����д���ʶ������
-    pmTyped: �ñ�ʶ���������ӵ�������,���Ҹñ�ʶ��������Ҳ����д�룡
+=== 标识符的可见范围和 MetaInfo 的控制 ===
+标识符号有以下属性，用来控制它的可见范围和MetaInfo的多寡：
+  tvPrivate: 该标识符私有，没有名字，没有类型！
+  tvPublic:该标识符将被连接到链表中【高级语言使用】
+    pmNamed: 该标识符将被连接到链表中,并被写入标识符名称
+    pmTyped: 该标识符将被连接到链表中,并且该标识符的类型也将被写入！
   TTurboVisibility = (tvPrivate, tvPublic);
   TTurboPublicModifier = (pmNamed, pmTyped);
   TTurboPublicModifiers = set of TTurboPublicModifier;
 
-  [�߼����Զ���]��
+  [高级语言定义]：
     ttPrivate := tvPublic
     ttProtected:= tvPublic, pmNamed
     ttPublic := tvPublic, pmNamed
     ttPublished := tvPublic, pmNamed, pmTyped
 
-  ׼����һ�� LongWord��DWord������ţ�
+  准备用一个 LongWord（DWord）来存放：
   tvPrivateVisibilty = $00000000;
   tvPublicVisibilty  = $00000001;
   tvPublicNamedVisibilty   = $01000000;
   tvPublicTypedVisibilty   = $02000000;
-  
-����������ࣺ
+
+最最基本的类：
 === Class ===
-TObject Ϊ���ж���Ļ���
+TObject 为所有对象的基类
 
-==== ���� ====
+==== 类名 ====
 
-��������������ɣ� local name, namespace prefix
+类名由两部分组成： local name, namespace prefix
 Name: PChar; //local name
 NamespacePrefix: PChar;
 
@@ -479,13 +479,13 @@ namespace AcmeCorp.LOB {
 </code>
 
 ==== Flags ====
-���ͱ�־.
+类型标志.
 // TypeDef/ExportedType attr bits, used by DefineTypeDef.
 typedef enum CorTypeAttr
 {
     // Use this mask to retrieve the type visibility information.
     tdVisibilityMask        =   0x00000007,
-    tdNotPublic             =   0x00000000,     // Class is not public scope. 
+    tdNotPublic             =   0x00000000,     // Class is not public scope.
     tdPublic                =   0x00000001,     // Class is public scope.
     tdNestedPublic          =   0x00000002,     // Class is nested with public visibility.  b010
     tdNestedPrivate         =   0x00000003,     // Class is nested with private visibility. b011
@@ -495,12 +495,12 @@ typedef enum CorTypeAttr
     tdNestedFamORAssem      =   0x00000007,     // Class is nested with family or assembly visibility.  b111
 
     // Use this mask to retrieve class layout information
-    //�������͵����ݳ�Ա���ڴ��е�������֯����
+    //控制类型的数据成员在内存中的物理组织布局
     tdLayoutMask            =   0x00000018,
-    tdAutoLayout            =   0x00000000,     // Class fields are auto-laid out, ȱʡֵ�����ݳ�Ա�ֶδ�С���Զ�������˳���Ż�Ϊ��С�ڴ�ռ�á�
-    tdSequentialLayout      =   0x00000008,     // Class fields are laid out sequentially ����Ա�����˳����֯��û���Ż���
-    tdExplicitLayout        =   0x00000010,     // Layout is supplied explicitly. //Explicitģʽ���ɿ�����ʹ��FieldOffsetAttribute�������ָ���ֶε�����λ��
-    ���磺
+    tdAutoLayout            =   0x00000000,     // Class fields are auto-laid out, 缺省值，根据成员字段大小，自动调整其顺序，优化为最小内存占用。
+    tdSequentialLayout      =   0x00000008,     // Class fields are laid out sequentially 按成员定义的顺序组织，没有优化。
+    tdExplicitLayout        =   0x00000010,     // Layout is supplied explicitly. //Explicit模式则由开发者使用FieldOffsetAttribute特性逐个指定字段的物理位置
+    『如：
     [StructLayout(LayoutKind.Explicit)]
     public struct Rect =
      [FieldOffset(0)] public int left;
@@ -518,17 +518,17 @@ typedef enum CorTypeAttr
     // end semantics mask
 
     // Special semantics in addition to class semantics.
-    tdAbstract              =   0x00000080,     // Class is abstract, which we can't initialize. ��ʾ����ֻ����Ϊ���౻���ڼ̳У������ܽ��ж���ʵ������
+    tdAbstract              =   0x00000080,     // Class is abstract, which we can't initialize. 表示该类只能作为父类被用于继承，而不能进行对象实例化。
     tdSealed                =   0x00000100,     // Class is concrete and may not be extended
-    tdSpecialName           =   0x00000400,     // Class name is special.  Name describes how. ָ�����������������ġ����������������������
+    tdSpecialName           =   0x00000400,     // Class name is special.  Name describes how. 指定此类别名称是特殊的。其名称描述其特殊的理由
 
     // Implementation attributes.
-    tdImport                =   0x00001000,     // Class / interface is imported Import����ʹ������TlbImp.exe֮��Ĺ��ߣ�ֱ����COM���Ϳ⵼��İ�װ��, ����ֻ����Ϊ��COM�������н�����stub����
-    tdSerializable          =   0x00002000,     // The class is Serializable. ֧�����л�����, ����ʹ��TypeInfo.
+    tdImport                =   0x00001000,     // Class / interface is imported Import类是使用诸如TlbImp.exe之类的工具，直接由COM类型库导入的包装类, 其类只是作为与COM库代码进行交互的stub存在
+    tdSerializable          =   0x00002000,     // The class is Serializable. 支持序列化操作, 必须使用TypeInfo.
 
     // Use tdStringFormatMask to retrieve string information for native interop
-    //��������DLL��ʽ������н���ʱ������ͨ��DllImportAttribute���Զ��嵼�뺯��������DllImportAttribute.CharSet�ֶζ����˺�����ʹ���ַ�������ʽ��
-    //��׼��Win32 APIһ�㶼�ṩ��A��W���ֺ�׺��ʵ�֣�ǰ����ANSI������WIDE����д����ʾchar��wchar_t�����ַ������������ַ�����ʽΪautoʱ��CLR���Զ��ж�ʹ�ÿ�խ�ַ���Ҳ������Ansi��Unicodeָ����
+    //在与现有DLL形式代码进行交互时，可以通过DllImportAttribute特性定义导入函数，其中DllImportAttribute.CharSet字段定义了函数中使用字符串的形式。
+    //标准的Win32 API一般都提供了A和W两种后缀的实现，前者是ANSI或者是WIDE的缩写，表示char和wchar_t两类字符串。当定义字符串格式为auto时，CLR会自动判断使用宽窄字符，也可以用Ansi或Unicode指定。
     tdStringFormatMask      =   0x00030000,
     tdAnsiClass             =   0x00000000,     // LPTSTR is interpreted as ANSI in this class
     tdUnicodeClass          =   0x00010000,     // LPTSTR is interpreted as UNICODE
@@ -549,30 +549,30 @@ typedef enum CorTypeAttr
 
 
 ==== Extends ====
-Extends��ָ��TypeDef��TypeRef��TypeSpec������������������͵ĸ��ࡣ
-�Խӿ���˵�����ֶ�ӦΪ�գ�����ͨ��InterfaceImpl��ʵ�ֶ���ӿڣ�������������˵��
-����System.Object���⣬�������Ͷ������Ǵ��������ͼ̳ж����ģ���������������ᵽ
-System.Object�����ϣ����CLR�е�����������Java/Delphi�еĵ�����֯ģʽ��
-��������֯ģʽ���ṹ��������ʵ���������л�֮�������Ҳ�����ף������Է�չ�Ĵ����ơ�
+Extends是指向TypeDef、TypeRef和TypeSpec表的索引，定义此类型的父类。
+对接口来说，此字段应为空，而是通过InterfaceImpl表实现多个接口；而对于类型来说，
+除了System.Object以外，所有类型都必须是从其它类型继承而来的，而最终类型树归结到
+System.Object类型上，因而CLR中的类型是类似Java/Delphi中的单根组织模式。
+这样的组织模式，结构跟清晰，实现诸如序列化之类的特性也更容易，是语言发展的大趋势。
 
-ֵ��ע����������м����������ƣ��緲��ֵ���Ͷ�����̳���System.ValueType��
-����ö�����ͱ���ֱ�Ӽ̳���System.Enum������delegate���ͱ���̳���
-System.Delegate<=System.MulticastDelegate�ȵȡ��⼸��������ʽ�̳е���ȶ�
-���ܳ���һ�㣬����������һ���õ����ϵġ�
+值得注意的是这里有几个特殊限制，如凡是值类型都必须继承自System.ValueType，
+所有枚举类型必须直接继承自System.Enum，所有delegate类型必须继承自
+System.Delegate<=System.MulticastDelegate等等。这几种特殊形式继承的深度都
+不能超过一层，这是在语言一级得到保障的。
 
 FieldList
 
 MethodList
-virtual .ctor  : ʵ������������
-virtual .dtor  : ʵ��Destructor����
-static .cctor : �๹������Constructor������ (�� CLR������Ϊ Type Initializer����)
-                �涨���������е��ø����cctor��ֻ���Ǹ������Լ��ģ�
-static .cdtor : ��Destructor����(������CLR�� cctor ֻ��Ϊ�˶Ծ�̬�ֶν��и�ֵ�����Բ�û�� cdtor����)
+virtual .ctor  : 实例构造器方法
+virtual .dtor  : 实例Destructor方法
+static .cctor : 类构造器（Constructor）方法 (在 CLR中是作为 Type Initializer出现)
+                规定不能在其中调用父类的cctor，只能是负责处理自己的！
+static .cdtor : 类Destructor方法(由于在CLR中 cctor 只是为了对静态字段进行赋值，所以并没有 cdtor方法)
 
-��ʲôʱ��ִ��cctor������
-1. �ڵ�һ�η��ʸ����͵��κγ�Ա(�������ֶ�)��ʱ��ִ��
-2. �ڵ�һ�η��ʸ����͵ľ�̬�ֶε�ʱ��ִ�� ��������뽫���ͱ��ΪBeforeFieldInit attribute����������в�����cctor��������ôCLRĬ�Ͼͻ����ø����ԡ������attribute�㶨��˵����
-3. ���ص��ڴ�֮��ִ�С����ӵġ���
+在什么时候执行cctor方法？
+1. 在第一次访问该类型的任何成员(方法或字段)的时候，执行
+2. 在第一次访问该类型的静态字段的时候，执行 这个【必须将类型标记为BeforeFieldInit attribute，如果类型中不存在cctor方法，那么CLR默认就会设置该属性。这个等attribute搞定在说？】
+3. 加载到内存之后执行【俺加的】。
 
 CLR Supports 2 policies for this,
 
@@ -587,29 +587,29 @@ This means that calling a static method on a beforefieldinit type does not guara
 
 The C# Compiler sets the beforefieldinit attribute for all types that lack an explicit type initializer method.
 
-=== �������� ===
-ϵͳ�ڶ�������(native primitive type)��
-�����ͣ�������������ö�٣��ַ�����С��������(�ַ���)�����У���̬���飬��̬���С���ν��̬���Ǵ����õģ�������Delphi�еġ�
+=== 基本类型 ===
+系统内定的类型(native primitive type)：
+序数型（布尔，整数，枚举，字符），小数，数组(字符串)，序列，动态数组，动态序列【所谓动态就是带引用的，类似于Delphi中的】
 
 Advanced type:
-���е�Advanced ���ʹ� TType ��������֧�ֲ��������ء�
+所有的Advanced 类型从 TType 派生，并支持操作符重载。
 
-�ڱ���������Ҫ����Ƿ���� System ��Ԫ�������������ϵͳ��Ԫ�ж��������Ϊ׼���Ծ٣�����������ڲ������Ϊ׼��
-���е�����ϵͳ��Ԫ��ʱ�򣬲�����ȥ��������System��Ԫ��
+在编译器中需要检查是否存在 System 单元，如果存在则以系统单元中定义的类型为准（自举），否则就以内部定义的为准。
+还有当编译系统单元的时候，不得再去查找引用System单元。
 
-�ڲ�������������£���Ȼ��Щ�������Ͷ��д�С֮�֣��Ǿ��ں��渽��1�����֣���ѡ����ʾռ���ֽ�
-�����ͣ���׼����ֻ֧��32λ��Ĭ�ϣ���64λ���㡣���ݶ�ջʼ����32λ�ġ���������Ϊת������㡣
-Bool: Bool(Ĭ��), Bool.8, Bool.16, Bool.32, Bool.64
+内部定义的类型如下：既然这些基本类型都有大小之分，那就在后面附件1个数字（可选）表示占用字节
+序数型：标准类型只支持32位（默认）或64位计算。数据堆栈始终是32位的。其它长度为转换后计算。
+Bool: Bool(默认), Bool.8, Bool.16, Bool.32, Bool.64
 Int: Int, Int.8, Int.16, Int.32, Int.64
 UInt: UInt, UInt.8, UInt.16, UInt.32, UInt.64
-ö������: TEnum[: Int.8] = (xxx[=43], xxxx, xxxxx);
+枚举类型: TEnum[: Int.8] = (xxx[=43], xxxx, xxxxx);
 Char, WideChar:
-��������: TSet =  Set[.8] of TEnum;
-��¼����: �������ǴӼ�¼�������������ģ���¼������ʹ��static��������ͨ���������ǲ�֧���鷽����
+集合类型: TSet =  Set[.8] of TEnum;
+记录类型: 类类型是从记录类型派生出来的，记录上允许使用static方法和普通方法，但是不支持虚方法。
 TRecord = [packed] Record
   static Field1: Int = System.DateTime.Now.Ticks;
   static Field2: Int = System.DateTime.Now.Ticks;
-  static Field3: Int; 
+  static Field3: Int;
   Field4: Int;
   static procedure XXX();
   static Constructor Create();  //cctor
@@ -618,63 +618,63 @@ TRecord = [packed] Record
   end;
 end;
 
-��ôstatic �ֶεĳ�ʼ��˳���ǣ�Field1, Field2, Field3. Ҳ����˵�ȳ�ʼ�������ֶζ����еĹ��̣�Ȼ������û������cctor���̡�
+那么static 字段的初始化顺序是：Field1, Field2, Field3. 也就是说先初始化的是字段定义中的过程，然后才是用户定义的cctor过程。
 
-== FORTH����Դ�ļ���дָ�� ==
-+ Compiler Switch: 
+== FORTH代码源文件编写指南 ==
++ Compiler Switch:
   + Assert directives
-    �Ƿ����ö��ԡ�
+    是否启用断言。
     Syntax	{$C+} or {$C-}
             {$ASSERTIONS ON} or {$ASSERTIONS OFF}
     Default	{$C+}
             {$ASSERTIONS ON}
     Scope	  Local
-    ��Delphi���ƣ�����رգ��򲻻����Assert���̡�
-    Ҫ��ʹ�ö��ԣ�����ʹ�ò����������������룬���ӹ��̲�����Ȼ���룬����: �����Assert(False, 'helo'); �Զ�����ɣ�
+    和Delphi类似，如果关闭，则不会编译Assert过程。
+    要想使用断言，必须使用参数，可以这样编译，增加过程参数，然后翻译，比如: 将语句Assert(False, 'helo'); 自动翻译成：
       Push False; Push 'Helo'; CALL Assert
   + MESSAGE directive
-    ��ʾ�����û��������Ϣ�������﷨������Ϣ���������﷨�����������Ϣ�����������������ɹ�����
+    显示各种用户定义的消息，包括语法错误消息（当发生语法或语意错误消息，编译器将不会编译成功）。
     Syntax    {$MESSAGE  HINT|WARN|SYNTAX|SYMANTIC 'text string' }
-    Examples: {$MESSAGE 'Boo!'}                   emits a hint 
+    Examples: {$MESSAGE 'Boo!'}                   emits a hint
   + MaxCodeSize directive
-    �������Ĵ�����ռ���ڴ��С�����С��ʵ�ʱ����Ĵ����С������ʵ�ʴ����СΪ׼��
+    设置最大的代码体占用内存大小，如果小于实际编译后的代码大小，则以实际代码大小为准。
     Syntax    {$MaxCodeSize  Size[KB|MB] }
-    ע�⣺�������Program|Unit֮�󣬵� MaxCodeSizeΪ-1��ʾ����ʵ�ʴ������СΪ׼��
+    注意：必须放在Program|Unit之后，当 MaxCodeSize为-1表示以以实际代码体大小为准。
   + MaxDataSize directive
-    ������������ռ���ڴ��С�����С��ʵ�ʱ����Ĵ����ݴ�С������ʵ�����ݴ�СΪ׼��
+    设置最大的数据占用内存大小，如果小于实际编译后的代数据大小，则以实际数据大小为准。
     Syntax    {$MaxDataSize  Size[KB|MB] }
-    ע�⣺�� MaxDataSizeΪ-1��ʾ����ʵ�����ݴ�СΪ׼��
+    注意：当 MaxDataSize为-1表示以以实际数据大小为准。
   + LoadOnDemand directive
-    �Ƿ�Ԥ�ȼ��أ����õģ�ģ�飬���ǰ���Ҫ���أ������ű����õ�ģ��Ĺ��̵�ʱ���ȥ���أ�
+    是否预先加载（引用的）模块，还是按需要加载（仅当脚本调用到模块的过程的时候才去加载）
     Syntax    {$L+|-} or {$LoadOnDemand ON|OFF}
     Default:  {$LoadOnDemand OFF}
-    ע�⣺�򿪰�����صĺô�������ű�û��ִ�е�ĳ��ģ��Ĺ���ʱ�����ģ�鲻�����ڴ��У�������ģ���ļ����Բ����ڣ����ܽ�ʡ�ڴ棬����Ӱ����Ч�ʡ�
+    注意：打开按需加载的好处是如果脚本没有执行到某个模块的过程时不会该模块不会在内存中（甚至该模块文件可以不存在），能节省内存，但是影响了效率。
 
-=== ���ļ� ===
-������Delphi��:
+=== 库文件 ===
+类似于Delphi的:
 Lib aName;
   Const aConstName = Value;
   [Published] Var aVarName: Type [= InitValue];
   : [Published] DefinedWord
-     [���] ������ [������]
+     [标号] 操作码 [操作数]
   ;
-  
+
   initilization
   finalization
-End. //lib 
+End. //lib
 
 
-==== �ķ�����ʽ ====
+==== 文法产生式 ====
 IGNORE CASE
 
 CHARACTERS
   eol     = CHR(13) .
-  Special = '"' + "%&'()*+,-./:;<=>?|[]". 
+  Special = '"' + "%&'()*+,-./:;<=>?|[]".
   Digit   = "0123456789" .
   HexDigit = "0123456789ABCDEF" .
   Letter  = CHR(33)..CHR(255) - Special - Digit .
   noQuote = ANY - "'" .
-  noDblQuote = ANY - '"' .               
+  noDblQuote = ANY - '"' .
 
 TOKENS
   IdentName     = Letter { Letter | Digit }.
@@ -682,41 +682,41 @@ TOKENS
   HexNumber = "$" HexDigit {HexDigit}.
   float_    = [Digit { Digit }] "." Digit { Digit } [ 'E' [ ('+' | '-') ] Digit { Digit } ].
   String = "'" { noQuote | "''" } "'" .
-  //String2 = '"' { noDblQuote } '"' . 
+  //String2 = '"' { noDblQuote } '"' .
   //BlobString = '[' HexDigit HexDigit { HexDigit HexDigit } ']'.
   CharNumber = "#" digit{digit} | "#" digit{digit}.
 
 PRODUCTIONS
 
-Lib = 
+Lib =
   "Lib" IdentName  ";"
   [Declaration{";" Declaration}]
   ["Initilization"]
   ["Finalization"]
   "End."
 
-Declaration = 
+Declaration =
   ConstDeclaration
   |VarDeclaration
   |WordDeclaration
 
-ConstDeclaration = 
+ConstDeclaration =
   "Const" IdentName "=" Value
 
-VarDeclaration = 
+VarDeclaration =
   "Var" IdentName ":" TypeName ["=" Value]
 
 WordDeclaration =
   ":" [Visibility] IdentName
   [Statement { Statement}]
-  ";" 
+  ";"
 
-Statement = 
-  [LabelDeclaration] 
+Statement =
+  [LabelDeclaration]
    PushIntStatement
   |AddIntStatement
 
-Value = 
+Value =
   IdentName
   |Integer_
   |Float_
@@ -735,13 +735,13 @@ TypeName =
   |"String"
   |"ShortString"
 
-== Forth�������ڴ澵��(TCustomTurboExecutor.Memory) ==
+== Forth代码区内存镜像(TCustomTurboExecutor.Memory) ==
 
-ÿһ��Executor ʵ������һ�������Ĵ����ڴ���������������������ͷ��k�ֽ��Ǳ����ģ����ݼ� TTurboPreservedDataMemory ��¼.
-�����ⲿ���������֣�һ���ǵ���DLL��Host�ڲ��ĺ������� CallExt ����ָ��ִ�У�һ���ǵ�������ģ��Ĺ����������� CallFar ����ָ��ִ�С�
+每一个Executor 实例都有一个独立的代码内存区和数据区，数据区的头几k字节是保留的，内容见 TTurboPreservedDataMemory 记录.
+调用外部函数有两种，一种是调用DLL或Host内部的函数，用 CallExt 机器指令执行；一种是调用其它模块的公开函数，用 CallFar 机器指令执行。
 CallFar PTurboModuleEntry cfa-address
 CallExt PTurboWordEntry
-���Ҫʵ��Host function Ӧ������ CallExt,������word ���뵽LastWordEntry�С�
+如果要实现Host function 应该是用 CallExt,并将该word 加入到LastWordEntry中。
 
 type //in TurboScriptConsts
   PTurboPreservedDataMemory = ^ TTurboPreservedDataMemory;
@@ -752,125 +752,125 @@ type //in TurboScriptConsts
     //this Module unique Index in this program, allocated by compiler.
     ModuleIndex: Integer;
     ModuleType: TTurboModuleType;
-    //����ջ��ַ
+    //数据栈基址
     ParamStackBase: Pointer;
-    //����ջ��С,��λ�ֽڡ�
+    //数据栈大小,单位字节。
     ParamStackSize: Integer; //bytes
     ParamStackBottom: Pointer;
-    //����ջ��ַ
+    //返回栈基址
     ReturnStackBase: Pointer;
-    //����ջ��С,��λ�ֽڡ�
+    //返回栈大小,单位字节。
     ReturnStackSize: Integer; //bytes
     ReturnStackBottom: Pointer;
     ToIn: Integer; //the text buffer current index
     //the text buffer length
-    TIBLength: Integer; 
+    TIBLength: Integer;
     //the text buffer
     TIB: array [0..cMAXTIBCount-1] of char;
     LastErrorCode: TTurboForthProcessorErrorCode;
-    //���ModuleType��ģ�飬��ô����װ�����и�ģ��ǰִ�еĳ�ʼ�����̣���ڵ�ַ
-    //����Ǻ��������Ǹú�������ڵ�ַ
-    InitializeProc: Pointer; 
-    FinalizeProc: Pointer; //�����ģ��Ļ�
+    //如果ModuleType是模块，那么就是装载运行该模块前执行的初始化过程，入口地址
+    //如果是函数，则是该函数的入口地址
+    InitializeProc: Pointer;
+    FinalizeProc: Pointer; //如果是模块的话
     //last Used(import) module entry.
     LastModuleEntry: PTurboModuleEntry;
-    //�����ֵĺ���������ָ�����һ��������ڡ�
+    //有名字的函数链表，指向最后一个函数入口。
     LastWordEntry: PTurboWordEntry;
-    //�����ֵı�������
+    //有名字的变量链表
     LastVariableEntry: PTurboVariableEntry;
-    //RTTI ���ű� ����
+    //RTTI 符号表 链表
     LastSymbolEntry: PTurboSymbolEntry;
   end;
 
 == TurboForth Virtual Machine Codes ==
-�û��Զ��庯��������Ե�ַ(�����FMemory)��ʾ���ڱ���ʱ�̡���
-������ռ���˴�����ǰ�������1024���ֽڣ������û�������ַ������С��255�������Ϳ����жϸò���������VMָ����û�������ַ��
+用户自定义函数采用相对地址(相对于FMemory)表示【在编译时刻】。
+由于我占用了代码区前面的至少1024个字节，所以用户函数地址不可能小于255，这样就可以判断该操作到底是VM指令还是用户函数地址。
 
-VMָ������ֽ���ʵ�֡�һ��VMָ������ռ��1���ֽڡ�
+VM指令采用字节流实现。一个VM指令至少占用1个字节。
 
-�û��Զ���word(����):���У� û��Enter�ˣ�ֻ��Exit.
+用户自定义word(函数):序列： 没有Enter了！只有Exit.
 
-ע��
-�������������һ�ַ�ʽ����VMָ��: ָ���Ϊ1�ֽڣ�ר������һ��ָ��CALL,��������û����嵥�ʵ���ڵ�ַ��
+注：
+本来还有另外的一种方式定义VM指令: 指令长度为1字节，专门增加一个指令CALL,后面紧跟用户定义单词的入口地址。
 
-���ø÷�ʽ���ɣ�
-  1����Լ�ڴ棬ϵͳ��������Ҫ�����û��Զ��嵥���ϣ���������û��Զ��嵥�ʵĴ���ԶԶ���ڵ���VMָ�������ʱ����Ȼ���ַ�ʽ�ȽϽ�Լ�ڴ档
-  2����������ϵͳָ���ʽ2���ֻ����256��ָ������޷����䡣
+采用该方式理由：
+  1、节约内存，系统的扩建主要是在用户自定义单词上，如果调用用户自定义单词的次数远远多于调用VM指令次数的时候，显然这种方式比较节约内存。
+  2、便于扩充系统指令，方式2最多只能有256个指令，而且无法扩充。
 
-�����ڸ�Ϊ��ʽ2�ˣ�ָ�����ֽ�������ʽ���֡���
-  1�������� CLR ����
-  2���ֽ�װ�ر�Int32װ�ؿ�
-  3��ָ���������ͨ��ĳ��ָ����չʵ�֡�
+【现在改为方式2了，指令以字节流的形式体现】：
+  1、尽量与 CLR 兼容
+  2、字节装载比Int32装载快
+  3、指令扩充可以通过某个指令扩展实现。
 
-VM �������Ĵ�����
-SP, RP, PC, TOS, W, StatesRegister, 
+VM 处理器寄存器：
+SP, RP, PC, TOS, W, StatesRegister,
 
-VM ������״̬��
+VM 处理器状态：
   TTurboForthProcessorState = (psLoaded, psRunning, psStepping, psCompiling, psFinished);
   TTurboForthProcessorStates = set of TTurboForthProcessorState;
 
-VM �����������룺�ϴη����Ĵ������ڱ����ڴ��� LastErrorCode��
+VM 处理器错误码：上次发生的错误存放在保留内存中 LastErrorCode。
   TTurboForthProcessorErrorCode = (errNone, errBadInstruction, errDizZero, errMemOverFlow, errDataStackOverflow, errReturnStackOverflow);
 
-=== VMָ������ ===
+=== VM指令详述 ===
 
-==== ����ָ�� ====
+==== 核心指令 ====
 
-����ĵģ�����Ҫ��Forthָ�Next, Enter, Exit, Halt
+最核心的，最重要的Forth指令：Next, Enter, Exit, Halt
 
-iVMNext: 
-Forthִ�����ĺ���, װ��ָ�����ָ��
+iVMNext:
+Forth执行器的核心, 装入指令，调度指令
 
 iVMEnter:
-�û��Զ���˽�к�����ڣ��� iVMNext �ڽ����û��Զ��庯��ǰ����
+用户自定义私有函数入口，由 iVMNext 在进入用户自定义函数前调用
 push the current IP(ESI),set the new IP, and run the vmNext
 
 iVMExit:
-�û��Զ��庯�����ڣ�ÿһ���û��Զ��庯���˳���ʱ�������ã�
+用户自定义函数出口，每一个用户自定义函数退出的时候必须调用！
 pop to the IP(ESI),and run the vmNext.
 
-iVMHalt: 
-��ֹForth����ִ��.
+iVMHalt:
+终止Forth机器执行.
 
-EnterFar:  MemBase-addr(��һģ����ڴ��ַ) cfa-addr 
-���ñ����û���˽�к���(���Ա�����ģ����õ�)���
+EnterFar:  MemBase-addr(另一模块的内存基址) cfa-addr
+调用本地用户非私有函数(可以被其它模块调用的)入口
 
 ExitFar
-�û���˽�к���(���Ա�����ģ����õ�)���س���
+用户非私有函数(可以被其它模块调用的)本地出口
 
 iVMCallFar: PTurboModuleEntry cfa-addr
-��������ģ����û���˽�к���(���Ա�����ģ����õ�)
+调用其它模块的用户非私有函数(可以被其它模块调用的)
 
 iVMCallExt: PTurboWordEntry
-ͨ�õĵ��ú���, ���Ե��� �ⲿ����(Register,pascal, stdcall, fastcall Լ��)
+通用的调用函数, 可以调用 外部过程(Register,pascal, stdcall, fastcall 约定)
 
-==== ���̿���ָ�� ====
+==== 流程控制指令 ====
 Flow Control Directives
 
 iVMExecute: call(EXECUTE) the (User defined Forth word) (CFA -- )
 
 
-== TurboInterpreter(Forth������ʵ��) ==
- ����x86ָ���Ż�������ָ����ʵ�֣��Ĵ�������x86�ļĴ�������Ӧ��ϵ���£�
-ESP: ���ض�ջָ��.��סѹ����٣��������ӵ�ַ��
-EBP: ����ջָ�룬��ַָ������ڴ�ĳ����Ԫ�С�����EBP����ָ���ջ����
-EDX: Ϊ����ջջ���� 
-ESI: ָ��ǰָ���ַ
-EBX: ״̬�Ĵ��� (0Bit: �Ƿ����У�1Bit:�Ƿ����) TTurboProcessorStates = set of TTurboProcessorState; TTurboProcessorState = (psRunning, psDebugging, psCompiling)
-EAX: W Register ��ʱ�Ĵ���
-ECX: ��ʱ�Ĵ���
-EDI: FMemory��ַ
+== TurboInterpreter(Forth解释器实现) ==
+ 基于x86指令优化。核心指令汇编实现，寄存器采用x86的寄存器，对应关系如下：
+ESP: 返回堆栈指针.记住压入减少，弹出增加地址。
+EBP: 数据栈指针，基址指针放在内存某个单元中。所以EBP总是指向次栈顶。
+EDX: 为数据栈栈顶。
+ESI: 指向当前指令地址
+EBX: 状态寄存器 (0Bit: 是否运行；1Bit:是否调试) TTurboProcessorStates = set of TTurboProcessorState; TTurboProcessorState = (psRunning, psDebugging, psCompiling)
+EAX: W Register 临时寄存器
+ECX: 临时寄存器
+EDI: FMemory基址
 
 
 
-���ں�������ָ���ڽ������в��ò���ֵ�ķ�ʽʵ�֣�
+基于核心虚拟指令在解释器中采用查表字典的方式实现！
 
 __________________________________________
-������
+附件：
 __________________________________________
-FORTH �ĺ��ķ���:
+FORTH 的核心分析:
 
-cwords.htm �������ú�ȫ��
+cwords.htm 中叙述得很全面
 
 Pygmy is a direct-threaded Forth with the top-of-stack kept in register. The 8086 register assignments are:
 
@@ -884,56 +884,56 @@ Most 8086 Forths use the SI register for IP, so that NEXT can be written with th
 NEXT:  LODSW  ' Load the [DS:SI] to the AX
        JMP AX
 
-This is short enough to include in-line in every CODE word. 
+This is short enough to include in-line in every CODE word.
 
 
 __________________________________________
-Moving Forth���
-ԭ�ĳ���http://www.zetetics.com/bj/papers/index.html
-�����վhttp://www.zetetics.com/camel/index.html
+Moving Forth简介
+原文出处http://www.zetetics.com/bj/papers/index.html
+相关网站http://www.zetetics.com/camel/index.html
 
-Ŀ�ģ�
-  ��ν�Forth��ֲ����һ��CPUϵͳ�ϡ�
-������
-  Ҫ��Forth��ֲ����һ��CPU�ϣ������˽�Ŀ��CPU֮���Լ�Forth�ļܹ���
-��ƪ���³�����Forth�ܹ��⣬��˵������CPU������Forth֮������̬֮ѡ��
+目的：
+  如何将Forth移植至另一个CPU系统上。
+概述：
+  要将Forth移植至另一个CPU上，必须了解目标CPU之特性及Forth的架构。
+此篇文章除概述Forth架构外，亦说明数种CPU构架下Forth之运作型态之选择。
 
-�ص�������
-  ����Forth��֮�ܹ���������������
-1.Forthϵͳ�Ź�
-  Forth��һ�׽�����һ������Ӳ����֮ϵͳ�����а����в���ϵͳ�����ԡ��������ȵ�������
-  ����Forth����Ϊ��ϲ���ϵͳ֮���ԡ����������ʹ֮�ر������Ƕ��ʽϵͳ�С�
+重点整理：
+  将其Forth上之架构概念重新整理。
+1.Forth系统概观
+  Forth是一套建造于一个虚拟硬件上之系统，其中包括有操作系统、语言、除错器等等软件。
+  所以Forth规类为混合操作系统之语言。因此种特性使之特别合适于嵌入式系统中。
 
-2.��ʶForth�������
-  Forth�����Լ���CPU�ܹ������������⣬ӵ�ж����ջ��һ��Ϊ���򷵻ضѣ�һ��Ϊ���ݶ�ջ��
-  ������Forth������������������
+2.认识Forth虚拟机器
+  Forth有其自己的CPU架构，除缓存器外，拥有二组堆栈，一组为程序返回堆，一组为数据堆栈。
+  完整的Forth缓存器有下列六个。
   PSP:Parameter Stack(or data stack) Pointer : EDI
   TOS:Top Of Stack:  EAX
   RSP:Return Stack Pointer:  ESP
   IP :Interpreter Pointer(Program Counter): ESI
   UP :User Pointer
   W  :Working register: ECX
-  ����������������moving forthԭ���ڳ�ΪX����������������A(Addressing)��������
-  �������������������ܡ�
-  PSP,TOS��Ϊ���ݶ�ջ��ػ�������PSPΪ�������ݶ�ջָ֮������
-    ��TOSΪ���ݶ�ջ���˻�����������Ϊ���ݶ�ջ�������󣬵�ֻ��һ�������ڡ�
-    ����������������CPU֮�У��м������ݴ��������á�
-  RSP��Ϊ�������֮���ض�ջָ������
-  IP ��ִ��Forth word��֮��ַ������������ָ���´�ִ����Ϊ�Σ����������ֵ���ء�
-  UP ��ʹ���߹����û�������Ϊ����������û�������ָ��task����������¼��Task�����Ϣ��
-  W  �����������û������������ֵ䶯���������á�
+  另有其它缓存器，moving forth原文内称为X缓存器，亦有人用A(Addressing)缓存器。
+  以下描述各缓存器功能。
+  PSP,TOS：为数据堆栈相关缓存器，PSP为管理数据堆栈之指针器。
+    而TOS为数据堆栈顶端缓存器，主因为数据堆栈动作量大，但只有一个进出口。
+    若将顶端数据留在CPU之中，有加速数据处理的作用。
+  RSP：为程序呼叫之返回堆栈指针器。
+  IP ：执行Forth word用之地址缓存器，用以指向下次执行字为何，其运作和字典相关。
+  UP ：使用者管理用缓存器，为多任务管理用缓存器，指向task作用区。记录其Task相关信息。
+  W  ：辅助工作用缓存器，辅助字典动作或运算用。
 
-3.Forth�ֵ�Wordִ�л���
-�Ըõ��ʶ���˵���� ": SQUARE  DUP * ;"
+3.Forth字典Word执行机制
+以该单词定义说明： ": SQUARE  DUP * ;"
 
-  Forth�ֵ�Wordִ�л��������ַ�ʽ��
+  Forth字典Word执行机制有四种方式：
   Indirect Thread Code(ITC)
   Direct Thread Code(DTC)
   Subroution Thread Code(STC)
   Token Thread Code(TTC)
-  ITC:ΪԭʼForth��ʹ�õ��ֵ䷽�������Ѳ��ã���ΪDTC��ȡ����
-    ������Ϊ���������̵���ڵ�ַ
-    ��ṹ������ԭ������Moving Forth-Figure 1��
+  ITC:为原始Forth所使用的字典方法。现已不用，多为DTC所取代。
+    代码流为：各个过程的入口地址
+    其结构及动作原理参照Moving Forth-Figure 1。
     machine code Address of ENTER, address of DUP , address of *, address of EXIT
    In pseudo-code, this is:
    (IP) -> W  fetch memory pointed by IP into "W" register
@@ -941,45 +941,45 @@ Moving Forth���
    IP+2 -> IP advance IP, just like a program counter
               (assuming 2-byte addresses in the thread)
    (W) ->  X  fetch memory pointed by W into "X" register
-              ...X now holds address of the machine code 
+              ...X now holds address of the machine code
    JP (X)     jump to the address in the X register
 
    DOCOLON or ENTER in various Forths:
    PUSH IP     onto the "return address stack"
-   W+2 -> IP   W still points to the Code Field, so W+2 is 
+   W+2 -> IP   W still points to the Code Field, so W+2 is
                the address of the Body!  (Assuming a 2-byte
                address -- other Forths may be different.)
    JUMP to interpreter ("NEXT")
-  DTC:����Forth���õ��ֵ䷽�����ṹ������ԭ������Moving Forth-Figure 2��
-������ITC��ͬ�����ڵײ�ִ�л�е��֮�ֵ�ṹ��ͬ���߽�����һ����
-    ��ͬ�������̴�����ڴ�Ϊʵ�ʵĻ�����
+  DTC:现在Forth常用的字典方法，结构及动作原理参照Moving Forth-Figure 2。
+　　和ITC不同点在于底层执行机械码之字典结构不同，高阶字则一样。
+    不同处：过程代码入口处为实际的机器码
     CALL/JUMP ENTER, address of DUP , address of *, address of EXIT
    The NEXT pseudo-code for direct threading is simply:
    (IP) -> W   fetch memory pointed by IP into "W" register
    IP+2 -> IP  advance IP (assuming 2-byte addresses)
    JP (W)      jump to the address in the W register
-  STC:������򵥣�������������ֵ䶯����ֱ��ʹ��һ��CPU�ĺ��С�
-���������нϿ��ִ���ٶȣ����Ӵ��������������
-�������Ҹ߽��ּ��ͽ�������ͬ�Ľṹ��������ʵ�ֵ��ֵ䶯����
-����������CPU callָ֮�������IP��������
-�����ṹ������ԭ������Moving Forth-Figure 3��
-  TTC:���ʽ���ֵ䶯��������С��ִ�е����ʺ���ͨ��ʽ�ĳ�����ʹ�á�
-�����Դ��ֵ�ṹ��ִ���ļ���������ɿ���һ��Forth CPU��ִ���롣��Ƚ���Forthԭ��CPUִ���롣
-�����ṹ������ԭ������Moving Forth-Figure 4��
+  STC:动作最简单，最容易理解的字典动作，直接使用一般CPU的呼叫。
+　　可能有较快的执行速度，但加大程序代码的容量。
+　　而且高阶字及低阶字有相同的结构，最容易实现的字典动作。
+　　因利用CPU call之指令，所以无IP缓存器。
+　　结构及动作原理参照Moving Forth-Figure 3。
+  TTC:查表式的字典动作，有最小的执行档，适合在通信式的场合下使用。
+　　以此字典结构的执行文件来看，则可看见一个Forth CPU的执行码。会比较像Forth原生CPU执行码。
+　　结构及动作原理参照Moving Forth-Figure 4。
 
-4.Ŀ��CPU�ܹ���Forth�������������֮ѡ��
-������ʹ�õ�Ŀ��CPU���仺�������ƣ����Ա��뽫����������ѡ��ʹ�û��������ڴ����������
-��������Ҫ����˵UPΪ��͵ģ��������ڴ���ʵ�֡���ʹ�öȽ������������͡�
-�����ΪTOS���˻�����Ϊ�����ã���ʹ�ý��ٶȽ�����
-�������ΪIP�����޷�ʵ�ִ˻����������Խ�Forth�ֵ�������ʽ��ΪSTC����Խ����
-��W��������Ŀ��CPU������Moving Forthԭ�������г�һЩCPU֮�Ƚ���ѡ��ʽ��
-��
-5.������Ҫ����
-��Moving Forth����������ʵ��Forth���ϵ�ע�������DOES>���ʵ�ֵȵȡ�
-������ʹ��Assemble��Metacompilerʵ��Forth����ȱ���������ᡣ
+4.目标CPU架构及Forth虚拟机器缓存器之选择
+　因所使用的目标CPU有其缓存器限制，所以必须将六个缓存器选择使用缓存器或内存或是舍弃。
+　依其重要度来说UP为最低的，可以以内存来实现。因使用度较其它缓存器低。
+　其次为TOS，此缓存器为加速用，不使用仅速度较慢。
+　再其次为IP，若无法实现此缓存器，可以将Forth字典运作方式改为STC则可以解决。
+　W缓存器依目标CPU而定。Moving Forth原文中有列出一些CPU之比较与选择方式。
+　
+5.其它重要内容
+　Moving Forth文中有许多实现Forth字上的注意事项，如DOES>如何实现等等。
+　另外使用Assemble及Metacompiler实现Forth的优缺点亦有所提。
 
-Moving ForthΪʵ��Forth����Ҫ�������£�ʵ������ΪCamel Forth��
-���Բ��ո���Forth֮ʵ�ַ��������˽�Forth�ĺ���������
+Moving Forth为实现Forth的重要入门文章，实现上则为Camel Forth。
+可以参照各家Forth之实现方法，以了解Forth的核心运作。
 
 
  Many systems support a variant of the word SAVE
@@ -1000,286 +1000,286 @@ the word SAVE (whose use is inevitable for
 some kinds of applications) imposes significant
 Restrictions on Functionality.
 
-ϵͳ������ָ��
+系统变量及指令
 
-ϵͳ���� 
-�ڽ������ͱ�����������ʱ����������Ҫ�����ڴ������λ�ã����¼�¼������Ҫ���ڴ���ȡ�����ο�����һ����ص�ϵͳ�����ǣ� 
+系统变量
+在解释器和编译器运作的时候，许多数据要存入内存的特殊位置，留下记录，或者要从内存中取出来参考，这一套相关的系统变量是：
 
-HLD ����ֵת����ASCII�ַ���ʱ��ϵͳ�����ݴ��ַ�����ָ�롣 
-SPAN EXPECTָ�������ܵ��ַ����ĳ��ȡ� 
->IN �����ַ�������һ��������Ҫ����λ�õ�ָ�롣 
-#TIB �������������ַ����ĳ��ȡ� 
-'TIB ����������Ϊ�ն˻��������ֵ��ݴ����� 
-BASE ����������Ϊ��ֵת��ʱ���õĻ����� 
+HLD 将数值转换成ASCII字符串时，系统所用暂存字符串的指针。
+SPAN EXPECT指令所接受到字符串的长度。
+>IN 输入字符串中下一个解释器要处理位置的指针。
+#TIB 解释器所处理字符串的长度。
+'TIB 变量，内容为终端机输入文字的暂存区。
+BASE 变量，内容为数值转换时所用的基数。
 
-CONTEXT ���ֵ�ʱ����Ѱָ�룬����Ҫ��ָ֮���������� 
-CP �ֵ��Ͽհ�����ʼ�ĵ�ַ�� 
-LAST �ֵ������һָ��������� 
-CURRENT: ����ָ��ǰ���¶���ĵ���
+CONTEXT 查字典时的搜寻指针，最先要查之指令名称栏。
+CP 字典上空白区开始的地址。
+LAST 字典上最后一指令的名称栏
+CURRENT: 总是指向当前最新定义的单词
 
-'EVAL ����������Ϊ $INTERPRET�� $COMPILE�ĵ�ַ�����Ծ���ϵͳ���������롣 
-'ABORT ����������ΪQUIT�ĵ�ַ����������ʱҪִ�е�ָ� 
-TEXT ���ֽ�ѹ�󴢴���ݴ����� 
-tmp ���뻺������ 
+'EVAL 变量，内容为 $INTERPRET或 $COMPILE的地址，用以决定系统是译码或编码。
+'ABORT 变量，内容为QUIT的地址，发生错误时要执行的指令。
+TEXT 文字解压后储存的暂存区域。
+tmp 编码缓存器。
 
-//ϵͳ״̬�� 0=ִ��̬�� 1=����̬
+//系统状态： 0=执行态； 1=编译态
 state:Integer;
 
-CFA: Code Field Address ���ʵ�Code Field Address��ʼ��ַ�����������е��ʵ�ʵ��ִ�е�ַ��.
+CFA: Code Field Address 单词的Code Field Address起始地址，里面内容有单词的实际执行地址。.
 
-ϵͳָ�� 
+系统指令
 
-��ָ�� 
-P24�Ļ�����󲿷ֶ���Forth�Ļ���ָ���Ҳ��һЩ�ϸ��ӵ�Forthָ����ü�����������϶��ɡ�����ָ�һ������ӳ���ķ�ʽ�����졣������P24������У�һ��24λ��������������ĸ������룬�������һ��Forthָ�����ֱ�����ĸ�����ٵĻ���������ɣ��ͱ����ӳ���������Ҫ��ʡ����ռ䡣���������ٶ�Ҳ���Լӿ����ࡣ����Forthָ��������������У������Ժ�ķ�ʽ�����֡���ָ��ֱ�ӿɽ�����������������������ӳ����������������ض�ջ�ĸ�����
-�� EXIT ret ; �ӳ��򷵻ء�
-�� EXECUTE push ret �� ִ��Ŀǰ��ջ�ϵĵ�ַ��
-�� ! sta st �� �����ݴ����ڴ��ָ����ַ�С�
-�� @ sta ld �� ���ڴ��ָ����ַ��ȡ�����ݡ�
-�� R> pop �� �����ض�ջ�ϵ���������ѹ���ջ��
-�� R@ pop dup push �� �����ض�ջ�ϵ������ƣ�ѹ���ջ��
-�� >R push�� ����ջ�ϵ���������ѹ�뷵�ض�ջ��
-�� SWAP push sta pop lda �� ������ջ���϶���ֵ��λ�á�
-�� OVER push dupp sta pop lda �� ���ƶ�ջ��֮�ڶ���ֵ��
-�� 2DROP drop drop�� ������������ջ�ϵ�������ֵ���� 
-+ add�� ����������ֵ����Ӻ�Żض�ջ��
-�� NOT com�� ����ջ�ϵ�������෴ֵ��
-�� NEGATE com 1 ldi add �� ����ջ�ϵ�����ɸ�ֵ��
-�� 1- -1 ldi add�� ����ջ�ϵ���ֵ��1��
-�� 1+ 1 ldi add�� ����ջ�ϵ���ֵ�ӣ���
-�� BL 32 ldi �� ���ո���ѹ���ջ��
-�� +! sta ld add st�� ����ֵ�����ڴ��ָ����ַ�С���
-�� - com add 1 ldi add�� ����������ֵ�������Żض�ջ�� 
-��Щ��ָ���OVER����Ҫ5�������룬�����ӳ������Ҫ��ռһ��ռ䣬�ƺ��������ʵ������ǣ���������ڱ����У�ǰ���ǻ����룬������������ָ���������Ļ����룬���Ǽ�����Ч�غϲ���������������룬������������ӳ������ָ��ʱ��Ҫ�Ȱ�δ��ɵ�������NOP������������ʡ�ռ䣬Ҳ�ɼӿ�ִ���ٶȡ� 
-ʹ�ú�ָ�����ϵͳ����ϵø�������٣����ܳ�ַ���P24������Ĺ��ܡ�Ψһ��ȱ���Ǻ�ָ��ֻ����P24��������ڹ�������ʵ�ʲ���ʱ���������ͱ��������޷�ֱ�����ú�ָ�������Ǳ����ڲ���ϵͳ�У��������һ�����ָ�����Ӧ���ӳ���ָ�ר���������ͱ�����ʹ�á���Щ��ǿ����������������ָ�������OK24.F�����С� 
+宏指令
+P24的机器码大部分都是Forth的基本指令。但也有一些较复杂的Forth指令，需用几个机器码组合而成。这种指令，一般可用子程序的方式来建造。但是在P24计算机中，一个24位的字码可以塞入四个机器码，所以如果一个Forth指令可以直接用四个或更少的机器码来完成，就比用子程序来建造要节省记忆空间。并且运算速度也可以加快许多。这种Forth指令在我们组合器中，就是以宏的方式来呈现。宏指令直接可将机器码组合起来，避免了子程序呼叫所需进出返回堆栈的负担。
+： EXIT ret ; 子程序返回。
+： EXECUTE push ret ； 执行目前堆栈上的地址。
+： ! sta st ； 将数据存入内存的指定地址中。
+： @ sta ld ； 从内存的指定地址中取出数据。
+： R> pop ； 将返回堆栈上的数弹出，压入堆栈。
+： R@ pop dup push ； 将返回堆栈上的数复制，压入堆栈。
+： >R push； 将堆栈上的数弹出，压入返回堆栈。
+： SWAP push sta pop lda ； 交换堆栈最上二数值的位置。
+： OVER push dupp sta pop lda ； 复制堆栈上之第二数值。
+： 2DROP drop drop； 弹出并弃除堆栈上的两个数值。：
++ add； 弹出两个数值，相加后放回堆栈。
+： NOT com； 将堆栈上的数变成相反值。
+： NEGATE com 1 ldi add ； 将堆栈上的数变成负值。
+： 1- -1 ldi add； 将堆栈上的数值减1。
+： 1+ 1 ldi add； 将堆栈上的数值加１。
+： BL 32 ldi ； 将空格码压入堆栈。
+： +! sta ld add st； 将数值加入内存的指定地址中。。
+： - com add 1 ldi add； 弹出两个数值，相减后放回堆栈。
+有些宏指令，如OVER，需要5个机器码，比用子程序好像还要多占一点空间，似乎并不很适当。但是，如果它们在编码中，前后都是机器码，或者是其它宏指令所产生的机器码，它们即可有效地合并，连续塞入机器码，而不必像组合子程序呼叫指令时，要先把未完成的字码用NOP补满，因而会节省空间，也可加快执行速度。
+使用宏指令，整个系统会组合得更精简快速，更能充分发挥P24计算机的功能。唯一的缺点是宏指令只能在P24的组合器内工作。在实际操作时，解释器和编译器都无法直接利用宏指令。因此我们必须在操作系统中，另外加上一套与宏指令相对应的子程序指令，专供解释器和编译器使用。这些补强解释器及编译器的指令都定义在OK24.F档案中。
 
-���ָ� 
-������һ��ָ���P24���ӳ���ָ����ڲ��Ĺ��ܶ�����P24��������ϳɵġ�����Ϊ��ҪP24�������ٶ����ټ�ǿ�������ٶȣ������ӳ�������û�������ϵĶ�������˽��������������ռ���KERN24.F�����С���Щָ������ˣ� 
-O< ( n -- f ) ��nС��0����f=-1������f=0 
-OR ( n n -- n ) �� 
-UM+ ( n1 n2 -- sum carry) ���n1��n2�ĺͼ�����λ�š� 
-?DUP ( n -- n n | 0) �� nΪ0����һ�ݡ� 
-ROT ( n1 n2 n3 -- n2 n3 n2 ) ����ջ����������ת�� 
-2DUP ( n1 n2 -- n1 n2 n1 n2 ) ���ƶ�ջ���϶����� 
-DNEGATE ( d -- d ) ����ջ��˫���ı���ֵ���š� 
-ABS ( n -- |n| ) ����ջ����ֵ��Ϊ����ֵ�� 
-= ( n1 n2 -- f ) �� n1=n2��f=-1������f=0�� 
-2! ( d a -- ) ��˫��d����a��ַ�� 
-2@ ( a -- d ) ��a��ַȡ��˫��d�� 
-COUNT ( a -- a+1 n ) ��a��ַȡ��n������a��1�� 
-B> ( b a -- b+1 a ) ����ַb��δѹ����������ȡ��������a�����8λ��a�����������ư�λ������ѹ���ַ�����24λ����Ļ���ָ� 
->B ( a b -- a+1 b+3 cnt) ��a����24λ����������8�ֽڷŵ� b+0��b+1��b+2λ�ã�b��3���Լ�����ѹ��a����ߵ�8λ������ΪCOUNT����������a��ѹ���ַ����ĳ��ȡ� 
+组合指令集
+下面这一组指令都是P24的子程序指令，其内部的功能都是用P24机器码组合成的。我们为了要P24的运算速度能再加强到最快的速度，所有子程序可能用机器码组合的都尽量如此建造起来，并都收集在KERN24.F档案中。这些指令包括了：
+O< ( n -- f ) 若n小于0，则f=-1，否则f=0
+OR ( n n -- n ) 或
+UM+ ( n1 n2 -- sum carry) 算出n1加n2的和及其溢位号。
+?DUP ( n -- n n | 0) 若 n为0则复制一份。
+ROT ( n1 n2 n3 -- n2 n3 n2 ) 将堆栈最上三数旋转。
+2DUP ( n1 n2 -- n1 n2 n1 n2 ) 复制堆栈最上二数。
+DNEGATE ( d -- d ) 将堆栈上双数改变数值符号。
+ABS ( n -- |n| ) 将堆栈上数值变为绝对值。
+= ( n1 n2 -- f ) 若 n1=n2，f=-1；否则f=0。
+2! ( d a -- ) 将双数d存入a地址。
+2@ ( a -- d ) 从a地址取出双数d。
+COUNT ( a -- a+1 n ) 从a地址取出n，并将a加1。
+B> ( b a -- b+1 a ) 将地址b处未压缩数据字码取出，移入a的最低8位，a中数据向左移八位。这是压缩字符串到24位字码的基本指令。
+>B ( a b -- a+1 b+3 cnt) 将a处的24位字码解出三个8字节放到 b+0、b+1、b+2位置，b加3可以继续解压。a中最高的8位，则作为COUNT，它可能是a中压缩字符串的长度。
 
-�ն˻�ָ�� 
-EMIT ( c -- ) ��ASCII��c���������ն˻�����ʾ�� 
-KEY ( -- c ) ��ʹ�������ն˻��ϰ��������������ASCII��c�ŵ���ջ�ϡ� 
-P24���ն˻��ӿ���һ����Ч�ֺܼ򵥵���ơ���ִ��SHRָ��ʱ��T�������е����ݶ�������һλ����ʱT(0) λ���������������ǽ�T(0)����һ��������������������������ֱ�Ӿ�����һ�������λ�ϣ��˼�P24���ն˻�����˿ڡ� 
-��ִ��SHRָ��ʱ�����ǽ��ն˻������λ��״̬����T(24) ������T����������λ��Carry�����˼��ն˻�������˿��ˡ��ն˻���������������ȫ��EMIT��KEY���ٿء�EMIT��KEY��50us��100us����ָ�����ӳٵ�9600 Baud�İ�λ��1λ��ʱ�� 
+终端机指令
+EMIT ( c -- ) 将ASCII码c弹出，到终端机上显示。
+KEY ( -- c ) 等使用者在终端机上按键，并将键入的ASCII码c放到堆栈上。
+P24的终端机接口是一个有效又很简单的设计。在执行SHR指令时，T缓存器中的数据都向右移一位，此时T(0) 位即被挤出。但我们将T(0)送入一个正反器，而这个正反器的输出直接就连到一个输出脚位上，此即P24的终端机输出端口。
+当执行SHR指令时，我们将终端机输入脚位的状态锁入T(24) ，这是T缓存器的溢位【Carry】，此即终端机的输入端口了。终端机的输入和输出，即全由EMIT及KEY来操控。EMIT及KEY用50us及100us两个指令来延迟到9600 Baud的半位及1位的时序。
 
-ϵͳ����ָ�� 
-�Ƚ�ָ� 
-< ( n1 n2 -- f ) ��n1
+系统常用指令
+比较指令：
+< ( n1 n2 -- f ) 若n1
 
-����ָ� 
-UM�~�vn1 n2 -- d�w ����Ȼ��n1����n2����˫���������ǳ˷��Ļ���ָ������˷�ָ��Դ�����������P24�е����˷�������MUL����T����O��n1����S�ڣ�n2����A�ڣ��ظ�ִ��MUL24�Σ�������T-A�еõ�48λ�Ļ��� 
-�����ĳ˳�ָ���ǣ�
-�~ �vn1 n2 -- prod�w �ˡ� 
-M�~ �vn1 n2 -- d�w ˫�ˣ����48λ��˫������ 
-*/ �vn1 n2 n3 -- q�w ���n1*n2/n3��������ά��48λ���� 
-*/MOD�vn1 n2 n3 -- r q�w���n1*n2/n3�����������̡� 
+乘数指令：
+UM﹡﹙n1 n2 -- d﹚ 将自然数n1乘以n2，得双数积。这是乘法的基本指令，其它乘法指令皆从它衍生出。P24有单步乘法机器码MUL。将T清作O，n1放在S内，n2放在A内，重复执行MUL24次，即可在T-A中得到48位的积。
+其它的乘除指令是：
+﹡ ﹙n1 n2 -- prod﹚ 乘。
+M﹡ ﹙n1 n2 -- d﹚ 双乘，算出48位的双数积。
+*/ ﹙n1 n2 n3 -- q﹚ 算出n1*n2/n3（计算中维持48位）。
+*/MOD﹙n1 n2 n3 -- r q﹚算出n1*n2/n3最后的余数及商。
 
-����ָ� 
-HERE �v-- a�w ����������Ϊ�ʵ�߽����ߵ�ַ�� 
-PAD �v-- a�w ����������Ϊ�ַ����ݴ����ĵ�ַ�� 
-TIB �v-- a�w ����������Ϊ�ն˻��ݴ����ĵ�ַ�� 
-@EXECUTE�va --�w ��a��ȡ��ִ��������ַ��Ȼ�������ô�ȥִ�С� 
-CMOVE �va1 a2 n --�w ��a1��n��24λ���뵽a2���� 
-FILL �va n c --�w ��24λ��ֵc����a���n�������� 
->CHAR �vc -- c�w ������ӡ�����ַ�����Ϊ���߷���_�����Ϊ��ֹ��ӡ����ֽ����ӡ�����롣 
+记忆指令：
+HERE ﹙-- a﹚ 变量，内容为词典边界的最高地址。
+PAD ﹙-- a﹚ 变量，内容为字符串暂存区的地址。
+TIB ﹙-- a﹚ 变量，内容为终端机暂存区的地址。
+@EXECUTE﹙a --﹚ 由a中取出执行码栏地址，然后跳到该处去执行。
+CMOVE ﹙a1 a2 n --﹚ 从a1搬n个24位字码到a2区。
+FILL ﹙a n c --﹚ 将24位数值c填入a起的n字码区。
+>CHAR ﹙c -- c﹚ 将不能印出的字符都改为底线符号_，如此为防止打印机在纸张上印出乱码。
 
-ѹ���ַ�������ѹָ� 
-PACK$�vb n a -- a�w ����b��ַ��n���ַ�ѹ����a����ÿ����8λ�ַ�ѹ����һ��24λ�������У����0�� 
-UNPACK$�va b -- b�w ����a��ַ�е�һ��ѹ������ַ�����ѹ��������b���� 
-����7���ַ����ַ�����UNPACK$����δѹ��ʱ����8��24λ֮������ɣ�ѹ�����Ϊ3�����룬�������£� 
-Bit 23 22 21 20 19 18 17 16 15 14 13 12 11 10 09 08 07 06 05 04 03 02 01 00 
-���� 0 0 0 0 0 1 1 1 0 1 0 1 0 1 0 1 0 1 0 0 1 1 1 0 
-7 'U' 'N' 
-���� 0 1 0 1 0 0 0 0 0 1 0 0 0 0 0 1 0 1 0 0 0 0 1 1 
-'P' 'A' 'C' 
-���� 0 1 0 0 1 0 1 1 0 0 1 0 0 1 0 0 0 0 0 0 0 0 0 0 
-'K' '$' 0 
-�ַ���ѹ���󲻵������˼���洢�Ŀռ䣬Ҳ�����ؼ�����Forthϵͳ���ֵ���ٶȡ��ڱȶ��ַ���ʱ����һ�αȽ�3���ַ��� 
+压缩字符串及解压指令：
+PACK$﹙b n a -- a﹚ 将在b地址的n个字符压缩到a区，每三个8位字符压缩到一个24位的字码中，最后补0。
+UNPACK$﹙a b -- b﹚ 将在a地址中的一个压缩后的字符串解压，并放在b区。
+例如7个字符的字符串「UNPACK$」，未压缩时是由8个24位之字码组成，压缩后成为3个字码，内容如下：
+Bit 23 22 21 20 19 18 17 16 15 14 13 12 11 10 09 08 07 06 05 04 03 02 01 00
+字码 0 0 0 0 0 1 1 1 0 1 0 1 0 1 0 1 0 1 0 0 1 1 1 0
+7 'U' 'N'
+字码 0 1 0 1 0 0 0 0 0 1 0 0 0 0 0 1 0 1 0 0 0 0 1 1
+'P' 'A' 'C'
+字码 0 1 0 0 1 0 1 1 0 0 1 0 0 1 0 0 0 0 0 0 0 0 0 0
+'K' '$' 0
+字符串压缩后不但减少了记忆存储的空间，也显著地加速了Forth系统查字典的速度。在比对字符串时，可一次比较3个字符。
 
-��ֵӡ��ָ� 
-p24����ֵ������24λ��ʽ�����ڴ漰�������еģ�ֻ���ڽ�����ӡ��ʱ����Ҫ����ת��ΪASCII�ַ�����ÿ�ַ�8λ��ת��ʱ��BASE��������ֵ��ת���Ļ��������Կ��Ժܷ���ذ���ֵ��ʱת����ʮ���ƣ�ʮ�����ƣ��������������ַ�����ʽӡ���� 
-���ִ�ӡ��ָ��õ������¼����� 
-. �vn--�w ��nת�����ַ�����ʾ���ն˻��ϡ� 
-U. �vu--�w ����Ȼ��u��ʾ���ն˻��ϡ� 
-.R �vn1 n2 -- �w��n1��ʾ��n2�ֶ��У����Ҷ��롣 
-U.R �vu n --�w ����Ȼ��u��ʾ��n�ֶ��У����Ҷ��롣 
-? �va--�w ��a��ַ�е���ֵȡ������ʾ���ն˻��ϡ� 
-HEX �v--�w ��BASE������Ϊ16���Ժ�����ת����ʮ�����ơ� 
-DECIMAL �v--�w ��BASE������Ϊ10���Ժ�����ת����ʮ���ơ� 
-ΪҪ���������ֵ��ӡ�Ĺ��ܣ�eForth��Ҫ��һϵ�е�֧��ָ�ʹ����Ҳ��������������Щָ���Ƴ����ʺ����ⲻͬ����Ӧ�õĴ�ӡָ� 
-str�vn -- b u�w ����ֵnת�����ַ���������b�����ַ���������u�� 
-DIGIT�vu -- c�w ��һλ����ֵuת�������Ӧ��ASCII����c�� 
-EXTRACT�vn1 base -- n2 c�w�Ի���BASEȥ��n1������ת��һλ������c����������n2���Ա������ֵת��֮���� 
-<#�v--�w ׼��ת�����趨PAD�������ַ�������HLDΪָ�롣 
-HOLD�vc --�w ��һλ����cд��HLD��ָ��λ�ã�����HLD��1��׼��������һ���롣 
-# �vu1 -- u2�w ��u1��ת��һλ����д��PAD�У�����u2�� 
-#S�vu --o�w ��uת�����������ַ���д��PAD�У��������0�� 
-SIGN�vn --�w ��nС���㣬���������ַ���ǰ�Ӹ��š� 
-#>�vu1 -- b u2�w ����u1�����������ַ����ĵ�ַb���䳤��u2�� 
+数值印出指令：
+p24的数值都是以24位方式存在内存及缓存器中的，只有在将数字印出时才须要将其转成为ASCII字符串，每字符8位。转换时用BASE里所存数值作转换的基数。所以可以很方便地把数值随时转成以十进制，十六进制，或其它基数的字符串形式印出。
+数字打印的指令常用的有以下几个：
+. ﹙n--﹚ 将n转换成字符串显示在终端机上。
+U. ﹙u--﹚ 将自然数u显示在终端机上。
+.R ﹙n1 n2 -- ﹚将n1显示在n2字段中，靠右对齐。
+U.R ﹙u n --﹚ 将自然数u显示在n字段中，靠右对齐。
+? ﹙a--﹚ 将a地址中的数值取出，显示在终端机上。
+HEX ﹙--﹚ 将BASE基数改为16，以后数字转换即十六进制。
+DECIMAL ﹙--﹚ 将BASE基数改为10，以后数字转换即十进制。
+为要完成以上数值打印的功能，eForth须要有一系列的支持指令。使用者也可以自行利用这些指令，设计出更适合特殊不同场合应用的打印指令。
+str﹙n -- b u﹚ 将数值n转换成字符串储存在b区，字符串长度是u。
+DIGIT﹙u -- c﹚ 将一位数的值u转换成其对应的ASCII数码c。
+EXTRACT﹙n1 base -- n2 c﹚以基数BASE去除n1，余数转成一位的数码c，留下商数n2，以便继续数值转换之程序。
+<#﹙--﹚ 准备转换，设定PAD存所得字符串，以HLD为指针。
+HOLD﹙c --﹚ 将一位数码c写到HLD所指的位置，并将HLD减1，准备接受下一数码。
+# ﹙u1 -- u2﹚ 由u1中转出一位数码写到PAD中，商是u2。
+#S﹙u --o﹚ 将u转出所有数码字符串写到PAD中，最后商是0。
+SIGN﹙n --﹚ 若n小于零，则在数码字符串前加负号。
+#>﹙u1 -- b u2﹚ 丢掉u1，留下数码字符串的地址b及其长度u2。
 
-��ֵ����ָ� 
-���ն˻���������ֶ���ASCII�����ַ�������Ҫת���ɶ�Ӧ��24λ��ֵ���ܷ��ڶ�ջ�����ã����Ǵ����ڴ��С��������ַ���ת������ֵ��ָ����: 
-NUMBER?�v a -- n -1 | a 0 �w ���ڵ�ַa�������ַ���ת���� 24λ����ֵn��-1����š���ת�����ɹ���(�ַ������з�������ķ���)��������ַa������0����š� 
-DIGITS�v c base -- u f �w ��һλ�����ַ�c������BASEתΪ��ֵu�� -1����c�������룬����c������0����š� 
+数值输入指令：
+由终端机输入的数字都是ASCII数码字符串，须要转换成对应的24位数值才能放在堆栈上运用，或是存在内存中。将数码字符串转换成数值的指令是:
+NUMBER?﹙ a -- n -1 | a 0 ﹚ 将在地址a的数码字符串转换成 24位的数值n及-1的旗号。若转换不成功，(字符串中有非数字码的符号)，则保留地址a并留下0的旗号。
+DIGITS﹙ c base -- u f ﹚ 将一位数码字符c按基数BASE转为数值u及 -1，若c不是数码，则保留c并留下0的旗号。
 
-������ӡָ� 
-���˴�ӡ��ֵ�ַ����⣬eForthҲ�ṩһ���൱������ָ���ʹ���ߺܷ�������ն˻�����ʾ�����������ݣ����г��������۵��ļ�������ָ���ǣ� 
-SPACE �v--�w ���һ���ո� 
-SPACES�vn --�w ���n���ո� 
-CR �v--�w ���С� 
-CHARS �vn c --�w���n��ASCII��c����Ӧ���ַ��� 
-TYPE �va u --�w�ӵ�ַaȡu��ASCII���ַ������ 
-Do$ �v-- a�w ��������ڳ����е��ַ�����ѹ����TEXT��������TEXT���ĵ�ַa���϶�ջ�� 
-$"| �v-- a�w �������ڴ�ָ�����ַ�����ѹ���浽a���� 
-."| �v--�w �������ڴ�ָ�����ַ�����ѹ����ӡ���� 
+其它打印指令：
+除了打印数值字符串外，eForth也提供一套相当完整的指令，让使用者很方便地在终端机上显示各样文字数据，排列成整齐美观的文件，这套指令是：
+SPACE ﹙--﹚ 输出一个空格。
+SPACES﹙n --﹚ 输出n个空格。
+CR ﹙--﹚ 换行。
+CHARS ﹙n c --﹚输出n个ASCII码c所对应的字符。
+TYPE ﹙a u --﹚从地址a取u个ASCII码字符输出。
+Do$ ﹙-- a﹚ 将存编码在程序中的字符串解压缩到TEXT区，并将TEXT区的地址a放上堆栈。
+$"| ﹙-- a﹚ 将编码在此指令后的字符串解压，存到a区。
+."| ﹙--﹚ 将编码在此指令后的字符串解压，并印出。
 
-���������ָ�� 
-���ָ� 
-���ָ����eForthϵͳ����������������У��ֽ�������ַ����Ļ��ơ�һ�������������������ַ������Կո��ĳЩ����ӡ���Ŀ����ַ��vASCII��0��31֮��w���ָ�ġ��ַ����ָ�����󣬲Ž�����������Interpreter�������� 
-PARSE �v c -- b u �w �������������vTIB��Text Input Buffer�w��ȡ����һ�����ַ�c���ָ���ַ������ҵ����ַ����󣬽������ڵ�ַb������u���ڶ�ջ�ϡ� 
-(parse) �v b u c -- b u delta �w �ڴ�b��ʼ����Ϊu������������ȡ��һ�����ַ�c���ָ���ַ������ҵ��ַ����󣬽��ַ�������deltaȡ��c�����c����32�v�ո�w���򻹻Ὣb ������ͷ�Ŀո��Թ�����ʱ��b������ʣ����ͷ�ǿո����ַ�����ַ�� 
-TOKEN �v -- a �w ������������ȡ���ÿո�����ָ����һ���ַ������ַ�������a+1���䳤�ȴ���a�� 
-WORD �v c -- a �w���������������ַ�cȡ����һ���ַ������ַ�������a+1���䳤�ȴ���a�� 
+解释器相关指令
+解读指令：
+解读指令是eForth系统由输入的文字序列中，分解出个别字符串的机制。一般文字序列中有许多字符串，以空格或某些不能印出的控制字符﹙ASCII码0到31之间﹚来分割的。字符串分割出来后，才交给解释器【Interpreter】处理。
+PARSE ﹙ c -- b u ﹚ 在文字输入区﹙TIB，Text Input Buffer﹚中取出下一个以字符c来分割的字符串。找到此字符串后，将其所在地址b及长度u留在堆栈上。
+(parse) ﹙ b u c -- b u delta ﹚ 在从b开始长度为u的文字序列中取出一个用字符c所分割的字符串。找到字符串后，将字符串长度delta取代c。如果c码是32﹙空格﹚，则还会将b 区中起头的空格都略过。此时的b，将是剩下起头非空格后的字符串地址。
+TOKEN ﹙ -- a ﹚ 在文字输入区取出用空格字码分割的下一个字符串。字符串存在a+1，其长度存在a。
+WORD ﹙ c -- a ﹚在文字输入区用字符c取出下一个字符串。字符串存在a+1，其长度存在a。
 
-���ֵ�ָ� 
-eForth��ָ����Ǵ����ڴ��У�һ���ض������ֵ������ÿ��ָ���ж�������������������������ִ��������������Ϊһ���볤�ȣ����к�һ����ַ��ָ����һ��ָ������������������ĳ��Ȳ���������ָ������Ƽ��䳤�ȣ���ѹ���ַ�������ʽ���档ִ�������ڣ�����п�ִ�еĻ����뼰������ݡ� 
+查字典指令：
+eForth的指令，都是存在内存中，一个特定叫做字典的区域。每个指令中都有三栏：连接栏、名称栏和执行码栏。连接栏为一字码长度，其中含一个地址，指到上一个指令的名称栏。名称栏的长度不定，存有指令的名称及其长度，以压缩字符串的形式储存。执行码栏内，则存有可执行的机器码及相关数据。
 
-�������е�ָ�����ֵ���Ͷ����ӳ�һ�������б������������д����0����ʾ�б��ľ�ͷ����������������ֵ�������������Ѱ�ҵ�Ҫִ�е�ָ����ֵ�ʱ��������������0����֪���Ѳ鵽���ֵ�ľ�ͷ������û�ҵ���Ҫ��ָ���ʾ���ƴ������δ���塣�����ֵ����ؼ�ָ�����FIND�� 
-FIND �v a va -- xt na | a o �w ָ�������ַ����ڵ�ַa��vaΪ��Ѱ����ָ�꣬������Ϊ�������������ֵ�ָ֮�����������ַ����va��ʼ���ֵ䣬���ҵ���ָ��������������֮�ַ�����ͬ�����¸�ָ��ִ����ĵ�ַxt���������ĵ�ַna���������ֵ����Ҳ���������ԭ�ַ�����ַa������һ��0����ű�ʧ�ܡ� 
+这样所有的指令在字典里就都连接成一长串的列表。若连接栏中存的是0，表示列表的尽头。解释器可在这个字典里，依输入的名称寻找到要执行的指令。查字典时遇到连接栏里是0，就知道已查到了字典的尽头，都还没找到所要的指令，表示名称错误或尚未定义。而查字典的最关键指令就是FIND。
+FIND ﹙ a va -- xt na | a o ﹚ 指令名称字符串在地址a，va为搜寻起点的指标，其内容为最后定义而被纳入字典之指令的名称栏地址。由va开始查字典，若找到的指令其名称与所给之字符串相同，留下该指令执行码的地址xt及名称栏的地址na。若查完字典仍找不到，则保留原字符串地址a，并给一个0的旗号表失败。
 
-NAME? �v a -- xt na | a o �w��ϵͳ����CONTEXT��Ϊ�ֵ���Ѱ����ָ�룬�����п�ȡ���ֵ���������������ַ���������ڵ�ַa�������ַ�����ȣ����Ѳ��ֵ��и�ָ���ִ�����ַxt���������ĵ�ַna�� 
-SAME? �v al a2 u -- a1 a2 f �w�Ƚ���a1������a2����������Ϊu���ַ������������ַ�����ȫ��ͬ����f=0�������κβ��ȵ����룬f��0�� 
-NAME> �v na -- xa �w��ָ�����������ַna�����ִ�������ĵ�ַxa�� 
+NAME? ﹙ a -- xt na | a o ﹚将系统变量CONTEXT作为字典搜寻起点的指针，从其中可取出字典最后定义的名称栏地址，与所给在地址a的名称字符串相比，以搜查字典中该指令的执行码地址xt及名称栏的地址na。
+SAME? ﹙ al a2 u -- a1 a2 f ﹚比较在a1区和在a2区两个长度为u的字符串，若两个字符串完全相同，则f=0，若有任何不等的字码，f≠0。
+NAME> ﹙ na -- xa ﹚由指令的名称栏地址na换算出执行码栏的地址xa。
 
-�����������е�ָ� 
-KEY��EMIT���ն˻���������Ļ���ָ��ɴ˶�ָ������������߽׵��������ָ�֧��eForthϵͳ���˻����档 
-QUERY�v--�w���ն˻���������80���ַ����ַ������������ַ��������ն˻��������vTIB�w�� 
-ACCEPT ( b u1 -- b u2 ) ���ն˻�����u1���ַ����ַ��������������b������ʹ���߽��յ�u1�ַ�ǰ����RET������ʵ�ʽ��ܵ����ַ�����u2�� 
-EXPECT ( b u -- ) ���ն˻�����u���ַ�������b����ʵ�������ܵ��ַ����ĳ��������SPAN�С� 
-^H ( bot eot cur -- bot eot cur ) ִ���˸��������Backspace���Ĺ��ܡ���cur=bot�����������ֲ��䣬��cur>bot����cur��1��ͬʱ�������ASCII����Backspace��Space��Backspace��������ն˻��ϲ�������ַ��� 
-TAP ( bot eot cur - bot eot cur ) ����һ���ַ�c�����������������cur ��1�� 
-KTAP ( bot eot cur - bot eot cur ) ����һ���ַ�c��������䲢����CR��BS��������ASCII���Ʒ��š� 
+输入文字序列的指令：
+KEY和EMIT是终端机输入输出的基本指令。由此二指令衍生出许多高阶的输出输入指令，支持eForth系统的人机界面。
+QUERY﹙--﹚从终端机接受最多达80个字符的字符串，并将此字符串存入终端机输入区﹙TIB﹚。
+ACCEPT ( b u1 -- b u2 ) 从终端机接受u1个字符的字符串，并将其存入b区。若使用者接收到u1字符前按了RET键，所实际接受到的字符数是u2。
+EXPECT ( b u -- ) 从终端机接受u个字符，存至b区，实际所接受到字符串的长度则存于SPAN中。
+^H ( bot eot cur -- bot eot cur ) 执行退格清除键【Backspace】的功能。若cur=bot则三参数保持不变，若cur>bot，则将cur减1，同时输出三个ASCII字码Backspace、Space、Backspace，以清除终端机上才输入的字符。
+TAP ( bot eot cur - bot eot cur ) 接受一个字符c，存入记忆区，并将cur 加1。
+KTAP ( bot eot cur - bot eot cur ) 接受一个字符c，存入记忆并处理CR、BS、及其它ASCII控制符号。
 
-���ָ�� 
-��eForthִ��һ����ָ����ڰ�;�������󣬱���������Ӧ��ֹͣ�����Ķ�������ϵͳ���赽������ִ��״̬���Ⱥ�ʹ���������µ�ָ���ؼ������ָ���ABORT�� 
-ABORT ( -- )ֹͣ����ִ�е�ָ�����QUIT���¿���INTERPRETER�������Ⱥ�������һ�ֵ���ָ� 
-ERROR ( a -- )aָ��Ŀǰ��ִ��ָ��������ַ����������ַ���ӡ�������ӡ�?���ַ����پ���ABORT����QUIT�� 
-abort" ( f -- )��f��0����ӡ�������ڴ�ָ�����ַ���������ABORT����QUIT����f=0����ִ�к�����ָ� 
+侦错指令
+当eForth执行一连串指令，若在半途发生错误，必须立即反应，停止后续的动作，将系统重设到正常的执行状态，等候使用者输入新的指令。最关键的侦错指令即是ABORT。
+ABORT ( -- )停止现在执行的指令，跳到QUIT重新开动INTERPRETER解释器等候输入下一轮的新指令。
+ERROR ( a -- )a指到目前所执行指令的名称字符串，将此字符串印出并附加「?」字符，再经由ABORT跳回QUIT。
+abort" ( f -- )若f≠0，则印出编码在此指令后的字符串，并由ABORT跳回QUIT。若f=0，则执行后续的指令。
 
-������ 
-��������eForth����ϵͳ�ĺ��ġ������ն˻�����ʹ���߼�����������У������е��ַ����ֽ������Ȼ����������Щ�ַ�������Щ�ַ�����ָ����ֵ��в鵽��ȥִ�С���Щ�ַ��������֣���ת������ֵ�ŵ���ջ�ϡ�ȫ������������˴�����ϣ��͵���һ���ٽ����µ���������������������ܶ���ʼ��ֱ���ػ���ִ��ָ������ַ���ʱ���д��������¿����������� 
-QUIT ( -- )���������趨�ն˻�������������·�������������в����������е�ָ� 
-EVAL ( -- )����Ҳ��һ����·�����Ѿ���������������зֽ��ַ�����Ȼ���ַ������� 'EVAL�д��ָ��������������д�����ϣ����� .OKָ��ӡ����OK����������aʱ��'EVAL�д���� $INTERPRET������ʱ���� 'EVAL���� $COMPILE�� 
-.OK ( -- )�ڽ�a����ʱ��ӡ����OK����������ʾһ�����������Ѿ������ꡣ���ڱ������ʱ����ӡ�����������빤���� [ ( -- )�� $INTERPRETָ���ִ��������ַ���� 'EVAL�����У����ϵͳ���ɽ�����������ָ���ַ����� 
-$INTERPRET ( a -- )���ݴ��ڵ�ַa�������ַ������ֵ䣬���ҵ������������ָ���ִ�и�ָ����ֵ���û�д�ָ����ַ���������Ŀ��ת����һ����ֵ�����ڶ�ջ�ϡ����ַ���������Ŀ�֣�����ERROR�����˴�������� 
+解释器
+解释器是eForth操作系统的核心。它由终端机接受使用者键入的文字序列，将其中的字符串分解出来，然后依序处理这些字符串。有些字符串是指令，在字典中查到后即去执行。有些字符串是数字，即转换成数值放到堆栈上。全部文字序列如此处理完毕，就等下一轮再接受新的文字序列来处理，如此周而复始，直到关机。执行指令或处理字符串时若有错误，则重新开动解释器。
+QUIT ( -- )解释器。设定终端机输入区后进入回路，接受文字序列并处理序列中的指令。
+EVAL ( -- )本身也是一个回路，在已经输入的文字序列中分解字符串。然后将字符串交给 'EVAL中存的指令处理。当文字序列处理完毕，则由 .OK指令印出「OK」字样。解碼时，'EVAL中存的是 $INTERPRET。编码时，则 'EVAL中是 $COMPILE。
+.OK ( -- )在解碼操作时，印出「OK」字样，显示一组文字序列已经处理完。若在编码操作时，则不印，并继续编码工作。 [ ( -- )将 $INTERPRET指令的执行码栏地址存入 'EVAL变量中，如此系统即由解释器来处理指令字符串。
+$INTERPRET ( a -- )根据存在地址a的名称字符串查字典，若找到与名称相符的指令，即执行该指令。若字典中没有此指令，则将字符串当作数目字转换成一个数值，留在堆栈上。若字符串不是数目字，则交由ERROR处理此错误情况。
 
-������(COMPILER)���ָ�� 
-������ָ�� 
-eForth�еĽ������ͱ�������һ�������ֵܣ���������ͬ��QUIT���ƣ������ն˻�������������С�����ͬ�Ľ��ָ��PARSE�ֽ��ָ���ַ���������ָ���ַ���ȥ���ֵ䡣��ͬ���ǵ��������ҵ���ָ��ʱ��ȥִ�У����������ҵ�ָ��ʱ������ֱ��ִ�У����ǽ�ָ���ִ��������ַ�������ֵ�߽綥�������ڶ������ָ���С���ָ�����ɺ��ڱ�����ִ��ʱ�������ִ����ͻᱻ����ִ���ˡ� 
-��EVAL�Ļ�·����һ���� 'EVAL @EXECUTE,���� 'EVAL����������ĵ�ַ�г���ִ�С�����������ʱ��'EVAL��������� $INTERPRETָ���ִ��������ַ�����Ǳ������ڹ�����'EVAL�д������ $COMPILE��ִ��������ַ���ı� 'EVAL������ĵ�ַ���ͻ���eForth��������Ĺ�������������Ĺ����� 
+编译器(COMPILER)相关指令
+编译器指令
+eForth中的解释器和编译器是一对孪生兄弟，他们用相同的QUIT机制，接受终端机输入的文字序列。用相同的解读指令PARSE分解出指令字符串，再由指令字符串去查字典。不同的是当解释器找到了指令时即去执行，而编译器找到指令时，不会直接执行，而是将指令的执行码栏地址，编入字典边界顶端所正在定义的新指令中。新指令建造完成后，在被点名执行时，编入的执行码就会被依序执行了。
+在EVAL的回路中有一段是 'EVAL @EXECUTE,即将 'EVAL变量中所存的地址叫出来执行。解释器工作时，'EVAL中所存的是 $INTERPRET指令的执行码栏地址，若是编译器在工作，'EVAL中存的则是 $COMPILE的执行码栏地址。改变 'EVAL中所存的地址，就会让eForth或做编码的工作，或做译码的工作。
 
-$COMPILE ( a -- ) 
-����a���е������ַ������ֵ䡣���ҵ��������ַ��������ָ�������ָ���ִ�����ַ�������ֵ�߽綥�����ڶ������ָ���С���������ָ�������������λ($800000)�����㣬���ָ�������ִ�С�Immediate���࣬����ָ����漴��ִ�ж��������롣���ַ�������һ��ָ�����������ֵת����������ֵ��Literal��ʽ������ָ�������ָ�Ҳ�������֣�������ERROR�������˴�������� 
+$COMPILE ( a -- )
+根据a区中的名称字符串查字典。若找到与名称字符串相符的指令，即将此指令的执行码地址，编入字典边界顶端正在定义的新指令中。但假若此指令名称栏中最高位($800000)不是零，这个指令即属立即执行【Immediate】类，这类指令会随即被执行而不被编码。若字符串不是一个指令，则将它当作数值转换，而将数值以Literal形式编入新指令。若不是指令，也不是数字，则跳到ERROR，处理此错误情况。
 
-LITERAL( n -- ) ������ָ�����ָ���б��� LIT �����룬Ȼ����ű������롣����ָ��ִ�е� LIT ʱ���Ὣ�����������ȡ�����ڶ�ջ�ϡ����� eForth �����в�����ֵ�����������϶�ջ��Ψһ����������������ĵĹ������� $COMPILE ��ɵġ���������Ĺ������������ֵ��Ͻ����µ�ָ������൱���ӵĹ�������Ҫһϵ�������������ĸ���ָ�����Բ����������ı��빤���� 
+LITERAL( n -- ) 是数码指令，在新指令中编入 LIT 机器码，然后接着编入数码。当新指令执行到 LIT 时，会将其后编入的数码取出放在堆栈上。这是 eForth 程序中产生数值，并将它放上堆栈的唯一方法。编译器最核心的工作是由 $COMPILE 完成的。所做编码的工作，即是在字典上建造新的指令。这是相当复杂的工作，须要一系列下述编译器的辅助指令，才能圆满达成完整的编码工作。
 
 LIT ...a.k.a. "literal"; is a Forth word that fetches a cell value from the high-level thread. Several words use such in-line parameters, and this is a good indicator of their performance. It reflects your choice for the IP register.
 
-$,n ( a -- )���ֵ�߽�Ķ��˽���һ����ָ���������������������������ʱ�����ڵ�ַa�������ַ���ѹ���������������С� 
+$,n ( a -- )在字典边界的顶端建造一个新指令的连接栏和名称栏。建名称栏时，将在地址a的名称字符串压缩后塞入名称栏中。
 
-?UNIQNE ( a - a ) �õ�ַa���ַ������ֵ䣬�������Ƿ�������ͬ���Ƶ�ָ����У���ӡ����Redef���ľ���Ѷ�š� 
-$," ( -- )����ָ��Ķ����б���һ���ַ��������ַ������� " �Ž����ġ� 
+?UNIQNE ( a - a ) 用地址a的字符串查字典，看其中是否已有相同名称的指令。若有，则印出「Redef」的警告讯号。
+$," ( -- )在新指令的定义中编入一个字符串，此字符串是以 " 号结束的。
 
-LITERAL ( n -- )����ָ���б���һ������ָ�� LIT��Ȼ���������n�������ڳ���ִ�е���ָ��ʱ��n�ᱻȡ�����ڶ�ջ�ϡ� 
-COMPILE ( -- )�������д�ָ������������ָ��ȡ�����������ڶ������ָ���С� 
-[COMPILE] ( -- )��������ִ��ָ�����Ѱ����һ�ַ���������������ָ��������ַ��CALL��ָ����ʽ�������ֵ�߽綥�����������ָ���С��� ( n -- )�˶���ָ����ǽ���ջ�ϵ�һ����ֵn�����ֵ�߽綥�����ڶ������ָ���С� 
-ALLOT ( n -- )���ֵ�ָ��CP����n�������������ָ������n������Ŀռ䡣 
-' ( -- a )�˵�����ָ�Ѱ����һ�ַ�����������ָ��ҵ�����ִ��������ַ���ڶ�ջ���Ҳ��������������ָ������ʾ�����źš� 
-OVERT ( -- )������ָ��ɹ��󣬽�����ָ��������������ֵ�Ĵ������б��С��Ժ���ֵ䣬�����ڴ˴��������ҵ������ָ�
-�� ( -- )��ʼ����һ����ָ�����һ�ַ�����Ϊ��ָ������ƣ�����һ������������������
-�� ( -- )����һ����ָ��Ķ��塣�ڴ���ָ��Ļ��������׷�ӱ���һ��RET�Ļ����룬����OVERT������ָ������ֵ�Ĵ������� 
-] ( -- )�� $COMPILE��ִ��������ַ���� 'EVAL�С��Ժ��ô˱������������������������е�ָ���ַ����� 
+LITERAL ( n -- )在新指令中编入一个数码指令 LIT，然后编入数码n，将来在程序执行到此指令时，n会被取出放在堆栈上。
+COMPILE ( -- )将程序中此指令后面所编入的指令取出，编入现在定义的新指令中。
+[COMPILE] ( -- )此属立即执行指令。它会寻找下一字符串文字所代表的指令，并将其地址以CALL的指令形式，编入字典边界顶端正定义的新指令中。， ( n -- )此逗点指令，乃是将堆栈上的一个数值n编入字典边界顶端正在定义的新指令中。
+ALLOT ( n -- )将字典指针CP增加n，给正定义的新指令留下n个字码的空间。
+' ( -- a )此单引号指令，寻找下一字符串所代表的指令，找到后将其执行码栏地址留在堆栈。找不到与名称相符的指令，则会显示错误信号。
+OVERT ( -- )编造新指令成功后，将这新指令的名称栏加入字典的串连链列表中。以后查字典，即可在此串连链中找到这个新指令。
+： ( -- )开始定义一个新指令。用下一字符串做为新指令的名称，建造一个连接栏及名称栏。
+； ( -- )结束一个新指令的定义。在此新指令的机器码最后，追加编入一个RET的机器码，并用OVERT把这新指令加入字典的串连链。
+] ( -- )将 $COMPILE的执行码栏地址存入 'EVAL中。以后即让此编译器处理所输入文字序列中的指令字符串。
 
-�ṹ������ָ�� 
-eForth��ָ����ִ�������У����������P24�Ļ����롣���ڸ߽׶����ָ���У��󲿷ݶ����Ի�����CALL�������ӳ�������һ��Գ������Ľṹ���ӳ�����С�List of Subroutine Calls�������ӳ�������Subroutine Threaded�������ֽṹ�����ײ���P24�Ļ����룬���ӳ���ĺ�����һ���ࡣ������һ�������еĳ��򣬿����Ǹ߽׵ı������͵ͽ׵������ͬʱ������������ѻ��Ľ���� 
-eForth���ϸ�Ľṹ�����ԣ�����һ�������Ľṹ������ָ����ǿ�������ָ��Ķ����У�������ֲַ漰��·�ĳ���ṹ��ʹ�ó����д����������Ƚ����ס����ܽ���ĳ���ṹ����صĽṹ��ָ����£�
+结构化编码指令
+eForth的指令中执行码栏中，所编入的是P24的机器码。但在高阶定义的指令中，大部份都是以机器码CALL来呼叫子程序，所以一般皆称这样的结构作子程序表列【List of Subroutine Calls】，或子程序串链【Subroutine Threaded】。这种结构很容易插入P24的机器码，和子程序的呼叫码一起混编。所以在一个定义中的程序，可以是高阶的编译器和低阶的组合器同时作用所产生最佳化的结果。
+eForth是严格的结构化语言，备有一套完整的结构化编码指令。我们可以在新指令的定义中，建造各种分叉及回路的程序结构，使得程序的写作及侦错都比较容易。它能建造的程序结构及相关的结构化指令，如下：
 
-�ֲ�ṹ�� ( f -- ) IF ���� THEN ��f��0��IF��ִ�к�����ָ���f=0�������Ժ�����ָ�����THEN������ִ��THEN�Ժ��ָ� ( f -- ) IF ���� ELSE ���� THEN ��f��0��IF��ִ�к�����ָ�ELSEΪֹ��Ȼ��ִ��THEN�Ժ��ָ���f=0��IF�����Ժ�����ָ�����ELSE��ִ��ELSE�Ժ��ָ�����Ҳ����ִ��THEN�Ժ��ָ���������·�� BEGIN ���� AGAIN ����˻�·���ظ�ִ��BEGIN��AGAIN�м�ȫ����ָ�
+分叉结构： ( f -- ) IF …… THEN 若f≠0，IF即执行后续的指令。若f=0，即忽略后续的指令，跳到THEN，接着执行THEN以后的指令。 ( f -- ) IF …… ELSE …… THEN 若f≠0，IF即执行后续的指令到ELSE为止，然后执行THEN以后的指令。若f=0，IF即忽略后续的指令，跳到ELSE，执行ELSE以后的指令，并且也继续执行THEN以后的指令。无条件回路： BEGIN …… AGAIN 进入此回路后，重复执行BEGIN及AGAIN中间全部的指令。
 
-��������·�� BEGIN ���� ( f -- ) UNTIL ����˻�·��ִ����BEGIN��UNTIL�м�ȫ����ָ�UNTIL������ջ�ϵ���ֵf����f=0��������BEGIN�ظ���·����f��0����������·������ִ��UNTIL���ָ� BEGIN ���� ( f -- ) WHILE ���� REPAT ����˻�·��ִ����BEGIN��WHILE������ָ�WHILE������ջ�ϵ���ֵf����f��0����ִ��WHILE��REPEAT�м��ָ�Ȼ������BEGIN�������˻�·����f=0��WHILE �����Ժ���ָ��������·������ִ��REPEAT�Ժ��ָ�
+有条件回路： BEGIN …… ( f -- ) UNTIL 进入此回路后，执行完BEGIN及UNTIL中间全部的指令，UNTIL会检验堆栈上的数值f。若f=0，则跳到BEGIN重复回路。若f≠0，则跳出回路，继续执行UNTIL后的指令。 BEGIN …… ( f -- ) WHILE …… REPAT 进入此回路后，执行完BEGIN及WHILE中所有指令，WHILE会检验堆栈上的数值f。若f≠0，即执行WHILE到REPEAT中间的指令，然后跳回BEGIN，继续此回路。若f=0，WHILE 即忽略后续指令跳出回路，接着执行REPEAT以后的指令。
 
-���޻�·�� ( n -- ) FOR ���� NEXT FOR����·ָ��n�����ݶ�ջȡ�����ŵ����ض�ջ�ϣ����Ž����·��ִ��FOR��NEXT���ָ�NEXT������·ָ�꣬��ָ����0����������·��ִ��NEXT���ָ���ָ�겻��0���ͽ����1��Ȼ������FOR���ظ�ִ�д˻�·�е�ָ� 
-�ڱ������ָ���У����ǻ����Լ���һЩ�����Ľṹ������ǰ����LITERAL���������ṹ�������ɻ�����LIT���Ϻ�������һ����ֵ�����γɵļ򵥽ṹ���ַ����Ľṹ���Ϊ���ӣ�����һ�������ַ�����ָ���룬���Ӻ�������һ��ѹ���ַ������γɡ� LITERAL ( n -- )����ָ���н���һ������ṹ����LIT�����������ֵ��n��ɡ�ִ��ʱ��LIT����������ȡ�����϶�ջ����" ( -- )����ָ���н���һ���ַ����ṹ��ִ��ʱ�����ַ���ӡ�����ַ����ṹ���ԣ�"| ָ�ʼ������ѹ�����ַ����� $" ( -- a )����ָ���н���һ���ַ����ṹ��ִ��ʱ����ѹ���ַ����⿪������TEXT��������TEXT�ĵ�ַa���϶�ջ�� ABORT" ( f -- )����ָ��Ķ����У�����һ��ӡ���ַ�����ָ��ṹ����ִ�е���ָ��ʱ������ջ�ϵ���ֵf��0����ӡ���ַ���������ABORT������ϵͳ�� 
-
-
-��������ָ��Ľ���ָ�� 
-eForth����õ�ָ������ð�ţ�������ģ���ִ�������ڶ���CALL�����������롣����ָ��ͨ��ð��ָ���Forth�Ļ���������ð��ָ���⣬eForth���ṩ���ֲ�ͬ����Ľ���ָ������������ֲ�ͬ�����ָ� 
-eForth֧�ֵĴ����ð���⣬���г��������������󡢻����뼰�������๹���ȵȡ� 
-
-CODE ( -- )��������붨��ĵͽ�ָ��ڴ�eForthϵͳ�У���ð��ָ����ͬ����ͬ�ĵط�������CODEָ��ִ�к�ϵͳ�������ڽ������У������ǽ���ר�Ž���ð��ָ�����õı������С� 
-
-VARIABLE ( -- ) ����һ������ָ����ʼֵ��Ϊ0��ִ�иñ���ָ��ʱ���Ὣ���ĵ�ַ���϶�ջ���Ա������ȡ��д����ֵ�Ķ����� CONSTANT ( n -- ) ����һ������ָ�ȡ��ջ�ϵ�nΪ��ֵ��ִ�иó���ָ��ʱ���Ὣ��n���϶�ջ�� 
-
-CREATE ( -- )����һ������ָ�ִ�иþ���ָ��ʱ�Ὣ������ʼ�ĵ�ַ���϶�ջ�����ھ�������Ĵ�С��Ҫ��ALLOT���綨�� 
-
-DOES��һ���ر��ָ������������еķ�ʽ����һ���´���Ĺ���ָ��� ���� CREATE ���� DOES ���� ; 
-����ġ����ơ����´��๹��ָ������֡��������ָ��������������������ͬһ�������ָ���Щ��ָ������Ƕ�����ݵı��뷽ʽ����CREATE��DOES���ָ�����涨����Щ��ָ����ִ��ʱ��Ƕ�����ݵĵ�ַ���ȷ��϶�ջ��Ȼ�����ִ����DOES�ͣ�֮���ָ�����֮��CREATE��DOES�м��ָ���������ָ��ı�����������DOES�룻���ָ���������ָ��Ľ������� 
-
-��CREATE ���� DOES�Ľṹ������ʹ�����������������й涨���������µĴ��࣬����ʹ��Forth׫д�������߾��硣���Խ��ܸ��ӵ�רҵ�ⷨ�����ɴ���ָ��õ������Ч�ı�����µ�һЩָ���ǣ� 
-
-.( ( -- )ӡ�������ڵ����֡�����ԭʼ�����ļ��к����ã��ڳ�����ع����У���������ʾָ��ı�����̡� 
-( ( -- )���������ڵ����֣���ԭʼ�����У���Ϊ��ע֮�á� 
-\ ( -- )������TIB����������������С� 
-IMMEDIATE ( -- ) ���¶���ָ����������ڡ��趨��һ��������λ($800000) Ϊ1��ʹ��ָ���Ϊ������ִ�С���ָ������ڱ���ʱ����ָ���ֱ�ӱ�ִ�У����ǲ������롣 
-
-����ָ�� 
-
-����չ����ָ�� 
-eForth�����˽������ͱ�����������һ���������Ĳ���ϵͳ�ˡ���Ҫ��������չӦ�õ������������Ǻܷ���ġ������ټ��ϼ�������ָ������������ϵͳ���Ĺ������������γ���һ������Ч�ĳ���չ���������Ժܿ��ٵ�д���������޸�һЩ���ӵ�Ӧ�ó��� 
-
-DUMP ( a u -- ) ���ڴ��ɵ�ַa��ʼ��u��������ʾ���ն˻��ϡ������ָ����Լ��ȫ���ڴ������е����ݺ�ִ���롣���������װ��Ҳ�����ڼ�������ϣ���Ҳ��������������е��������װ�õ�״̬�� 
-
-.S ( -- )����ջ�����е�������ʾ���ն˻��ϡ�Forth���������ݴ󶼾�����ջ���� .S������ջ�ϵ����ݣ��ܿ����֪������Ľ����Ƿ���ȷ�� SEE ( -- )������ָ��������ַ�������һ��ָ������ȥ���ֵ䣬���������ָ�����ִ�������е����������������ʾ���ն˻��ϡ�����CALL�����룬�Ὣ�����е�ָ������ӡ������SEEָ����������ն����ָ��Ƿ���ȷ������Ԥ�ڷ�ʽ����ɹ��� 
-
-WORDS ( -- ) ���ֵ�������ָ���������ʾ���ն˻��ϡ���鵵���е�ָ��Ƿ񶼳ɹ��ر��������ϵͳ������˽�����ɵĽ��ȡ� 
-
-READ ( -- )���ն˻�ֱ�����ص������ֵ�p24������PAD��ʼ�ļ������������յ�ESC�����ַ�ʱ�ͽ������ء� 
-
-OK ( -- )�����READ���ش���PAD���������С�����ִ����������Ķ������������趨����ִ�в�ͬ��Ӧ��ϵͳ�� 
-
-SEND ( a u -- )���ӵ�ַa��ʼ����Ϊu�����ݣ������ն˻�����p24�ϴ�����������д��档������������ϵͳ���ֵ�Ľṹ���ϴ������ݼ���ֱ������EPROM����Ƕ��ʽϵͳ�� 
-
-FORGET ( -- )���ֵ���Ѱ����һ�ַ������������ָ��ҵ��󽫸�ָ�������ж����ָ����ֵ�Ĵ��������г�����ʱ�ֵ伴�ָ�����ָ��δ������ǰ��״̬���������ֵ��ָ��ڷ�������һ��Ӧ�ó���ʱʮ�����ã������˷�p24�ļ���ռ䡣 
-
-DIAGNOSE (--)��һ��ָ���ִ�е��󲿷ݵĻ����룬���Լ������еĻ������Ƿ񶼱�p24ϵͳ��ȷ��ִ�У������ȷ��CPU�����������ˡ� 
+有限回路： ( n -- ) FOR …… NEXT FOR将回路指针n从数据堆栈取出，放到返回堆栈上，接着进入回路，执行FOR与NEXT间的指令。NEXT会检验回路指标，若指标是0，就跳出回路，执行NEXT后的指令。若指标不是0，就将其减1，然后跳回FOR处重复执行此回路中的指令。
+在编造的新指令中，我们还可以加入一些其它的结构，例如前述用LITERAL建造的数码结构，乃是由机器码LIT加上后面编入的一个数值，所形成的简单结构。字符串的结构则较为复杂，是由一个处理字符串的指令码，附加后面编入的一个压缩字符串所形成。 LITERAL ( n -- )在新指令中建造一个数码结构。由LIT机器码加上数值码n组成。执行时，LIT即将该数码取出放上堆栈。．" ( -- )在新指令中建造一个字符串结构，执行时将此字符串印出。字符串结构是以．"| 指令开始，加上压缩的字符串。 $" ( -- a )在新指令中建造一个字符串结构。执行时将此压缩字符串解开，放在TEXT区。并将TEXT的地址a放上堆栈。 ABORT" ( f -- )在新指令的定义中，建造一个印出字符串的指令结构。在执行到该指令时，若堆栈上的数值f≠0，即印出字符串并跳到ABORT重新起动系统。
 
 
-�����ָ�� 
-������ǰ�������������ƺ������½��У��ѿ��������PC�������������������P24������ϵͳ�������ϵͳ��P24�϶�����֮�����ǵı���������CALL����ʽ�����µ�ָ�Ҫ��ַ���P24������Ĺ��ܣ������ڽ������ͱ�����֮�⣬����Ҫһ����P24���ܵ����������Ϊ�ڱ������ϣ���ԭ�Ѿ����������๹���ṹ�������ָ���������ֻҪ�����ܹ����ĸ�����������һ������Ĺ��ߣ��Ϳ�ӵ��һ��������������ˡ�Ϊ��������£����ǽ�OK24.F��һЩָ����P24ϵͳ�� mask ( -- mask )��Ϊϵͳ������������֮����ѡ������֮һ�������Խ�һ��6λ�Ļ���������Ŀǰ�����24λ�����С� 
+其它词类指令的建造指令
+eForth中最常用的指令是用冒号：来建造的，其执行码栏内都是CALL或其它机器码。这类指令通称冒号指令，是Forth的基础。除了冒号指令外，eForth还提供几种不同词类的建造指令，用来构筑各种不同词类的指令。
+eForth支持的词类除冒号外，尚有常数、变量、矩阵、机器码及其它词类构筑等等。
 
-ALIGN ( -- )׼��������������һ���յ�24λ�����С� 
-,W ( n -- )�����ݶ�ջ�ϵ�n���������ڱ����24λ����� 
-,I ( n -- )��6λ�Ļ�����n�������ڱ����24λ�����У�����������ĸ������룬Ȼ��Ὣ���������һ��24λ�����С� 
-Anew ( -- )��Ŀǰ�����24λ���뻹û��װ�꣬����NOP�Ա㿪ʼ����һ24λ�����롣 
-DoInst ( -- )�������д�ָ�����ԭ����Ļ�����ȡ�����������ڱ����24λ�����С����ָ����������ĺ��ġ� 
-������P24��������õĻ�����ָ�����Сд�����֣���������ͳ��õ�Forthָ��������ˡ���һ�׼���ָ���ǣ� ret ldp ld stp st com shl shr mul xor and div add pop lda dup push sta nop drop 
+CODE ( -- )建造机器码定义的低阶指令。在此eForth系统中，与冒号指令相同。不同的地方，仅在CODE指令执行后，系统还会留在解释器中，而不是进入专门建造冒号指令所用的编译器中。
 
-��ָ�� 
-Ϊ�˽�������ֿ��ٵ�P24ϵͳ����KERNEL�����Ƕ��������ָ���Щָ��ֻ�ڽ���P24ϵͳ��PC�����ã��ڽ��õ�ϵͳ�õ���P24�����룬��û�����ˡ�Ϊ����P24Ҳ��ʹ����Щָ����Ǳ�������һ�׸��������ͱ�����ʹ�á���Щָ���ǣ� EXIT EXECUTE ! @ R> R@ >R SWAP OVER 2DROP + NOT NEGATE 1- 1+ BL +! 
+VARIABLE ( -- ) 建造一个变量指令，其初始值设为0。执行该变量指令时，会将它的地址放上堆栈，以便后续读取或写入数值的动作。 CONSTANT ( n -- ) 建造一个常数指令，取堆栈上的n为其值。执行该常数指令时，会将此n放上堆栈。
 
-����ָ�� 
-eForth����������ָ����COLD������ʱP24�ɵ�ַ0��ʼִ�л����롣��λ�������Ƚ�ϵͳ������ROM������RAM����Ȼ�������COLDָ�COLD������Ҳ�ܼ򵥣���ִ��DIAGNOSEȷ��CPU����������Ȼ��ӡ����P24 V2.02������ʹ����CPU �ѿ�ʼ������Ȼ�����QUIT�Ⱥ�ʹ�������ն˻�������ָ�����֡� 
+CREATE ( -- )建造一个矩阵指令，执行该矩阵指令时会将矩阵起始的地址放上堆栈。至于矩阵区域的大小，要用ALLOT来界定。
+
+DOES是一个特别的指令，被用来以下列的方式建造一个新词类的构筑指令：： 名称 CREATE …… DOES …… ;
+这里的「名称」是新词类构筑指令的名字。这个构筑指令是用来定义许多属此同一词类的新指令。这些新指令所用嵌入数据的编码方式乃用CREATE和DOES间的指令来规定。这些新指令在执行时，嵌入数据的地址会先放上堆栈，然后接着执行在DOES和；之间的指令。换言之，CREATE和DOES中间的指令是这词类指令的编译器，而在DOES与；间的指令是这词类指令的解释器。
+
+用CREATE …… DOES的结构，能让使用者随心所欲地自行规定或创造其它新的词类，这是使用Forth撰写程序的最高境界。可以将很复杂的专业解法，经由词类指令得到最简单有效的表达。余下的一些指令是：
+
+.( ( -- )印出括号内的文字。这在原始程序文件中很有用，在程序加载过程中，可用以显示指令集的编码进程。
+( ( -- )忽视括号内的文字，在原始程序中，作为批注之用。
+\ ( -- )忽视在TIB中已输入的文字序列。
+IMMEDIATE ( -- ) 在新定义指令的名称栏内、设定第一字码的最高位($800000) 为1，使此指令变为「立即执行」的指令。就算在编码时，该指令会直接被执行，而是不被编入。
+
+工具指令
+
+程序发展工具指令
+eForth中有了解释器和编译器，就是一个很完整的操作系统了。但要用它来发展应用的软件，还不是很方便的。我们再加上几个工具指令，帮助做侦错及系统检查的工作。这样就形成了一个很有效的程序发展环境，可以很快速地写作，并且修改一些复杂的应用程序。
+
+DUMP ( a u -- ) 将内存由地址a开始的u个字码显示到终端机上。用这个指令可以检查全部内存中所有的数据和执行码。若输入输出装置也都挂在记忆汇排上，它也可以用来检查所有的输入输出装置的状态。
+
+.S ( -- )将堆栈上所有的数据显示到终端机上。Forth处理的数据大都经过堆栈。用 .S来检查堆栈上的数据，很快可以知道程序的进行是否正确。 SEE ( -- )反编码指令。将其后的字符串当作一个指令名称去查字典，若有相符的指令，将其执行码栏中当初所定义的内容显示在终端机上。遇到CALL机器码，会将所呼叫的指令名称印出。这SEE指令可用来检查刚定义的指令，是否正确地依所预期方式编码成功。
+
+WORDS ( -- ) 将字典中所有指令的名称显示到终端机上。检查档案中的指令集是否都成功地被编码加载系统，或可了解所完成的进度。
+
+READ ( -- )从终端机直接下载档案文字到p24，存在PAD开始的记忆区。当接收到ESC控制字符时就结束下载。
+
+OK ( -- )解读由READ下载存在PAD的文字序列。依序执行译码或编码的动作，建立、设定、或执行不同的应用系统。
+
+SEND ( a u -- )将从地址a开始长度为u的数据，经由终端机，从p24上传到主计算机中储存。若包括了整个系统含字典的结构，上传的数据即可直接烧入EPROM建成嵌入式系统。
+
+FORGET ( -- )在字典搜寻与下一字符串名称相符的指令。找到后将该指令及其后所有定义的指令，从字典的串连链上切除。这时字典即恢复到该指令未被编入前的状态。这个清除字典的指令，在反复试验一段应用程序时十分有用，不需浪费p24的记忆空间。
+
+DIAGNOSE (--)这一个指令会执行到大部份的机器码，用以检验所有的机器码是否都被p24系统正确地执行，因而能确认CPU是正常工作了。
+
+
+组合器指令
+我们在前述，组合器的设计和制造章节中，已看到如何在PC上设计组合器，用来组合P24的整个系统。当这个系统在P24上动起来之后，我们的编译器能用CALL的形式编组新的指令。要充分发挥P24计算机的功能，我们在解释器和编译器之外，还需要一个在P24上跑的组合器。因为在编译器上，我原已经建好了许多构筑结构化程序的指令。所以现在只要加上能够把四个机器码塞入一个字码的工具，就可拥有一个完整的组合器了。为了做这件事，我们将OK24.F中一些指令搬进P24系统： mask ( -- mask )此为系统放置四组面罩之矩阵。选择面罩之一，可用以将一个6位的机器码塞入目前编码的24位字码中。
+
+ALIGN ( -- )准备将机器码编进下一个空的24位字码中。
+,W ( n -- )将数据堆栈上的n，编入正在编码的24位字码里。
+,I ( n -- )将6位的机器码n塞入现在编码的24位字码中，它会依序编四个机器码，然后会将新码编入下一个24位字码中。
+Anew ( -- )若目前编码的24位字码还没有装完，补满NOP以便开始编下一24位的字码。
+DoInst ( -- )将程序中此指令后面原编入的机器码取出，编入现在编码的24位字码中。这个指令是组合器的核心。
+所有在P24的组合器用的机器码指令、都用小写的名字，这样不会和常用的Forth指令相混淆了。这一套集合指令是： ret ldp ld stp st com shl shr mul xor and div add pop lda dup push sta nop drop
+
+宏指令
+为了建造最精简又快速的P24系统，在KERNEL中我们定了许多宏指令，这些指令只在建造P24系统的PC上有用，在建好的系统用的是P24机器码，就没有用了。为了在P24也能使用这些指令，我们必须另建一套给解释器和编译器使用。这些指令是： EXIT EXECUTE ! @ R> R@ >R SWAP OVER 2DROP + NOT NEGATE 1- 1+ BL +!
+
+启动指令
+eForth开机启动的指令是COLD。开机时P24由地址0开始执行机器码。这段机器码会先将系统变量由ROM区抄到RAM区，然后就跳入COLD指令。COLD做的事也很简单，先执行DIAGNOSE确定CPU工作正常，然后印出「P24 V2.02」告诉使用人CPU 已开始工作，然后进入QUIT等候使用人由终端机上输入指令文字。
 
